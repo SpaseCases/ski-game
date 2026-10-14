@@ -7,9 +7,9 @@ const SNOW_SHADE = new Color('#c4d3e6');
 const scratch = new Color();
 
 /**
- * Builds a flat-shaded snow mesh from a heightfield. Triangles don't share
- * vertices, so each face gets its own color from the snow palette.
- * The cell split matches sim/terrain.ts so the surface and the physics agree.
+ * Builds a flat-shaded snow mesh from a heightfield plus its visual detail.
+ * Triangles don't share vertices, so each face gets its own color from the
+ * snow palette.
  */
 export function createTerrainMesh(hf: Heightfield, seed: number): Mesh {
   const cells = (hf.cols - 1) * (hf.rows - 1);
@@ -19,8 +19,9 @@ export function createTerrainMesh(hf: Heightfield, seed: number): Mesh {
   let c = 0;
 
   const vertex = (col: number, row: number): void => {
+    const i = row * hf.cols + col;
     positions[p++] = hf.originX + col * hf.cellSize;
-    positions[p++] = hf.heights[row * hf.cols + col] ?? 0;
+    positions[p++] = (hf.heights[i] ?? 0) + (hf.detail?.[i] ?? 0);
     positions[p++] = hf.originZ + row * hf.cellSize;
   };
   const faceColor = (col: number, row: number, tri: number): void => {

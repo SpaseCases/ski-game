@@ -3,15 +3,16 @@
   "terrain": {
     "type": "generated",
     "width": 80,
-    "length": 360,
+    "length": 400,
     "cellSize": 2,
     "slopeDeg": 17,
-    "flatTop": 20,
-    "runout": 50,
+    "flatTop": 24,
+    "runout": 80,
     "bermWidth": 14,
     "bermHeight": 7,
     "noise": 0.18,
-    "seed": 7
+    "seed": 7,
+    "rollers": { "start": 170, "end": 250, "amplitude": 0.6, "spacing": 20 }
   },
   "features": [
     { "type": "box", "x": 0, "z": -130, "length": 9, "width": 0.6, "height": 0.7, "yaw": 0 }

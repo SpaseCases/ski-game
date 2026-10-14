@@ -1,15 +1,19 @@
 import './style.css';
-import { CONFIG } from './config.ts';
+import { createInputState, DEFAULT_BINDINGS, Keyboard } from './core/input.ts';
 import { startLoop } from './core/loop.ts';
 import { parseMap } from './maps/loader.ts';
 import { generateSlope } from './maps/terrain.ts';
 import testSlope from './maps/test-slope.json';
+import { ChaseCamera } from './render/chaseCamera.ts';
 import { createFeatureMeshes } from './render/features.ts';
 import { createView, type View } from './render/scene.ts';
+import { createSkierPose, interpolateSkier, SkierView } from './render/skierView.ts';
 import { createTerrainMesh } from './render/terrainMesh.ts';
-import { heightAt } from './sim/terrain.ts';
+import { copySkierState, createSkierState, placeSkier, stepSkier } from './sim/skier.ts';
+import type { DevPanel } from './ui/devPanel.ts';
 import { mountWindowButtons } from './ui/embed.ts';
 import { mountFpsMeter } from './ui/fps.ts';
+import { mountControlsHint, mountFocusHint } from './ui/hints.ts';
 
 const app = byId('app');
 const hud = byId('hud');
@@ -31,31 +35,60 @@ scene.add(createTerrainMesh(heightfield, map.terrain.seed));
 scene.add(createFeatureMeshes(map.features, heightfield));
 
 mountWindowButtons(hud);
+mountControlsHint(hud);
+mountFocusHint(hud);
 const fps = mountFpsMeter(hud);
 
-// Milestone 0 has no rider yet: the camera slowly orbits the first feature.
-const first = map.features[0];
-const focusX = first ? first.x : map.spawn.x;
-const focusZ = first ? first.z : map.spawn.z;
-const focusY = heightAt(heightfield, focusX, focusZ) + 1;
+// Simulation state: the current step and the one before it, for interpolation.
+const keyboard = new Keyboard(DEFAULT_BINDINGS);
+keyboard.attach(window);
+const keys = createInputState();
+const skier = createSkierState();
+const skierPrev = createSkierState();
 
-const sim = { time: 0, prevTime: 0 };
+// Render state.
+const pose = createSkierPose();
+const skierView = new SkierView(scene, heightfield);
+const chase = new ChaseCamera(camera, heightfield);
+let snapView = true;
+
+function respawn(): void {
+  placeSkier(skier, map.spawn, heightfield);
+  copySkierState(skierPrev, skier);
+  snapView = true;
+}
+respawn();
+
+let devPanel: DevPanel | null = null;
+if (import.meta.env.DEV) {
+  void import('./ui/devPanel.ts').then(({ mountDevPanel }) => {
+    devPanel = mountDevPanel({ respawn });
+  });
+}
 
 startLoop(
   (dt) => {
-    sim.prevTime = sim.time;
-    sim.time += dt;
+    keyboard.sample(keys);
+    if (keys.respawn.pressed) {
+      respawn();
+      return;
+    }
+    copySkierState(skierPrev, skier);
+    stepSkier(skier, keys, heightfield, dt);
   },
   (alpha, frameTime) => {
-    const t = sim.prevTime + (sim.time - sim.prevTime) * alpha;
-    const angle = t * CONFIG.camera.orbitSpeed;
-    const cx = focusX + Math.sin(angle) * CONFIG.camera.orbitRadius;
-    const cz = focusZ + Math.cos(angle) * CONFIG.camera.orbitRadius;
-    camera.position.set(cx, heightAt(heightfield, cx, cz) + CONFIG.camera.orbitHeight, cz);
-    camera.lookAt(focusX, focusY, focusZ);
+    interpolateSkier(pose, skierPrev, skier, alpha);
+    if (snapView) {
+      skierView.snap(pose);
+      chase.snap(pose);
+      snapView = false;
+    }
+    skierView.update(pose, frameTime);
+    chase.update(pose, frameTime);
 
     renderer.render(scene, camera);
     fps.frame(frameTime);
+    devPanel?.update(pose);
   },
 );
 

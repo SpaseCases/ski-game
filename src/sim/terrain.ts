@@ -1,8 +1,9 @@
 import type { Heightfield } from '../maps/types.ts';
 
-// Terrain sampling. Each grid cell is split into two triangles along the
-// (col, row) -> (col + 1, row + 1) diagonal, the same split the terrain mesh
-// uses, so sampled heights sit exactly on the rendered surface.
+// Physics surface: a smooth Catmull-Rom (bicubic) surface through the
+// heightfield samples, so slope and normal change continuously and the skier
+// doesn't hop at every triangle edge. The rendered triangles pass through the
+// same samples and differ from this surface by a few centimeters at most.
 
 export interface Vec3Like {
   x: number;
@@ -10,62 +11,102 @@ export interface Vec3Like {
   z: number;
 }
 
-interface CellPlane {
-  /** Height at the cell's (col, row) corner. */
-  h00: number;
-  /** Height change per meter along X and Z inside the sampled triangle. */
-  dhdx: number;
-  dhdz: number;
-  /** Offset of the sample point from the (col, row) corner, in meters. */
-  dx: number;
-  dz: number;
+/** Catmull-Rom weights (w) and their derivatives (d) for one axis. */
+interface AxisWeights {
+  w0: number;
+  w1: number;
+  w2: number;
+  w3: number;
+  d0: number;
+  d1: number;
+  d2: number;
+  d3: number;
 }
 
-// Reused scratch result so sampling never allocates.
-const plane: CellPlane = { h00: 0, dhdx: 0, dhdz: 0, dx: 0, dz: 0 };
+// Reused scratch so sampling never allocates.
+const wx: AxisWeights = { w0: 0, w1: 0, w2: 0, w3: 0, d0: 0, d1: 0, d2: 0, d3: 0 };
+const wz: AxisWeights = { w0: 0, w1: 0, w2: 0, w3: 0, d0: 0, d1: 0, d2: 0, d3: 0 };
+const surface = { height: 0, dhdx: 0, dhdz: 0 };
+let rowHeight = 0;
+let rowSlope = 0;
 
-function locate(hf: Heightfield, x: number, z: number): CellPlane {
+function setWeights(t: number, a: AxisWeights): void {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  a.w0 = 0.5 * (-t + 2 * t2 - t3);
+  a.w1 = 0.5 * (2 - 5 * t2 + 3 * t3);
+  a.w2 = 0.5 * (t + 4 * t2 - 3 * t3);
+  a.w3 = 0.5 * (-t2 + t3);
+  a.d0 = 0.5 * (-1 + 4 * t - 3 * t2);
+  a.d1 = 0.5 * (-10 * t + 9 * t2);
+  a.d2 = 0.5 * (1 + 8 * t - 9 * t2);
+  a.d3 = 0.5 * (-2 * t + 3 * t2);
+}
+
+/** Interpolates along one heightfield row; sets rowHeight and rowSlope (per cell). */
+function sampleRow(hf: Heightfield, row: number, c0: number, c1: number, c2: number, c3: number): void {
+  const base = row * hf.cols;
+  const h = hf.heights;
+  const v0 = h[base + c0] ?? 0;
+  const v1 = h[base + c1] ?? 0;
+  const v2 = h[base + c2] ?? 0;
+  const v3 = h[base + c3] ?? 0;
+  rowHeight = wx.w0 * v0 + wx.w1 * v1 + wx.w2 * v2 + wx.w3 * v3;
+  rowSlope = wx.d0 * v0 + wx.d1 * v1 + wx.d2 * v2 + wx.d3 * v3;
+}
+
+function sampleSurface(hf: Heightfield, x: number, z: number): typeof surface {
   const gx = clamp((x - hf.originX) / hf.cellSize, 0, hf.cols - 1);
   const gz = clamp((z - hf.originZ) / hf.cellSize, 0, hf.rows - 1);
   const col = Math.min(Math.floor(gx), hf.cols - 2);
   const row = Math.min(Math.floor(gz), hf.rows - 2);
-  const fx = gx - col;
-  const fz = gz - row;
+  setWeights(gx - col, wx);
+  setWeights(gz - row, wz);
 
-  const i = row * hf.cols + col;
-  const h = hf.heights;
-  const h00 = h[i] ?? 0;
-  const h10 = h[i + 1] ?? 0;
-  const h01 = h[i + hf.cols] ?? 0;
-  const h11 = h[i + hf.cols + 1] ?? 0;
+  const c0 = Math.max(col - 1, 0);
+  const c3 = Math.min(col + 2, hf.cols - 1);
+  const r0 = Math.max(row - 1, 0);
+  const r3 = Math.min(row + 2, hf.rows - 1);
 
-  plane.h00 = h00;
-  if (fx >= fz) {
-    plane.dhdx = (h10 - h00) / hf.cellSize;
-    plane.dhdz = (h11 - h10) / hf.cellSize;
-  } else {
-    plane.dhdx = (h11 - h01) / hf.cellSize;
-    plane.dhdz = (h01 - h00) / hf.cellSize;
-  }
-  plane.dx = fx * hf.cellSize;
-  plane.dz = fz * hf.cellSize;
-  return plane;
+  let height = 0;
+  let dx = 0;
+  let dz = 0;
+  sampleRow(hf, r0, c0, col, col + 1, c3);
+  height += wz.w0 * rowHeight;
+  dx += wz.w0 * rowSlope;
+  dz += wz.d0 * rowHeight;
+  sampleRow(hf, row, c0, col, col + 1, c3);
+  height += wz.w1 * rowHeight;
+  dx += wz.w1 * rowSlope;
+  dz += wz.d1 * rowHeight;
+  sampleRow(hf, row + 1, c0, col, col + 1, c3);
+  height += wz.w2 * rowHeight;
+  dx += wz.w2 * rowSlope;
+  dz += wz.d2 * rowHeight;
+  sampleRow(hf, r3, c0, col, col + 1, c3);
+  height += wz.w3 * rowHeight;
+  dx += wz.w3 * rowSlope;
+  dz += wz.d3 * rowHeight;
+
+  surface.height = height;
+  surface.dhdx = dx / hf.cellSize;
+  surface.dhdz = dz / hf.cellSize;
+  return surface;
 }
 
-/** Terrain height at world (x, z). Points outside the map use the nearest edge. */
+/** Snow height at world (x, z). Points outside the map use the nearest edge. */
 export function heightAt(hf: Heightfield, x: number, z: number): number {
-  const p = locate(hf, x, z);
-  return p.h00 + p.dhdx * p.dx + p.dhdz * p.dz;
+  return sampleSurface(hf, x, z).height;
 }
 
-/** Writes the unit surface normal at world (x, z) into `out` and returns it. */
-export function normalAt<T extends Vec3Like>(hf: Heightfield, x: number, z: number, out: T): T {
-  const p = locate(hf, x, z);
-  const len = Math.hypot(p.dhdx, 1, p.dhdz);
-  out.x = -p.dhdx / len;
+/** Writes the unit snow normal at world (x, z) into `out` and returns the snow height. */
+export function groundAt(hf: Heightfield, x: number, z: number, out: Vec3Like): number {
+  const s = sampleSurface(hf, x, z);
+  const len = Math.hypot(s.dhdx, 1, s.dhdz);
+  out.x = -s.dhdx / len;
   out.y = 1 / len;
-  out.z = -p.dhdz / len;
-  return out;
+  out.z = -s.dhdz / len;
+  return s.height;
 }
 
 function clamp(v: number, lo: number, hi: number): number {

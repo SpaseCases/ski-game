@@ -1,4 +1,4 @@
-import type { Feature, MapDef, TerrainDef } from './types.ts';
+import type { Feature, MapDef, RollersDef, TerrainDef } from './types.ts';
 
 /**
  * Checks raw JSON against the map format and returns a typed MapDef.
@@ -43,7 +43,14 @@ function parseTerrain(raw: unknown): TerrainDef {
     bermHeight: n('bermHeight'),
     noise: n('noise'),
     seed: n('seed'),
+    rollers: t.rollers === undefined ? undefined : parseRollers(t.rollers),
   };
+}
+
+function parseRollers(raw: unknown): RollersDef {
+  const r = obj(raw, 'terrain.rollers');
+  const n = (key: string): number => num(r[key], `terrain.rollers.${key}`);
+  return { start: n('start'), end: n('end'), amplitude: n('amplitude'), spacing: n('spacing') };
 }
 
 function parseFeature(raw: unknown, path: string): Feature {

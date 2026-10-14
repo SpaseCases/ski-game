@@ -22,4 +22,6 @@ Every push to `main` builds the game and deploys `dist/` to GitHub Pages through
 
 ## Status
 
-Milestone 0 (scaffold and deploy): a greybox slope with one box, an orbiting camera, and a frame-rate readout in the bottom-left corner for checking performance on real hardware.
+Milestone 1 (skiing) on a greybox test slope: carving, braking (hockey stop), pole pushing, crouch and pop, airs off rollers, and a chase camera. Keys: ← → turn, hold ↑ to crouch and release to pop, ↓ brake, Shift pole push, R restart. A frame-rate readout sits in the bottom-left corner for checking performance on real hardware.
+
+`npm run dev` also shows a lil-gui panel for live-tuning the physics and camera numbers in `src/config.ts`; "Copy config as JSON" copies the tuned values. The panel is left out of production builds.

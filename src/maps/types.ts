@@ -1,6 +1,17 @@
 // Map data shapes. Maps are plain data: a heightfield plus a list of features.
 // World axes: +Y is up, downhill runs toward -Z, and +X is to the rider's
-// right when facing downhill.
+// right when facing downhill. Headings follow Three.js: 0 faces -Z and
+// positive angles turn left (counter-clockwise seen from above).
+
+/** A run of smooth rollers across the slope. Distances are measured down from the top. */
+export interface RollersDef {
+  start: number;
+  end: number;
+  /** Half the crest-to-trough height. */
+  amplitude: number;
+  /** Distance between crests. */
+  spacing: number;
+}
 
 /** Parameters for a procedurally generated slope. All lengths in meters. */
 export interface GeneratedTerrainDef {
@@ -15,14 +26,15 @@ export interface GeneratedTerrainDef {
   slopeDeg: number;
   /** Flat area at the top before the pitch starts. */
   flatTop: number;
-  /** Gentler area at the bottom. */
+  /** Area at the bottom that flattens out and then rises gently to stop the rider. */
   runout: number;
   /** Raised banks along both sides. */
   bermWidth: number;
   bermHeight: number;
-  /** Random height jitter so flat shading shows facets. */
+  /** Visual-only height jitter so flat shading shows facets. Physics ignores it. */
   noise: number;
   seed: number;
+  rollers?: RollersDef;
 }
 
 export type TerrainDef = GeneratedTerrainDef;
@@ -44,7 +56,7 @@ export type Feature = BoxFeature;
 export interface SpawnDef {
   x: number;
   z: number;
-  /** Heading in degrees; 0 faces downhill (-Z). */
+  /** Heading in degrees; 0 faces downhill (-Z), positive turns left. */
   heading: number;
 }
 
@@ -68,5 +80,8 @@ export interface Heightfield {
   originX: number;
   /** World Z of row 0. */
   originZ: number;
+  /** The snow surface the simulation rides on. */
   heights: Float32Array;
+  /** Optional visual-only offsets added to the rendered mesh, same layout as heights. */
+  detail?: Float32Array;
 }

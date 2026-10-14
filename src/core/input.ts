@@ -1,0 +1,120 @@
+// Keyboard input with rebindable keys. Bindings use KeyboardEvent.code, so
+// they follow key position rather than the layout's printed letter.
+
+export type Action = 'left' | 'right' | 'up' | 'down' | 'pole' | 'respawn';
+
+export const ACTIONS: readonly Action[] = ['left', 'right', 'up', 'down', 'pole', 'respawn'];
+
+export type Bindings = Record<Action, readonly string[]>;
+
+export const DEFAULT_BINDINGS: Bindings = {
+  left: ['ArrowLeft'],
+  right: ['ArrowRight'],
+  up: ['ArrowUp'],
+  down: ['ArrowDown'],
+  pole: ['ShiftLeft', 'ShiftRight'],
+  respawn: ['KeyR'],
+};
+
+export interface ButtonState {
+  held: boolean;
+  /** Went down since the previous simulation step. */
+  pressed: boolean;
+  /** Came up since the previous simulation step. */
+  released: boolean;
+}
+
+export type InputState = Record<Action, ButtonState>;
+
+export function createInputState(): InputState {
+  const state = {} as InputState;
+  for (const action of ACTIONS) state[action] = { held: false, pressed: false, released: false };
+  return state;
+}
+
+/**
+ * Tracks held keys and latches presses and releases until the simulation
+ * reads them, so a quick tap between two steps is never lost.
+ */
+export class Keyboard {
+  private actionsByCode = new Map<string, Action[]>();
+  private heldCodes = new Set<string>();
+  private heldCount = new Map<Action, number>();
+  private pressedLatch = new Set<Action>();
+  private releasedLatch = new Set<Action>();
+
+  constructor(bindings: Bindings) {
+    this.setBindings(bindings);
+  }
+
+  setBindings(bindings: Bindings): void {
+    this.actionsByCode.clear();
+    for (const action of ACTIONS) {
+      for (const code of bindings[action]) {
+        const list = this.actionsByCode.get(code);
+        if (list) list.push(action);
+        else this.actionsByCode.set(code, [action]);
+      }
+    }
+    this.releaseAll();
+  }
+
+  attach(target: Window): void {
+    target.addEventListener('keydown', (e) => this.onKeyDown(e));
+    target.addEventListener('keyup', (e) => this.onKeyUp(e));
+    // Keys released while the window is unfocused never send keyup.
+    target.addEventListener('blur', () => this.releaseAll());
+  }
+
+  /** Copies the current state into `out` and clears the latched edges. */
+  sample(out: InputState): void {
+    for (const action of ACTIONS) {
+      const button = out[action];
+      button.held = (this.heldCount.get(action) ?? 0) > 0;
+      button.pressed = this.pressedLatch.has(action);
+      button.released = this.releasedLatch.has(action);
+    }
+    this.pressedLatch.clear();
+    this.releasedLatch.clear();
+  }
+
+  private onKeyDown(e: KeyboardEvent): void {
+    if (isTypingTarget(e.target)) return;
+    const actions = this.actionsByCode.get(e.code);
+    if (!actions) return;
+    e.preventDefault(); // stop arrows and Tab from scrolling or moving focus
+    if (this.heldCodes.has(e.code)) return; // auto-repeat
+    this.heldCodes.add(e.code);
+    for (const action of actions) {
+      const count = this.heldCount.get(action) ?? 0;
+      if (count === 0) this.pressedLatch.add(action);
+      this.heldCount.set(action, count + 1);
+    }
+  }
+
+  private onKeyUp(e: KeyboardEvent): void {
+    if (!this.heldCodes.delete(e.code)) return;
+    for (const action of this.actionsByCode.get(e.code) ?? []) {
+      const count = (this.heldCount.get(action) ?? 1) - 1;
+      this.heldCount.set(action, count);
+      if (count === 0) this.releasedLatch.add(action);
+    }
+  }
+
+  /** Drops every held key without reporting releases (so losing focus never pops). */
+  private releaseAll(): void {
+    this.heldCodes.clear();
+    this.heldCount.clear();
+    this.pressedLatch.clear();
+    this.releasedLatch.clear();
+  }
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    (target instanceof HTMLElement && target.isContentEditable)
+  );
+}
