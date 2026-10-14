@@ -1,4 +1,4 @@
-# [GAME NAME]: Game Design
+# Park Laps: Game Design
 
 A small, physics-driven 3D freeski game that runs in Chrome on school Chromebooks. The feel is modeled on Shredsauce: momentum, crouch-to-pop, and rotations built from separate spin and flip axes, so corks come from combining them. **There is no scoring in v1.** The point is riding and landing clean.
 

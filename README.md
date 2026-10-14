@@ -1,9 +1,10 @@
-# Ski Game
+# Park Laps
 
 A small, physics-driven, low-poly 3D freeski game that runs in the browser on school Chromebooks. Keyboard only, no accounts, no backend.
 
 - **Play:** https://spasecases.github.io/ski-game/
 - **Embed test:** https://spasecases.github.io/ski-game/embed-test.html (loads the game in an iframe like a Google Sites page)
+- **Skier poses:** https://spasecases.github.io/ski-game/poses.html (the low-poly skier in every pose, side by side; ← → rotates)
 
 `GAME_DESIGN.md` describes what is being built and the milestone order. `CLAUDE.md` holds the technical rules.
 

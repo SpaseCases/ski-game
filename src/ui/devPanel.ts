@@ -46,6 +46,8 @@ export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
   const pop = gui.addFolder('Pole push, crouch and pop');
   pop.add(s, 'polePushSpeed', 0, 6, 0.05);
   pop.add(s, 'poleMaxSpeed', 0, 20, 0.1);
+  pop.add(s, 'polePlantTime', 0, 0.5, 0.01);
+  pop.add(s, 'polePushTime', 0.05, 1.5, 0.01);
   pop.add(s, 'polePushInterval', 0.1, 2, 0.01);
   pop.add(s, 'crouchTime', 0.01, 1, 0.01);
   pop.add(s, 'standTime', 0.01, 1, 0.01);

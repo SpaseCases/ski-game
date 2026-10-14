@@ -34,7 +34,11 @@ export interface SkierState {
   /** Lean into the turn in radians; positive leans to the skier's left. */
   lean: number;
   poleCooldown: number;
-  /** 0..1 progress of the latest pole push; 1 when idle. */
+  /** Seconds since the latest pole push started. */
+  poleTime: number;
+  /** Direction of the latest push along the skis: +1 forward, -1 switch. */
+  poleDir: number;
+  /** 0..1 progress of the latest pole push cycle; 1 when idle. */
   polePhase: number;
 }
 
@@ -53,6 +57,8 @@ export function createSkierState(): SkierState {
     brakeSide: -1,
     lean: 0,
     poleCooldown: 0,
+    poleTime: Infinity,
+    poleDir: 1,
     polePhase: 1,
   };
 }
@@ -71,6 +77,8 @@ export function copySkierState(dst: SkierState, src: SkierState): void {
   dst.brakeSide = src.brakeSide;
   dst.lean = src.lean;
   dst.poleCooldown = src.poleCooldown;
+  dst.poleTime = src.poleTime;
+  dst.poleDir = src.poleDir;
   dst.polePhase = src.polePhase;
 }
 
@@ -93,7 +101,8 @@ const contactNormal = new Vector3();
 export function stepSkier(s: SkierState, input: InputState, hf: Heightfield, dt: number): void {
   const c = CONFIG.skier;
   s.poleCooldown = Math.max(0, s.poleCooldown - dt);
-  s.polePhase = Math.min(1, s.polePhase + dt / c.polePushDuration);
+  s.poleTime += dt;
+  s.polePhase = Math.min(1, s.poleTime / c.polePushInterval);
 
   // Pop: release the crouch on the snow (or just after leaving it).
   if (input.up.released && s.canPop && (s.grounded || s.airTime <= c.popCoyoteTime)) {
@@ -147,14 +156,19 @@ function rideSnow(s: SkierState, input: InputState, dt: number): void {
   const overHold = Math.abs(sidePull) - c.edgeHold * load;
   if (overHold > 0) w += Math.sign(sidePull) * overHold * dt;
 
-  // Pole push: only helps at low speed.
-  if (input.pole.held && s.poleCooldown === 0 && s.brake < 0.5) {
-    const gain = 1 - Math.abs(u) / c.poleMaxSpeed;
-    if (gain > 0) {
-      u += (u < -0.5 ? -1 : 1) * c.polePushSpeed * gain;
-      s.poleCooldown = c.polePushInterval;
-      s.polePhase = 0;
-    }
+  // Pole push: each push is a stroke whose force swells and fades over
+  // polePushTime (after the poles plant), so speed builds rather than jumps.
+  // It only helps below poleMaxSpeed.
+  if (input.pole.held && s.poleCooldown === 0 && s.brake < 0.5 && Math.abs(u) < c.poleMaxSpeed) {
+    s.poleCooldown = c.polePushInterval;
+    s.poleTime = 0;
+    s.poleDir = u < -0.5 ? -1 : 1;
+  }
+  const stroke = (s.poleTime - c.polePlantTime) / c.polePushTime;
+  if (stroke > 0 && stroke < 1) {
+    const gain = Math.max(0, 1 - Math.abs(u) / c.poleMaxSpeed);
+    const envelope = Math.sin(Math.PI * stroke) ** 2; // integrates to 1/2 over the stroke
+    u += s.poleDir * ((2 * c.polePushSpeed) / c.polePushTime) * envelope * gain * dt;
   }
 
   // Carve or skid. Within the grip limit, sideways speed turns into speed

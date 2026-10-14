@@ -10,10 +10,10 @@ export const CONFIG = {
   },
 
   skier: {
-    /** m/s². A little above real gravity so airs feel snappy. */
-    gravity: 11,
+    /** m/s². Above real gravity so the slope pulls hard and airs feel snappy. */
+    gravity: 12,
     /** Kinetic friction coefficient along the skis. */
-    skiFriction: 0.05,
+    skiFriction: 0.035,
     /** Quadratic air drag (per meter) standing up and fully crouched. */
     dragStand: 0.0055,
     dragCrouch: 0.003,
@@ -25,7 +25,7 @@ export const CONFIG = {
      * the snow's push back (normal load). Also caps how fast the skis turn at
      * speed, so a held turn carves instead of skidding out.
      */
-    grip: 2.2,
+    grip: 2.0,
     /** Fraction of the sideways speed turned into a carve that is lost (carving costs a little speed). */
     carveFriction: 0.08,
     /** Slip angle (radians) between skis and travel where carving has faded out and the skis just skid. Full grip below half of it. */
@@ -36,12 +36,12 @@ export const CONFIG = {
     edgeHold: 0.9,
 
     /** Ski turn rate (rad/s) when stopped and at turnSpeedRef or faster. */
-    turnRateSlow: 2.8,
-    turnRateFast: 1.5,
+    turnRateSlow: 2.3,
+    turnRateFast: 1.25,
     /** Speed (m/s) where the turn rate reaches turnRateFast. */
     turnSpeedRef: 20,
     /** How quickly the turn rate reaches its target (rad/s²). */
-    turnResponse: 14,
+    turnResponse: 10,
 
     /** Extra deceleration (m/s²) at full brake. */
     brakeDecel: 7,
@@ -49,19 +49,20 @@ export const CONFIG = {
     brakeRampTime: 0.15,
 
     /** Speed (m/s) one pole push adds from a standstill; it shrinks to zero at poleMaxSpeed. */
-    polePushSpeed: 1.8,
-    poleMaxSpeed: 7,
-    /** Seconds between pushes while Shift is held. */
-    polePushInterval: 0.55,
-    /** Seconds the push animation lasts. */
-    polePushDuration: 0.5,
+    polePushSpeed: 2.4,
+    poleMaxSpeed: 8.5,
+    /** Seconds from the start of a push until the poles bite, then how long the push force lasts. */
+    polePlantTime: 0.1,
+    polePushTime: 0.5,
+    /** Seconds per push cycle while Shift is held (also the length of the push animation). */
+    polePushInterval: 0.8,
 
     /** Seconds to reach full crouch, and to stand back up. */
     crouchTime: 0.22,
     standTime: 0.1,
     /** Pop speed (m/s, along the snow normal) from no crouch and from full crouch. */
-    popMin: 3,
-    popMax: 5.2,
+    popMin: 3.2,
+    popMax: 5.5,
     /** Seconds after leaving the snow that a pop still works (helps time it at a lip). */
     popCoyoteTime: 0.12,
 

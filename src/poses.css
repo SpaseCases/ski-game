@@ -1,0 +1,51 @@
+#cells {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  pointer-events: none;
+}
+
+.cell {
+  position: relative;
+  border-right: 1px solid rgb(20 32 48 / 0.12);
+  border-bottom: 1px solid rgb(20 32 48 / 0.12);
+}
+
+.cell-label {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  right: 10px;
+  color: #142030;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.cell-label strong {
+  display: block;
+  font-size: 15px;
+}
+
+.cell-info {
+  padding: 16px 18px;
+  background: rgb(255 255 255 / 0.55);
+  color: #142030;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.cell-info h1 {
+  margin: 0 0 6px;
+  font-size: 20px;
+}
+
+.cell-info p {
+  margin: 0 0 6px;
+}
+
+.reach-warning {
+  color: #b3261e;
+  font-weight: 600;
+}
