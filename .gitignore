@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+Thumbs.db
+
+# Playwright MCP screenshots and logs from play-testing
+.playwright-mcp/
+
+# Local Claude Code state. The Three.js skills are third-party reference
+# docs with no license, so they stay local and out of the public repo.
+.claude/settings.local.json
+.claude/skills/

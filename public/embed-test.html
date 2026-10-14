@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Embed test</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 16px;
+        background: #eef1f5;
+        color: #1c2733;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 20px;
+      }
+      p {
+        margin: 0 0 12px;
+        max-width: 70ch;
+      }
+      label {
+        display: inline-block;
+        margin-bottom: 12px;
+      }
+      #frame-holder iframe {
+        display: block;
+        width: min(100%, 960px);
+        aspect-ratio: 16 / 9;
+        border: 1px solid #9aa6b4;
+        background: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Embed test</h1>
+    <p>
+      Loads the game in an iframe, the way a Google Sites page embeds it. Embedded, the game
+      should show an <strong>Open in new tab</strong> button. The Fullscreen button should
+      appear only when the iframe is allowed to go fullscreen.
+    </p>
+    <label>
+      Embed mode
+      <select id="mode">
+        <option value="sandboxed">Sandboxed, no fullscreen (close to Google Sites)</option>
+        <option value="plain">Plain iframe with fullscreen allowed</option>
+      </select>
+    </label>
+    <div id="frame-holder"></div>
+
+    <script>
+      const SANDBOX =
+        'allow-scripts allow-same-origin allow-forms allow-popups ' +
+        'allow-popups-to-escape-sandbox allow-modals allow-downloads';
+
+      const select = document.getElementById('mode');
+      const holder = document.getElementById('frame-holder');
+
+      function load(mode) {
+        // Sandbox and permissions only apply on navigation, so build a fresh iframe.
+        const frame = document.createElement('iframe');
+        frame.title = 'Game';
+        if (mode === 'sandboxed') {
+          frame.setAttribute('sandbox', SANDBOX);
+          // This test page is same-origin with the game, which Chrome would let go
+          // fullscreen by default. Google Sites is cross-origin, so deny it explicitly.
+          frame.setAttribute('allow', "fullscreen 'none'");
+        } else {
+          frame.allowFullscreen = true;
+        }
+        frame.src = './';
+        holder.replaceChildren(frame);
+      }
+
+      const params = new URLSearchParams(location.search);
+      if (params.get('mode') === 'plain') select.value = 'plain';
+      select.addEventListener('change', () => {
+        history.replaceState(null, '', '?mode=' + select.value);
+        load(select.value);
+      });
+      load(select.value);
+    </script>
+  </body>
+</html>
