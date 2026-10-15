@@ -49,7 +49,7 @@ export const CONFIG = {
     brakeRampTime: 0.15,
 
     /** Speed (m/s) one pole push adds from a standstill; it shrinks to zero at poleMaxSpeed. */
-    polePushSpeed: 2.4,
+    polePushSpeed: 2.9,
     poleMaxSpeed: 8.5,
     /** Seconds from the start of a push until the poles bite, then how long the push force lasts. */
     polePlantTime: 0.1,
@@ -104,12 +104,16 @@ export const CONFIG = {
   },
 
   landing: {
-    /** Biggest angle (radians) between the body's up and the snow normal that still lands. */
-    tiltMax: 0.6,
+    /** Biggest nose-up or nose-down angle (radians) between the skis and the snow that still lands. */
+    pitchMax: 0.6,
+    /** Biggest roll onto an edge (radians) that still lands; past it the edge catches. */
+    rollMax: 0.9,
     /** Biggest angle (radians) between the skis and the direction of travel (or its reverse) that still lands. */
-    sideMax: 0.8,
+    sideMax: 1,
     /** Below this speed (m/s) along the snow, landing sideways is fine. */
-    sideSpeed: 4,
+    sideSpeed: 6,
+    /** Airs shorter than this (seconds) skip the edge and sideways checks, so a skid over a small bump never catches. */
+    edgeCheckAir: 0.3,
     /** Speed (m/s) into the snow that is too hard to absorb. */
     impactMax: 15,
     /** Speed into the snow (m/s) that gives a full-depth absorb crouch, and how long it lasts (s). */
@@ -189,6 +193,20 @@ export const CONFIG = {
     tuckSpeedFull: 12,
     /** How fast (per second) the skier tilts to match the snow, and eases out of a jump in orientation (takeoff, landing, crash). */
     tiltSmoothing: 10,
+    /**
+     * Turning comes from the knees and hips, not a stiff lean from the boots.
+     * leanBodyShare is the part of the sim's turn lean that tilts the whole
+     * body; the rest drives the knees and hips into the turn while the skis
+     * roll onto their edges by the full lean.
+     */
+    leanBodyShare: 0.5,
+    /** Hips move into the turn (m per radian of knee-and-hip lean); knees point into it this hard. */
+    hipShift: 0.3,
+    kneeDrive: 1.6,
+    /** Hips sink in a turn (m per radian of lean). */
+    turnSink: 0.1,
+    /** Upper body turns to face down the hill in a turn (radians per radian of lean). */
+    turnCounter: 0.25,
     /** Seconds to reach or let go of a grab. */
     grabBlendTime: 0.12,
     /** How far toward a crouch the body sits in the air, and the extra tuck at full rotation speed. */

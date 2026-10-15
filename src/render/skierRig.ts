@@ -436,7 +436,7 @@ function buildPelvis(jacket: Color): BufferGeometry {
 function buildTorso(jacket: Color): BufferGeometry {
   const dark = shade(jacket, 0.78);
   const parts = [
-    paint(prism(0.205, 0.222, 0.5, 12).translate(0, 0.02, 0).scale(1, 1, 0.66), jacket),
+    paint(prism(0.214, 0.222, 0.5, 12).translate(0, 0.02, 0).scale(1, 1, 0.66), jacket),
     // High collar and the hood bunched behind the neck.
     paint(prism(0.112, 0.102, 0.09, 12).translate(0, 0.49, 0.008).scale(1, 1, 0.95), jacket),
     paint(new SphereGeometry(0.13, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1.25, 0.6, 0.85).translate(0, 0.5, 0.115), dark),
@@ -450,11 +450,14 @@ function buildTorso(jacket: Color): BufferGeometry {
   return merge(parts);
 }
 
-/** The long jacket below the waist, built along +Y from the waist down to mid-thigh. */
+/**
+ * The long jacket below the waist, built along +Y from the waist down to
+ * mid-thigh. Wide enough at the hips that the tops of the thighs stay inside.
+ */
 function buildSkirt(jacket: Color): BufferGeometry {
   return merge([
-    paint(prism(0.207, 0.262, 0.36, 12).scale(1, 1, 0.68), jacket),
-    paint(prism(0.264, 0.266, 0.03, 12).translate(0, 0.335, 0).scale(1, 1, 0.68), shade(jacket, 0.78)),
+    paint(prism(0.218, 0.276, 0.36, 12).scale(1, 1, 0.72), jacket),
+    paint(prism(0.278, 0.28, 0.03, 12).translate(0, 0.335, 0).scale(1, 1, 0.72), shade(jacket, 0.78)),
   ]);
 }
 
@@ -600,7 +603,7 @@ function buildThigh(pants: Color, side: number): BufferGeometry {
   // In the segment frame +X points to the skier's left when standing, so the
   // outside of the left leg is +X.
   return merge([
-    paint(prism(0.118, 0.104, t, 12), pants),
+    paint(prism(0.106, 0.104, t, 12), pants),
     paint(new IcosahedronGeometry(0.106, 1).translate(0, t, 0), pants),
     paint(new BoxGeometry(0.03, 0.13, 0.12).translate(-side * 0.11, t * 0.45, 0), shade(pants, 0.85)),
   ]);

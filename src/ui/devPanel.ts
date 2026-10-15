@@ -78,7 +78,9 @@ export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
 
   const L = CONFIG.landing;
   const land = gui.addFolder('Landing');
-  land.add(L, 'tiltMax', 0.05, 1.6, 0.01);
+  land.add(L, 'pitchMax', 0.05, 1.6, 0.01);
+  land.add(L, 'rollMax', 0.05, 1.6, 0.01);
+  land.add(L, 'edgeCheckAir', 0, 1, 0.01);
   land.add(L, 'sideMax', 0.05, 1.6, 0.01);
   land.add(L, 'sideSpeed', 0, 20, 0.5);
   land.add(L, 'impactMax', 1, 40, 0.5);
@@ -137,7 +139,7 @@ export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
       readout.speed = `${Math.round(pose.velocity.length() * 3.6)} km/h`;
       readout.state = skier.bailed ? `crash (${skier.bailReason})` : pose.grounded ? 'riding' : 'air';
       readout.landing =
-        `${skier.bailReason && skier.bailed ? 'BAIL ' : ''}tilt ${Math.round(skier.landTilt * DEG)}° ` +
+        `${skier.bailReason && skier.bailed ? 'BAIL ' : ''}pitch ${Math.round(skier.landPitch * DEG)}° roll ${Math.round(skier.landRoll * DEG)}° ` +
         `side ${Math.round(skier.landSide * DEG)}° ${skier.landImpact.toFixed(1)} m/s`;
     },
   };

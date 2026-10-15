@@ -59,15 +59,20 @@ const TOP = 0.035;
 
 const SNOW_FEET: PoseDef['feet'] = [{ ankle: [-0.13, 0.16, 0.02] }, { ankle: [0.13, 0.16, 0.02] }];
 
+/**
+ * Athletic riding stance: ankles flexed so the shins press forward into the
+ * boots, knees bent over the toes, hips back over the heels, chest forward,
+ * and hands out in front, wider than the body.
+ */
 export const STANCE: PoseDef = {
-  pelvis: [0, 0.9, 0.07],
-  pelvisPitch: 0.15,
-  chestPitch: 0.14,
-  headPitch: -0.22,
+  pelvis: [0, 0.85, 0.1],
+  pelvisPitch: 0.3,
+  chestPitch: 0.12,
+  headPitch: -0.34,
   feet: SNOW_FEET,
   hands: [
-    { at: [-0.34, 0.9, -0.24], pole: [-0.18, -0.8, 0.55] },
-    { at: [0.34, 0.9, -0.24], pole: [0.18, -0.8, 0.55] },
+    { at: [-0.37, 0.92, -0.34], pole: [-0.15, -0.84, 0.52] },
+    { at: [0.37, 0.92, -0.34], pole: [0.15, -0.84, 0.52] },
   ],
 };
 

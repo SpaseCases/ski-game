@@ -22,7 +22,7 @@ import { groundAt, heightAt } from './terrain.ts';
 // crashes: a cheap tumble that rolls and slides to a stop.
 
 /** Why the last landing was a crash ('' if it was clean). */
-export type BailReason = '' | 'tilt' | 'sideways' | 'impact' | 'head';
+export type BailReason = '' | 'pitch' | 'edge' | 'sideways' | 'impact' | 'head';
 
 export interface SkierState {
   /** Feet position on the snow. */
@@ -80,8 +80,13 @@ export interface SkierState {
   /** Seconds since the last landing, and how deep (0..1) its absorb crouch is. */
   landTime: number;
   landDepth: number;
-  /** Last landing check: body tilt and skis-to-travel angle (radians), speed into the snow (m/s). */
-  landTilt: number;
+  /**
+   * Last landing check (radians): body tilted nose up or down against the
+   * snow (pitch), rolled onto an edge (roll), skis against the direction of
+   * travel (side); and the speed into the snow (m/s).
+   */
+  landPitch: number;
+  landRoll: number;
   landSide: number;
   landImpact: number;
   bailed: boolean;
@@ -118,7 +123,8 @@ export function createSkierState(): SkierState {
     grab: -1,
     landTime: Infinity,
     landDepth: 0,
-    landTilt: 0,
+    landPitch: 0,
+    landRoll: 0,
     landSide: 0,
     landImpact: 0,
     bailed: false,
@@ -154,7 +160,8 @@ export function copySkierState(dst: SkierState, src: SkierState): void {
   dst.grab = src.grab;
   dst.landTime = src.landTime;
   dst.landDepth = src.landDepth;
-  dst.landTilt = src.landTilt;
+  dst.landPitch = src.landPitch;
+  dst.landRoll = src.landRoll;
   dst.landSide = src.landSide;
   dst.landImpact = src.landImpact;
   dst.bailed = src.bailed;
@@ -181,6 +188,7 @@ const contactNormal = new Vector3();
 const bodyUp = new Vector3();
 const bodyForward = new Vector3();
 const tangent = new Vector3();
+const skiSide = new Vector3();
 const axis = new Vector3();
 const head = new Vector3();
 const qTilt = new Quaternion();
@@ -450,7 +458,8 @@ function moveInAir(s: SkierState, hf: Heightfield, dt: number): void {
     p.x = s.center.x;
     p.z = s.center.z;
     p.y = groundAt(hf, p.x, p.z, contactNormal);
-    s.landTilt = Math.acos(clamp(bodyUp.dot(contactNormal), -1, 1));
+    s.landPitch = Math.acos(clamp(bodyUp.dot(contactNormal), -1, 1));
+    s.landRoll = 0;
     s.landSide = 0;
     s.landImpact = Math.max(0, -s.velocity.dot(contactNormal));
     crash(s, 'head');
@@ -466,23 +475,41 @@ function land(s: SkierState): void {
 
   const vn = s.velocity.dot(n);
   const impact = Math.max(0, -vn);
-  const tilt = Math.acos(clamp(bodyUp.dot(n), -1, 1));
+  // The skis' direction along the snow, and across it.
+  bodyForward.addScaledVector(n, -bodyForward.dot(n));
+  const skiLen = bodyForward.length();
+  if (skiLen > 1e-3) bodyForward.divideScalar(skiLen);
+  skiSide.crossVectors(n, bodyForward);
+  // Body up against the snow normal: tipped nose up or down, and rolled onto
+  // an edge. Past 90° (upside down) both read as more than 90°.
+  const upN = bodyUp.dot(n);
+  const pitch = skiLen > 1e-3 ? Math.atan2(Math.abs(bodyUp.dot(bodyForward)), upN) : Math.PI / 2;
+  const roll = Math.atan2(Math.abs(bodyUp.dot(skiSide)), upN);
   // Skis against the direction of travel along the snow; switch counts as lined up.
   tangent.copy(s.velocity).addScaledVector(n, -vn);
   const speed = tangent.length();
-  bodyForward.addScaledVector(n, -bodyForward.dot(n));
-  const skiLen = bodyForward.length();
   let side = 0;
   if (speed > L.sideSpeed && skiLen > 1e-3) {
-    side = Math.acos(clamp(Math.abs(bodyForward.dot(tangent)) / (skiLen * speed), 0, 1));
+    side = Math.acos(clamp(Math.abs(bodyForward.dot(tangent)) / speed, 0, 1));
   }
-  s.landTilt = tilt;
+  s.landPitch = pitch;
+  s.landRoll = roll;
   s.landSide = side;
   s.landImpact = impact;
 
+  // Short hops (skidding over a bump) never catch an edge or land sideways.
+  const edgeChecks = s.airTime >= L.edgeCheckAir;
   s.normal.copy(n);
   const reason: BailReason =
-    tilt > L.tiltMax ? 'tilt' : side > L.sideMax ? 'sideways' : impact > L.impactMax ? 'impact' : '';
+    pitch > L.pitchMax || upN <= 0
+      ? 'pitch'
+      : edgeChecks && roll > L.rollMax
+        ? 'edge'
+        : edgeChecks && side > L.sideMax
+          ? 'sideways'
+          : impact > L.impactMax
+            ? 'impact'
+            : '';
   if (reason !== '') {
     crash(s, reason);
     return;

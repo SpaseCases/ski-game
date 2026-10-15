@@ -123,7 +123,6 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - Respawn goes to the map spawn until checkpoints arrive (milestone 4).
 - Crashing into an obstacle isn't a bail trigger yet; there are no solid obstacles until rails, boxes and trees.
 - The test slope's large jump overshoots its landing with a full pop above ~15 m/s takeoff speed (impact crash), and a 720 needs a little more air or spin rate than it gives. The real maps (milestone 5) get properly sized jumps.
-- Visual-only facet jitter means skis can sit up to ~3 cm into or above the drawn snow.
 - In the japan grab the ski hangs low, its tip near the other ski's level.
 - Braking during a pole plant leaves a hand ~3 cm short of its target (not visible).
 
@@ -140,5 +139,8 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - Pole push is now a stroke: `polePushSpeed` 1.8 → 2.4, `poleMaxSpeed` 7 → 8.5, `polePushInterval` 0.55 → 0.8, new `polePlantTime` 0.1 and `polePushTime` 0.5.
 - `skier.popMin` 3 → 3.2, `popMax` 5.2 → 5.5 (keeps pop heights at the higher gravity).
 - `light.sunFrom` moved behind and above the skier so the chase camera sees it lit.
-- `landing.sideMax` 1.0 → 0.8 rad (a spin held all the way down still landed 52° sideways).
+- Landing made more forgiving on edges: the tilt check is split into `landing.pitchMax` 0.6 (nose up/down) and `rollMax` 0.9 (on an edge); `sideMax` 1.0 rad, `sideSpeed` 4 → 6; airs under `edgeCheckAir` 0.3 s skip the edge and sideways checks.
+- `skier.polePushSpeed` 2.4 → 2.9 (stronger pole push).
+- Athletic stance (lower hips, knees over toes, chest forward, hands out front). Turns come from the knees: `render.leanBodyShare` 0.5 of the lean tilts the body, the rest drives the hips (`hipShift`) and knees (`kneeDrive`) into the turn while the skis roll fully onto their edges; the upper body turns slightly downhill (`turnCounter`).
+- The skis rest on the drawn snow facets (the sim rides a smooth surface a few cm off), and the side banks have half the facet jitter they had.
 - New look and camera values: `render.tuckSpeedMin` 7 / `tuckSpeedFull` 12, `brakeCounter` 0.4, `brakeLean` 0.3, `brakeSink` 0.35; `camera.orbit*` for the drag orbit.

@@ -15,6 +15,7 @@ import { groundAt } from '../sim/terrain.ts';
 import { addPoseDelta, createPoseBuffer, setPose, type PoseBuffer } from './poseBlend.ts';
 import { CROUCH, GRABS, STANCE, TUCK, TUMBLE, TUMBLE_CENTER } from './skierPoses.ts';
 import { SkierRig } from './skierRig.ts';
+import { drawnHeightAt } from './terrainMesh.ts';
 
 /** Skier state blended between the last two simulation steps, for drawing. */
 export interface SkierPose {
@@ -107,8 +108,6 @@ export class SkierView {
   private readonly pose: PoseBuffer = createPoseBuffer();
   private readonly shadow: Mesh;
   private readonly shadowMaterial: MeshBasicMaterial;
-  /** Smoothed snow normal the body is tilted to while riding. */
-  private readonly tiltUp = new Vector3(0, 1, 0);
   private readonly tilt = new Quaternion();
   private readonly turn = new Quaternion();
   private readonly target = new Quaternion();
@@ -157,7 +156,6 @@ export class SkierView {
 
   /** Drops all smoothing and blending and shows the pose as it is (start and respawn). */
   snap(pose: SkierPose): void {
-    this.tiltUp.copy(pose.normal);
     this.offset.identity();
     this.mode = pose.bailed ? 2 : pose.grounded ? 0 : 1;
     this.airWeight = pose.grounded ? 0 : 1;
@@ -169,13 +167,12 @@ export class SkierView {
     const r = CONFIG.render;
     const ease = 1 - Math.exp(-r.tiltSmoothing * frameTime);
 
-    // Orientation: on the snow, tilted to the (smoothed) slope and turned to
-    // the heading; in the air and in a crash, straight from the sim.
+    // Orientation: on the snow, tilted to the slope (the sim's normal is
+    // already smooth, so the skis follow it with no lag) and turned to the
+    // heading; in the air and in a crash, straight from the sim.
     const mode = state.bailed ? 2 : state.grounded ? 0 : 1;
-    if (mode === 0 && this.mode !== 0) this.tiltUp.copy(state.normal);
     if (mode === 0) {
-      this.tiltUp.lerp(state.normal, ease).normalize();
-      this.tilt.setFromUnitVectors(UP, this.tiltUp);
+      this.tilt.setFromUnitVectors(UP, state.normal);
       this.turn.setFromAxisAngle(UP, state.yaw);
       this.target.multiplyQuaternions(this.tilt, this.turn);
     } else {
@@ -208,10 +205,15 @@ export class SkierView {
     this.root.position.lerpVectors(state.position, state.center, bw);
     this.rig.root.position.set(-TUMBLE_CENTER[0] * bw, -TUMBLE_CENTER[1] * bw, -TUMBLE_CENTER[2] * bw);
 
-    // Hockey stop: the skis swing sideways and the skier leans away from the skid.
+    // Hockey stop: the skis swing sideways and the skier leans away from the
+    // skid. Only part of a lean tilts the whole body; the rest comes from the
+    // knees and hips (see angulate).
     const swing = state.brake * r.brakeTwist * state.brakeSide * live;
+    const leanTotal = (state.lean + state.brake * r.brakeLean * state.brakeSide) * live;
+    const onSnow = (1 - this.airWeight) * live;
+    const bodyLean = leanTotal * (1 - (1 - r.leanBodyShare) * onSnow);
     this.swing.rotation.y = swing;
-    this.lean.rotation.z = (state.lean + state.brake * r.brakeLean * state.brakeSide) * live;
+    this.lean.rotation.z = bodyLean;
 
     // Body on the snow: stance, sinking into a crouch while ↑ is held, which
     // becomes a speed tuck when going fast. Braking sinks a little, and a
@@ -235,22 +237,109 @@ export class SkierView {
       if (w > 0) addPoseDelta(p, STANCE, GRABS[i]!, w);
     }
     addPoseDelta(p, STANCE, TUMBLE, bw);
-    // The upper body turns back against the swing to keep facing down the hill.
-    p.pelvisYaw -= swing * r.brakeCounter * 0.5;
-    p.chestYaw -= swing * r.brakeCounter * 0.5;
     if (!state.bailed) poleStroke(p, state.polePhase);
+    // The upper body turns back against the hockey-stop swing to keep facing
+    // down the hill, and a little against each turn.
+    const counter = -swing * r.brakeCounter - leanTotal * r.turnCounter * onSnow;
+    angulate(p, bodyLean, leanTotal - bodyLean, counter, onSnow);
     this.rig.apply(p);
+    this.sitOnDrawnSnow(onSnow);
 
-    // Shadow sits on the snow under the body and fades as it rises.
+    // Shadow sits on the drawn snow under the body and fades as it rises.
     const pos = state.center;
     const ground = groundAt(this.hf, pos.x, pos.z, this.groundNormal);
     const height = Math.max(0, pos.y - ground - (state.bailed ? CONFIG.bail.centerHeight : CONFIG.air.comHeight));
-    this.shadow.position.set(pos.x, ground, pos.z).addScaledVector(this.groundNormal, 0.06);
+    const drawn = drawnHeightAt(this.hf, pos.x, pos.z);
+    this.shadow.position.set(pos.x, drawn, pos.z).addScaledVector(this.groundNormal, 0.06);
     this.shadow.quaternion.setFromUnitVectors(UP, this.groundNormal);
     const fade = Math.max(0.15, 1 - height / 6);
     this.shadow.scale.setScalar(0.75 + 0.25 * fade);
     this.shadowMaterial.opacity = SHADOW_OPACITY * fade;
   }
+
+  /**
+   * The sim rides a smooth surface, but the snow is drawn as flat facets
+   * with some jitter, a few centimeters off (more on the side banks). On the
+   * snow, move the skier up or down so the skis rest on the drawn facets:
+   * the lowest point of each ski touches, none sinks in.
+   */
+  private sitOnDrawnSnow(weight: number): void {
+    if (weight <= 0) return;
+    this.root.updateMatrix();
+    let lift = -Infinity;
+    for (let i = 0; i < SKI_POINTS.length; i++) {
+      const pt = SKI_POINTS[i]!;
+      skiPoint.set(pt[0], 0, pt[1]).applyQuaternion(this.swing.quaternion).applyMatrix4(this.root.matrix);
+      lift = Math.max(lift, drawnHeightAt(this.hf, skiPoint.x, skiPoint.z) - skiPoint.y);
+    }
+    this.root.position.y += lift * weight;
+  }
+}
+
+/** Points along the bottom of each ski (skier space x, z): tail, middle and tip where they touch the snow. */
+const SKI_POINTS: readonly (readonly [number, number])[] = [
+  [-0.13, 0.7],
+  [-0.13, 0],
+  [-0.13, -0.7],
+  [0.13, 0.7],
+  [0.13, 0],
+  [0.13, -0.7],
+];
+const skiPoint = new Vector3();
+
+/**
+ * Turns from the knees and hips. The rig sits in the lean group, already
+ * tilted by bodyLean; legLean is the rest of the turn's lean. Here:
+ * - the feet stay on the snow even though the group is tilted,
+ * - the skis roll onto their edges by the full lean,
+ * - the hips move into the turn and sink, the knees point into it,
+ * - the upper body turns by `counter` to face down the hill,
+ * and the hands travel with the upper body. `weight` fades it all out in
+ * the air and in a crash.
+ */
+function angulate(p: PoseBuffer, bodyLean: number, legLean: number, counter: number, weight: number): void {
+  const r = CONFIG.render;
+  if (weight > 0) {
+    const tilt = Math.tan(bodyLean);
+    for (let i = 0; i < 2; i++) {
+      const f = p.feet[i === 0 ? 0 : 1];
+      // Keep the ski on the snow plane outside the tilted group.
+      f.ankle[1] -= f.ankle[0] * tilt * weight;
+      f.roll += legLean * weight;
+      f.knee[0] -= legLean * r.kneeDrive * weight;
+    }
+    // Inside of a left turn (lean > 0) is the skier's left, -X.
+    const shiftX = -legLean * r.hipShift * weight;
+    const drop = (Math.abs(0.13 * tilt) + Math.abs(bodyLean + legLean) * r.turnSink) * weight;
+    p.pelvis[0] += shiftX;
+    p.pelvis[1] -= drop;
+    for (let i = 0; i < 2; i++) {
+      const h = p.hands[i === 0 ? 0 : 1];
+      if (h.grab !== undefined && h.weight > 0) continue;
+      h.at[0] += shiftX;
+      h.at[1] -= drop;
+    }
+  }
+  if (counter === 0) return;
+  // Turn the upper body, and the hands with it, about the hips.
+  p.pelvisYaw += counter * 0.4;
+  p.chestYaw += counter * 0.6;
+  const c = Math.cos(counter);
+  const s = Math.sin(counter);
+  for (let i = 0; i < 2; i++) {
+    const h = p.hands[i === 0 ? 0 : 1];
+    turnY(h.at, c, s, p.pelvis[0], p.pelvis[2]);
+    turnY(h.pole, c, s, 0, 0);
+    turnY(h.elbow, c, s, 0, 0);
+  }
+}
+
+/** Rotates a point or direction about the vertical axis through (cx, cz). */
+function turnY(v: [number, number, number], c: number, s: number, cx: number, cz: number): void {
+  const x = v[0] - cx;
+  const z = v[2] - cz;
+  v[0] = cx + x * c + z * s;
+  v[2] = cz - x * s + z * c;
 }
 
 /**

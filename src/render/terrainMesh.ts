@@ -1,4 +1,5 @@
 import { BufferAttribute, BufferGeometry, Color, Mesh, MeshLambertMaterial } from 'three';
+import { sampleJump, type JumpSample } from '../maps/jumps.ts';
 import { hash2 } from '../maps/terrain.ts';
 import type { Heightfield } from '../maps/types.ts';
 
@@ -85,4 +86,18 @@ export function renderedHeightAt(hf: Heightfield, x: number, z: number): number 
   }
   const h01 = h(col, row + 1);
   return h00 + fz * (h01 - h00) + fx * (h11 - h01);
+}
+
+const jumpSample: JumpSample = { height: 0, dhdx: 0, dhdz: 0, along: 0 };
+
+/** Height of everything drawn as snow at world (x, z): the terrain facets plus any jumps on them. */
+export function drawnHeightAt(hf: Heightfield, x: number, z: number): number {
+  let h = renderedHeightAt(hf, x, z);
+  const jumps = hf.jumps;
+  if (jumps) {
+    for (let i = 0; i < jumps.length; i++) {
+      if (sampleJump(jumps[i]!, x, z, jumpSample)) h += jumpSample.height;
+    }
+  }
+  return h;
 }

@@ -38,7 +38,7 @@ export function generateSlope(def: GeneratedTerrainDef): Heightfield {
       const berm = smoothstep(halfWidth - def.bermWidth, halfWidth, Math.abs(x));
       const i = row * cols + col;
       heights[i] = base + roll * (1 - berm) + berm * berm * def.bermHeight;
-      detail[i] = hash2(col, row, def.seed) * def.noise * (0.15 + 2 * berm);
+      detail[i] = hash2(col, row, def.seed) * def.noise * (0.15 + berm);
     }
   }
 
