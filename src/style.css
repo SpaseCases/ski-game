@@ -135,6 +135,8 @@ body {
 
 .toast[hidden],
 .finish-panel[hidden],
+.finish-detail[hidden],
+.race-hud[hidden],
 .hold-top[hidden] {
   display: none;
 }
@@ -206,4 +208,36 @@ body {
   background: #fff;
   transform: scaleX(0);
   transform-origin: left;
+}
+
+.finish-detail {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.race-hud {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 16px 8px;
+  border-radius: 8px;
+  background: rgb(20 32 48 / 0.72);
+  color: #fff;
+  text-align: center;
+}
+
+.race-time {
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.race-missed {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.85;
 }

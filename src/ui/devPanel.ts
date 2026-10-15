@@ -2,6 +2,8 @@
 // import.meta.env.DEV, so neither this file nor lil-gui reaches production.
 import GUI from 'lil-gui';
 import { CONFIG } from '../config.ts';
+import { QUALITIES, type Quality } from '../core/settings.ts';
+import type { MapDef } from '../maps/types.ts';
 import type { SkierPose } from '../render/skierView.ts';
 import type { SkierState } from '../sim/skier.ts';
 
@@ -9,9 +11,76 @@ export interface DevPanel {
   update(pose: SkierPose, skier: SkierState): void;
 }
 
+export interface DevActions {
+  respawn: () => void;
+  backToTop: () => void;
+  /** Puts the skier at (x, z) facing `heading` (radians), moving at `speed` m/s. */
+  teleport: (x: number, z: number, heading: number, speed: number) => void;
+  setQuality: (q: Quality) => void;
+  quality: Quality;
+  map: MapDef;
+}
+
 const DEG = 180 / Math.PI;
 
-export function mountDevPanel(actions: { respawn: () => void; backToTop: () => void }): DevPanel {
+/** A place to test from: x, z, and heading in radians. */
+export interface TestSpot {
+  x: number;
+  z: number;
+  heading: number;
+}
+
+/**
+ * Places to try each feature from: every start gate, a run-up before each
+ * jump, kicker, landing, rail and box, the halfpipe's drop-in deck, and the
+ * slalom's first gate.
+ */
+export function testSpots(map: MapDef): Record<string, TestSpot> {
+  const spots: Record<string, TestSpot> = { spawn: { x: map.spawn.x, z: map.spawn.z, heading: map.spawn.heading / DEG } };
+  const count: Record<string, number> = {};
+  const name = (kind: string): string => {
+    count[kind] = (count[kind] ?? 0) + 1;
+    return `${kind} ${count[kind]}`;
+  };
+  /** `back` meters before (x, z), facing heading (degrees). */
+  const before = (x: number, z: number, heading: number, back: number): TestSpot => {
+    const h = heading / DEG;
+    return { x: x + Math.sin(h) * back, z: z + Math.cos(h) * back, heading: h };
+  };
+  for (const f of map.features) {
+    switch (f.type) {
+      case 'start':
+        spots[`start: ${f.style}`] = { x: f.x, z: f.z, heading: f.heading / DEG };
+        break;
+      case 'jump':
+      case 'kicker':
+        spots[name(f.type)] = before(f.x, f.z, f.yaw, 30);
+        break;
+      case 'landing':
+        spots[name('landing')] = before(f.x, f.z, f.yaw, 10);
+        break;
+      case 'halfpipe':
+        spots[name('halfpipe deck')] = before(f.x, f.z, f.yaw, -f.dropIn / 2);
+        break;
+      case 'rail':
+      case 'box': {
+        const [a, b] = f.points;
+        if (!a || !b) break;
+        const heading = Math.atan2(-(b.x - a.x), -(b.z - a.z)) * DEG;
+        spots[name(f.type)] = before(a.x, a.z, heading, 20);
+        break;
+      }
+      case 'slalom': {
+        const g = f.gates[0];
+        if (g) spots[name('slalom')] = before(g.x, g.z, g.heading, 25);
+        break;
+      }
+    }
+  }
+  return spots;
+}
+
+export function mountDevPanel(actions: DevActions): DevPanel {
   const gui = new GUI({ title: 'Tuning (dev only)', width: 290 });
   // Keep the top-right corner free for the window buttons.
   gui.domElement.style.left = '0';
@@ -24,6 +93,27 @@ export function mountDevPanel(actions: { respawn: () => void; backToTop: () => v
   gui.add(actions, 'respawn').name('Respawn (R)');
   gui.add(actions, 'backToTop').name('Back to top (hold R)');
   gui.add({ copy: copyConfig }, 'copy').name('Copy config as JSON');
+  gui
+    .add({ quality: actions.quality }, 'quality', QUALITIES)
+    .name('Quality (decor)')
+    .onChange((q: Quality) => actions.setQuality(q));
+
+  const spots = testSpots(actions.map);
+  const go = { spot: 'spawn', speed: 0 };
+  const test = gui.addFolder('Test spots');
+  test.add(go, 'spot', Object.keys(spots)).name('Spot');
+  test.add(go, 'speed', 0, 30, 0.5).name('Speed (m/s)');
+  test
+    .add(
+      {
+        go: (): void => {
+          const s = spots[go.spot];
+          if (s) actions.teleport(s.x, s.z, s.heading, go.speed);
+        },
+      },
+      'go',
+    )
+    .name('Go there');
 
   const s = CONFIG.skier;
   const ride = gui.addFolder('Riding');

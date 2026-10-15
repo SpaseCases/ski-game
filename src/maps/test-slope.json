@@ -2,37 +2,112 @@
   "name": "Test Slope",
   "terrain": {
     "type": "generated",
-    "width": 80,
-    "length": 400,
+    "width": 200,
+    "length": 520,
     "cellSize": 2,
     "slopeDeg": 17,
-    "flatTop": 24,
-    "runout": 80,
+    "flatTop": 30,
+    "runout": 90,
     "bermWidth": 14,
     "bermHeight": 7,
     "noise": 0.18,
     "seed": 7,
-    "rollers": { "start": 170, "end": 250, "amplitude": 0.6, "spacing": 20 }
+    "margin": 50,
+    "rollers": { "start": 350, "end": 410, "amplitude": 0.6, "spacing": 20 }
   },
   "features": [
-    { "type": "box", "x": 0, "z": -130, "length": 9, "width": 0.6, "height": 0.7, "yaw": 0 },
-    { "type": "rail", "points": [{ "x": 18, "z": -128, "height": 0.5 }, { "x": 18, "z": -140, "height": 0.5 }] },
-    { "type": "rail", "points": [{ "x": 23, "z": -50, "height": 0.5 }, { "x": 23, "z": -115, "height": 0.5 }] },
-    { "type": "rail", "points": [{ "x": 18, "z": -150, "height": 0.8 }, { "x": 18, "z": -160, "height": 0.35 }] },
+    { "type": "start", "style": "deck", "x": -20, "z": -12, "heading": 0, "height": 0.6 },
+    { "type": "start", "style": "tower", "x": 20, "z": -8, "heading": 0, "height": 7 },
+    { "type": "start", "style": "ridge", "x": -62, "z": -12, "heading": 0 },
+    { "type": "start", "style": "race", "x": 62, "z": -36, "heading": 0 },
+
+    { "type": "halfpipe", "x": -62, "z": -70, "yaw": 0, "length": 150 },
+
+    { "type": "jump", "x": -20, "z": -48, "width": 5, "sideWidth": 2, "lipHeight": 1, "lipAngle": 15, "gap": 4, "landingAngle": 14, "knuckle": 2, "transition": 4 },
+    { "type": "jump", "x": -20, "z": -84, "width": 6, "sideWidth": 2.5, "lipHeight": 2, "lipAngle": 16, "gap": 8, "landingAngle": 12, "transition": 6 },
+    { "type": "jump", "x": -20, "z": -128, "width": 7, "sideWidth": 2.5, "lipHeight": 2.2, "lipAngle": 20, "gap": 9, "deck": false, "landingHeight": 3.6, "landingAngle": 12, "transition": 6 },
+    { "type": "jump", "x": -20, "z": -180, "width": 7, "sideWidth": 2.5, "lipHeight": 3.4, "lipAngle": 18, "gap": 11, "deck": false, "landingHeight": 2.9, "landingAngle": 10, "transition": 6 },
+    { "type": "jump", "x": -20, "z": -243, "width": 9, "sideWidth": 3, "lipHeight": 4, "lipAngle": 18, "gap": 8, "landingAngle": 10, "transition": 6 },
+    { "type": "kicker", "x": -44, "z": -306, "yaw": -30, "width": 5, "sideWidth": 2, "lipHeight": 1.4, "lipAngle": 24, "back": 1.5 },
+    { "type": "landing", "x": -32, "z": -312, "width": 12, "sideWidth": 3, "height": 2.2, "angle": 16, "back": 2, "top": 3 },
+
+    { "type": "box", "width": 0.6, "points": [{ "x": 18, "z": -50, "height": 0 }, { "x": 18, "z": -53, "height": 0.3 }, { "x": 18, "z": -62, "height": 0.3 }] },
+    { "type": "rail", "points": [{ "x": 25, "z": -50, "height": 0 }, { "x": 25, "z": -54, "height": 0.4 }, { "x": 25, "z": -64, "height": 0.4 }] },
+    { "type": "kicker", "x": 20, "z": -84, "width": 3, "sideWidth": 1.5, "lipHeight": 0.7, "lipAngle": 20, "back": 1.2 },
+    { "type": "rail", "points": [{ "x": 20, "z": -90, "height": 1.0 }, { "x": 20, "z": -100, "height": 1.0 }] },
+    { "type": "rail", "points": [{ "x": 20, "z": -130, "height": 0.8 }, { "x": 20, "z": -140, "height": 0.35 }] },
+    { "type": "rail", "points": [{ "x": 14, "z": -150, "height": 0.5 }, { "x": 14, "z": -155, "height": 1.4 }, { "x": 14, "z": -165, "height": 0.45 }] },
+    { "type": "box", "width": 0.6, "points": [{ "x": 26, "z": -150, "height": 0.4 }, { "x": 26, "z": -155, "height": 0.4 }, { "x": 26, "z": -159, "height": 1.6 }, { "x": 26, "z": -166, "height": 1.6 }] },
+    { "type": "rail", "points": [{ "x": 20, "z": -195, "height": 0.5 }, { "x": 20, "z": -201, "height": 0.5 }, { "x": 23, "z": -207, "height": 0.5 }] },
     {
       "type": "rail",
-      "points": [{ "x": 0, "z": -142, "height": 0.5 }, { "x": 0, "z": -148, "height": 1.25 }, { "x": 0, "z": -160, "height": 0.45 }]
+      "points": [
+        { "x": 20, "z": -230, "height": 0.4 },
+        { "x": 20, "z": -231, "height": 0.71 },
+        { "x": 20, "z": -232, "height": 0.97 },
+        { "x": 20, "z": -233, "height": 1.14 },
+        { "x": 20, "z": -234, "height": 1.2 },
+        { "x": 20, "z": -235, "height": 1.14 },
+        { "x": 20, "z": -236, "height": 0.97 },
+        { "x": 20, "z": -237, "height": 0.71 },
+        { "x": 20, "z": -238, "height": 0.4 }
+      ]
     },
-    { "type": "jump", "x": -10, "z": -45, "yaw": 0, "width": 5, "sideWidth": 2, "lipHeight": 0.9, "lipAngle": 16, "deckLength": 2, "landingLength": 8 },
-    { "type": "jump", "x": 10, "z": -90, "yaw": 0, "width": 6, "sideWidth": 2.5, "lipHeight": 1.8, "lipAngle": 18, "deckLength": 2, "landingLength": 20 },
-    { "type": "jump", "x": -14, "z": -140, "yaw": 0, "width": 8, "sideWidth": 3, "lipHeight": 3, "lipAngle": 20, "deckLength": 3, "landingLength": 28 }
+
+    {
+      "type": "slalom",
+      "gates": [
+        { "x": 57, "z": -62, "width": 5 },
+        { "x": 67, "z": -84, "width": 5 },
+        { "x": 57, "z": -106, "width": 5 },
+        { "x": 67, "z": -128, "width": 5 },
+        { "x": 57, "z": -150, "width": 5 },
+        { "x": 67, "z": -172, "width": 5 },
+        { "x": 57, "z": -194, "width": 5 },
+        { "x": 67, "z": -216, "width": 5 },
+        { "x": 57, "z": -238, "width": 5 },
+        { "x": 67, "z": -260, "width": 5 },
+        { "x": 57, "z": -282, "width": 5 },
+        { "x": 67, "z": -304, "width": 5 }
+      ]
+    }
   ],
-  "spawn": { "x": 0, "z": -8, "heading": 0 },
+  "spawn": { "x": -20, "z": -12, "heading": 0 },
   "flags": [
-    { "x": 0, "z": -72, "heading": 0, "width": 36 },
-    { "x": 0, "z": -192, "heading": 0, "width": 44 },
-    { "x": 0, "z": -262, "heading": 0, "width": 44 }
+    { "x": -20, "z": -75, "heading": 0, "width": 22 },
+    { "x": 22, "z": -118, "heading": 0, "width": 18 },
+    { "x": -20, "z": -175, "heading": 0, "width": 22 }
   ],
-  "finish": { "x": 0, "z": -330, "heading": 0, "width": 56, "length": 70 },
+  "finish": { "x": 0, "z": -440, "heading": 0, "width": 190, "length": 70 },
+  "decor": [
+    { "kind": "pine", "area": { "x": -128, "z": -250, "width": 46, "length": 640 }, "count": 650, "seed": 3, "minScale": 0.8, "maxScale": 1.5 },
+    { "kind": "pine", "area": { "x": 114, "z": -250, "width": 16, "length": 640 }, "count": 220, "seed": 5, "minScale": 0.8, "maxScale": 1.4 },
+    { "kind": "pine", "area": { "x": 144, "z": -250, "width": 12, "length": 640 }, "count": 160, "seed": 6, "minScale": 0.9, "maxScale": 1.5 },
+    { "kind": "rock", "area": { "x": -125, "z": -250, "width": 50, "length": 640 }, "count": 70, "seed": 8, "minScale": 0.6, "maxScale": 1.6 },
+    { "kind": "boulder", "area": { "x": 125, "z": -250, "width": 45, "length": 640 }, "count": 40, "seed": 9, "minScale": 0.8, "maxScale": 1.6 },
+
+    { "kind": "pine", "area": { "x": -72.5, "z": -290, "width": 25, "length": 90 }, "count": 40, "seed": 21, "minScale": 0.7, "maxScale": 1.2, "solid": true },
+    { "kind": "snag", "area": { "x": -72.5, "z": -290, "width": 25, "length": 90 }, "count": 6, "seed": 22, "minScale": 0.8, "maxScale": 1.1, "solid": true },
+    { "kind": "rock", "area": { "x": -72.5, "z": -290, "width": 25, "length": 90 }, "count": 10, "seed": 23, "minScale": 0.6, "maxScale": 1.2, "solid": true },
+    { "kind": "boulder", "area": { "x": -72.5, "z": -290, "width": 25, "length": 90 }, "count": 4, "seed": 24, "minScale": 0.8, "maxScale": 1.1, "solid": true },
+
+    { "kind": "fence", "points": [{ "x": -39, "z": -42 }, { "x": -39, "z": -228 }] },
+    { "kind": "netting", "points": [{ "x": 47, "z": -44 }, { "x": 47, "z": -322 }] },
+    { "kind": "netting", "points": [{ "x": 77, "z": -44 }, { "x": 77, "z": -322 }] },
+    { "kind": "dyeLine", "points": [{ "x": 51, "z": -46 }, { "x": 51, "z": -316 }] },
+    { "kind": "dyeLine", "points": [{ "x": 73, "z": -46 }, { "x": 73, "z": -316 }] },
+    { "kind": "barrier", "points": [{ "x": -33, "z": -276 }, { "x": -33, "z": -300 }] },
+    { "kind": "barrier", "points": [{ "x": -7, "z": -276 }, { "x": -7, "z": -300 }] },
+    { "kind": "bunting", "points": [{ "x": -34, "z": -2 }, { "x": -27, "z": -2 }, { "x": -13, "z": -2 }, { "x": -6, "z": -2 }] },
+    { "kind": "chairlift", "points": [{ "x": 129, "z": 40 }, { "x": 129, "z": -560 }] },
+
+    { "kind": "banner", "points": [{ "x": -32, "z": -110 }, { "x": -8, "z": -160 }], "heading": 90 },
+    { "kind": "banner", "points": [{ "x": -8, "z": -110 }], "heading": 90, "color": "#ff7a1a" },
+    { "kind": "lightPole", "points": [{ "x": 36, "z": -45 }, { "x": 36, "z": -85 }, { "x": 36, "z": -125 }, { "x": 36, "z": -165 }, { "x": 36, "z": -205 }, { "x": 36, "z": -245 }], "heading": -90 },
+    { "kind": "floodlight", "points": [{ "x": -37, "z": -262 }], "heading": -90 },
+    { "kind": "floodlight", "points": [{ "x": -3, "z": -288 }], "heading": 90 },
+    { "kind": "flag", "points": [{ "x": 11, "z": -3 }, { "x": 29, "z": -3 }, { "x": 8, "z": -14 }, { "x": 32, "z": -14 }], "heading": 0 },
+    { "kind": "groomer", "points": [{ "x": 84, "z": -470 }], "heading": 30 }
+  ],
   "colors": { "sky": "#9fc3e6", "fog": "#dce8f3" }
 }

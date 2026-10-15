@@ -1,5 +1,6 @@
 import type { PerspectiveCamera } from 'three';
 import { CONFIG } from '../config.ts';
+import { pipeAt } from '../maps/shapes.ts';
 import type { Heightfield } from '../maps/types.ts';
 import { wrapAngle } from '../sim/skier.ts';
 import { heightAt } from '../sim/terrain.ts';
@@ -15,8 +16,9 @@ export interface OrbitDrag {
 /**
  * Third-person chase camera. Sits behind and above the skier along the
  * direction of travel (so it swings around when riding switch), pulls back
- * with speed, never rolls, and stays above the snow. Dragging with the mouse
- * orbits it around the skier; once riding, it eases back behind.
+ * with speed, never rolls, and stays above the snow. In a halfpipe it looks
+ * down the pipe rather than swinging with every wall. Dragging with the
+ * mouse orbits it around the skier; once riding, it eases back behind.
  */
 export class ChaseCamera {
   private readonly camera: PerspectiveCamera;
@@ -101,9 +103,11 @@ export class ChaseCamera {
     this.camera.lookAt(p.x + fx * c.lookAhead, lookY, p.z + fz * c.lookAhead);
   }
 
-  /** Heading of travel, falling back to where the skis point when nearly stopped. */
+  /** Heading of travel, falling back to where the skis point when nearly stopped; down the pipe in a halfpipe. */
   private targetYaw(pose: SkierPose): number {
     const c = CONFIG.camera;
+    const pipe = pose.bailed ? undefined : pipeAt(this.hf.shapes, pose.position.x, pose.position.z);
+    if (pipe) return pipe.heading;
     const v = pose.velocity;
     const speed = Math.hypot(v.x, v.z);
     const t = clamp((speed - c.travelMinSpeed) / (c.travelFullSpeed - c.travelMinSpeed), 0, 1);

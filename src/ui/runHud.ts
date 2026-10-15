@@ -6,6 +6,7 @@ import { CONFIG } from '../config.ts';
  */
 export class RunHud {
   private readonly finish: HTMLElement;
+  private readonly detail: HTMLElement;
   private readonly hold: HTMLElement;
   private readonly holdFill: HTMLElement;
   private holdShown = -1;
@@ -17,6 +18,9 @@ export class RunHud {
     const title = document.createElement('div');
     title.className = 'finish-title';
     title.textContent = 'Finished!';
+    this.detail = document.createElement('div');
+    this.detail.className = 'finish-detail';
+    this.detail.hidden = true;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'hud-button finish-button';
@@ -25,7 +29,7 @@ export class RunHud {
       button.blur();
       onBackToTop();
     });
-    this.finish.append(title, button);
+    this.finish.append(title, this.detail, button);
     hud.appendChild(this.finish);
 
     this.hold = document.createElement('div');
@@ -42,9 +46,17 @@ export class RunHud {
     hud.appendChild(this.hold);
   }
 
-  /** `finished`: in the finish zone. `holdTime`: seconds R has been held toward going to the top (0 if not). */
-  update(finished: boolean, holdTime: number): void {
+  /**
+   * `finished`: in the finish zone. `detail`: a line under the title (the
+   * run time on a timed run), or ''. `holdTime`: seconds R has been held
+   * toward going to the top (0 if not).
+   */
+  update(finished: boolean, detail: string, holdTime: number): void {
     if (this.finish.hidden === finished) this.finish.hidden = !finished;
+    if (this.detail.textContent !== detail) {
+      this.detail.textContent = detail;
+      this.detail.hidden = detail === '';
+    }
 
     const c = CONFIG.checkpoints;
     const progress = holdTime > c.holdHintDelay ? Math.min(1, holdTime / c.holdToTop) : 0;

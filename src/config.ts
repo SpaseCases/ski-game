@@ -71,6 +71,15 @@ export const CONFIG = {
     /** Biggest lean into a turn (radians) and how fast lean follows (per second). */
     leanMax: 0.85,
     leanResponse: 8,
+    /**
+     * Snow curving up under the skis (a halfpipe transition, the bottom of a
+     * dip) pushes on them harder than gravity alone. This share of that extra
+     * push (m/s², capped at curveLoadMax) adds to the load the edges grip
+     * with and friction works against; curveSmoothing (per second) evens it out.
+     */
+    curveLoad: 1,
+    curveLoadMax: 60,
+    curveSmoothing: 15,
   },
 
   air: {
@@ -101,6 +110,15 @@ export const CONFIG = {
     /** Speeds (m/s) along the skis where path following starts and is full (none for a pop in place). */
     pathSpeedMin: 2,
     pathSpeedFull: 8,
+    /**
+     * Snow steeper than this (degrees) is a wall: riding up it and off the
+     * top launches straight up, rotating in the wall's plane, so the skier
+     * comes back down into the halfpipe. The skis' heading then follows the
+     * path along the wall instead of their pitch.
+     */
+    wallAngle: 50,
+    /** How far (m) back inside the lip a wall air comes down. */
+    wallDrift: 0.6,
   },
 
   landing: {
@@ -119,6 +137,14 @@ export const CONFIG = {
     /** Speed into the snow (m/s) that gives a full-depth absorb crouch, and how long it lasts (s). */
     squashImpact: 9,
     squashTime: 0.35,
+    /**
+     * Rough landings (casing a deck, coming up short on a knuckle): past
+     * roughImpact m/s into the snow, each extra m/s loses roughLoss of the
+     * speed along the snow, up to roughLossMax.
+     */
+    roughImpact: 7,
+    roughLoss: 0.04,
+    roughLossMax: 0.4,
   },
 
   rails: {
@@ -149,8 +175,15 @@ export const CONFIG = {
     bodyRadius: 0.25,
     /** Skis this far (m) below the top of a rail or box are hitting its side, not riding over it. */
     stepTolerance: 0.12,
-    /** Speed (m/s) into the side of a rail or box that crashes; slower bumps just stop. */
+    /** Speed (m/s) into the side of a rail or box (or a tree, a fence...) that crashes; slower bumps just stop. */
     crashSpeed: 5,
+    /**
+     * Riding onto a rail or box that starts at the snow: travel has to be at
+     * least this lined up with it (cosine of the angle) to lock on.
+     */
+    mountAlign: 0.75,
+    /** Snow this far (m) above a rail's top takes the skis off it; a top this far below the skis can't be ridden onto. */
+    sinkDepth: 0.03,
   },
 
   bail: {
@@ -182,6 +215,27 @@ export const CONFIG = {
     /** Height (m) of the finish banner's bottom edge, and its depth. */
     finishHeight: 4.2,
     finishBanner: 1.2,
+  },
+
+  slalom: {
+    /** Pole height (m) above the snow. */
+    poleHeight: 1.8,
+    /** A pole closer than this (m) to the skier's line is clipped. */
+    clipReach: 0.45,
+    /** Bend speed (rad/s) a clip gives per m/s of the skier's speed. */
+    kick: 0.6,
+    /** How a bent pole springs back (per second², per second), and the most it bends (radians). */
+    stiffness: 60,
+    damping: 5,
+    maxBend: 1.3,
+  },
+
+  quality: {
+    /**
+     * Share of scenery decoration (trees and rocks off the course) drawn by
+     * each preset. Solid decoration is always drawn. Auto draws Medium's.
+     */
+    decorDensity: { auto: 0.7, low: 0.35, medium: 0.7, high: 1 },
   },
 
   camera: {

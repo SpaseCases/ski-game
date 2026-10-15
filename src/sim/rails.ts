@@ -7,33 +7,13 @@ import { heightAt, type Vec3Like } from './terrain.ts';
 // seen from above: a point is "over" a segment when it projects inside it,
 // and its distance across is measured to the right of the segment's direction.
 
-const DEG = Math.PI / 180;
-
-/** Builds the slide lines for every rail and box in the map, sitting on the snow. */
+/** Builds the slide lines for every rail and box in the map, sitting on the snow (and on any shapes built on it). */
 export function buildRailShapes(features: readonly Feature[], hf: Heightfield): RailShape[] {
   const shapes: RailShape[] = [];
   for (const f of features) {
-    if (f.type === 'box') {
-      // From the uphill end to the downhill end (for yaw 0), deck on top.
-      const yaw = f.yaw * DEG;
-      const dx = -Math.sin(yaw) * (f.length / 2);
-      const dz = -Math.cos(yaw) * (f.length / 2);
-      shapes.push(
-        makeShape('box', f.width / 2, [
-          [f.x - dx, f.z - dz, f.height],
-          [f.x + dx, f.z + dz, f.height],
-        ], hf),
-      );
-    } else if (f.type === 'rail') {
-      shapes.push(
-        makeShape(
-          'rail',
-          CONFIG.rails.radius,
-          f.points.map((p) => [p.x, p.z, p.height] as const),
-          hf,
-        ),
-      );
-    }
+    if (f.type !== 'box' && f.type !== 'rail') continue;
+    const halfWidth = f.type === 'box' ? f.width / 2 : CONFIG.rails.radius;
+    shapes.push(makeShape(f.type, halfWidth, f.points.map((p) => [p.x, p.z, p.height] as const), hf));
   }
   return shapes;
 }

@@ -143,15 +143,17 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - 2, air: spins, flips, corks, Lincoln loops, the 8 grabs, landing check, crash tumble, respawn.
 - 3, rails and boxes: lock on by landing, slide, free ski rotation, pop or spin off, slip off when off-angle.
 - 4, checkpoints: flag gates, Tab personal checkpoint (keeps speed), R respawn, hold R to go to the top, finish zone with Back to top.
+- 5a, map features, all on a widened test slope (four lanes, dev panel "Test spots" to jump to each): knuckled tables, step-up, step-down, hip, kickers; halfpipe with drop-in deck; ride-on box and rail, kicker to rail, kinked and rainbow rails; slalom gates that flex, run timer and missed-gate count; the four start gates; decoration (trees, rocks, snags, fences, netting, dye lines, banners, light poles, floodlights, chairlift, groomer) with Low/Medium/High density; terrain split into culled chunks.
 - Also done: the Park Laps name and the low-poly skier with all its poses (`poses.html`).
-- Next: milestone 5a (map features), then 5b (the four maps).
+- Next: milestone 5b (the four maps). A clean 720 takes about 2.3 s at the current spin values, so 720 jumps need about 2.75 s of air.
 
 **Known issues**
 - Not yet tested on a real school Chromebook.
-- The test slope ends in an invisible wall.
+- The test slope ends in an invisible wall at the top of the side berms and at the bottom.
 - Riding off a rail sideways crashes unless you turn the skis back first.
-- A full pop carries 6–9 m, so rails need an early pop. No snow-level boxes or rails yet.
-- The large test jump is badly sized: a fast full pop overshoots the landing. Milestone 5 maps get properly sized jumps.
+- A full pop carries 6–9 m, so popped rails need a small, early pop. A full pop off any test jump flies past its landing onto the slope (a rough landing, not a crash); the jumps are sized for riding straight in without a pop.
+- The test slope's 17° pitch reaches 20 m/s, so its later jumps are big. The 5b maps need flatter sections to keep speeds down.
+- In the halfpipe the skis follow the path along the wall, like the pitch assist off jumps: a straight air lands forward, a 180 lands switch.
 - In the japan grab the ski hangs low.
 - Back to top isn't in a pause menu yet (milestone 6). A flag respawns you at the middle of its gate, so maps must keep that spot clear.
 
@@ -161,4 +163,5 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - Pole push: `polePushSpeed` 1.8 → 3.1, `poleMaxSpeed` 7 → 8.5, `polePushInterval` 0.55 → 0.73.
 - Pop: `popMin` 3 → 3.2, `popMax` 5.2 → 5.5.
 - Camera: `heightNear` 2.1 → 2.35, `heightFar` 2.6 → 4.85.
-- Added along the way: landing tolerances (loosened so edge landings stick), rail values and checkpoint timings (both still untuned), and skier pose values.
+- Slalom: `kick` 0.25 → 0.6 (clipped poles bend 30–40°).
+- Added along the way: landing tolerances (loosened so edge landings stick), rail values and checkpoint timings (both still untuned), skier pose values, and in 5a the wall air, curve load, rough landing, ride-on and decoration density values (untuned).

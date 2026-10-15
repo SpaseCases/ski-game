@@ -1,4 +1,4 @@
-import { sampleJump, type JumpSample } from '../maps/jumps.ts';
+import { sampleShape, type ShapeSample } from '../maps/shapes.ts';
 import type { Heightfield } from '../maps/types.ts';
 
 // Physics surface: a smooth Catmull-Rom (bicubic) surface through the
@@ -28,7 +28,7 @@ interface AxisWeights {
 const wx: AxisWeights = { w0: 0, w1: 0, w2: 0, w3: 0, d0: 0, d1: 0, d2: 0, d3: 0 };
 const wz: AxisWeights = { w0: 0, w1: 0, w2: 0, w3: 0, d0: 0, d1: 0, d2: 0, d3: 0 };
 const surface = { height: 0, dhdx: 0, dhdz: 0 };
-const jump: JumpSample = { height: 0, dhdx: 0, dhdz: 0, along: 0 };
+const shape: ShapeSample = { height: 0, dhdx: 0, dhdz: 0 };
 let rowHeight = 0;
 let rowSlope = 0;
 
@@ -94,15 +94,22 @@ function sampleSurface(hf: Heightfield, x: number, z: number): typeof surface {
   surface.dhdx = dx / hf.cellSize;
   surface.dhdz = dz / hf.cellSize;
 
-  // Jumps sit on top of the smooth slope.
-  const jumps = hf.jumps;
-  if (jumps) {
-    for (let i = 0; i < jumps.length; i++) {
-      if (!sampleJump(jumps[i]!, x, z, jump)) continue;
-      surface.height += jump.height;
-      surface.dhdx += jump.dhdx;
-      surface.dhdz += jump.dhdz;
+  // Jumps, pipes and decks sit on top of the smooth slope; where two
+  // overlap, the higher one is the snow.
+  const shapes = hf.shapes;
+  if (shapes) {
+    let top = 0;
+    let gx = 0;
+    let gz = 0;
+    for (let i = 0; i < shapes.length; i++) {
+      if (!sampleShape(shapes[i]!, x, z, shape) || shape.height <= top) continue;
+      top = shape.height;
+      gx = shape.dhdx;
+      gz = shape.dhdz;
     }
+    surface.height += top;
+    surface.dhdx += gx;
+    surface.dhdz += gz;
   }
   return surface;
 }
