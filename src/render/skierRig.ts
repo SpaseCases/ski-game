@@ -453,12 +453,19 @@ function buildTorso(jacket: Color): BufferGeometry {
 
 /**
  * The long jacket below the waist, built along +Y from the waist down to
- * mid-thigh. Wide enough at the hips that the tops of the thighs stay inside.
+ * mid-thigh. It flares quickly over the hips and stays roomy below, so the
+ * thighs and their pockets stay inside in every riding pose (measured
+ * against the rig in stance, crouch, tuck, carves, hockey stops and landings).
  */
 function buildSkirt(jacket: Color): BufferGeometry {
+  const depth = 0.82;
+  const band = shade(jacket, 0.78);
   return merge([
-    paint(prism(0.218, 0.276, 0.36, 12).scale(1, 1, 0.78), jacket),
-    paint(prism(0.278, 0.28, 0.03, 12).translate(0, 0.335, 0).scale(1, 1, 0.78), shade(jacket, 0.78)),
+    paint(prism(0.228, 0.285, 0.1, 12).scale(1, 1, depth), jacket),
+    paint(prism(0.285, 0.305, 0.26, 12).translate(0, 0.1, 0).scale(1, 1, depth), jacket),
+    // Drawcord band at the waist and a darker hem.
+    paint(prism(0.232, 0.24, 0.028, 12).scale(1, 1, depth), band),
+    paint(prism(0.307, 0.309, 0.03, 12).translate(0, 0.335, 0).scale(1, 1, depth), band),
   ]);
 }
 
