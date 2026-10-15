@@ -90,6 +90,22 @@ const GOGGLE_Y = 0.205;
 const ANKLE_MIN = 55;
 const ANKLE_MAX = 145;
 
+/** Joint hints used when a pose leaves them out, per side (index 0 left, 1 right). */
+export const DEFAULT_HINTS = {
+  knee: [
+    [-0.15, 0.05, -1],
+    [0.15, 0.05, -1],
+  ],
+  elbow: [
+    [-0.7, -0.4, 0.5],
+    [0.7, -0.4, 0.5],
+  ],
+  pole: [
+    [-0.18, -0.8, 0.55],
+    [0.18, -0.8, 0.55],
+  ],
+} as const satisfies Record<string, readonly [Vec3, Vec3]>;
+
 const DOWN = new Vector3(0, -1, 0);
 
 export class SkierRig {
@@ -179,13 +195,13 @@ export class SkierRig {
         .applyQuaternion(this.chestQ)
         .add(this.pelvisPos);
       this.hands[i]!.set(hand.at[0], hand.at[1], hand.at[2]);
-      setHint(hint, hand.elbow, side * 0.7, -0.4, 0.5);
+      setHint(hint, hand.elbow ?? DEFAULT_HINTS.elbow[i === 0 ? 0 : 1]);
       this.solveLimb(this.shoulders[i]!, this.hands[i]!, BODY.upperArm, BODY.forearm + BODY.hand, hint, this.elbows[i]!);
       segment(this.upperArms[i]!, this.shoulders[i]!, this.elbows[i]!, hint);
       segment(this.forearms[i]!, this.elbows[i]!, this.hands[i]!, hint);
 
       // Pole hangs from the hand.
-      setHint(v3, hand.pole, side * 0.18, -0.8, 0.55).normalize();
+      setHint(v3, hand.pole ?? DEFAULT_HINTS.pole[i === 0 ? 0 : 1]).normalize();
       this.poles[i]!.position.copy(this.hands[i]!);
       this.poles[i]!.quaternion.setFromUnitVectors(DOWN, v3);
     }
@@ -202,7 +218,7 @@ export class SkierRig {
       if (grip) ankleForGrip(this.ankles[i]!, this.hands[holder]!, grip, this.footQs[i]!);
       else this.ankles[i]!.set(foot.ankle[0], foot.ankle[1], foot.ankle[2]);
 
-      setHint(hint, foot.knee, side * 0.15, 0.05, -1);
+      setHint(hint, foot.knee ?? DEFAULT_HINTS.knee[i === 0 ? 0 : 1]);
       this.solveLimb(this.hips[i]!, this.ankles[i]!, BODY.thigh, BODY.shin, hint, this.knees[i]!);
       segment(this.thighs[i]!, this.hips[i]!, this.knees[i]!, hint);
       segment(this.shins[i]!, this.knees[i]!, this.ankles[i]!, hint);
@@ -294,8 +310,8 @@ function segment(mesh: Mesh, a: Vector3, b: Vector3, front: Vector3): void {
   mesh.quaternion.setFromRotationMatrix(basis);
 }
 
-function setHint(out: Vector3, v: Vec3 | undefined, x: number, y: number, z: number): Vector3 {
-  return v ? out.set(v[0], v[1], v[2]) : out.set(x, y, z);
+function setHint(out: Vector3, v: Vec3): Vector3 {
+  return out.set(v[0], v[1], v[2]);
 }
 
 /** Where the ankle must be for the ski point `grip` (ski space) to sit at `hand`. */

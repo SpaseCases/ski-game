@@ -118,8 +118,16 @@ export const CONFIG = {
     /** Fog start and end distance in meters. The camera far plane follows fogFar. */
     fogNear: 70,
     fogFar: 240,
-    /** Radians the skier swings sideways for a hockey stop at full brake. */
+    /** Radians the skis swing sideways for a hockey stop at full brake. */
     brakeTwist: 1.2,
+    /** Share of that swing the upper body turns back to keep facing down the hill. */
+    brakeCounter: 0.4,
+    /** Lean (radians) away from the skid, and how far toward a crouch the skier sinks, at full brake. */
+    brakeLean: 0.3,
+    brakeSink: 0.35,
+    /** Speeds (m/s) where holding ↑ shifts from the pop crouch into a speed tuck. */
+    tuckSpeedMin: 7,
+    tuckSpeedFull: 12,
     /** How fast (per second) the skier tilts to match the snow or straightens in the air. */
     tiltSmoothing: 10,
   },

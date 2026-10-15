@@ -56,6 +56,17 @@ export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
   pop.add(s, 'popCoyoteTime', 0, 0.5, 0.01);
   pop.add(s, 'groundTolerance', 0, 0.3, 0.005);
 
+  const look = gui.addFolder('Skier look');
+  const r = CONFIG.render;
+  look.add(r, 'tuckSpeedMin', 0, 30, 0.5);
+  look.add(r, 'tuckSpeedFull', 0, 40, 0.5);
+  look.add(r, 'brakeTwist', 0, 1.6, 0.01);
+  look.add(r, 'brakeCounter', 0, 1, 0.01);
+  look.add(r, 'brakeLean', 0, 0.8, 0.01);
+  look.add(r, 'brakeSink', 0, 1, 0.01);
+  look.add(r, 'tiltSmoothing', 1, 30, 0.5);
+  look.close();
+
   const cam = gui.addFolder('Camera');
   const c = CONFIG.camera;
   cam.add(c, 'distNear', 1, 15, 0.1);
