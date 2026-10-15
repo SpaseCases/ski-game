@@ -22,7 +22,8 @@ export interface OrbitDrag {
  */
 export class ChaseCamera {
   private readonly camera: PerspectiveCamera;
-  private readonly hf: Heightfield;
+  /** The snow to stay above; swapped when another map loads. */
+  hf: Heightfield;
   private yaw = 0;
   private focusY = 0;
   /** Orbit added by dragging, on top of the chase heading and tilt. */

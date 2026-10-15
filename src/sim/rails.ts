@@ -13,22 +13,36 @@ export function buildRailShapes(features: readonly Feature[], hf: Heightfield): 
   for (const f of features) {
     if (f.type !== 'box' && f.type !== 'rail') continue;
     const halfWidth = f.type === 'box' ? f.width / 2 : CONFIG.rails.radius;
-    shapes.push(makeShape(f.type, halfWidth, f.points.map((p) => [p.x, p.z, p.height] as const), hf));
+    const points = f.points.map((p) => [p.x, p.z, p.height] as const);
+    shapes.push(makeShape(f.type, halfWidth, f.follow > 0 ? followSnow(points, f.follow) : points, hf));
   }
   return shapes;
 }
 
-function makeShape(
-  kind: RailShape['kind'],
-  halfWidth: number,
-  points: readonly (readonly [number, number, number])[],
-  hf: Heightfield,
-): RailShape {
+type LinePoint = readonly [x: number, z: number, height: number];
+
+/** Adds points every `spacing` m along each segment, heights blended linearly, so the line rides the snow's curves. */
+function followSnow(points: readonly LinePoint[], spacing: number): LinePoint[] {
+  const out: LinePoint[] = [points[0]!];
+  for (let i = 1; i < points.length; i++) {
+    const [ax, az, ah] = points[i - 1]!;
+    const [bx, bz, bh] = points[i]!;
+    const n = Math.max(1, Math.round(Math.hypot(bx - ax, bz - az) / spacing));
+    for (let k = 1; k <= n; k++) {
+      const t = k / n;
+      out.push([ax + (bx - ax) * t, az + (bz - az) * t, ah + (bh - ah) * t]);
+    }
+  }
+  return out;
+}
+
+function makeShape(kind: RailShape['kind'], halfWidth: number, points: readonly LinePoint[], hf: Heightfield): RailShape {
   const xyz = new Float32Array(points.length * 3);
   const dist = new Float32Array(points.length);
   let px = 0;
   let py = 0;
   let pz = 0;
+  const box = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
   points.forEach(([x, z, height], i) => {
     const y = heightAt(hf, x, z) + height;
     xyz.set([x, y, z], i * 3);
@@ -36,8 +50,17 @@ function makeShape(
     px = x;
     py = y;
     pz = z;
+    box.minX = Math.min(box.minX, x);
+    box.maxX = Math.max(box.maxX, x);
+    box.minZ = Math.min(box.minZ, z);
+    box.maxZ = Math.max(box.maxZ, z);
   });
-  return { kind, points: xyz, dist, length: dist[points.length - 1] ?? 0, halfWidth };
+  return { kind, points: xyz, dist, length: dist[points.length - 1] ?? 0, halfWidth, ...box };
+}
+
+/** True when (x, z) is more than `reach` beyond a rail's bounding box. */
+function farFrom(r: RailShape, x: number, z: number, reach: number): boolean {
+  return x < r.minX - reach || x > r.maxX + reach || z < r.minZ - reach || z > r.maxZ + reach;
 }
 
 /** Where a point sits relative to a rail: see railUnder. */
@@ -83,6 +106,7 @@ export function railUnder(rails: readonly RailShape[], x: number, z: number, rea
   let best = Infinity;
   for (let i = 0; i < rails.length; i++) {
     const r = rails[i]!;
+    if (farFrom(r, x, z, r.halfWidth + reach)) continue;
     const segs = r.dist.length - 1;
     for (let k = 0; k < segs; k++) {
       segment(r, k);
@@ -110,9 +134,14 @@ export function railUnder(rails: readonly RailShape[], x: number, z: number, rea
  * and the unit direction of the rail there. Returns the segment index.
  */
 export function railFrame(r: RailShape, s: number, pos: Vec3Like, dir: Vec3Like): number {
-  const last = r.dist.length - 2;
+  // The segment holding s: the last k with dist[k] < s (binary search; a long rail has hundreds).
   let k = 0;
-  while (k < last && s > (r.dist[k + 1] ?? 0)) k++;
+  let hi = r.dist.length - 2;
+  while (k < hi) {
+    const mid = (k + hi + 1) >> 1;
+    if (s > (r.dist[mid] ?? 0)) k = mid;
+    else hi = mid - 1;
+  }
   const p = r.points;
   const x0 = p[k * 3] ?? 0;
   const y0 = p[k * 3 + 1] ?? 0;
@@ -144,6 +173,7 @@ export function collideRails(rails: readonly RailShape[], p: Vec3Like, v: Vec3Li
   let hit = -1;
   for (let i = 0; i < rails.length; i++) {
     const r = rails[i]!;
+    if (farFrom(r, p.x, p.z, r.halfWidth + radius)) continue;
     const segs = r.dist.length - 1;
     for (let k = 0; k < segs; k++) {
       segment(r, k);

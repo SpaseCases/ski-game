@@ -14,10 +14,16 @@ export interface View {
   renderer: WebGLRenderer;
   scene: Scene;
   camera: PerspectiveCamera;
+  /** Sky light; its sky color follows the map's. */
+  hemi: HemisphereLight;
 }
 
+/** Sky and fog before any map is loaded (the map-select menu). */
+const DEFAULT_SKY = '#9fc3e6';
+const DEFAULT_FOG = '#dce8f3';
+
 /** Creates the renderer, scene, lights, fog and camera. Throws if WebGL is unavailable. */
-export function createView(container: HTMLElement, map: MapDef): View {
+export function createView(container: HTMLElement): View {
   const renderer = new WebGLRenderer({
     antialias: CONFIG.render.antialias,
     powerPreference: 'high-performance',
@@ -27,9 +33,9 @@ export function createView(container: HTMLElement, map: MapDef): View {
   container.appendChild(renderer.domElement);
 
   const scene = new Scene();
-  const fogColor = new Color(map.colors.fog);
+  const fogColor = new Color(DEFAULT_FOG);
   scene.background = fogColor;
-  scene.fog = new Fog(fogColor, CONFIG.render.fogNear, CONFIG.render.fogFar);
+  scene.fog = new Fog(fogColor.clone(), CONFIG.render.fogNear, CONFIG.render.fogFar);
 
   // Nothing past the fog is visible, so the far plane stops there too.
   const camera = new PerspectiveCamera(
@@ -39,7 +45,8 @@ export function createView(container: HTMLElement, map: MapDef): View {
     CONFIG.render.fogFar,
   );
 
-  scene.add(new HemisphereLight(map.colors.sky, '#7d8796', CONFIG.light.hemiIntensity));
+  const hemi = new HemisphereLight(DEFAULT_SKY, '#7d8796', CONFIG.light.hemiIntensity);
+  scene.add(hemi);
   const sun = new DirectionalLight('#fff6e8', CONFIG.light.sunIntensity);
   const from = CONFIG.light.sunFrom;
   sun.position.set(from.x, from.y, from.z).normalize();
@@ -51,5 +58,13 @@ export function createView(container: HTMLElement, map: MapDef): View {
     camera.updateProjectionMatrix();
   });
 
-  return { renderer, scene, camera };
+  return { renderer, scene, camera, hemi };
+}
+
+/** Sets the sky, fog and sky light to a map's colors. */
+export function applyMapColors(view: View, map: MapDef): void {
+  const fog = new Color(map.colors.fog);
+  view.scene.background = fog;
+  view.scene.fog?.color.copy(fog);
+  view.hemi.color.set(map.colors.sky);
 }

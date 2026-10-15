@@ -13,6 +13,39 @@ export interface RollersDef {
   spacing: number;
 }
 
+/** A stretch of the fall line at one pitch. */
+export interface PitchSection {
+  /** Length down the fall line (m). */
+  length: number;
+  /**
+   * Pitch in degrees, downhill positive (negative climbs). On a lane's last
+   * section it can be left out: it's then solved so the lane ends level with
+   * the slope beside it.
+   */
+  pitch?: number;
+  /** Distance (m) the pitch takes to ease in from the one before, centered where this section starts. */
+  ease: number;
+}
+
+/**
+ * A band down the slope with its own fall line: steeper for a halfpipe or a
+ * big jump's landing, flatter for a rail garden. It starts level with the
+ * slope beside it and ends level again, so lines can cross at both ends; in
+ * between, banks blend it into its neighbors.
+ */
+export interface TerrainLane {
+  /** Middle of the band across the slope (X), and its full-strength width. */
+  x: number;
+  width: number;
+  /** Width of the bank on each side where it blends into the slope beside it. */
+  blend: number;
+  /** Distance down the slope where the band starts. */
+  start: number;
+  sections: PitchSection[];
+  /** Distance (m) the pitch takes to ease back to the slope's at the end. */
+  endEase: number;
+}
+
 /** Parameters for a procedurally generated slope. All lengths in meters. */
 export interface GeneratedTerrainDef {
   type: 'generated';
@@ -22,12 +55,21 @@ export interface GeneratedTerrainDef {
   length: number;
   /** Distance between heightfield samples. */
   cellSize: number;
-  /** Main pitch of the slope in degrees. */
+  /**
+   * A straight slope (used when there's no profile): its pitch in degrees, a
+   * flat area at the top before the pitch starts, and an area at the bottom
+   * that flattens out and then rises gently to stop the rider.
+   */
   slopeDeg: number;
-  /** Flat area at the top before the pitch starts. */
   flatTop: number;
-  /** Area at the bottom that flattens out and then rises gently to stop the rider. */
   runout: number;
+  /**
+   * Varied pitch: the fall line as sections from the top down. Past the last
+   * one its pitch carries on (make it climb to stop riders at the bottom).
+   */
+  profile?: PitchSection[];
+  /** Bands with their own fall line (see TerrainLane). */
+  lanes?: TerrainLane[];
   /** Raised banks along both sides. */
   bermWidth: number;
   bermHeight: number;
@@ -66,6 +108,12 @@ export interface RailPoint {
 export interface RailFeature {
   type: 'rail';
   points: RailPoint[];
+  /**
+   * Follow the snow: extra points every `follow` meters, with heights
+   * blended between the given ones, so a long rail bends with the slope
+   * instead of cutting straight between its points. 0 keeps the points as given.
+   */
+  follow: number;
 }
 
 /** A box: a wide wooden-sided deck along a polyline, like a rail. */
@@ -73,6 +121,7 @@ export interface BoxFeature {
   type: 'box';
   width: number;
   points: RailPoint[];
+  follow: number;
 }
 
 /**
@@ -431,4 +480,9 @@ export interface RailShape {
   length: number;
   /** Half the width of the top: the rail's radius, or half the box's width. */
   halfWidth: number;
+  /** Bounding box of the line seen from above, for skipping rails far from the rider. */
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
 }

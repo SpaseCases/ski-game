@@ -128,7 +128,8 @@ export class SkierView {
   private readonly grabWeights = new Float32Array(GRABS.length);
   private bailWeight = 0;
   private railWeight = 0;
-  private readonly hf: Heightfield;
+  /** The snow the skier is on; swapped when another map loads. */
+  hf: Heightfield;
 
   constructor(scene: Scene, hf: Heightfield) {
     this.hf = hf;

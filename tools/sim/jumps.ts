@@ -5,8 +5,7 @@
 // "40% down the face" means 40% of the way down the straight landing face;
 // landings past the end are on the slope beyond it (rough, not a crash).
 
-import { DT, loadMap, Rider } from './harness.ts';
-import type { JumpFeature } from '../../src/maps/types.ts';
+import { DT, jumpLayout as layout, loadMap, Rider } from './harness.ts';
 
 const file = process.argv[2];
 if (!file) throw new Error('Usage: node tools/sim/jumps.ts <map.json> [speeds]');
@@ -15,23 +14,6 @@ const sim = loadMap(file);
 const DEG = Math.PI / 180;
 /** How far before the takeoff the run-up starts (m). */
 const RUN_UP = 20;
-
-/** Distances along a jump (m from where its takeoff starts), the same way maps/shapes.ts builds it. */
-function layout(j: JumpFeature): { lip: number; knuckle: number; faceStart: number; faceEnd: number; end: number } {
-  const lip = (2 * j.lipHeight) / Math.tan(j.lipAngle * DEG);
-  const knuckle = lip + j.gap;
-  const s = Math.tan(j.landingAngle * DEG);
-  let k = j.knuckle;
-  let t = j.transition;
-  let face = j.landingHeight / s - (k + t) / 2;
-  if (face < 0) {
-    const f = (2 * j.landingHeight) / (s * (k + t));
-    k *= f;
-    t *= f;
-    face = 0;
-  }
-  return { lip, knuckle, faceStart: knuckle + k, faceEnd: knuckle + k + face, end: knuckle + k + face + t };
-}
 
 sim.map.features.forEach((f, index) => {
   if (f.type !== 'jump') return;

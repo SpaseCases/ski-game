@@ -9,35 +9,20 @@ import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
 import { CONFIG } from '../../src/config.ts';
 import { ACTIONS, createInputState, type Action } from '../../src/core/input.ts';
-import { decorObstacles, layoutDecor } from '../../src/maps/decor.ts';
+import { buildMap, type BuiltMap } from '../../src/maps/build.ts';
 import { parseMap } from '../../src/maps/loader.ts';
-import { buildShapes } from '../../src/maps/shapes.ts';
-import { startFrames, startObstacles, startShapes } from '../../src/maps/startGates.ts';
-import { generateSlope } from '../../src/maps/terrain.ts';
-import type { MapDef } from '../../src/maps/types.ts';
+import type { JumpFeature } from '../../src/maps/types.ts';
 import { createRun, updateRun, type RunState } from '../../src/sim/checkpoints.ts';
-import { buildObstacles, type Course } from '../../src/sim/obstacles.ts';
-import { buildRace, createRace, finishRace, stepRace, type RaceDef, type RaceState } from '../../src/sim/race.ts';
-import { buildRailShapes } from '../../src/sim/rails.ts';
+import { createRace, finishRace, stepRace, type RaceState } from '../../src/sim/race.ts';
 import { copySkierState, createSkierState, placeSkierAt, stepSkier } from '../../src/sim/skier.ts';
 
 export const DT = 1 / CONFIG.sim.stepHz;
 
-/** A map built exactly as the game builds it (main.ts). */
-export interface Sim {
-  map: MapDef;
-  course: Course;
-  race: RaceDef | undefined;
-}
+/** A map built exactly as the game builds it. */
+export type Sim = BuiltMap;
 
 export function loadMap(file: string): Sim {
-  const map = parseMap(JSON.parse(readFileSync(file, 'utf8')));
-  const hf = generateSlope(map.terrain);
-  const starts = startFrames(map.features);
-  hf.shapes = [...buildShapes(map.features), ...startShapes(starts)];
-  const rails = buildRailShapes(map.features, hf);
-  const obstacles = buildObstacles([...startObstacles(starts), ...decorObstacles(layoutDecor(map, hf, 1))], hf);
-  return { map, course: { hf, rails, obstacles }, race: buildRace(map.features, hf) };
+  return buildMap(parseMap(JSON.parse(readFileSync(file, 'utf8'))));
 }
 
 /** One skier riding a Sim, stepped by hand with the keys to hold each step. */
@@ -97,4 +82,23 @@ export class Rider {
     const state = s.bailed ? `crashed (${s.bailReason})` : s.rail >= 0 ? `on rail ${s.rail}` : s.grounded ? 'riding' : 'in the air';
     return `t=${this.t.toFixed(2)}s at (${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}) ${this.speed.toFixed(1)} m/s, ${state}`;
   }
+}
+
+const DEG = Math.PI / 180;
+
+/** Distances along a jump (m from where its takeoff starts) to its lip, knuckle, landing face and end, the way maps/shapes.ts builds it. */
+export function jumpLayout(j: JumpFeature): { lip: number; knuckle: number; faceStart: number; faceEnd: number; end: number } {
+  const lip = (2 * j.lipHeight) / Math.tan(j.lipAngle * DEG);
+  const knuckle = lip + j.gap;
+  const s = Math.tan(j.landingAngle * DEG);
+  let k = j.knuckle;
+  let t = j.transition;
+  let face = j.landingHeight / s - (k + t) / 2;
+  if (face < 0) {
+    const f = (2 * j.landingHeight) / (s * (k + t));
+    k *= f;
+    t *= f;
+    face = 0;
+  }
+  return { lip, knuckle, faceStart: knuckle + k, faceEnd: knuckle + k + face, end: knuckle + k + face + t };
 }

@@ -1,4 +1,4 @@
-import { BufferAttribute, BufferGeometry, Color, Mesh, MeshLambertMaterial, Vector3 } from 'three';
+import { BufferAttribute, BufferGeometry, Color, Group, Mesh, MeshLambertMaterial, Vector3 } from 'three';
 import { CONFIG } from '../config.ts';
 import type { Heightfield, RailShape } from '../maps/types.ts';
 import { railFrame } from '../sim/rails.ts';
@@ -6,8 +6,8 @@ import { drawnHeightAt } from './terrainMesh.ts';
 import { TriBuilder } from './triBuilder.ts';
 
 // Rails and boxes, drawn from the slide lines the physics uses so the skis
-// sit exactly on what you see. Everything goes into one merged, vertex-colored
-// mesh: a single draw call however many rails a map has.
+// sit exactly on what you see. They're merged into one vertex-colored mesh
+// per 64 m tile, so a long rail drops out of view past the fog.
 
 const BOX_DECK = new Color('#9aa4ad');
 const BOX_SIDE = new Color('#8a5a32');
@@ -20,34 +20,53 @@ const POST_SPACING = 2.5;
 const POST_INSET = 0.4;
 /** How far (m) boxes and posts reach below the snow, so bumps in it never show a gap. */
 const BURY = 0.25;
+/** Size (m) of a tile of merged rail meshes. */
+const TILE = 64;
 
 const material = new MeshLambertMaterial({ vertexColors: true, flatShading: true });
 
-export function createRailMesh(rails: readonly RailShape[], hf: Heightfield): Mesh {
-  const b = new TriBuilder();
+export function createRailMesh(rails: readonly RailShape[], hf: Heightfield): Group {
+  const tiles = new Map<string, TriBuilder>();
+  const near: Near = (x, z) => {
+    const key = `${Math.floor(x / TILE)},${Math.floor(z / TILE)}`;
+    let b = tiles.get(key);
+    if (!b) {
+      b = new TriBuilder();
+      tiles.set(key, b);
+    }
+    return b;
+  };
   for (const r of rails) {
-    if (r.kind === 'box') addBox(b, r, hf);
-    else addRail(b, r, hf);
+    if (r.kind === 'box') addBox(near, r, hf);
+    else addRail(near, r, hf);
   }
-  const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new BufferAttribute(new Float32Array(b.positions), 3));
-  geometry.setAttribute('color', new BufferAttribute(new Float32Array(b.colors), 3));
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
-  const mesh = new Mesh(geometry, material);
-  mesh.matrixAutoUpdate = false;
-  return mesh;
+  const group = new Group();
+  for (const b of tiles.values()) {
+    // No normals: flat shading works them out per face on the GPU.
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new BufferAttribute(new Float32Array(b.positions), 3));
+    geometry.setAttribute('color', new BufferAttribute(new Float32Array(b.colors), 3));
+    geometry.computeBoundingSphere();
+    const mesh = new Mesh(geometry, material);
+    mesh.matrixAutoUpdate = false;
+    group.add(mesh);
+  }
+  return group;
 }
+
+/** The triangle builder for the tile holding world (x, z). */
+type Near = (x: number, z: number) => TriBuilder;
 
 const UP = new Vector3(0, 1, 0);
 
 /** A box: wooden sides down into the snow under a sliding deck along its top line. */
-function addBox(b: TriBuilder, r: RailShape, hf: Heightfield): void {
+function addBox(near: Near, r: RailShape, hf: Heightfield): void {
   const segs = r.dist.length - 1;
   const w = r.halfWidth;
   for (let k = 0; k < segs; k++) {
     const a = point(r, k);
     const e = point(r, k + 1);
+    const b = near(a.x, a.z);
     const along = new Vector3(e.x - a.x, 0, e.z - a.z).normalize();
     const right = new Vector3(-along.z, 0, along.x);
     const aL = a.clone().addScaledVector(right, -w);
@@ -68,13 +87,14 @@ function addBox(b: TriBuilder, r: RailShape, hf: Heightfield): void {
 }
 
 /** A round rail: a tube under its top line, capped at both ends, on posts down to the snow. */
-function addRail(b: TriBuilder, r: RailShape, hf: Heightfield): void {
+function addRail(near: Near, r: RailShape, hf: Heightfield): void {
   const radius = r.halfWidth;
   const segs = r.dist.length - 1;
   const ring = Array.from({ length: RAIL_SIDES }, () => new Vector3());
   for (let k = 0; k < segs; k++) {
     const a = point(r, k);
     const e = point(r, k + 1);
+    const b = near(a.x, a.z);
     const dir = e.clone().sub(a).normalize();
     // Overlap the tubes a little at a kink so the joint has no gap.
     if (k > 0) a.addScaledVector(dir, -radius);
@@ -109,6 +129,7 @@ function addRail(b: TriBuilder, r: RailShape, hf: Heightfield): void {
     const top = pos.y - 2 * radius;
     const bottom = drawnHeightAt(hf, pos.x, pos.z) - BURY;
     if (top - bottom < 0.05) continue;
+    const b = near(pos.x, pos.z);
     const along = new Vector3(dir.x, 0, dir.z).normalize().multiplyScalar(half);
     const right = new Vector3(-along.z, 0, along.x);
     const corners = [

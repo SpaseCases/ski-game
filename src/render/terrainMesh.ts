@@ -73,14 +73,19 @@ function createChunk(
     }
   }
 
+  // No normals: flat shading works them out per face on the GPU. Once the
+  // chunk is on the GPU its arrays aren't needed here, so they're let go.
   const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new BufferAttribute(colors, 3));
-  geometry.computeVertexNormals();
+  geometry.setAttribute('position', new BufferAttribute(positions, 3).onUpload(releaseArray));
+  geometry.setAttribute('color', new BufferAttribute(colors, 3).onUpload(releaseArray));
   geometry.computeBoundingSphere();
   const mesh = new Mesh(geometry, material);
   mesh.matrixAutoUpdate = false;
   return mesh;
+}
+
+function releaseArray(this: BufferAttribute): void {
+  this.array = new Float32Array(0);
 }
 
 /**

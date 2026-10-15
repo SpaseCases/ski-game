@@ -6,12 +6,14 @@ import type {
   FlagDef,
   LineKind,
   MapDef,
+  PitchSection,
   PropKind,
   RailPoint,
   RollersDef,
   ScatterKind,
   StartStyle,
   TerrainDef,
+  TerrainLane,
   XZ,
 } from './types.ts';
 
@@ -53,20 +55,53 @@ function parseTerrain(raw: unknown): TerrainDef {
   const t = obj(raw, 'terrain');
   if (t.type !== 'generated') throw new Error(`Map: unknown terrain type ${String(t.type)}`);
   const n = reader(t, 'terrain');
+  const profile = t.profile === undefined ? undefined : sections(t.profile, 'terrain.profile', false);
+  // A profile replaces the straight slope's numbers.
+  const straight = profile ? 0 : undefined;
   return {
     type: 'generated',
     width: n('width'),
     length: n('length'),
     cellSize: n('cellSize'),
-    slopeDeg: n('slopeDeg'),
-    flatTop: n('flatTop'),
-    runout: n('runout'),
+    slopeDeg: n('slopeDeg', straight),
+    flatTop: n('flatTop', straight),
+    runout: n('runout', straight),
+    profile,
+    lanes: t.lanes === undefined ? undefined : arr(t.lanes, 'terrain.lanes').map((l, i) => parseLane(l, `terrain.lanes[${i}]`)),
     bermWidth: n('bermWidth'),
     bermHeight: n('bermHeight'),
     noise: n('noise'),
     seed: n('seed'),
     rollers: t.rollers === undefined ? undefined : parseRollers(t.rollers),
     margin: n('margin', 0),
+  };
+}
+
+/** Pitch sections; `solveLast` lets the last one leave its pitch out. */
+function sections(raw: unknown, path: string, solveLast: boolean): PitchSection[] {
+  const list = arr(raw, path);
+  if (list.length === 0) throw new Error(`Map: ${path} needs at least one section`);
+  return list.map((s, i) => {
+    const p = `${path}[${i}]`;
+    const o = obj(s, p);
+    const m = reader(o, p);
+    const length = m('length');
+    if (!(length > 0)) throw new Error(`Map: ${p}.length must be more than 0`);
+    const solved = solveLast && i === list.length - 1 && o.pitch === undefined;
+    return { length, pitch: solved ? undefined : m('pitch'), ease: m('ease', 20) };
+  });
+}
+
+function parseLane(raw: unknown, path: string): TerrainLane {
+  const o = obj(raw, path);
+  const n = reader(o, path);
+  return {
+    x: n('x'),
+    width: n('width'),
+    blend: n('blend', 20),
+    start: n('start'),
+    sections: sections(o.sections, `${path}.sections`, true),
+    endEase: n('endEase', 20),
   };
 }
 
@@ -90,9 +125,9 @@ function parseFeature(raw: unknown, path: string): Feature {
   const n = reader(f, path);
   switch (f.type) {
     case 'box':
-      return { type: 'box', width: n('width'), points: railPoints(f.points, `${path}.points`) };
+      return { type: 'box', width: n('width'), points: railPoints(f.points, `${path}.points`), follow: n('follow', 0) };
     case 'rail':
-      return { type: 'rail', points: railPoints(f.points, `${path}.points`) };
+      return { type: 'rail', points: railPoints(f.points, `${path}.points`), follow: n('follow', 0) };
     case 'jump': {
       const lipHeight = n('lipHeight');
       const deck = f.deck === undefined ? true : bool(f.deck, `${path}.deck`);

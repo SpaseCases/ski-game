@@ -91,6 +91,8 @@ export class Keyboard {
   private heldCount = new Map<Action, number>();
   private pressedLatch = new Set<Action>();
   private releasedLatch = new Set<Action>();
+  /** Off while a menu is open: keys go to the page as usual (Tab moves focus, arrows scroll). */
+  private enabled = true;
 
   constructor(bindings: Bindings) {
     this.setBindings(bindings);
@@ -115,6 +117,12 @@ export class Keyboard {
     target.addEventListener('blur', () => this.releaseAll());
   }
 
+  /** Turns game keys on or off. Either way, everything held is dropped, so nothing carries across. */
+  setEnabled(on: boolean): void {
+    this.enabled = on;
+    this.releaseAll();
+  }
+
   /** Copies the current state into `out` and clears the latched edges. */
   sample(out: InputState): void {
     for (const action of ACTIONS) {
@@ -128,7 +136,7 @@ export class Keyboard {
   }
 
   private onKeyDown(e: KeyboardEvent): void {
-    if (isTypingTarget(e.target)) return;
+    if (!this.enabled || isTypingTarget(e.target)) return;
     // Enter and Space on a focused HUD button or link work it, not the game.
     if (isPressable(e.target) && (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space')) return;
     const actions = this.actionsByCode.get(e.code);

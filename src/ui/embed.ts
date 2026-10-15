@@ -10,9 +10,10 @@ export function isEmbedded(): boolean {
 
 /**
  * Adds the window buttons to the HUD: "Open in new tab" when embedded, and
- * "Fullscreen" only when the browser allows it here.
+ * "Fullscreen" only when the browser allows it here. Returns the bar, so
+ * other buttons can join it.
  */
-export function mountWindowButtons(hud: HTMLElement): void {
+export function mountWindowButtons(hud: HTMLElement): HTMLElement {
   const bar = document.createElement('div');
   bar.className = 'window-buttons';
 
@@ -46,5 +47,6 @@ export function mountWindowButtons(hud: HTMLElement): void {
     bar.appendChild(button);
   }
 
-  if (bar.childElementCount > 0) hud.appendChild(bar);
+  hud.appendChild(bar);
+  return bar;
 }

@@ -3,12 +3,11 @@ import {
   Group,
   InstancedMesh,
   Matrix4,
-  Mesh,
   MeshBasicMaterial,
   MeshLambertMaterial,
   Quaternion,
   Vector3,
-  type Object3D,
+  type BufferGeometry,
 } from 'three';
 import { alongLine, DECOR_SIZE, type DecorLayout, type ScatterItem } from '../maps/decor.ts';
 import type { Heightfield, LineDecor, XZ } from '../maps/types.ts';
@@ -17,10 +16,13 @@ import { drawProp, FLAG_COLORS, PALETTE, scatterModels } from './models.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
 
 // Draws a map's decoration: trees, snags and rocks as instanced meshes (one
-// draw call per model), everything else merged into meshes per 64 m tile so
-// whole tiles drop out when off screen or past the fog.
+// draw call per model in each band across the map), everything else merged
+// into meshes per 64 m tile, so whole bands and tiles drop out when off
+// screen or past the fog.
 
 const TILE = 64;
+/** Depth (m, down the slope) of one band of instanced trees and rocks. */
+const BAND = 160;
 /** How far (m) posts, trunks and rocks sink below the drawn snow so bumps never show a gap. */
 const SINK = 0.15;
 
@@ -58,48 +60,50 @@ export function createDecor(layout: DecorLayout, hf: Heightfield): Group {
   return group;
 }
 
-/** Frees the geometry of decoration made by createDecor (materials are shared and stay). */
-export function disposeDecor(group: Object3D): void {
-  group.traverse((o) => {
-    if (o instanceof Mesh) o.geometry.dispose();
-  });
-}
-
 function scatterMeshes(items: readonly ScatterItem[], hf: Heightfield): InstancedMesh[] {
   const models = scatterModels();
   const meshes: InstancedMesh[] = [];
+  for (const kind of ['pine', 'snag', 'rock', 'boulder'] as const) {
+    const variants = models[kind];
+    variants.forEach((geometry, v) => {
+      const bands = new Map<number, ScatterItem[]>();
+      for (const t of items) {
+        if (t.kind !== kind || Math.min(variants.length - 1, Math.floor(t.tint * variants.length)) !== v) continue;
+        const band = Math.floor(t.z / BAND);
+        const list = bands.get(band);
+        if (list) list.push(t);
+        else bands.set(band, [t]);
+      }
+      if (bands.size === 0) geometry.dispose();
+      for (const mine of bands.values()) meshes.push(scatterMesh(geometry, mine, hf));
+    });
+  }
+  return meshes;
+}
+
+/** One instanced mesh drawing `geometry` at every item. */
+function scatterMesh(geometry: BufferGeometry, mine: readonly ScatterItem[], hf: Heightfield): InstancedMesh {
   const m = new Matrix4();
   const q = new Quaternion();
   const pos = new Vector3();
   const scale = new Vector3();
   const up = new Vector3(0, 1, 0);
   const tint = new Color();
-  for (const kind of ['pine', 'snag', 'rock', 'boulder'] as const) {
-    const variants = models[kind];
-    variants.forEach((geometry, v) => {
-      const mine = items.filter((t) => t.kind === kind && Math.min(variants.length - 1, Math.floor(t.tint * variants.length)) === v);
-      if (mine.length === 0) {
-        geometry.dispose();
-        return;
-      }
-      const mesh = new InstancedMesh(geometry, material, mine.length);
-      mine.forEach((t, i) => {
-        pos.set(t.x, drawnHeightAt(hf, t.x, t.z) - SINK * t.scale, t.z);
-        q.setFromAxisAngle(up, t.yaw);
-        scale.setScalar(t.scale);
-        m.compose(pos, q, scale);
-        mesh.setMatrixAt(i, m);
-        // A little light and shade from one to the next.
-        const shade = 0.84 + 0.16 * ((t.tint * 7.3) % 1);
-        mesh.setColorAt(i, tint.setRGB(shade, shade, shade));
-      });
-      mesh.instanceMatrix.needsUpdate = true;
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-      mesh.computeBoundingSphere();
-      meshes.push(mesh);
-    });
-  }
-  return meshes;
+  const mesh = new InstancedMesh(geometry, material, mine.length);
+  mine.forEach((t, i) => {
+    pos.set(t.x, drawnHeightAt(hf, t.x, t.z) - SINK * t.scale, t.z);
+    q.setFromAxisAngle(up, t.yaw);
+    scale.setScalar(t.scale);
+    m.compose(pos, q, scale);
+    mesh.setMatrixAt(i, m);
+    // A little light and shade from one to the next.
+    const shade = 0.84 + 0.16 * ((t.tint * 7.3) % 1);
+    mesh.setColorAt(i, tint.setRGB(shade, shade, shade));
+  });
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  mesh.computeBoundingSphere();
+  return mesh;
 }
 
 /** Snow height under a spot, for sitting things on it. */

@@ -118,7 +118,7 @@ function gridMesh(
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(positions, 3));
   geometry.setAttribute('color', new BufferAttribute(colors, 3));
-  geometry.computeVertexNormals();
+  // No normals: flat shading works them out per face on the GPU.
   geometry.computeBoundingSphere();
   const mesh = new Mesh(geometry, material);
   mesh.matrixAutoUpdate = false;

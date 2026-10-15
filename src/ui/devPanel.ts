@@ -9,6 +9,8 @@ import type { SkierState } from '../sim/skier.ts';
 
 export interface DevPanel {
   update(pose: SkierPose, skier: SkierState): void;
+  /** Lists the test spots of a newly loaded map. */
+  setMap(map: MapDef): void;
 }
 
 export interface DevActions {
@@ -18,7 +20,6 @@ export interface DevActions {
   teleport: (x: number, z: number, heading: number, speed: number) => void;
   setQuality: (q: Quality) => void;
   quality: Quality;
-  map: MapDef;
 }
 
 const DEG = 180 / Math.PI;
@@ -31,9 +32,9 @@ export interface TestSpot {
 }
 
 /**
- * Places to try each feature from: every start gate, a run-up before each
- * jump, kicker, landing, rail and box, the halfpipe's drop-in deck, and the
- * slalom's first gate.
+ * Places to try each feature from: every start gate and flag, a run-up
+ * before each jump, kicker, landing, rail and box, the halfpipe's drop-in
+ * deck, and the slalom's first gate.
  */
 export function testSpots(map: MapDef): Record<string, TestSpot> {
   const spots: Record<string, TestSpot> = { spawn: { x: map.spawn.x, z: map.spawn.z, heading: map.spawn.heading / DEG } };
@@ -47,6 +48,9 @@ export function testSpots(map: MapDef): Record<string, TestSpot> {
     const h = heading / DEG;
     return { x: x + Math.sin(h) * back, z: z + Math.cos(h) * back, heading: h };
   };
+  map.flags.forEach((f, i) => {
+    spots[`flag ${i + 1}`] = before(f.x, f.z, f.heading, 8);
+  });
   for (const f of map.features) {
     switch (f.type) {
       case 'start':
@@ -98,22 +102,24 @@ export function mountDevPanel(actions: DevActions): DevPanel {
     .name('Quality (decor)')
     .onChange((q: Quality) => actions.setQuality(q));
 
-  const spots = testSpots(actions.map);
-  const go = { spot: 'spawn', speed: 0 };
+  let spots: Record<string, TestSpot> = {};
+  const go = {
+    spot: 'spawn',
+    speed: 0,
+    go: (): void => {
+      const s = spots[go.spot];
+      if (s) actions.teleport(s.x, s.z, s.heading, go.speed);
+    },
+  };
   const test = gui.addFolder('Test spots');
-  test.add(go, 'spot', Object.keys(spots)).name('Spot');
-  test.add(go, 'speed', 0, 30, 0.5).name('Speed (m/s)');
-  test
-    .add(
-      {
-        go: (): void => {
-          const s = spots[go.spot];
-          if (s) actions.teleport(s.x, s.z, s.heading, go.speed);
-        },
-      },
-      'go',
-    )
-    .name('Go there');
+  /** Rebuilds the folder for this map's spots (a dropdown's options can't change in place). */
+  const fillSpots = (): void => {
+    for (const c of [...test.controllers]) c.destroy();
+    go.spot = 'spawn';
+    test.add(go, 'spot', Object.keys(spots)).name('Spot');
+    test.add(go, 'speed', 0, 30, 0.5).name('Speed (m/s)');
+    test.add(go, 'go').name('Go there');
+  };
 
   const s = CONFIG.skier;
   const ride = gui.addFolder('Riding');
@@ -249,6 +255,10 @@ export function mountDevPanel(actions: DevActions): DevPanel {
   cam.close();
 
   return {
+    setMap(map: MapDef): void {
+      spots = testSpots(map);
+      fillSpots();
+    },
     update(pose: SkierPose, skier: SkierState): void {
       readout.speed = `${Math.round(pose.velocity.length() * 3.6)} km/h`;
       readout.state = skier.bailed
