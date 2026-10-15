@@ -143,34 +143,23 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 
 ## Status (2026-10-15)
 
-**Done:** 0 scaffold and deploy, 1 skiing, 2 air, 3 rails and boxes, 4 checkpoints, 5a map features, 5b map select and the Park. Also the Park Laps name and the low-poly skier with all its poses (`poses.html`). **Next:** 5c, the Freeride map.
-
-**5b in short**
-- The game opens on the map-select menu (arrow keys and Enter, or the mouse). Esc or the Maps button opens it again and pauses the game (the pause menu comes in milestone 6). `?map=park` in the URL skips straight to a map.
-- The Park is authored by `tools/maps/park.ts`, which writes `src/maps/park.json`: 2.4 km down, five sections (warm-up 7°, main park 10°, two steep pro zones at 21°, a cruise and jib garden at 7.5°) with flats between them, four lines side by side, a rail from the top to the finish, 121 features and 20 flags.
-- `tools/sim/line.ts` rides a whole line from a flag (standing or tucked, with or without pops and 720s). Every line runs top to bottom with no crashes; a straight run standing takes the bots 3.3 to 3.6 minutes (tucked, 2.7 to 3.2).
-- The two huge jumps: a clean 720 takes 2.28 s, so they need 2.75 s of air. Tucking the in-run from the flag gives 3.2 s without a pop and 3.5 s with one, both landing clean 720s. Measured in the game too.
-- Frame rate (this PC, CPU slowed 4×, Low preset): about 0.6 ms of main-thread work per frame, 30k to 104k triangles and 36 to 83 draw calls, fewer than the Test slope. Not yet checked on a Chromebook.
+**Done:** 0 scaffold and deploy, 1 skiing, 2 air, 3 rails and boxes, 4 checkpoints, 5a map features, 5b map select and the Park (`tools/maps/park.ts` writes `src/maps/park.json`; `tools/sim/line.ts` rides a whole line headlessly). **Next:** 5c, the Freeride map.
 
 **Known issues**
-- Not yet tested on a real school Chromebook.
+- Not yet tested on a real school Chromebook. On a PC with the CPU slowed 4×, the Park on Low uses ~0.6 ms of CPU per frame.
+- Esc opens the map menu as a stand-in pause until milestone 6.
+- The Park's huge jumps are sized for tucking the in-run from their flag; tucking straight in from the section above overshoots.
+- The long rail has no brake (about 23 m/s standing through the steeps).
+- Kicker-fed rails are built to roll onto; a full pop flies over them.
 - The Test slope ends in an invisible wall at the top of the side berms and at the bottom.
 - Riding off a rail sideways crashes unless you turn the skis back first.
-- A full pop carries 6–9 m: popped rails need a small, early pop, and a full pop off any Test slope jump flies past its landing (a rough landing, not a crash). Kicker-fed rails in the Park are built to roll onto without a pop.
-- The Park's huge jumps are sized for tucking the in-run. Standing with no pop cases the knuckle (rough, not a crash). Tucking straight in from the section above without checking speed lands low on the landing and can crash.
-- The pro line's terrain sits up to 15 m above or below the lines beside it, with steep banks between.
-- The long rail has no brake: about 23 m/s through the steeps standing, 35 m/s tucked.
-- Halfpipe airs turn with the path along the wall: a straight air lands forward, a 180 lands switch. Wall airs top out about 3.4 m above the coping.
 - In the japan grab the ski hangs low.
-- No pause menu yet (milestone 6). A flag respawns you at the middle of its gate, so maps keep that spot clear.
 
-**Tuned config values** (`src/config.ts`, start → now; none changed in 5b)
+**Tuned config values** (`src/config.ts`, start → now)
 - Riding: `gravity` 11 → 12, `skiFriction` 0.05 → 0.042, `dragStand` 0.0055 → 0.0066, `dragCrouch` 0.003 → 0.002, `brakeDecel` 6 → 9.5, `brakeRampTime` 0.15 → 0.12.
 - Turning: `grip` 1.8 → 2.0, `turnRateSlow` 2.8 → 2.3, `turnRateFast` 1.5 → 1.25, `turnResponse` 14 → 10.
 - Pole push: `polePushSpeed` 1.8 → 3.1, `poleMaxSpeed` 7 → 8.5, `polePushInterval` 0.55 → 0.73.
 - Pop: `popMin` 3 → 3.2, `popMax` 5.2 → 5.5.
 - Camera: `heightNear` 2.1 → 2.35, `heightFar` 2.6 → 4.85.
-- Landing tolerances loosened so edge landings stick.
-- Slalom poles: `kick` 0.25 → 0.6, `clipReach` 0.45 → 0.55.
-- Halfpipe, set by testing in 5a: `wallPop` 0.4, `wallLaunchMax` 9 m/s.
-- Still untuned: rail values, checkpoint timings, curve load, rough landings, ride-on, decoration density.
+- Slalom poles: `kick` 0.25 → 0.6, `clipReach` 0.45 → 0.55. Halfpipe: `wallPop` 0.4, `wallLaunchMax` 9 m/s.
+- Landing tolerances loosened so edge landings stick. Still untuned: rail values, checkpoint timings, curve load, rough landings, decoration density.
