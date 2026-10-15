@@ -1,10 +1,11 @@
 import './style.css';
 import { createInputState, DEFAULT_BINDINGS, Keyboard } from './core/input.ts';
 import { startLoop } from './core/loop.ts';
+import { PointerOrbit } from './core/pointerOrbit.ts';
 import { parseMap } from './maps/loader.ts';
 import { generateSlope } from './maps/terrain.ts';
 import testSlope from './maps/test-slope.json';
-import { ChaseCamera } from './render/chaseCamera.ts';
+import { ChaseCamera, type OrbitDrag } from './render/chaseCamera.ts';
 import { createFeatureMeshes } from './render/features.ts';
 import { createView, type View } from './render/scene.ts';
 import { createSkierPose, interpolateSkier, SkierView } from './render/skierView.ts';
@@ -50,6 +51,9 @@ const skierPrev = createSkierState();
 const pose = createSkierPose();
 const skierView = new SkierView(scene, heightfield);
 const chase = new ChaseCamera(camera, heightfield);
+const orbit = new PointerOrbit();
+orbit.attach(renderer.domElement);
+const drag: OrbitDrag = { x: 0, y: 0, active: false };
 let snapView = true;
 
 function respawn(): void {
@@ -84,7 +88,9 @@ startLoop(
       snapView = false;
     }
     skierView.update(pose, frameTime);
-    chase.update(pose, frameTime);
+    orbit.take(drag);
+    drag.active = orbit.dragging;
+    chase.update(pose, frameTime, drag);
 
     renderer.render(scene, camera);
     fps.frame(frameTime);

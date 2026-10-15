@@ -76,6 +76,7 @@ Each map defines: name, heightfield (generated from parameters or loaded from a 
 - Third-person chase from behind and above, smoothed. It pulls back as speed rises and swings around when you ride switch.
 - It doesn't clip into terrain.
 - In the air it keeps the horizon stable and does not spin with the skier.
+- Click-and-drag with the mouse (or a finger) orbits the camera around the skier. Standing still, the view stays where you leave it; once riding, it eases back behind the skier a moment after you let go.
 
 ## Audio (sound effects only)
 - Built with Web Audio, either procedurally (filtered noise) or from CC0 sound files.

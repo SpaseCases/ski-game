@@ -2,7 +2,7 @@
 export function mountControlsHint(hud: HTMLElement): void {
   const el = document.createElement('div');
   el.className = 'controls-hint';
-  el.textContent = '← → turn · hold ↑ crouch, release to pop · ↓ brake · Shift pole push · R restart';
+  el.textContent = '← → turn · hold ↑ crouch, release to pop · ↓ brake · Shift pole push · R restart · drag to look around';
   hud.appendChild(el);
 }
 

@@ -69,6 +69,12 @@ export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
   cam.add(c, 'heightSmoothingGround', 0.5, 30, 0.5);
   cam.add(c, 'heightSmoothingAir', 0.5, 30, 0.5);
   cam.add(c, 'clearance', 0, 3, 0.05);
+  cam.add(c, 'orbitSensitivity', 0.001, 0.02, 0.0005);
+  cam.add(c, 'orbitPitchMin', -1, 0, 0.05);
+  cam.add(c, 'orbitPitchMax', 0, 1.2, 0.05);
+  cam.add(c, 'orbitHoldSpeed', 0, 10, 0.1);
+  cam.add(c, 'orbitReturnDelay', 0, 5, 0.1);
+  cam.add(c, 'orbitReturnRate', 0.1, 10, 0.1);
   cam.close();
 
   return {

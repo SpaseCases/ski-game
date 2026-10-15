@@ -49,8 +49,8 @@ const ENTRIES: (Entry | null)[] = [
   { name: 'Right mute', note: 'Right hand, left ski, outside edge in front of the boot', pose: RIGHT_MUTE, airborne: true },
   { name: 'Left safety', note: 'Left hand, left ski, outside edge beside the boot', pose: LEFT_SAFETY, airborne: true },
   { name: 'Right safety', note: 'Right hand, right ski, outside edge beside the boot', pose: RIGHT_SAFETY, airborne: true },
-  { name: 'Left japan', note: 'Left hand on the left ski’s inside edge, ski tweaked up behind', pose: LEFT_JAPAN, airborne: true },
-  { name: 'Right japan', note: 'Right hand on the right ski’s inside edge, ski tweaked up behind', pose: RIGHT_JAPAN, airborne: true },
+  { name: 'Left japan', note: 'Left hand behind the leg to the left ski’s inside edge; tail up behind', pose: LEFT_JAPAN, airborne: true },
+  { name: 'Right japan', note: 'Right hand behind the leg to the right ski’s inside edge; tail up behind', pose: RIGHT_JAPAN, airborne: true },
   { name: 'Left tail', note: 'Left hand back to the left ski’s tail', pose: LEFT_TAIL, airborne: true },
   { name: 'Right tail', note: 'Right hand back to the right ski’s tail', pose: RIGHT_TAIL, airborne: true },
 ];
@@ -116,11 +116,15 @@ ENTRIES.forEach((entry, i) => {
     const title = document.createElement('strong');
     title.textContent = entry.name;
     label.append(title, entry.note);
-    const error = rigs[i]?.reachError ?? 0;
-    if (error > 0.02) {
+    const reach = rigs[i]?.reachError ?? 0;
+    const ankle = rigs[i]?.ankleError ?? 0;
+    const problems: string[] = [];
+    if (reach > 0.02) problems.push(`Hand or foot ${Math.round(reach * 100)} cm short of its target`);
+    if (ankle > 0) problems.push(`Boot bent ${Math.round(ankle)}° past what an ankle allows`);
+    for (const text of problems) {
       const warn = document.createElement('div');
       warn.className = 'reach-warning';
-      warn.textContent = `Hand or foot ${Math.round(error * 100)} cm short of its target`;
+      warn.textContent = text;
       label.append(warn);
     }
     cell.append(label);
@@ -129,7 +133,7 @@ ENTRIES.forEach((entry, i) => {
     cell.innerHTML =
       '<h1>Park Laps · skier poses</h1>' +
       '<p>Low-poly skier with procedural poses. Grabs are shown mid-air.</p>' +
-      '<p><strong>← →</strong> rotate every view · <strong>↑ ↓</strong> tilt · <strong>0</strong> reset</p>';
+      '<p><strong>← →</strong> rotate every view · <strong>↑ ↓</strong> tilt · <strong>+ −</strong> zoom · <strong>F</strong> zoom on head or feet · <strong>0</strong> reset</p>';
   }
   cells.append(cell);
 });
@@ -137,15 +141,22 @@ ENTRIES.forEach((entry, i) => {
 // View angle shared by all cells: 0 looks at the skier's front.
 const DEFAULT_YAW = 0.6;
 const DEFAULT_PITCH = 0.18;
+const DEFAULT_ZOOM = 1;
 let viewYaw = DEFAULT_YAW;
 let viewPitch = DEFAULT_PITCH;
+let zoom = DEFAULT_ZOOM;
+let focusFeet = false;
 const held = new Set<string>();
 window.addEventListener('keydown', (e) => {
   if (e.key.startsWith('Arrow')) e.preventDefault();
+  if (e.key === 'f' || e.key === 'F') focusFeet = !focusFeet;
   if (e.key === '0') {
     viewYaw = DEFAULT_YAW;
     viewPitch = DEFAULT_PITCH;
+    zoom = DEFAULT_ZOOM;
   }
+  if (e.key === '+' || e.key === '=') zoom = Math.min(4, zoom * 1.25);
+  if (e.key === '-' || e.key === '_') zoom = Math.max(0.6, zoom / 1.25);
   held.add(e.key);
 });
 window.addEventListener('keyup', (e) => held.delete(e.key));
@@ -176,15 +187,20 @@ function frame(now: number): void {
     renderer.setViewport(x, y, w, h);
     renderer.setScissor(x, y, w, h);
 
+    // Aim at the body; zooming in slides the aim to this pose's head (or feet).
     const lift = entry.airborne ? AIR_HEIGHT : 0;
-    const targetY = 0.92 + lift * 0.55;
-    const dist = 4.1;
+    const toFocus = Math.min(1, (zoom - 1) / 1.5);
+    const focus = focusFeet ? rig.feetCenter : rig.headCenter;
+    const tx = focus.x * toFocus;
+    const ty = (0.92 + lift * 0.55) * (1 - toFocus) + (focus.y + lift) * toFocus;
+    const tz = focus.z * toFocus;
+    const dist = 4.1 / zoom;
     camera.position.set(
-      Math.sin(viewYaw) * Math.cos(viewPitch) * dist,
-      targetY + Math.sin(viewPitch) * dist,
-      -Math.cos(viewYaw) * Math.cos(viewPitch) * dist,
+      tx + Math.sin(viewYaw) * Math.cos(viewPitch) * dist,
+      ty + Math.sin(viewPitch) * dist,
+      tz - Math.cos(viewYaw) * Math.cos(viewPitch) * dist,
     );
-    camera.lookAt(0, targetY, 0);
+    camera.lookAt(tx, ty, tz);
 
     rig.root.visible = true;
     renderer.render(scene, camera);

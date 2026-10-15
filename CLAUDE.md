@@ -11,7 +11,7 @@ Browser-based 3D freeski game for Chromebooks. Read `GAME_DESIGN.md` before star
 
 ## Hard constraints
 - **Target hardware:** low-end Chromebooks: ~4GB RAM, Celeron/MediaTek-class CPU, integrated GPU, 1366×768 screen. Must hold 60fps on the Low preset there and never drop below 30.
-- **Keyboard only.** No mouse-look, no pointer lock, no right-click. The mouse is only for clicking menus.
+- **Keyboard only for playing.** No pointer lock, no right-click, and no mouse-look while just moving the mouse. The mouse clicks menus, and the one exception (the user's request): click-and-drag on the game view orbits the camera around the skier, which eases back behind once riding.
 - **Runs inside an iframe:** a Google Sites page embeds the GitHub Pages URL. Detect `window.self !== window.top`; when embedded, show an "Open in new tab" button. Only show a Fullscreen button when `document.fullscreenEnabled` is true.
 - **No sound before the first user input** (browser autoplay rules).
 - **localStorage can throw or get wiped.** Wrap every read and write in try/catch; the game must work without it.

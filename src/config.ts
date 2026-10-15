@@ -94,6 +94,19 @@ export const CONFIG = {
     heightSmoothingAir: 3,
     /** Minimum gap (m) between camera and snow. */
     clearance: 0.7,
+    /** Mouse-drag orbit: radians turned per pixel dragged. */
+    orbitSensitivity: 0.006,
+    /** Extra tilt the drag can add (radians, below and above the normal view). */
+    orbitPitchMin: -0.5,
+    orbitPitchMax: 0.85,
+    /**
+     * After letting go, once the skier is faster than orbitHoldSpeed (m/s),
+     * the camera waits orbitReturnDelay seconds and then swings back behind
+     * at orbitReturnRate per second. Slower than that, the view stays put.
+     */
+    orbitHoldSpeed: 2,
+    orbitReturnDelay: 1,
+    orbitReturnRate: 2,
   },
 
   render: {
