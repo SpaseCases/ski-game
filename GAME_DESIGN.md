@@ -69,10 +69,15 @@ Every map has a start gate themed to its kind of skiing, checkpoint flags, a fin
    - Decoration: orange safety fencing along the lines, plain banners, a chairlift in the distance, light poles, a groomer parked to the side.
    - Start gate: a wooden start deck under a banner arch.
    - Flags: one at the start of each section.
-2. **Freeride:** a really big open mountain, the largest map, several minutes top to bottom and wide enough for many separate lines: bowls, rollers, cliff bands and drops of several heights, chutes, pillows, natural side hits, and tree runs.
-   - Decoration: dense rock outcrops and boulders, stands of trees (solid in the tree runs), wind-scoured ridges, a few dead snags.
-   - Start gate: a ridgetop start with a line of flags and a small start hut, like a freeride contest.
-   - Flags: 4 to 6, spread across the main lines.
+2. **Freeride:** a grand mountain adventure. You start on the summit and can ride down in any direction, not along one line: about 2 to 3 minutes from the peak to the bottom whichever way you go, with far more variety than the Park.
+   - Every face has its own character, for example steep chutes and cliff bands with drops of several heights; open bowls and pillow fields; tree runs; rolling terrain with natural side hits. Ridges between the faces carry wind lips and cornices, and a gully makes a natural halfpipe.
+   - Natural features to ride: fallen trees as rails (slides that look like logs), rock and stump jibs, and booters (snow kickers with landings) dug into ridges, gully walls and banks. Some built jumps and rails too, but mostly natural ones.
+   - A ski town at the base of one face, fully rideable: chalet roofs as drops and kickers, handrails down stairs, ledges and benches as rails and boxes, a main street, lamp posts and banners. Building walls are solid.
+   - Runs end in the town or at a run-out at the base of each other face; each has a finish zone with Back to top, which returns to the summit (no lift ride: chairlifts climb the faces as scenery).
+   - Scenery: rock outcrops and boulders, stands of trees (solid in the tree runs) thinning to a treeline, dead snags, wind-scoured ridges, trail signs at forks, and distant peaks around the map. Detailed enough to look good on a fast computer in clear weather (milestone 6b), while Low thins it out.
+   - Start gate: a ridgetop start on the summit with a line of flags and a small start hut, like a freeride contest.
+   - Flags: on ledges and shoulders across the mountain, at the top of each face's main lines, so a respawn puts you back on the line you were riding.
+   - Built by a script like the Park (`tools/maps/`): the mountain's overall shape around the peak, terrain features placed on it (ridges, bowls, gullies, cliffs, chutes, pillows), then fine rocky detail.
 3. **Slalom:** two timed courses side by side on a groomed run: a slalom with tight gates and a giant slalom with wider, faster turns. Each course has its own race start house and timing wand, its own gates, run timer, missed-gate count and finish line, and respawn returns you to that course's start house. This map alone has timed runs.
    - Slalom gates bend when you clip them. Giant slalom gates have a plain panel between their two poles.
    - Start gates: a race start house with a timing wand at the top of each course.
@@ -91,7 +96,7 @@ Every map has a start gate themed to its kind of skiing, checkpoint flags, a fin
 ### Mechanics the maps need
 - Done in 5a: the halfpipe (wall riding follows the surface normal; airs launch straight up and land back in the transition), ride-on rails and boxes at snow level, slalom gates with flex, the missed-gate check and the run timer.
 - Done in 5b: terrain with varied pitch (the fall line as pitch sections, plus lanes: bands with their own fall line that start and end level with the slope beside them), rails that follow the snow, and the map-select menu.
-- Still to build: bowls, ridges and cliffs, more than one timed course on a map, and giant slalom gates with panels.
+- Still to build: terrain built around a peak that can be ridden down in any direction (ridges, bowls, gullies, cliff bands, chutes, pillows), several finish zones on one map, decoration placed by height and steepness, log rails, rideable buildings, more than one timed course on a map, and giant slalom gates with panels.
 
 Each map defines: name, heightfield (generated from parameters or loaded from a small grayscale PNG), features, spawn, start gate type, flags, finish zone, decoration sets, and sky and fog colors. Large maps split their terrain into chunks with frustum culling, so only what's inside the fog distance gets drawn.
 
@@ -124,7 +129,7 @@ Each map defines: name, heightfield (generated from parameters or loaded from a 
 - **HUD:** minimal and with no score. A brief "Checkpoint set" toast, the Back to top button at the finish, and "Open in new tab" when the game is embedded.
 
 ## Not in v1 (later ideas)
-Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ragdoll crashes, the full grab set, replays and photo mode, a level editor, gamepad support, music, multiplayer.
+Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ragdoll crashes, the full grab set, replays and photo mode, a level editor, gamepad support, music, multiplayer, riding a chairlift back up.
 
 ## Milestones
 0. **Scaffold and deploy.** Vite + TypeScript + Three.js app showing a slope and a box, deployed to GitHub Pages by GitHub Actions, with `embed-test.html` working. Test on a school Chromebook at this point.
@@ -134,16 +139,18 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 4. **Checkpoints.** Flags, the personal checkpoint, respawn, hold-R to top, and the finish zone with its Back to top button.
 5a. **Map features.** The halfpipe, knuckled jump shapes, ride-on rails and boxes, kicker-to-rail setups, slalom gates and the run timer, the four start gate types, and the decoration system with its density tied to the quality preset. Test each one on the test slope.
 5b. **Map select and the Park.** A simple map-select menu (a card per map, keyboard or mouse; milestone 6 finishes the menus) with the Test slope as a card. Terrain with varied pitch. Then the Park map from the Maps section. Verify its 720 jumps by measuring airtime, and check its frame rate on the Low preset, fully decorated.
-5c. **Freeride map.** Check its frame rate on the Low preset, fully decorated.
+5c-1. **Freeride, part 1: the mountain.** Terrain built around a peak and ridable in every direction, each face with its own character (ridges, bowls, gullies, cliff bands, chutes, pillows, wind lips), the summit start, flags, a finish zone at the base of each face, trees and rocks placed by height and steepness, and headless checks that ride down every face. Check its frame rate on the Low preset, fully decorated.
+5c-2. **Freeride, part 2: the town and natural features.** The rideable ski town, fallen-log rails, rock and stump jibs, booters, some built jumps and rails, trail signs, chairlifts and distant peaks as scenery. Check its frame rate on the Low preset, fully decorated, and that it looks good on High.
 5d. **Slalom map.** Its two timed courses (more than one timed course on a map) and giant slalom gates.
 5e. **Big air map.** Verify its 720 jumps by measuring airtime.
 6. **Menus.** Outfit colors, settings, key rebinding, and pause.
+6b. **Weather.** Clear (bluebird) or overcast and blizzard, changing the fog distance, sky and light, with falling snow in a blizzard. Low keeps its fog inside the Chromebook budget; clear weather on a fast computer shows the far scenery.
 7. **Sound effects.**
 8. **Performance and polish pass** on the Low preset, then a final embed and deploy check.
 
 ## Status (2026-10-15)
 
-**Done:** 0 scaffold and deploy, 1 skiing, 2 air, 3 rails and boxes, 4 checkpoints, 5a map features, 5b map select and the Park (`tools/maps/park.ts` writes `src/maps/park.json`; `tools/sim/line.ts` rides a whole line headlessly). After play-testing, the Park was made steeper (11° and 13° sections, 6° flats) and shorter (1.94 km) with the same features packed closer; a straight standing run takes the bots about 2 to 2.5 minutes. **Next:** 5c, the Freeride map.
+**Done:** 0 scaffold and deploy, 1 skiing, 2 air, 3 rails and boxes, 4 checkpoints, 5a map features, 5b map select and the Park (`tools/maps/park.ts` writes `src/maps/park.json`; `tools/sim/line.ts` rides a whole line headlessly). After play-testing, the Park was made steeper (11° and 13° sections, 6° flats) and shorter (1.94 km) with the same features packed closer; a straight standing run takes the bots about 2 to 2.5 minutes. **Next:** 5c-1, the Freeride mountain (see Maps, Freeride).
 
 **Known issues**
 - Not yet tested on a real school Chromebook. On a PC with the CPU slowed 4×, the Park on Low uses ~0.6 ms of CPU per frame.
