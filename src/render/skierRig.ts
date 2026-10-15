@@ -232,11 +232,12 @@ export class SkierRig {
 
     this.feetCenter.addVectors(this.ankles[0]!, this.ankles[1]!).multiplyScalar(0.5);
 
-    // Jacket skirt hangs from the waist, swinging partway toward the thighs.
+    // Jacket skirt hangs from the waist, swinging most of the way toward the
+    // thighs so bent legs push it forward instead of poking through it.
     const hinge = v1.set(0, 0.05, 0).applyQuaternion(this.pelvisQ).add(this.pelvisPos);
     v2.copy(DOWN).applyQuaternion(this.pelvisQ);
     v3.subVectors(this.knees[0]!, this.hips[0]!).add(v4.subVectors(this.knees[1]!, this.hips[1]!)).normalize();
-    v2.lerp(v3, 0.45).normalize();
+    v2.lerp(v3, 0.7).normalize();
     hint.set(0, 0, -1).applyQuaternion(this.pelvisQ);
     segment(this.skirt, hinge, v4.copy(hinge).add(v2), hint);
   }
@@ -456,8 +457,8 @@ function buildTorso(jacket: Color): BufferGeometry {
  */
 function buildSkirt(jacket: Color): BufferGeometry {
   return merge([
-    paint(prism(0.218, 0.276, 0.36, 12).scale(1, 1, 0.72), jacket),
-    paint(prism(0.278, 0.28, 0.03, 12).translate(0, 0.335, 0).scale(1, 1, 0.72), shade(jacket, 0.78)),
+    paint(prism(0.218, 0.276, 0.36, 12).scale(1, 1, 0.78), jacket),
+    paint(prism(0.278, 0.28, 0.03, 12).translate(0, 0.335, 0).scale(1, 1, 0.78), shade(jacket, 0.78)),
   ]);
 }
 

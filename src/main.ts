@@ -75,7 +75,7 @@ if (import.meta.env.DEV) {
     devPanel = mountDevPanel({ respawn });
   });
   // Handle for inspecting the sim from the browser console while testing.
-  Object.assign(window, { parkLaps: { skier, respawn, config: CONFIG, skierView } });
+  Object.assign(window, { parkLaps: { skier, respawn, config: CONFIG, skierView, camera } });
 }
 
 startLoop(

@@ -132,7 +132,7 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - Jumps are a map feature (`type: "jump"`), shaped exactly on top of the heightfield so lips stay sharp.
 
 **Tuned config values** (`src/config.ts`, starting value → current)
-- `skier.gravity` 11 → 12; `skier.skiFriction` 0.05 → 0.035 (faster acceleration).
+- `skier.gravity` 11 → 12; `skier.skiFriction` 0.05 → 0.035 → 0.025 (faster acceleration); `dragCrouch` 0.003 → 0.002.
 - `skier.grip` 1.8 → 2.0, plus new `carveFriction` 0.08; the ski turn rate is capped by grip so held turns carve.
 - `skier.turnRateSlow` 2.8 → 2.3, `turnRateFast` 1.5 → 1.25, `turnResponse` 14 → 10 (slower turning).
 - `skier.brakeDecel` 6 → 7.
@@ -140,7 +140,9 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - `skier.popMin` 3 → 3.2, `popMax` 5.2 → 5.5 (keeps pop heights at the higher gravity).
 - `light.sunFrom` moved behind and above the skier so the chase camera sees it lit.
 - Landing made more forgiving on edges: the tilt check is split into `landing.pitchMax` 0.6 (nose up/down) and `rollMax` 0.9 (on an edge); `sideMax` 1.0 rad, `sideSpeed` 4 → 6; airs under `edgeCheckAir` 0.3 s skip the edge and sideways checks.
-- `skier.polePushSpeed` 2.4 → 2.9 (stronger pole push).
+- `skier.polePushSpeed` 2.4 → 3.1 and `polePushInterval` 0.8 → 0.73 (stronger, quicker pole pushes).
+- `camera.heightNear` 2.1 → 2.35, `heightFar` 2.6 → 4.85 (higher view at speed). The camera always aims at the skier's real height, so a loose follow in the air never drops them off screen.
+- Stance knees straightened a little; the jacket skirt follows the thighs 70% of the way so bent legs don't poke through its front.
 - Athletic stance (lower hips, knees over toes, chest forward, hands out front). Turns come from the knees: `render.leanBodyShare` 0.5 of the lean tilts the body, the rest drives the hips (`hipShift`) and knees (`kneeDrive`) into the turn while the skis roll fully onto their edges; the upper body turns slightly downhill (`turnCounter`).
 - The skis rest on the drawn snow facets (the sim rides a smooth surface a few cm off), and the side banks have half the facet jitter they had.
 - New look and camera values: `render.tuckSpeedMin` 7 / `tuckSpeedFull` 12, `brakeCounter` 0.4, `brakeLean` 0.3, `brakeSink` 0.35; `camera.orbit*` for the drag orbit.

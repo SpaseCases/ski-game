@@ -13,10 +13,10 @@ export const CONFIG = {
     /** m/s². Above real gravity so the slope pulls hard and airs feel snappy. */
     gravity: 12,
     /** Kinetic friction coefficient along the skis. */
-    skiFriction: 0.035,
+    skiFriction: 0.025,
     /** Quadratic air drag (per meter) standing up and fully crouched. */
     dragStand: 0.0055,
-    dragCrouch: 0.003,
+    dragCrouch: 0.002,
     /** Quadratic air drag (per meter) in the air. */
     dragAir: 0.004,
 
@@ -49,13 +49,13 @@ export const CONFIG = {
     brakeRampTime: 0.15,
 
     /** Speed (m/s) one pole push adds from a standstill; it shrinks to zero at poleMaxSpeed. */
-    polePushSpeed: 2.9,
+    polePushSpeed: 3.1,
     poleMaxSpeed: 8.5,
     /** Seconds from the start of a push until the poles bite, then how long the push force lasts. */
     polePlantTime: 0.1,
     polePushTime: 0.5,
     /** Seconds per push cycle while Shift is held (also the length of the push animation). */
-    polePushInterval: 0.8,
+    polePushInterval: 0.73,
 
     /** Seconds to reach full crouch, and to stand back up. */
     crouchTime: 0.22,
@@ -140,8 +140,8 @@ export const CONFIG = {
     /** Distance behind and height above the skier, slow and at speedForFar. */
     distNear: 4.4,
     distFar: 6.4,
-    heightNear: 2.1,
-    heightFar: 2.6,
+    heightNear: 2.35,
+    heightFar: 4.85,
     /** m/s where the camera reaches its far distance. */
     speedForFar: 25,
     /** Aim point: height above the feet and distance ahead along travel. */

@@ -59,11 +59,12 @@ export class ChaseCamera {
       this.orbitPitch -= this.orbitPitch * k;
     }
 
-    // Follow height smoothly. On the snow, lead by vertical speed so a steady
-    // descent doesn't leave the camera lagging; in the air, follow loosely
-    // so the horizon stays calm.
+    // The camera's height follows smoothly: tightly on the snow, loosely in
+    // the air so the horizon stays calm. Leading by vertical speed stops it
+    // trailing behind a steady climb or fall. Its aim always stays on the
+    // skier (see place), so a lagging camera never loses them off screen.
     const rate = pose.grounded ? c.heightSmoothingGround : c.heightSmoothingAir;
-    const lead = pose.grounded ? pose.velocity.y / rate : 0;
+    const lead = pose.velocity.y / rate;
     this.focusY += (focusHeight(pose) + lead - this.focusY) * smoothing(rate, frameTime);
 
     this.place(pose);
@@ -92,11 +93,12 @@ export class ChaseCamera {
     // Stay above the snow at the camera and halfway back to the skier.
     cy = Math.max(cy, heightAt(this.hf, cx, cz) + c.clearance);
     const midGround = heightAt(this.hf, (p.x + cx) / 2, (p.z + cz) / 2) + c.clearance;
-    const midLine = (this.focusY + c.lookHeight + cy) / 2;
+    const lookY = focusHeight(pose) + c.lookHeight;
+    const midLine = (lookY + cy) / 2;
     if (midGround > midLine) cy += 2 * (midGround - midLine);
 
     this.camera.position.set(cx, cy, cz);
-    this.camera.lookAt(p.x + fx * c.lookAhead, this.focusY + c.lookHeight, p.z + fz * c.lookAhead);
+    this.camera.lookAt(p.x + fx * c.lookAhead, lookY, p.z + fz * c.lookAhead);
   }
 
   /** Heading of travel, falling back to where the skis point when nearly stopped. */

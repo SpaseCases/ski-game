@@ -65,14 +65,14 @@ const SNOW_FEET: PoseDef['feet'] = [{ ankle: [-0.13, 0.16, 0.02] }, { ankle: [0.
  * and hands out in front, wider than the body.
  */
 export const STANCE: PoseDef = {
-  pelvis: [0, 0.85, 0.1],
-  pelvisPitch: 0.3,
-  chestPitch: 0.12,
-  headPitch: -0.34,
+  pelvis: [0, 0.89, 0.08],
+  pelvisPitch: 0.24,
+  chestPitch: 0.13,
+  headPitch: -0.3,
   feet: SNOW_FEET,
   hands: [
-    { at: [-0.37, 0.92, -0.34], pole: [-0.15, -0.84, 0.52] },
-    { at: [0.37, 0.92, -0.34], pole: [0.15, -0.84, 0.52] },
+    { at: [-0.37, 0.95, -0.33], pole: [-0.15, -0.84, 0.52] },
+    { at: [0.37, 0.95, -0.33], pole: [0.15, -0.84, 0.52] },
   ],
 };
 
