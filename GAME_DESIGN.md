@@ -109,33 +109,28 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 
 ## Status (2026-10-15)
 
-**Milestones done**
+**Done**
 - 0, scaffold and deploy: Vite + Three.js, GitHub Pages via Actions, `embed-test.html`.
 - 1, skiing: carving, hockey-stop brake, pole push, crouch and pop, chase camera with drag orbit, dev tuning panel.
-- 2, air: spins, flips, corks and misty flips, Lincoln loops, the 8 grabs, carve-into-the-lip spin, landing check, crash tumble, fade and respawn. The test slope has three jumps.
-- 3, rails and boxes: land on a rail or box to lock on (light magnet), slide with friction, ←/→ rotate the skis freely, pop or spin off, ride off the end. Missing the line or landing off-angle slips off. Hitting a rail or box below its top bumps you, or crashes you if hard. The test slope has a flat box, a flat rail, a down rail, a flat-down rail, and a 65 m test rail on the right.
-- Also done early: the Park Laps name, the low-poly skier and all its poses (`poses.html`, which also shows the in-game riding states), turns driven from the knees. Skier look: snug matte black helmet, small goggles, black gaiter (no face showing), a straight hip-length shell jacket whose lower part rides up over the thighs.
-- 4, checkpoints: flag gates (two poles; riding through saves the gate, its pennants turn from orange to green), Tab personal checkpoint with position, heading and speed (a blue marker shows it), R back to the latest checkpoint (held: the skier waits there; after 1 s, back to the top with a progress bar), a finish arch and checkered line, and a Back to top panel at the finish (Enter or click). Back to top forgets every checkpoint and passed flag. The test slope has 3 flags and a finish zone over the runout.
+- 2, air: spins, flips, corks, Lincoln loops, the 8 grabs, landing check, crash tumble, respawn.
+- 3, rails and boxes: lock on by landing, slide, free ski rotation, pop or spin off, slip off when off-angle.
+- 4, checkpoints: flag gates, Tab personal checkpoint (keeps speed), R respawn, hold R to go to the top, finish zone with Back to top.
+- Also done: the Park Laps name and the low-poly skier with all its poses (`poses.html`).
 - Next: milestone 5 (the three maps).
 
 **Known issues**
 - Not yet tested on a real school Chromebook.
 - The test slope ends in an invisible wall.
-- Riding off a rail sideways crashes unless you turn the skis back first (the landing checks sideways however short the drop).
-- A full pop carries 6–9 m, so you pop well before a rail. Lower `popMin`/`popMax` if rails feel hard to hit.
-- No ride-on (snow-level) boxes or rails yet; every feature needs a pop to get on.
-- Back to top isn't in a pause menu yet (that comes with the menus in milestone 6).
-- Respawning at a flag puts you at the middle of the gate, so a map must keep that spot clear of features.
-- The large test jump: a full pop above ~15 m/s overshoots the landing and crashes, and a 720 needs a little more air than it gives. The real maps (milestone 5) get properly sized jumps.
+- Riding off a rail sideways crashes unless you turn the skis back first.
+- A full pop carries 6–9 m, so rails need an early pop. No snow-level boxes or rails yet.
+- The large test jump is badly sized: a fast full pop overshoots the landing. Milestone 5 maps get properly sized jumps.
 - In the japan grab the ski hangs low.
+- Back to top isn't in a pause menu yet (milestone 6). A flag respawns you at the middle of its gate, so maps must keep that spot clear.
 
-**Tuned config values** (`src/config.ts`, starting value → now)
+**Tuned config values** (`src/config.ts`, start → now)
 - Riding: `gravity` 11 → 12, `skiFriction` 0.05 → 0.042, `dragStand` 0.0055 → 0.0066, `dragCrouch` 0.003 → 0.002, `brakeDecel` 6 → 9.5, `brakeRampTime` 0.15 → 0.12.
-- Turning: `grip` 1.8 → 2.0 (plus new `carveFriction` 0.08), `turnRateSlow` 2.8 → 2.3, `turnRateFast` 1.5 → 1.25, `turnResponse` 14 → 10.
+- Turning: `grip` 1.8 → 2.0, `turnRateSlow` 2.8 → 2.3, `turnRateFast` 1.5 → 1.25, `turnResponse` 14 → 10.
 - Pole push: `polePushSpeed` 1.8 → 3.1, `poleMaxSpeed` 7 → 8.5, `polePushInterval` 0.55 → 0.73.
 - Pop: `popMin` 3 → 3.2, `popMax` 5.2 → 5.5.
-- Landing (new, loosened for edges): `pitchMax` 0.6, `rollMax` 1.15, `sideMax` 1.0 rad, `sideSpeed` 6 m/s, `edgeCheckAir` 0.3 s.
 - Camera: `heightNear` 2.1 → 2.35, `heightFar` 2.6 → 4.85.
-- Rails (new, untuned): `snapDistance` 0.35 m, `angleMax` 0.6 rad, `tiltMax` 0.75 rad, `railFriction` 0.05, `boxFriction` 0.09, `turnRate` 4 rad/s with `turnAccel` 30, `spinCarry` 0.5, `crashSpeed` 5 m/s.
-- Checkpoints (new): `holdToTop` 1 s, `toastTime` 1.6 s, flag `poleHeight` 3.2 m.
-- Skier look (new): `render.leanBodyShare` 0.5, `hipShift` 0.3, `kneeDrive` 1.1, `turnCounter` 0.25, `crouchAngulation` 0.25 (in a crouch or tuck most of the lean tilts the whole body).
+- Added along the way: landing tolerances (loosened so edge landings stick), rail values and checkpoint timings (both still untuned), and skier pose values.
