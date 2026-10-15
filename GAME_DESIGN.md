@@ -57,38 +57,40 @@ Grabs (hold in the air, release to let go):
 - Holding R for 1s sends you back to the top.
 - Every map has a finish zone at the bottom. Entering it shows an on-screen **Back to top** button (Enter also works). Back to top is also in the pause menu.
 
-## Maps (v1: four maps, all unlocked from the start)
-Every map has a start gate themed to its kind of skiing, checkpoint flags, a finish zone, and enough decoration to feel like a real place. Decoration stays inside the performance budget: instanced and merged meshes, and the Low preset thins it out. No real brand names or logos anywhere.
+## Maps (v1: four maps plus the Test slope, all unlocked from the start)
+Every map has a start gate themed to its kind of skiing, checkpoint flags, a finish zone, and enough decoration to feel like a real place. Decoration stays inside the performance budget: instanced and merged meshes, and the Low preset thins it out. No real brand names or logos anywhere. Every map is picked from the map-select menu.
 
-1. **Park:** a large terrain park, about 2 to 3 minutes top to bottom, with several lines side by side so you can pick a route.
-   - Jumps in every size, from small tables to a pro line of big jumps. The biggest jumps clear a clean 720 (see Jump sizing).
-   - Every jump has a rounded knuckle, and landing on it is rideable rather than an instant crash. Include step-ups, step-downs, and a hip.
-   - Rails and boxes: flat, down, flat-down, down-flat-down, kinked, and a rainbow. Mix ride-on features at snow level with ones you reach off a kicker (a jump onto a rail).
-   - A halfpipe with a drop-in deck at the top.
+1. **Park:** a huge terrain park, about 4 to 5 minutes top to bottom, with several lines side by side so you can pick a route, and flatter stretches between sections so speed stays under control.
+   - Jumps in every size, from small tables to a pro line of huge jumps. The biggest jumps clear a clean 720 (see Jump sizing).
+   - Every jump has a rounded knuckle, and landing on it is rideable rather than an instant crash. Include step-ups, step-downs, and hips.
+   - Rails and boxes of every kind: flat, down, flat-down, down-flat-down, kinked, and rainbow. Plenty are ride-on at snow level, and plenty are reached off a kicker (jumps onto rails and onto boxes).
+   - A rail that runs the whole way from the top of the map to the bottom.
+   - At least two halfpipes, a smaller one and a big one, each with a drop-in deck at the top.
    - Decoration: orange safety fencing along the lines, plain banners, a chairlift in the distance, light poles, a groomer parked to the side.
    - Start gate: a wooden start deck under a banner arch.
-   - Flags: one at the start of each section, about 5 in all.
-2. **Big air:** several big jumps of different sizes and takeoff steepness, from long and mellow to steep and poppy, side by side at the bottom of the hill. Each has its own lane from a shared start. At least two of them clear a 720 (see Jump sizing).
+   - Flags: one at the start of each section.
+2. **Freeride:** a really big open mountain, the largest map, several minutes top to bottom and wide enough for many separate lines: bowls, rollers, cliff bands and drops of several heights, chutes, pillows, natural side hits, and tree runs.
+   - Decoration: dense rock outcrops and boulders, stands of trees (solid in the tree runs), wind-scoured ridges, a few dead snags.
+   - Start gate: a ridgetop start with a line of flags and a small start hut, like a freeride contest.
+   - Flags: 4 to 6, spread across the main lines.
+3. **Slalom:** two timed courses side by side on a groomed run: a slalom with tight gates and a giant slalom with wider, faster turns. Each course has its own race start house and timing wand, its own gates, run timer, missed-gate count and finish line, and respawn returns you to that course's start house. This map alone has timed runs.
+   - Slalom gates bend when you clip them. Giant slalom gates have a plain panel between their two poles.
+   - Start gates: a race start house with a timing wand at the top of each course.
+   - Decoration: blue course lines dyed in the snow, safety netting along both sides, a finish banner for each course.
+4. **Big air:** several big jumps of different sizes and takeoff steepness, from long and mellow to steep and poppy, side by side at the bottom of the hill. Each has its own lane from a shared start. At least two of them clear a 720 (see Jump sizing).
    - Start gate: a scaffold drop-in tower, like a big air contest.
    - Decoration: spectator fencing beside the landings, flags, floodlights.
    - Flags: one at the top of each lane.
-3. **Freeride:** a large open face, about 2 to 3 minutes top to bottom, with many possible lines: a bowl, rollers, cliff bands and drops of several heights, chutes, pillows, natural side hits, and tree runs.
-   - Decoration: dense rock outcrops and boulders, stands of trees, wind-scoured ridges, a few dead snags.
-   - Start gate: a ridgetop start with a line of flags and a small start hut, like a freeride contest.
-   - Flags: 3 to 4.
-4. **Slalom:** a groomed carving run with slalom gates that bend when you clip them. This map alone shows a run timer and a missed-gate count. Respawn returns you to the start house.
-   - Start gate: a race start house with a timing wand that starts the timer when you push through it.
-   - Decoration: blue course lines dyed in the snow, safety netting along both sides, a finish banner.
+5. **Test slope:** the development map, kept as a playable map: every feature side by side in four lanes (halfpipe, jumps, rails and boxes, slalom) under all four start gates, for trying things out.
 
 ### Jump sizing
 - Size the 720 jumps from the config: measure the airtime a clean 720 takes at the current spin rate, including winding up and slowing down, then give those jumps at least 20% more airtime than that at the speed the in-run naturally reaches.
 - Every landing is long enough that riding in at full speed with a full pop still lands on the slope, not past it onto flat.
 - Casing a knuckle at low speed is a rough landing, not a crash.
 
-### New mechanics the maps need
-- **Halfpipe:** ride up the walls, launch straight up out of the pipe, rotate, and land back in the transition. Wall riding follows the surface normal, not only the terrain height.
-- **Ride-on rails and boxes** at snow level, so you can get on without a pop.
-- **Slalom gates** with simple flex when clipped, a missed-gate check, and the run timer.
+### Mechanics the maps need
+- Done in 5a: the halfpipe (wall riding follows the surface normal; airs launch straight up and land back in the transition), ride-on rails and boxes at snow level, slalom gates with flex, the missed-gate check and the run timer.
+- Still to build: terrain with varied pitch (flats, steeps, bowls, ridges, cliffs; the generator only makes one straight slope), more than one timed course on a map, giant slalom gates with panels, and the map-select menu.
 
 Each map defines: name, heightfield (generated from parameters or loaded from a small grayscale PNG), features, spawn, start gate type, flags, finish zone, decoration sets, and sky and fog colors. Large maps split their terrain into chunks with frustum culling, so only what's inside the fog distance gets drawn.
 
@@ -113,7 +115,7 @@ Each map defines: name, heightfield (generated from parameters or loaded from a 
 
 ## Menus (HTML/CSS overlay, usable with keyboard or mouse)
 - **Title:** Play, Outfit, Settings, Controls
-- **Map select:** four cards
+- **Map select:** a card per map: Park, Freeride, Slalom, Big air, and the Test slope
 - **Outfit:** color pickers with a live preview of the skier
 - **Settings:** quality (Auto / Low / Medium / High), volume, key rebinding, reset to defaults
 - **Controls:** the tables above
@@ -130,32 +132,27 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 3. **Rails and boxes.**
 4. **Checkpoints.** Flags, the personal checkpoint, respawn, hold-R to top, and the finish zone with its Back to top button.
 5a. **Map features.** The halfpipe, knuckled jump shapes, ride-on rails and boxes, kicker-to-rail setups, slalom gates and the run timer, the four start gate types, and the decoration system with its density tied to the quality preset. Test each one on the test slope.
-5b. **The four maps.** Build Park, Big air, Freeride, and Slalom from the Maps section. Verify the 720 jumps by measuring airtime, and check the frame rate on the Low preset with each map fully decorated.
+5b. **Map select and the Park.** A simple map-select menu (a card per map, keyboard or mouse; milestone 6 finishes the menus) with the Test slope as a card. Terrain with varied pitch. Then the Park map from the Maps section. Verify its 720 jumps by measuring airtime, and check its frame rate on the Low preset, fully decorated.
+5c. **Freeride map.** Check its frame rate on the Low preset, fully decorated.
+5d. **Slalom map.** Its two timed courses (more than one timed course on a map) and giant slalom gates.
+5e. **Big air map.** Verify its 720 jumps by measuring airtime.
 6. **Menus.** Outfit colors, settings, key rebinding, and pause.
 7. **Sound effects.**
 8. **Performance and polish pass** on the Low preset, then a final embed and deploy check.
 
 ## Status (2026-10-15)
 
-**Done**
-- 0, scaffold and deploy: Vite + Three.js, GitHub Pages via Actions, `embed-test.html`.
-- 1, skiing: carving, hockey-stop brake, pole push, crouch and pop, chase camera with drag orbit, dev tuning panel.
-- 2, air: spins, flips, corks, Lincoln loops, the 8 grabs, landing check, crash tumble, respawn.
-- 3, rails and boxes: lock on by landing, slide, free ski rotation, pop or spin off, slip off when off-angle.
-- 4, checkpoints: flag gates, Tab personal checkpoint (keeps speed), R respawn, hold R to go to the top, finish zone with Back to top.
-- 5a, map features, all on a widened test slope (four lanes, dev panel "Test spots" to jump to each): knuckled tables, step-up, step-down, hip, kickers; halfpipe with drop-in deck; ride-on box and rail, kicker to rail, kinked and rainbow rails; slalom gates that flex, run timer and missed-gate count; the four start gates; decoration (trees, rocks, snags, fences, netting, dye lines, banners, light poles, floodlights, chairlift, groomer) with Low/Medium/High density; terrain split into culled chunks.
-- Also done: the Park Laps name and the low-poly skier with all its poses (`poses.html`).
-- Next: milestone 5b (the four maps). A clean 720 takes about 2.3 s at the current spin values, so 720 jumps need about 2.75 s of air.
+**Done:** 0 scaffold and deploy, 1 skiing, 2 air, 3 rails and boxes, 4 checkpoints, 5a map features (all on the Test slope; the dev panel's "Test spots" jumps to each one). Also the Park Laps name and the low-poly skier with all its poses (`poses.html`). Headless sim checks live in `tools/sim/`. **Next:** 5b. A clean 720 takes about 2.3 s at the current spin values, so 720 jumps need about 2.75 s of air.
 
 **Known issues**
 - Not yet tested on a real school Chromebook.
-- The test slope ends in an invisible wall at the top of the side berms and at the bottom.
+- The Test slope ends in an invisible wall at the top of the side berms and at the bottom.
 - Riding off a rail sideways crashes unless you turn the skis back first.
-- A full pop carries 6–9 m, so popped rails need a small, early pop. A full pop off any test jump flies past its landing onto the slope (a rough landing, not a crash); the jumps are sized for riding straight in without a pop.
-- The test slope's 17° pitch reaches 20 m/s, so its later jumps are big. The 5b maps need flatter sections to keep speeds down.
-- In the halfpipe the skis follow the path along the wall, like the pitch assist off jumps: a straight air lands forward, a 180 lands switch.
+- A full pop carries 6–9 m: popped rails need a small, early pop, and a full pop off any Test slope jump flies past its landing (a rough landing, not a crash).
+- The Test slope's straight 17° pitch reaches 20 m/s, so its later jumps are big. The new maps need flatter sections.
+- Halfpipe airs turn with the path along the wall: a straight air lands forward, a 180 lands switch. Wall airs top out about 3.4 m above the coping.
 - In the japan grab the ski hangs low.
-- Back to top isn't in a pause menu yet (milestone 6). A flag respawns you at the middle of its gate, so maps must keep that spot clear.
+- No pause menu yet (milestone 6). A flag respawns you at the middle of its gate, so maps keep that spot clear.
 
 **Tuned config values** (`src/config.ts`, start → now)
 - Riding: `gravity` 11 → 12, `skiFriction` 0.05 → 0.042, `dragStand` 0.0055 → 0.0066, `dragCrouch` 0.003 → 0.002, `brakeDecel` 6 → 9.5, `brakeRampTime` 0.15 → 0.12.
@@ -163,5 +160,7 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - Pole push: `polePushSpeed` 1.8 → 3.1, `poleMaxSpeed` 7 → 8.5, `polePushInterval` 0.55 → 0.73.
 - Pop: `popMin` 3 → 3.2, `popMax` 5.2 → 5.5.
 - Camera: `heightNear` 2.1 → 2.35, `heightFar` 2.6 → 4.85.
-- Slalom: `kick` 0.25 → 0.6, `clipReach` 0.45 → 0.55 (knocked poles bend 25–75° and cost 1 m/s).
-- Added along the way: landing tolerances (loosened so edge landings stick), rail values and checkpoint timings (both still untuned), skier pose values, and in 5a the wall air, curve load, rough landing, ride-on and decoration density values (untuned).
+- Landing tolerances loosened so edge landings stick.
+- Slalom poles: `kick` 0.25 → 0.6, `clipReach` 0.45 → 0.55.
+- Halfpipe, set by testing in 5a: `wallPop` 0.4, `wallLaunchMax` 9 m/s.
+- Still untuned: rail values, checkpoint timings, curve load, rough landings, ride-on, decoration density.

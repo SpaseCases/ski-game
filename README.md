@@ -23,6 +23,17 @@ Every push to `main` builds the game and deploys `dist/` to GitHub Pages through
 
 ## Status
 
-Milestone 1 (skiing) on a greybox test slope: carving, braking (hockey stop), pole pushing, crouch and pop, airs off rollers, and a chase camera. Keys: ← → turn, hold ↑ to crouch and release to pop, ↓ brake, Shift pole push, R restart. A frame-rate readout sits in the bottom-left corner for checking performance on real hardware.
+See the Status section at the bottom of `GAME_DESIGN.md`: milestones done, known issues, and tuned config values. A frame-rate readout sits in the bottom-left corner for checking performance on real hardware.
 
-`npm run dev` also shows a lil-gui panel for live-tuning the physics and camera numbers in `src/config.ts`; "Copy config as JSON" copies the tuned values. The panel is left out of production builds.
+`npm run dev` also shows a lil-gui panel for live-tuning the physics and camera numbers in `src/config.ts` ("Copy config as JSON" copies the tuned values), a quality switch, and "Test spots" that put the skier in front of each feature. The panel is left out of production builds; `?quality=low` in the URL picks a quality preset.
+
+## Headless sim checks
+
+`tools/sim/` runs the real simulation in Node with scripted keys, no browser, for sizing features:
+
+```bash
+node tools/sim/spin720.ts                              # airtime a clean 720 needs
+node tools/sim/jumps.ts src/maps/test-slope.json 14,18 # every jump, no pop and full pop
+```
+
+`tools/sim/harness.ts` (`loadMap`, `Rider`) is the base for new checks.
