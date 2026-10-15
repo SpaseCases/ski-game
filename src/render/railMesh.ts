@@ -3,6 +3,7 @@ import { CONFIG } from '../config.ts';
 import type { Heightfield, RailShape } from '../maps/types.ts';
 import { railFrame } from '../sim/rails.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
+import { TriBuilder } from './triBuilder.ts';
 
 // Rails and boxes, drawn from the slide lines the physics uses so the skis
 // sit exactly on what you see. Everything goes into one merged, vertex-colored
@@ -23,7 +24,7 @@ const BURY = 0.25;
 const material = new MeshLambertMaterial({ vertexColors: true, flatShading: true });
 
 export function createRailMesh(rails: readonly RailShape[], hf: Heightfield): Mesh {
-  const b = new Builder();
+  const b = new TriBuilder();
   for (const r of rails) {
     if (r.kind === 'box') addBox(b, r, hf);
     else addRail(b, r, hf);
@@ -41,7 +42,7 @@ export function createRailMesh(rails: readonly RailShape[], hf: Heightfield): Me
 const UP = new Vector3(0, 1, 0);
 
 /** A box: wooden sides down into the snow under a sliding deck along its top line. */
-function addBox(b: Builder, r: RailShape, hf: Heightfield): void {
+function addBox(b: TriBuilder, r: RailShape, hf: Heightfield): void {
   const segs = r.dist.length - 1;
   const w = r.halfWidth;
   for (let k = 0; k < segs; k++) {
@@ -67,7 +68,7 @@ function addBox(b: Builder, r: RailShape, hf: Heightfield): void {
 }
 
 /** A round rail: a tube under its top line, capped at both ends, on posts down to the snow. */
-function addRail(b: Builder, r: RailShape, hf: Heightfield): void {
+function addRail(b: TriBuilder, r: RailShape, hf: Heightfield): void {
   const radius = r.halfWidth;
   const segs = r.dist.length - 1;
   const ring = Array.from({ length: RAIL_SIDES }, () => new Vector3());
@@ -126,7 +127,7 @@ function addRail(b: Builder, r: RailShape, hf: Heightfield): void {
 }
 
 /** Closes a tube end with a fan of triangles. */
-function cap(b: Builder, center: Vector3, ring: readonly Vector3[], out: Vector3): void {
+function cap(b: TriBuilder, center: Vector3, ring: readonly Vector3[], out: Vector3): void {
   for (let i = 0; i < ring.length; i++) {
     const o0 = ring[i]!;
     const o1 = ring[(i + 1) % ring.length]!;
@@ -136,29 +137,4 @@ function cap(b: Builder, center: Vector3, ring: readonly Vector3[], out: Vector3
 
 function point(r: RailShape, k: number): Vector3 {
   return new Vector3(r.points[k * 3], r.points[k * 3 + 1], r.points[k * 3 + 2]);
-}
-
-/** Collects flat-colored triangles, wound to face a given outward direction. */
-class Builder {
-  readonly positions: number[] = [];
-  readonly colors: number[] = [];
-  private readonly ab = new Vector3();
-  private readonly ac = new Vector3();
-
-  tri(a: Vector3, b: Vector3, c: Vector3, color: Color, out: Vector3): void {
-    this.ab.subVectors(b, a);
-    this.ac.subVectors(c, a);
-    const facing = this.ab.cross(this.ac).dot(out);
-    // Counter-clockwise seen from the outside faces outward.
-    const order = facing >= 0 ? [a, b, c] : [a, c, b];
-    for (const v of order) {
-      this.positions.push(v.x, v.y, v.z);
-      this.colors.push(color.r, color.g, color.b);
-    }
-  }
-
-  quad(a: Vector3, b: Vector3, c: Vector3, d: Vector3, color: Color, out: Vector3): void {
-    this.tri(a, b, c, color, out);
-    this.tri(a, c, d, color, out);
-  }
 }

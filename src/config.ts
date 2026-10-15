@@ -168,6 +168,22 @@ export const CONFIG = {
     fadeTime: 0.3,
   },
 
+  checkpoints: {
+    /** Seconds R must be held to go back to the top. */
+    holdToTop: 1,
+    /** Seconds R is held before the "back to top" progress bar appears (a tap never shows it). */
+    holdHintDelay: 0.2,
+    /** Seconds a checkpoint toast stays on screen. */
+    toastTime: 1.6,
+    /** Flag pole height (m), and the pennant's length and drop. */
+    poleHeight: 3.2,
+    pennantLength: 1.5,
+    pennantDrop: 1,
+    /** Height (m) of the finish banner's bottom edge, and its depth. */
+    finishHeight: 4.2,
+    finishBanner: 1.2,
+  },
+
   camera: {
     /** Distance behind and height above the skier, slow and at speedForFar. */
     distNear: 4.4,

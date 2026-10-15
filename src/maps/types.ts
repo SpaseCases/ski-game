@@ -99,11 +99,40 @@ export interface SpawnDef {
   heading: number;
 }
 
+/**
+ * A checkpoint gate: a flag pole at each end of a line across the run.
+ * Riding through it, in its direction, saves it as the respawn point, which
+ * is the middle of the line, facing `heading`.
+ */
+export interface FlagDef {
+  /** Middle of the gate. */
+  x: number;
+  z: number;
+  /** Heading in degrees riders pass through it; 0 faces downhill (-Z). */
+  heading: number;
+  /** Distance between the two poles. */
+  width: number;
+}
+
+/** The finish: a rectangle on the snow. Entering it offers Back to top. */
+export interface FinishDef {
+  /** Middle of the line where the zone starts (its uphill edge). */
+  x: number;
+  z: number;
+  /** Heading in degrees the zone extends from that line; 0 faces downhill (-Z). */
+  heading: number;
+  /** Size across, and how far it runs on past the line. */
+  width: number;
+  length: number;
+}
+
 export interface MapDef {
   name: string;
   terrain: TerrainDef;
   features: Feature[];
   spawn: SpawnDef;
+  flags: FlagDef[];
+  finish: FinishDef;
   colors: {
     sky: string;
     fog: string;

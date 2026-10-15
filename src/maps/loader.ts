@@ -1,4 +1,4 @@
-import type { Feature, MapDef, RollersDef, TerrainDef } from './types.ts';
+import type { Feature, FinishDef, FlagDef, MapDef, RollersDef, TerrainDef } from './types.ts';
 
 /**
  * Checks raw JSON against the map format and returns a typed MapDef.
@@ -10,6 +10,8 @@ export function parseMap(raw: unknown): MapDef {
   const spawn = obj(map.spawn, 'spawn');
   const features = map.features;
   if (!Array.isArray(features)) throw new Error('Map: features must be an array');
+  const flags = map.flags;
+  if (!Array.isArray(flags)) throw new Error('Map: flags must be an array');
 
   return {
     name: str(map.name, 'name'),
@@ -20,6 +22,8 @@ export function parseMap(raw: unknown): MapDef {
       z: num(spawn.z, 'spawn.z'),
       heading: num(spawn.heading, 'spawn.heading'),
     },
+    flags: flags.map((f, i) => parseFlag(f, `flags[${i}]`)),
+    finish: parseFinish(map.finish),
     colors: {
       sky: str(colors.sky, 'colors.sky'),
       fog: str(colors.fog, 'colors.fog'),
@@ -51,6 +55,18 @@ function parseRollers(raw: unknown): RollersDef {
   const r = obj(raw, 'terrain.rollers');
   const n = (key: string): number => num(r[key], `terrain.rollers.${key}`);
   return { start: n('start'), end: n('end'), amplitude: n('amplitude'), spacing: n('spacing') };
+}
+
+function parseFlag(raw: unknown, path: string): FlagDef {
+  const f = obj(raw, path);
+  const n = (key: string): number => num(f[key], `${path}.${key}`);
+  return { x: n('x'), z: n('z'), heading: n('heading'), width: n('width') };
+}
+
+function parseFinish(raw: unknown): FinishDef {
+  const f = obj(raw, 'finish');
+  const n = (key: string): number => num(f[key], `finish.${key}`);
+  return { x: n('x'), z: n('z'), heading: n('heading'), width: n('width'), length: n('length') };
 }
 
 function parseFeature(raw: unknown, path: string): Feature {

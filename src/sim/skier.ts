@@ -199,11 +199,16 @@ export function copySkierState(dst: SkierState, src: SkierState): void {
 
 /** Puts the skier at a spawn point, standing still on the snow. */
 export function placeSkier(s: SkierState, spawn: SpawnDef, hf: Heightfield): void {
+  placeSkierAt(s, spawn.x, spawn.z, (spawn.heading * Math.PI) / 180, hf);
+}
+
+/** Puts the skier on the snow at (x, z) facing `yaw` (radians), standing still in a fresh state. */
+export function placeSkierAt(s: SkierState, x: number, z: number, yaw: number, hf: Heightfield): void {
   const fresh = createSkierState();
   copySkierState(s, fresh);
-  s.position.set(spawn.x, 0, spawn.z);
-  s.position.y = groundAt(hf, spawn.x, spawn.z, s.normal);
-  s.yaw = (spawn.heading * Math.PI) / 180;
+  s.position.set(x, 0, z);
+  s.position.y = groundAt(hf, x, z, s.normal);
+  s.yaw = wrapAngle(yaw);
   groundOrient(s);
   s.center.copy(s.position).addScaledVector(s.normal, CONFIG.air.comHeight);
 }

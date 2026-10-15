@@ -28,5 +28,11 @@
     { "type": "jump", "x": -14, "z": -140, "yaw": 0, "width": 8, "sideWidth": 3, "lipHeight": 3, "lipAngle": 20, "deckLength": 3, "landingLength": 28 }
   ],
   "spawn": { "x": 0, "z": -8, "heading": 0 },
+  "flags": [
+    { "x": 0, "z": -72, "heading": 0, "width": 36 },
+    { "x": 0, "z": -192, "heading": 0, "width": 44 },
+    { "x": 0, "z": -262, "heading": 0, "width": 44 }
+  ],
+  "finish": { "x": 0, "z": -330, "heading": 0, "width": 56, "length": 70 },
   "colors": { "sky": "#9fc3e6", "fog": "#dce8f3" }
 }

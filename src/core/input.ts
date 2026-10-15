@@ -10,6 +10,8 @@ export type Action =
   | 'lincolnLeft'
   | 'lincolnRight'
   | 'respawn'
+  | 'checkpoint'
+  | 'confirm'
   | GrabAction;
 
 /** Grab keys, in the order of the GRABS list (render/skierPoses.ts): left hand first. */
@@ -35,6 +37,8 @@ export const ACTIONS: readonly Action[] = [
   'lincolnLeft',
   'lincolnRight',
   'respawn',
+  'checkpoint',
+  'confirm',
   ...GRAB_ACTIONS,
 ];
 
@@ -49,6 +53,8 @@ export const DEFAULT_BINDINGS: Bindings = {
   lincolnLeft: ['KeyQ'],
   lincolnRight: ['KeyE'],
   respawn: ['KeyR'],
+  checkpoint: ['Tab'],
+  confirm: ['Enter', 'NumpadEnter'],
   grabLeftMute: ['KeyA'],
   grabLeftSafety: ['KeyS'],
   grabLeftJapan: ['KeyD'],
@@ -123,6 +129,8 @@ export class Keyboard {
 
   private onKeyDown(e: KeyboardEvent): void {
     if (isTypingTarget(e.target)) return;
+    // Enter and Space on a focused HUD button or link work it, not the game.
+    if (isPressable(e.target) && (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space')) return;
     const actions = this.actionsByCode.get(e.code);
     if (!actions) return;
     e.preventDefault(); // stop arrows and Tab from scrolling or moving focus
@@ -151,6 +159,10 @@ export class Keyboard {
     this.pressedLatch.clear();
     this.releasedLatch.clear();
   }
+}
+
+function isPressable(target: EventTarget | null): boolean {
+  return target instanceof HTMLButtonElement || target instanceof HTMLAnchorElement;
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {

@@ -11,7 +11,7 @@ export interface DevPanel {
 
 const DEG = 180 / Math.PI;
 
-export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
+export function mountDevPanel(actions: { respawn: () => void; backToTop: () => void }): DevPanel {
   const gui = new GUI({ title: 'Tuning (dev only)', width: 290 });
   // Keep the top-right corner free for the window buttons.
   gui.domElement.style.left = '0';
@@ -22,6 +22,7 @@ export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
   gui.add(readout, 'state').name('State').listen().disable();
   gui.add(readout, 'landing').name('Last landing').listen().disable();
   gui.add(actions, 'respawn').name('Respawn (R)');
+  gui.add(actions, 'backToTop').name('Back to top (hold R)');
   gui.add({ copy: copyConfig }, 'copy').name('Copy config as JSON');
 
   const s = CONFIG.skier;
