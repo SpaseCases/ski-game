@@ -215,8 +215,12 @@ export class SkierRig {
       this.footQs[i]!.setFromEuler(euler.set(foot.pitch ?? 0, foot.yaw ?? 0, foot.roll ?? 0, 'YXZ'));
       const holder = p.hands[0].grab === i ? 0 : p.hands[1].grab === i ? 1 : -1;
       const grip = holder >= 0 ? p.hands[holder === 0 ? 0 : 1].on : undefined;
-      if (grip) ankleForGrip(this.ankles[i]!, this.hands[holder]!, grip, this.footQs[i]!);
-      else this.ankles[i]!.set(foot.ankle[0], foot.ankle[1], foot.ankle[2]);
+      this.ankles[i]!.set(foot.ankle[0], foot.ankle[1], foot.ankle[2]);
+      if (grip) {
+        // Partway into a grab, the ski is partway to the hand.
+        ankleForGrip(v1, this.hands[holder]!, grip, this.footQs[i]!);
+        this.ankles[i]!.lerp(v1, p.hands[holder === 0 ? 0 : 1].weight ?? 1);
+      }
 
       setHint(hint, foot.knee ?? DEFAULT_HINTS.knee[i === 0 ? 0 : 1]);
       this.solveLimb(this.hips[i]!, this.ankles[i]!, BODY.thigh, BODY.shin, hint, this.knees[i]!);

@@ -112,17 +112,25 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 **Done**
 - Milestone 0: scaffold, GitHub Pages deploy, `embed-test.html`.
 - Milestone 1: skiing (carve, hockey-stop brake, pole push, crouch and pop, airs off rollers, chase camera, dev tuning panel).
+- Milestone 2: air. Spins, flips, corks and misty flips (two axes held at once), Lincoln loops, the 8 grabs blended in and out, carve-into-the-lip spin, the landing check (body tilt, skis vs travel, impact), head-first crashes, the crash tumble, and fade-and-respawn. The test slope has three jumps (small, medium, large).
 - Extras ahead of schedule: the game is named Park Laps; the low-poly skier and all poses are built (stance, crouch, tuck, 8 grabs, reviewed on `poses.html`); stance, crouch, tuck, lean, brake and pole push animate in game; mouse-drag camera orbit.
-- Next: milestone 2 (air).
+- Next: milestone 3 (rails and boxes).
 
 **Known issues**
 - Not yet tested on a real school Chromebook.
 - The test slope ends in an invisible wall; brake or press R before the bottom.
 - The box on the test slope has no collision yet (milestone 3).
-- In the air the skier holds its stance; spins, flips, grabs and landing checks are milestone 2.
+- Respawn goes to the map spawn until checkpoints arrive (milestone 4).
+- Crashing into an obstacle isn't a bail trigger yet; there are no solid obstacles until rails, boxes and trees.
+- The test slope's large jump overshoots its landing with a full pop above ~15 m/s takeoff speed (impact crash), and a 720 needs a little more air or spin rate than it gives. The real maps (milestone 5) get properly sized jumps.
 - Visual-only facet jitter means skis can sit up to ~3 cm into or above the drawn snow.
 - In the japan grab the ski hangs low, its tip near the other ski's level.
 - Braking during a pole plant leaves a hand ~3 cm short of its target (not visible).
+
+**Air design notes**
+- In the air the skis' pitch eases toward the flight path (`air.pathAlign`), so a straight air off a well-built jump lines up with its landing; tricks rotate on top of that. It is not auto-landing: flips and spins still have to be stopped in time, and set to 0 the skier keeps its takeoff pitch.
+- A spin key held in the air builds rotation; once a key has driven an axis, letting go slows it (`air.rotateStop`). Spin carried off the snow from carving keeps going untouched.
+- Jumps are a map feature (`type: "jump"`), shaped exactly on top of the heightfield so lips stay sharp.
 
 **Tuned config values** (`src/config.ts`, starting value → current)
 - `skier.gravity` 11 → 12; `skier.skiFriction` 0.05 → 0.035 (faster acceleration).
@@ -132,4 +140,5 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - Pole push is now a stroke: `polePushSpeed` 1.8 → 2.4, `poleMaxSpeed` 7 → 8.5, `polePushInterval` 0.55 → 0.8, new `polePlantTime` 0.1 and `polePushTime` 0.5.
 - `skier.popMin` 3 → 3.2, `popMax` 5.2 → 5.5 (keeps pop heights at the higher gravity).
 - `light.sunFrom` moved behind and above the skier so the chase camera sees it lit.
+- `landing.sideMax` 1.0 → 0.8 rad (a spin held all the way down still landed 52° sideways).
 - New look and camera values: `render.tuckSpeedMin` 7 / `tuckSpeedFull` 12, `brakeCounter` 0.4, `brakeLean` 0.3, `brakeSink` 0.35; `camera.orbit*` for the drag orbit.

@@ -3,10 +3,13 @@
 import GUI from 'lil-gui';
 import { CONFIG } from '../config.ts';
 import type { SkierPose } from '../render/skierView.ts';
+import type { SkierState } from '../sim/skier.ts';
 
 export interface DevPanel {
-  update(pose: SkierPose): void;
+  update(pose: SkierPose, skier: SkierState): void;
 }
+
+const DEG = 180 / Math.PI;
 
 export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
   const gui = new GUI({ title: 'Tuning (dev only)', width: 290 });
@@ -14,9 +17,10 @@ export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
   gui.domElement.style.left = '0';
   gui.domElement.style.right = 'auto';
 
-  const readout = { speed: '0 km/h', state: 'riding' };
+  const readout = { speed: '0 km/h', state: 'riding', landing: '–' };
   gui.add(readout, 'speed').name('Speed').listen().disable();
   gui.add(readout, 'state').name('State').listen().disable();
+  gui.add(readout, 'landing').name('Last landing').listen().disable();
   gui.add(actions, 'respawn').name('Respawn (R)');
   gui.add({ copy: copyConfig }, 'copy').name('Copy config as JSON');
 
@@ -56,6 +60,42 @@ export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
   pop.add(s, 'popCoyoteTime', 0, 0.5, 0.01);
   pop.add(s, 'groundTolerance', 0, 0.3, 0.005);
 
+  const a = CONFIG.air;
+  const air = gui.addFolder('Air');
+  air.add(a, 'spinRate', 0, 15, 0.1);
+  air.add(a, 'flipRate', 0, 15, 0.1);
+  air.add(a, 'lincolnRate', 0, 15, 0.1);
+  air.add(a, 'rotateAccel', 1, 80, 0.5);
+  air.add(a, 'rotateStop', 0, 80, 0.5);
+  air.add(a, 'spinCarry', 0, 3, 0.05);
+  air.add(a, 'spinPreload', 0, 8, 0.1);
+  air.add(a, 'pathAlign', 0, 10, 0.1);
+  air.add(a, 'pathSpeedMin', 0, 20, 0.5);
+  air.add(a, 'pathSpeedFull', 0, 30, 0.5);
+  air.add(a, 'comHeight', 0, 1.5, 0.01);
+  air.add(a, 'headHeight', 0.5, 2.2, 0.01);
+  air.close();
+
+  const L = CONFIG.landing;
+  const land = gui.addFolder('Landing');
+  land.add(L, 'tiltMax', 0.05, 1.6, 0.01);
+  land.add(L, 'sideMax', 0.05, 1.6, 0.01);
+  land.add(L, 'sideSpeed', 0, 20, 0.5);
+  land.add(L, 'impactMax', 1, 40, 0.5);
+  land.add(L, 'squashImpact', 1.5, 30, 0.5);
+  land.add(L, 'squashTime', 0.05, 1, 0.01);
+  land.close();
+
+  const b = CONFIG.bail;
+  const bail = gui.addFolder('Crash');
+  bail.add(b, 'friction', 0, 2, 0.01);
+  bail.add(b, 'impactLoss', 0, 1, 0.01);
+  bail.add(b, 'rollRadius', 0.1, 2, 0.01);
+  bail.add(b, 'tumbleScale', 0, 2, 0.01);
+  bail.add(b, 'respawnDelay', 0, 5, 0.1);
+  bail.add(b, 'fadeTime', 0.05, 2, 0.05);
+  bail.close();
+
   const look = gui.addFolder('Skier look');
   const r = CONFIG.render;
   look.add(r, 'tuckSpeedMin', 0, 30, 0.5);
@@ -65,6 +105,10 @@ export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
   look.add(r, 'brakeLean', 0, 0.8, 0.01);
   look.add(r, 'brakeSink', 0, 1, 0.01);
   look.add(r, 'tiltSmoothing', 1, 30, 0.5);
+  look.add(r, 'grabBlendTime', 0.01, 0.5, 0.01);
+  look.add(r, 'airCrouch', 0, 1, 0.01);
+  look.add(r, 'spinTuck', 0, 1, 0.01);
+  look.add(r, 'bailBlendTime', 0.01, 1, 0.01);
   look.close();
 
   const cam = gui.addFolder('Camera');
@@ -89,9 +133,12 @@ export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
   cam.close();
 
   return {
-    update(pose: SkierPose): void {
+    update(pose: SkierPose, skier: SkierState): void {
       readout.speed = `${Math.round(pose.velocity.length() * 3.6)} km/h`;
-      readout.state = pose.grounded ? 'riding' : 'air';
+      readout.state = skier.bailed ? `crash (${skier.bailReason})` : pose.grounded ? 'riding' : 'air';
+      readout.landing =
+        `${skier.bailReason && skier.bailed ? 'BAIL ' : ''}tilt ${Math.round(skier.landTilt * DEG)}° ` +
+        `side ${Math.round(skier.landSide * DEG)}° ${skier.landImpact.toFixed(1)} m/s`;
     },
   };
 }

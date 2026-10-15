@@ -67,6 +67,19 @@ function parseFeature(raw: unknown, path: string): Feature {
         height: n('height'),
         yaw: n('yaw'),
       };
+    case 'jump':
+      return {
+        type: 'jump',
+        x: n('x'),
+        z: n('z'),
+        yaw: n('yaw'),
+        width: n('width'),
+        sideWidth: n('sideWidth'),
+        lipHeight: n('lipHeight'),
+        lipAngle: n('lipAngle'),
+        deckLength: n('deckLength'),
+        landingLength: n('landingLength'),
+      };
     default:
       throw new Error(`Map: ${path} has unknown type ${String(f.type)}`);
   }

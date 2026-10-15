@@ -28,6 +28,8 @@ export interface HandDef {
   grab?: 0 | 1;
   /** The point on that ski the hand holds, in ski space (origin at the base center, tip toward -Z). */
   on?: Vec3;
+  /** How far (0..1) the ski is pulled to the hand, for blending into a grab. Defaults to 1. */
+  weight?: number;
   /** Direction the pole points from the hand. */
   pole?: Vec3;
   /** Direction the elbow points (defaults to out and back). */
@@ -217,3 +219,38 @@ function flipOpt(v: Vec3 | undefined): Vec3 | undefined {
 function neg(v: number | undefined): number | undefined {
   return v === undefined ? undefined : -v;
 }
+
+/** Every grab, in the order of GRAB_ACTIONS (core/input.ts). */
+export const GRABS: readonly PoseDef[] = [
+  LEFT_MUTE,
+  LEFT_SAFETY,
+  LEFT_JAPAN,
+  LEFT_TAIL,
+  RIGHT_MUTE,
+  RIGHT_SAFETY,
+  RIGHT_JAPAN,
+  RIGHT_TAIL,
+];
+
+/**
+ * Crash tumble: balled up with the knees pulled in and the arms flung out.
+ * In game the whole body rolls around TUMBLE_CENTER.
+ */
+export const TUMBLE: PoseDef = {
+  pelvis: [0, 0.62, 0.12],
+  pelvisPitch: 0.9,
+  chestPitch: 0.55,
+  chestRoll: 0.15,
+  headPitch: -0.1,
+  feet: [
+    { ankle: [-0.18, 0.42, -0.28], pitch: 0.5, roll: 0.2, knee: [-0.3, 0.8, -0.6] },
+    { ankle: [0.2, 0.3, -0.12], pitch: -0.2, yaw: -0.3, roll: -0.3, knee: [0.4, 0.6, -0.8] },
+  ],
+  hands: [
+    { at: [-0.62, 0.95, -0.15], pole: [-0.6, 0.3, 0.7], elbow: [-0.5, 0.6, 0.5] },
+    { at: [0.5, 0.95, -0.1], pole: [0.5, 0.7, 0.4], elbow: [0.6, 0.4, 0.6] },
+  ],
+};
+
+/** Middle of the balled-up tumble pose, in skier space. */
+export const TUMBLE_CENTER: Vec3 = [0, 0.62, -0.05];

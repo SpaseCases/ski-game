@@ -30,6 +30,7 @@ import {
   RIGHT_TAIL,
   STANCE,
   TUCK,
+  TUMBLE,
 } from './render/skierPoses.ts';
 
 interface Entry {
@@ -53,10 +54,11 @@ const ENTRIES: (Entry | null)[] = [
   { name: 'Right japan', note: 'Right hand behind the leg to the right ski’s inside edge; tail up behind', pose: RIGHT_JAPAN, airborne: true },
   { name: 'Left tail', note: 'Left hand back to the left ski’s tail', pose: LEFT_TAIL, airborne: true },
   { name: 'Right tail', note: 'Right hand back to the right ski’s tail', pose: RIGHT_TAIL, airborne: true },
+  { name: 'Tumble', note: 'Crash: balled up, rolling to a stop', pose: TUMBLE, airborne: true },
 ];
 
 const COLS = 4;
-const ROWS = 3;
+const ROWS = 4;
 const AIR_HEIGHT = 0.55;
 
 const app = document.getElementById('app');

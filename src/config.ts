@@ -73,6 +73,65 @@ export const CONFIG = {
     leanResponse: 8,
   },
 
+  air: {
+    /**
+     * Height (m) of the body's center of mass above the feet. In the air the
+     * skier rotates around it, so flips turn around the belly, not the boots.
+     */
+    comHeight: 0.85,
+    /** Height (m) of the head above the feet; the head touching snow is a bail. */
+    headHeight: 1.65,
+    /** Rotation speeds (rad/s) while a key is held: spin (←/→), flip (↑/↓), Lincoln loop (Q/E). */
+    spinRate: 6.5,
+    flipRate: 5.5,
+    lincolnRate: 5,
+    /** How fast held keys build rotation, and how fast it dies after release (rad/s²). */
+    rotateAccel: 24,
+    rotateStop: 15,
+    /** Share of the carving turn rate at takeoff that becomes spin. Untouched, it keeps spinning. */
+    spinCarry: 1,
+    /** Extra spin (rad/s) when a spin key is already held as the skis leave the snow. */
+    spinPreload: 2.5,
+    /**
+     * How fast (per second) the skis' pitch follows the flight path, like an
+     * arrow. Off a jump this brings the skis in line with a landing built for
+     * that trajectory; flips add on top. 0 keeps the takeoff pitch all flight.
+     */
+    pathAlign: 2.2,
+    /** Speeds (m/s) along the skis where path following starts and is full (none for a pop in place). */
+    pathSpeedMin: 2,
+    pathSpeedFull: 8,
+  },
+
+  landing: {
+    /** Biggest angle (radians) between the body's up and the snow normal that still lands. */
+    tiltMax: 0.6,
+    /** Biggest angle (radians) between the skis and the direction of travel (or its reverse) that still lands. */
+    sideMax: 0.8,
+    /** Below this speed (m/s) along the snow, landing sideways is fine. */
+    sideSpeed: 4,
+    /** Speed (m/s) into the snow that is too hard to absorb. */
+    impactMax: 15,
+    /** Speed into the snow (m/s) that gives a full-depth absorb crouch, and how long it lasts (s). */
+    squashImpact: 9,
+    squashTime: 0.35,
+  },
+
+  bail: {
+    /** Friction coefficient of a tumbling body sliding on snow. */
+    friction: 0.7,
+    /** Share of speed along the snow lost in the crash impact. */
+    impactLoss: 0.3,
+    /** Rolling radius (m): tumble rate is speed divided by this, times tumbleScale. */
+    rollRadius: 0.5,
+    tumbleScale: 0.6,
+    /** Height (m) of the tumbling body's center above the snow. */
+    centerHeight: 0.42,
+    /** Seconds after a crash before the screen fades and the skier respawns; then the fade time. */
+    respawnDelay: 1.5,
+    fadeTime: 0.3,
+  },
+
   camera: {
     /** Distance behind and height above the skier, slow and at speedForFar. */
     distNear: 4.4,
@@ -128,8 +187,15 @@ export const CONFIG = {
     /** Speeds (m/s) where holding ↑ shifts from the pop crouch into a speed tuck. */
     tuckSpeedMin: 7,
     tuckSpeedFull: 12,
-    /** How fast (per second) the skier tilts to match the snow or straightens in the air. */
+    /** How fast (per second) the skier tilts to match the snow, and eases out of a jump in orientation (takeoff, landing, crash). */
     tiltSmoothing: 10,
+    /** Seconds to reach or let go of a grab. */
+    grabBlendTime: 0.12,
+    /** How far toward a crouch the body sits in the air, and the extra tuck at full rotation speed. */
+    airCrouch: 0.3,
+    spinTuck: 0.4,
+    /** Seconds to blend into the crash tumble. */
+    bailBlendTime: 0.2,
   },
 
   light: {

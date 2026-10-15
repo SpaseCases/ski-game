@@ -1,3 +1,4 @@
+import { sampleJump, type JumpSample } from '../maps/jumps.ts';
 import type { Heightfield } from '../maps/types.ts';
 
 // Physics surface: a smooth Catmull-Rom (bicubic) surface through the
@@ -27,6 +28,7 @@ interface AxisWeights {
 const wx: AxisWeights = { w0: 0, w1: 0, w2: 0, w3: 0, d0: 0, d1: 0, d2: 0, d3: 0 };
 const wz: AxisWeights = { w0: 0, w1: 0, w2: 0, w3: 0, d0: 0, d1: 0, d2: 0, d3: 0 };
 const surface = { height: 0, dhdx: 0, dhdz: 0 };
+const jump: JumpSample = { height: 0, dhdx: 0, dhdz: 0, along: 0 };
 let rowHeight = 0;
 let rowSlope = 0;
 
@@ -91,6 +93,17 @@ function sampleSurface(hf: Heightfield, x: number, z: number): typeof surface {
   surface.height = height;
   surface.dhdx = dx / hf.cellSize;
   surface.dhdz = dz / hf.cellSize;
+
+  // Jumps sit on top of the smooth slope.
+  const jumps = hf.jumps;
+  if (jumps) {
+    for (let i = 0; i < jumps.length; i++) {
+      if (!sampleJump(jumps[i]!, x, z, jump)) continue;
+      surface.height += jump.height;
+      surface.dhdx += jump.dhdx;
+      surface.dhdz += jump.dhdz;
+    }
+  }
   return surface;
 }
 

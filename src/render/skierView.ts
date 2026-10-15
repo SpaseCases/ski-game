@@ -13,7 +13,7 @@ import type { Heightfield } from '../maps/types.ts';
 import { wrapAngle, type SkierState } from '../sim/skier.ts';
 import { groundAt } from '../sim/terrain.ts';
 import { addPoseDelta, createPoseBuffer, setPose, type PoseBuffer } from './poseBlend.ts';
-import { CROUCH, STANCE, TUCK } from './skierPoses.ts';
+import { CROUCH, GRABS, STANCE, TUCK, TUMBLE, TUMBLE_CENTER } from './skierPoses.ts';
 import { SkierRig } from './skierRig.ts';
 
 /** Skier state blended between the last two simulation steps, for drawing. */
@@ -28,6 +28,17 @@ export interface SkierPose {
   brakeSide: number;
   polePhase: number;
   grounded: boolean;
+  /** Body orientation from the sim (used in the air and in a crash). */
+  orient: Quaternion;
+  /** Center of mass, or the middle of the tumbling body in a crash. */
+  center: Vector3;
+  /** Rotation speed in the air (rad/s). */
+  spinRate: number;
+  grab: number;
+  landTime: number;
+  landDepth: number;
+  bailed: boolean;
+  bailTime: number;
 }
 
 export function createSkierPose(): SkierPose {
@@ -42,6 +53,14 @@ export function createSkierPose(): SkierPose {
     brakeSide: -1,
     polePhase: 1,
     grounded: true,
+    orient: new Quaternion(),
+    center: new Vector3(),
+    spinRate: 0,
+    grab: -1,
+    landTime: Infinity,
+    landDepth: 0,
+    bailed: false,
+    bailTime: 0,
   };
 }
 
@@ -56,9 +75,18 @@ export function interpolateSkier(out: SkierPose, prev: SkierState, curr: SkierSt
   out.brakeSide = curr.brakeSide;
   out.polePhase = curr.polePhase;
   out.grounded = curr.grounded;
+  out.orient.slerpQuaternions(prev.orient, curr.orient, alpha);
+  out.center.lerpVectors(prev.center, curr.center, alpha);
+  out.spinRate = curr.grounded ? 0 : curr.spin.length();
+  out.grab = curr.grab;
+  out.landTime = curr.landTime;
+  out.landDepth = curr.landDepth;
+  out.bailed = curr.bailed;
+  out.bailTime = curr.bailTime;
 }
 
 const UP = new Vector3(0, 1, 0);
+const IDENTITY = new Quaternion();
 const SHADOW_OPACITY = 0.45;
 
 // Pole directions (from the hand) at the plant and at the end of the push,
@@ -79,11 +107,22 @@ export class SkierView {
   private readonly pose: PoseBuffer = createPoseBuffer();
   private readonly shadow: Mesh;
   private readonly shadowMaterial: MeshBasicMaterial;
-  /** Smoothed "up" the body is tilted to: the snow normal when riding, straight up in the air. */
+  /** Smoothed snow normal the body is tilted to while riding. */
   private readonly tiltUp = new Vector3(0, 1, 0);
   private readonly tilt = new Quaternion();
   private readonly turn = new Quaternion();
+  private readonly target = new Quaternion();
+  /**
+   * Leftover rotation from the moment the body switched between riding, flying
+   * and crashing; it eases out so the switch never pops.
+   */
+  private readonly offset = new Quaternion();
+  private mode: 0 | 1 | 2 = 0;
   private readonly groundNormal = new Vector3();
+  /** Blend weights, eased over time: air pose, each grab, the crash tumble. */
+  private airWeight = 0;
+  private readonly grabWeights = new Float32Array(GRABS.length);
+  private bailWeight = 0;
   private readonly hf: Heightfield;
 
   constructor(scene: Scene, hf: Heightfield) {
@@ -116,43 +155,96 @@ export class SkierView {
     scene.add(this.shadow);
   }
 
-  /** Jumps the body tilt straight to the current snow normal (after a respawn). */
+  /** Drops all smoothing and blending and shows the pose as it is (start and respawn). */
   snap(pose: SkierPose): void {
     this.tiltUp.copy(pose.normal);
+    this.offset.identity();
+    this.mode = pose.bailed ? 2 : pose.grounded ? 0 : 1;
+    this.airWeight = pose.grounded ? 0 : 1;
+    this.grabWeights.fill(0);
+    this.bailWeight = pose.bailed ? 1 : 0;
   }
 
   update(state: SkierPose, frameTime: number): void {
     const r = CONFIG.render;
-    this.root.position.copy(state.position);
-    const target = state.grounded ? state.normal : UP;
-    this.tiltUp.lerp(target, 1 - Math.exp(-r.tiltSmoothing * frameTime)).normalize();
-    this.tilt.setFromUnitVectors(UP, this.tiltUp);
-    this.turn.setFromAxisAngle(UP, state.yaw);
-    this.root.quaternion.multiplyQuaternions(this.tilt, this.turn);
+    const ease = 1 - Math.exp(-r.tiltSmoothing * frameTime);
+
+    // Orientation: on the snow, tilted to the (smoothed) slope and turned to
+    // the heading; in the air and in a crash, straight from the sim.
+    const mode = state.bailed ? 2 : state.grounded ? 0 : 1;
+    if (mode === 0 && this.mode !== 0) this.tiltUp.copy(state.normal);
+    if (mode === 0) {
+      this.tiltUp.lerp(state.normal, ease).normalize();
+      this.tilt.setFromUnitVectors(UP, this.tiltUp);
+      this.turn.setFromAxisAngle(UP, state.yaw);
+      this.target.multiplyQuaternions(this.tilt, this.turn);
+    } else {
+      this.target.copy(state.orient);
+    }
+    if (mode !== this.mode) {
+      // offset = target⁻¹ × what was on screen, so nothing jumps.
+      this.offset.copy(this.target).invert().multiply(this.root.quaternion);
+      this.mode = mode;
+    }
+    this.offset.slerp(IDENTITY, ease);
+    this.root.quaternion.multiplyQuaternions(this.target, this.offset);
+
+    // Blend weights.
+    this.airWeight = approach(this.airWeight, state.grounded ? 0 : 1, frameTime / r.grabBlendTime);
+    this.bailWeight = approach(this.bailWeight, state.bailed ? 1 : 0, frameTime / r.bailBlendTime);
+    let grabTotal = 0;
+    for (let i = 0; i < GRABS.length; i++) {
+      const w = approach(this.grabWeights[i] ?? 0, state.grab === i ? 1 : 0, frameTime / r.grabBlendTime);
+      this.grabWeights[i] = w;
+      grabTotal += w;
+    }
+    const live = 1 - this.bailWeight;
+    // Switching grabs briefly overlaps two; keep the total at most 1.
+    const grabScale = grabTotal > 1 ? live / grabTotal : live;
+    const free = live - Math.min(grabTotal, 1) * live;
+
+    // A crash tumbles around the middle of the balled-up body, not the feet.
+    const bw = this.bailWeight;
+    this.root.position.lerpVectors(state.position, state.center, bw);
+    this.rig.root.position.set(-TUMBLE_CENTER[0] * bw, -TUMBLE_CENTER[1] * bw, -TUMBLE_CENTER[2] * bw);
 
     // Hockey stop: the skis swing sideways and the skier leans away from the skid.
-    const swing = state.brake * r.brakeTwist * state.brakeSide;
+    const swing = state.brake * r.brakeTwist * state.brakeSide * live;
     this.swing.rotation.y = swing;
-    this.lean.rotation.z = state.lean + state.brake * r.brakeLean * state.brakeSide;
+    this.lean.rotation.z = (state.lean + state.brake * r.brakeLean * state.brakeSide) * live;
 
-    // Body: stance, sinking into a crouch while ↑ is held, which becomes a
-    // speed tuck when going fast on the snow. Braking sinks a little too.
+    // Body on the snow: stance, sinking into a crouch while ↑ is held, which
+    // becomes a speed tuck when going fast. Braking sinks a little, and a
+    // landing absorbs into a quick crouch. In the air: knees up a little,
+    // tucking tighter the faster it rotates.
     const speed = Math.hypot(state.velocity.x, state.velocity.z);
-    const tuck = state.grounded ? smoothstep(r.tuckSpeedMin, r.tuckSpeedFull, speed) : 0;
+    const tuck = smoothstep(r.tuckSpeedMin, r.tuckSpeedFull, speed);
+    const squash = state.landDepth * landCurve(state.landTime);
+    const groundCrouch =
+      state.crouch * (1 - tuck) +
+      state.brake * r.brakeSink * (1 - state.crouch) +
+      squash * (1 - state.crouch);
+    const airCrouch = r.airCrouch + r.spinTuck * Math.min(1, state.spinRate / CONFIG.air.flipRate);
+    const air = this.airWeight;
     const p = this.pose;
     setPose(p, STANCE);
-    addPoseDelta(p, STANCE, CROUCH, state.crouch * (1 - tuck) + state.brake * r.brakeSink * (1 - state.crouch));
-    addPoseDelta(p, STANCE, TUCK, state.crouch * tuck);
+    addPoseDelta(p, STANCE, CROUCH, free * (groundCrouch * (1 - air) + airCrouch * air));
+    addPoseDelta(p, STANCE, TUCK, free * state.crouch * tuck * (1 - air));
+    for (let i = 0; i < GRABS.length; i++) {
+      const w = (this.grabWeights[i] ?? 0) * grabScale;
+      if (w > 0) addPoseDelta(p, STANCE, GRABS[i]!, w);
+    }
+    addPoseDelta(p, STANCE, TUMBLE, bw);
     // The upper body turns back against the swing to keep facing down the hill.
     p.pelvisYaw -= swing * r.brakeCounter * 0.5;
     p.chestYaw -= swing * r.brakeCounter * 0.5;
-    poleStroke(p, state.polePhase);
+    if (!state.bailed) poleStroke(p, state.polePhase);
     this.rig.apply(p);
 
-    // Shadow sits on the snow under the skier and fades as they rise.
-    const pos = state.position;
+    // Shadow sits on the snow under the body and fades as it rises.
+    const pos = state.center;
     const ground = groundAt(this.hf, pos.x, pos.z, this.groundNormal);
-    const height = Math.max(0, pos.y - ground);
+    const height = Math.max(0, pos.y - ground - (state.bailed ? CONFIG.bail.centerHeight : CONFIG.air.comHeight));
     this.shadow.position.set(pos.x, ground, pos.z).addScaledVector(this.groundNormal, 0.06);
     this.shadow.quaternion.setFromUnitVectors(UP, this.groundNormal);
     const fade = Math.max(0.15, 1 - height / 6);
@@ -227,6 +319,18 @@ function poleAngle(key: PoleKey, riding: number, k: number, sign: number): numbe
 function ease(t: number): number {
   const c = Math.min(1, Math.max(0, t));
   return c * c * (3 - 2 * c);
+}
+
+/** Landing absorb: down fast, back up over the rest of squashTime. 1 at the bottom. */
+function landCurve(t: number): number {
+  const down = 0.07;
+  if (t < down) return t / down;
+  return Math.max(0, 1 - (t - down) / (CONFIG.landing.squashTime - down));
+}
+
+function approach(value: number, target: number, maxDelta: number): number {
+  if (value < target) return Math.min(value + maxDelta, target);
+  return Math.max(value - maxDelta, target);
 }
 
 function smoothstep(edge0: number, edge1: number, x: number): number {

@@ -15,7 +15,10 @@
     "rollers": { "start": 170, "end": 250, "amplitude": 0.6, "spacing": 20 }
   },
   "features": [
-    { "type": "box", "x": 0, "z": -130, "length": 9, "width": 0.6, "height": 0.7, "yaw": 0 }
+    { "type": "box", "x": 0, "z": -130, "length": 9, "width": 0.6, "height": 0.7, "yaw": 0 },
+    { "type": "jump", "x": -10, "z": -45, "yaw": 0, "width": 5, "sideWidth": 2, "lipHeight": 0.9, "lipAngle": 16, "deckLength": 2, "landingLength": 8 },
+    { "type": "jump", "x": 10, "z": -90, "yaw": 0, "width": 6, "sideWidth": 2.5, "lipHeight": 1.8, "lipAngle": 18, "deckLength": 2, "landingLength": 20 },
+    { "type": "jump", "x": -14, "z": -140, "yaw": 0, "width": 8, "sideWidth": 3, "lipHeight": 3, "lipAngle": 20, "deckLength": 3, "landingLength": 28 }
   ],
   "spawn": { "x": 0, "z": -8, "heading": 0 },
   "colors": { "sky": "#9fc3e6", "fog": "#dce8f3" }

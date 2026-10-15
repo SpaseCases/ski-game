@@ -36,7 +36,7 @@ export class ChaseCamera {
   /** Jumps straight to the skier with no smoothing and no orbit (start and respawn). */
   snap(pose: SkierPose): void {
     this.yaw = this.targetYaw(pose);
-    this.focusY = pose.position.y;
+    this.focusY = focusHeight(pose);
     this.orbitYaw = 0;
     this.orbitPitch = 0;
     this.place(pose);
@@ -62,17 +62,17 @@ export class ChaseCamera {
     // Follow height smoothly. On the snow, lead by vertical speed so a steady
     // descent doesn't leave the camera lagging; in the air, follow loosely
     // so the horizon stays calm.
-    const p = pose.position;
     const rate = pose.grounded ? c.heightSmoothingGround : c.heightSmoothingAir;
     const lead = pose.grounded ? pose.velocity.y / rate : 0;
-    this.focusY += (p.y + lead - this.focusY) * smoothing(rate, frameTime);
+    this.focusY += (focusHeight(pose) + lead - this.focusY) * smoothing(rate, frameTime);
 
     this.place(pose);
   }
 
   private place(pose: SkierPose): void {
     const c = CONFIG.camera;
-    const p = pose.position;
+    // Follow the body, not the feet, which swing around it in flips.
+    const p = pose.center;
     const speed = Math.hypot(pose.velocity.x, pose.velocity.z);
     const far = Math.min(1, speed / c.speedForFar);
     const dist = c.distNear + (c.distFar - c.distNear) * far;
@@ -108,6 +108,11 @@ export class ChaseCamera {
     const travel = Math.atan2(-v.x, -v.z);
     return pose.yaw + wrapAngle(travel - pose.yaw) * t;
   }
+}
+
+/** Feet height the camera follows: under the body center, so flips don't bob the view. */
+function focusHeight(pose: SkierPose): number {
+  return pose.center.y - (pose.bailed ? CONFIG.bail.centerHeight : CONFIG.air.comHeight);
 }
 
 function smoothing(rate: number, dt: number): number {

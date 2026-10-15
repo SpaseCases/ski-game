@@ -60,3 +60,29 @@ export function createTerrainMesh(hf: Heightfield, seed: number): Mesh {
   mesh.matrixAutoUpdate = false;
   return mesh;
 }
+
+/**
+ * Height of the drawn snow (the flat triangles above, including the visual
+ * detail) at world (x, z). Used to sit other meshes exactly on the snow.
+ */
+export function renderedHeightAt(hf: Heightfield, x: number, z: number): number {
+  const gx = Math.min(Math.max((x - hf.originX) / hf.cellSize, 0), hf.cols - 1);
+  const gz = Math.min(Math.max((z - hf.originZ) / hf.cellSize, 0), hf.rows - 1);
+  const col = Math.min(Math.floor(gx), hf.cols - 2);
+  const row = Math.min(Math.floor(gz), hf.rows - 2);
+  const fx = gx - col;
+  const fz = gz - row;
+  const h = (c: number, r: number): number => {
+    const i = r * hf.cols + c;
+    return (hf.heights[i] ?? 0) + (hf.detail?.[i] ?? 0);
+  };
+  const h00 = h(col, row);
+  const h11 = h(col + 1, row + 1);
+  // Matches the triangle split in createTerrainMesh.
+  if (fx >= fz) {
+    const h10 = h(col + 1, row);
+    return h00 + fx * (h10 - h00) + fz * (h11 - h10);
+  }
+  const h01 = h(col, row + 1);
+  return h00 + fz * (h01 - h00) + fx * (h11 - h01);
+}

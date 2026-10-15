@@ -4,7 +4,8 @@ import type { FootDef, HandDef, PoseDef, Vec3 } from './skierPoses.ts';
 // A mutable pose the game rebuilds every frame by mixing pose definitions,
 // so animating the skier never allocates. Every optional field of PoseDef is
 // filled in (missing angles are 0, missing hints use the rig's defaults).
-// Grabs are not blended here yet; they arrive with the air tricks.
+// Grabs blend like everything else, except that a grabbed ski is not moved
+// by the pose: the rig pulls it toward the hand by the grab's weight.
 
 type MutableVec3 = [number, number, number];
 
@@ -20,6 +21,10 @@ interface HandBuffer {
   at: MutableVec3;
   pole: MutableVec3;
   elbow: MutableVec3;
+  /** Ski this hand is reaching for, if any; the strongest grab blended in wins. */
+  grab: 0 | 1 | undefined;
+  on: MutableVec3;
+  weight: number;
 }
 
 export interface PoseBuffer {
@@ -38,7 +43,14 @@ export interface PoseBuffer {
 
 export function createPoseBuffer(): PoseBuffer {
   const foot = (): FootBuffer => ({ ankle: [0, 0, 0], yaw: 0, pitch: 0, roll: 0, knee: [0, 0, 0] });
-  const hand = (): HandBuffer => ({ at: [0, 0, 0], pole: [0, 0, 0], elbow: [0, 0, 0] });
+  const hand = (): HandBuffer => ({
+    at: [0, 0, 0],
+    pole: [0, 0, 0],
+    elbow: [0, 0, 0],
+    grab: undefined,
+    on: [0, 0, 0],
+    weight: 0,
+  });
   return {
     pelvis: [0, 0, 0],
     pelvisPitch: 0,
@@ -79,6 +91,9 @@ export function setPose(out: PoseBuffer, def: PoseDef): void {
     copy(h.at, hd.at);
     copy(h.pole, hd.pole ?? DEFAULT_HINTS.pole[s]);
     copy(h.elbow, hd.elbow ?? DEFAULT_HINTS.elbow[s]);
+    h.grab = undefined;
+    h.weight = 0;
+    if (hd.grab !== undefined && hd.on) setGrip(h, hd.grab, hd.on, hd.weight ?? 1);
   }
 }
 
@@ -103,7 +118,9 @@ export function addPoseDelta(out: PoseBuffer, base: PoseDef, target: PoseDef, w:
     const f = out.feet[s];
     const bf = base.feet[s];
     const tf = target.feet[s];
-    addDelta(f.ankle, bf.ankle, tf.ankle, w);
+    // A ski the target grabs goes to the hand instead (see setPose / the rig).
+    const grabbed = target.hands[0].grab === s || target.hands[1].grab === s;
+    if (!grabbed) addDelta(f.ankle, bf.ankle, tf.ankle, w);
     f.yaw += ((tf.yaw ?? 0) - (bf.yaw ?? 0)) * w;
     f.pitch += ((tf.pitch ?? 0) - (bf.pitch ?? 0)) * w;
     f.roll += ((tf.roll ?? 0) - (bf.roll ?? 0)) * w;
@@ -114,7 +131,14 @@ export function addPoseDelta(out: PoseBuffer, base: PoseDef, target: PoseDef, w:
     addDelta(h.at, bh.at, th.at, w);
     addDelta(h.pole, bh.pole ?? DEFAULT_HINTS.pole[s], th.pole ?? DEFAULT_HINTS.pole[s], w);
     addDelta(h.elbow, bh.elbow ?? DEFAULT_HINTS.elbow[s], th.elbow ?? DEFAULT_HINTS.elbow[s], w);
+    if (th.grab !== undefined && th.on && w > h.weight) setGrip(h, th.grab, th.on, w);
   }
+}
+
+function setGrip(h: HandBuffer, ski: 0 | 1, on: Vec3, weight: number): void {
+  h.grab = ski;
+  copy(h.on, on);
+  h.weight = weight;
 }
 
 function copy(out: MutableVec3, v: Vec3): void {

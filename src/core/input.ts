@@ -1,9 +1,42 @@
 // Keyboard input with rebindable keys. Bindings use KeyboardEvent.code, so
 // they follow key position rather than the layout's printed letter.
 
-export type Action = 'left' | 'right' | 'up' | 'down' | 'pole' | 'respawn';
+export type Action =
+  | 'left'
+  | 'right'
+  | 'up'
+  | 'down'
+  | 'pole'
+  | 'lincolnLeft'
+  | 'lincolnRight'
+  | 'respawn'
+  | GrabAction;
 
-export const ACTIONS: readonly Action[] = ['left', 'right', 'up', 'down', 'pole', 'respawn'];
+/** Grab keys, in the order of the GRABS list (render/skierPoses.ts): left hand first. */
+export const GRAB_ACTIONS = [
+  'grabLeftMute',
+  'grabLeftSafety',
+  'grabLeftJapan',
+  'grabLeftTail',
+  'grabRightMute',
+  'grabRightSafety',
+  'grabRightJapan',
+  'grabRightTail',
+] as const;
+
+export type GrabAction = (typeof GRAB_ACTIONS)[number];
+
+export const ACTIONS: readonly Action[] = [
+  'left',
+  'right',
+  'up',
+  'down',
+  'pole',
+  'lincolnLeft',
+  'lincolnRight',
+  'respawn',
+  ...GRAB_ACTIONS,
+];
 
 export type Bindings = Record<Action, readonly string[]>;
 
@@ -13,7 +46,17 @@ export const DEFAULT_BINDINGS: Bindings = {
   up: ['ArrowUp'],
   down: ['ArrowDown'],
   pole: ['ShiftLeft', 'ShiftRight'],
+  lincolnLeft: ['KeyQ'],
+  lincolnRight: ['KeyE'],
   respawn: ['KeyR'],
+  grabLeftMute: ['KeyA'],
+  grabLeftSafety: ['KeyS'],
+  grabLeftJapan: ['KeyD'],
+  grabLeftTail: ['KeyF'],
+  grabRightMute: ['KeyZ'],
+  grabRightSafety: ['KeyX'],
+  grabRightJapan: ['KeyC'],
+  grabRightTail: ['KeyV'],
 };
 
 export interface ButtonState {

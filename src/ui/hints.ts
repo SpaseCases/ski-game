@@ -1,9 +1,25 @@
-/** One-line key reminder until the Controls menu exists. */
+/** Key reminder until the Controls menu exists. */
 export function mountControlsHint(hud: HTMLElement): void {
   const el = document.createElement('div');
   el.className = 'controls-hint';
-  el.textContent = '← → turn · hold ↑ crouch, release to pop · ↓ brake · Shift pole push · R restart · drag to look around';
+  el.innerText =
+    '← → turn · hold ↑ crouch, release to pop · ↓ brake · Shift pole push · R restart · drag to look around\n' +
+    'In the air: ← → spin · ↑ ↓ flip · Q E Lincoln loop · grabs A S D F (left hand) Z X C V (right hand)';
   hud.appendChild(el);
+}
+
+/** "Crashed" notice shown while the skier tumbles. */
+export function mountCrashHint(hud: HTMLElement): { show(visible: boolean): void } {
+  const el = document.createElement('div');
+  el.className = 'crash-hint';
+  el.textContent = 'Crashed! Press R to skip';
+  el.hidden = true;
+  hud.appendChild(el);
+  return {
+    show(visible: boolean): void {
+      if (el.hidden === visible) el.hidden = !visible;
+    },
+  };
 }
 
 /**

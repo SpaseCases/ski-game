@@ -51,7 +51,30 @@ export interface BoxFeature {
   yaw: number;
 }
 
-export type Feature = BoxFeature;
+/**
+ * A park jump shaped into the snow: a curved takeoff ramp up to a lip, a deck
+ * that follows the slope at lip height, then a landing that eases back down
+ * to the slope. Heights are measured from the slope underneath.
+ */
+export interface JumpFeature {
+  type: 'jump';
+  /** Where the takeoff ramp starts (center of its front edge). */
+  x: number;
+  z: number;
+  /** Heading in degrees the rider jumps toward; 0 faces downhill (-Z). */
+  yaw: number;
+  /** Width of the full-height part; the sides slope away over sideWidth. */
+  width: number;
+  sideWidth: number;
+  /** Lip height above the slope, and the lip angle in degrees relative to the slope. */
+  lipHeight: number;
+  lipAngle: number;
+  /** Deck length after the lip, then the length of the landing down to the slope. */
+  deckLength: number;
+  landingLength: number;
+}
+
+export type Feature = BoxFeature | JumpFeature;
 
 export interface SpawnDef {
   x: number;
@@ -84,4 +107,24 @@ export interface Heightfield {
   heights: Float32Array;
   /** Optional visual-only offsets added to the rendered mesh, same layout as heights. */
   detail?: Float32Array;
+  /** Jumps added on top of the heights, sampled exactly so lips stay sharp. */
+  jumps?: JumpShape[];
+}
+
+/** A jump feature with its derived dimensions, ready for sampling. */
+export interface JumpShape {
+  x: number;
+  z: number;
+  /** Unit direction of the jump (along) and to its right (across), in XZ. */
+  dirX: number;
+  dirZ: number;
+  rightX: number;
+  rightZ: number;
+  halfWidth: number;
+  sideWidth: number;
+  lipHeight: number;
+  /** Distances along the jump: lip, end of deck, end of landing. */
+  lipAt: number;
+  deckEnd: number;
+  landingEnd: number;
 }
