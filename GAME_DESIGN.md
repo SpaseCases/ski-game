@@ -106,3 +106,30 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 6. **Menus.** Outfit colors, settings, key rebinding, and pause.
 7. **Sound effects.**
 8. **Performance and polish pass** on the Low preset, then a final embed and deploy check.
+
+## Status (2026-10-15)
+
+**Done**
+- Milestone 0: scaffold, GitHub Pages deploy, `embed-test.html`.
+- Milestone 1: skiing (carve, hockey-stop brake, pole push, crouch and pop, airs off rollers, chase camera, dev tuning panel).
+- Extras ahead of schedule: the game is named Park Laps; the low-poly skier and all poses are built (stance, crouch, tuck, 8 grabs, reviewed on `poses.html`); stance, crouch, tuck, lean, brake and pole push animate in game; mouse-drag camera orbit.
+- Next: milestone 2 (air).
+
+**Known issues**
+- Not yet tested on a real school Chromebook.
+- The test slope ends in an invisible wall; brake or press R before the bottom.
+- The box on the test slope has no collision yet (milestone 3).
+- In the air the skier holds its stance; spins, flips, grabs and landing checks are milestone 2.
+- Visual-only facet jitter means skis can sit up to ~3 cm into or above the drawn snow.
+- In the japan grab the ski hangs low, its tip near the other ski's level.
+- Braking during a pole plant leaves a hand ~3 cm short of its target (not visible).
+
+**Tuned config values** (`src/config.ts`, starting value → current)
+- `skier.gravity` 11 → 12; `skier.skiFriction` 0.05 → 0.035 (faster acceleration).
+- `skier.grip` 1.8 → 2.0, plus new `carveFriction` 0.08; the ski turn rate is capped by grip so held turns carve.
+- `skier.turnRateSlow` 2.8 → 2.3, `turnRateFast` 1.5 → 1.25, `turnResponse` 14 → 10 (slower turning).
+- `skier.brakeDecel` 6 → 7.
+- Pole push is now a stroke: `polePushSpeed` 1.8 → 2.4, `poleMaxSpeed` 7 → 8.5, `polePushInterval` 0.55 → 0.8, new `polePlantTime` 0.1 and `polePushTime` 0.5.
+- `skier.popMin` 3 → 3.2, `popMax` 5.2 → 5.5 (keeps pop heights at the higher gravity).
+- `light.sunFrom` moved behind and above the skier so the chase camera sees it lit.
+- New look and camera values: `render.tuckSpeedMin` 7 / `tuckSpeedFull` 12, `brakeCounter` 0.4, `brakeLean` 0.3, `brakeSink` 0.35; `camera.orbit*` for the drag orbit.
