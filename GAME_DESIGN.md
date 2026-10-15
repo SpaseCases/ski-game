@@ -107,42 +107,29 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 7. **Sound effects.**
 8. **Performance and polish pass** on the Low preset, then a final embed and deploy check.
 
-## Status (2026-10-15)
+## Status (2026-10-14)
 
-**Done**
-- Milestone 0: scaffold, GitHub Pages deploy, `embed-test.html`.
-- Milestone 1: skiing (carve, hockey-stop brake, pole push, crouch and pop, airs off rollers, chase camera, dev tuning panel).
-- Milestone 2: air. Spins, flips, corks and misty flips (two axes held at once), Lincoln loops, the 8 grabs blended in and out, carve-into-the-lip spin, the landing check (body tilt, skis vs travel, impact), head-first crashes, the crash tumble, and fade-and-respawn. The test slope has three jumps (small, medium, large).
-- Extras ahead of schedule: the game is named Park Laps; the low-poly skier and all poses are built (stance, crouch, tuck, 8 grabs, reviewed on `poses.html`); stance, crouch, tuck, lean, brake and pole push animate in game; mouse-drag camera orbit.
+**Milestones done**
+- 0, scaffold and deploy: Vite + Three.js, GitHub Pages via Actions, `embed-test.html`.
+- 1, skiing: carving, hockey-stop brake, pole push, crouch and pop, chase camera with drag orbit, dev tuning panel.
+- 2, air: spins, flips, corks and misty flips, Lincoln loops, the 8 grabs, carve-into-the-lip spin, landing check, crash tumble, fade and respawn. The test slope has three jumps.
+- Also done early: the Park Laps name, the low-poly skier and all its poses (`poses.html`), turns driven from the knees.
 - Next: milestone 3 (rails and boxes).
 
 **Known issues**
 - Not yet tested on a real school Chromebook.
-- The test slope ends in an invisible wall; brake or press R before the bottom.
-- The box on the test slope has no collision yet (milestone 3).
+- The test slope ends in an invisible wall.
+- The box has no collision yet, and hitting an obstacle isn't a crash trigger yet (milestone 3).
 - Respawn goes to the map spawn until checkpoints arrive (milestone 4).
-- Crashing into an obstacle isn't a bail trigger yet; there are no solid obstacles until rails, boxes and trees.
-- The test slope's large jump overshoots its landing with a full pop above ~15 m/s takeoff speed (impact crash), and a 720 needs a little more air or spin rate than it gives. The real maps (milestone 5) get properly sized jumps.
-- In the japan grab the ski hangs low, its tip near the other ski's level.
-- Braking during a pole plant leaves a hand ~3 cm short of its target (not visible).
+- The large test jump: a full pop above ~15 m/s overshoots the landing and crashes, and a 720 needs a little more air than it gives. The real maps (milestone 5) get properly sized jumps.
+- In the japan grab the ski hangs low.
+- In a full tuck the thighs poke up to ~1 cm through the jacket front (hidden by the body).
 
-**Air design notes**
-- In the air the skis' pitch eases toward the flight path (`air.pathAlign`), so a straight air off a well-built jump lines up with its landing; tricks rotate on top of that. It is not auto-landing: flips and spins still have to be stopped in time, and set to 0 the skier keeps its takeoff pitch.
-- A spin key held in the air builds rotation; once a key has driven an axis, letting go slows it (`air.rotateStop`). Spin carried off the snow from carving keeps going untouched.
-- Jumps are a map feature (`type: "jump"`), shaped exactly on top of the heightfield so lips stay sharp.
-
-**Tuned config values** (`src/config.ts`, starting value → current)
-- `skier.gravity` 11 → 12; `skier.skiFriction` 0.05 → 0.035 → 0.025 (faster acceleration); `dragCrouch` 0.003 → 0.002.
-- `skier.grip` 1.8 → 2.0, plus new `carveFriction` 0.08; the ski turn rate is capped by grip so held turns carve.
-- `skier.turnRateSlow` 2.8 → 2.3, `turnRateFast` 1.5 → 1.25, `turnResponse` 14 → 10 (slower turning).
-- `skier.brakeDecel` 6 → 7.
-- Pole push is now a stroke: `polePushSpeed` 1.8 → 2.4, `poleMaxSpeed` 7 → 8.5, `polePushInterval` 0.55 → 0.8, new `polePlantTime` 0.1 and `polePushTime` 0.5.
-- `skier.popMin` 3 → 3.2, `popMax` 5.2 → 5.5 (keeps pop heights at the higher gravity).
-- `light.sunFrom` moved behind and above the skier so the chase camera sees it lit.
-- Landing made more forgiving on edges: the tilt check is split into `landing.pitchMax` 0.6 (nose up/down) and `rollMax` 0.9 (on an edge); `sideMax` 1.0 rad, `sideSpeed` 4 → 6; airs under `edgeCheckAir` 0.3 s skip the edge and sideways checks.
-- `skier.polePushSpeed` 2.4 → 3.1 and `polePushInterval` 0.8 → 0.73 (stronger, quicker pole pushes).
-- `camera.heightNear` 2.1 → 2.35, `heightFar` 2.6 → 4.85 (higher view at speed). The camera always aims at the skier's real height, so a loose follow in the air never drops them off screen.
-- Stance knees straightened a little; the jacket skirt follows the thighs 70% of the way so bent legs don't poke through its front.
-- Athletic stance (lower hips, knees over toes, chest forward, hands out front). Turns come from the knees: `render.leanBodyShare` 0.5 of the lean tilts the body, the rest drives the hips (`hipShift`) and knees (`kneeDrive`) into the turn while the skis roll fully onto their edges; the upper body turns slightly downhill (`turnCounter`).
-- The skis rest on the drawn snow facets (the sim rides a smooth surface a few cm off), and the side banks have half the facet jitter they had.
-- New look and camera values: `render.tuckSpeedMin` 7 / `tuckSpeedFull` 12, `brakeCounter` 0.4, `brakeLean` 0.3, `brakeSink` 0.35; `camera.orbit*` for the drag orbit.
+**Tuned config values** (`src/config.ts`, starting value → now)
+- Riding: `gravity` 11 → 12, `skiFriction` 0.05 → 0.025, `dragCrouch` 0.003 → 0.002, `brakeDecel` 6 → 7.
+- Turning: `grip` 1.8 → 2.0 (plus new `carveFriction` 0.08), `turnRateSlow` 2.8 → 2.3, `turnRateFast` 1.5 → 1.25, `turnResponse` 14 → 10.
+- Pole push: `polePushSpeed` 1.8 → 3.1, `poleMaxSpeed` 7 → 8.5, `polePushInterval` 0.55 → 0.73.
+- Pop: `popMin` 3 → 3.2, `popMax` 5.2 → 5.5.
+- Landing (new, loosened for edges): `pitchMax` 0.6, `rollMax` 0.9, `sideMax` 1.0 rad, `sideSpeed` 6 m/s, `edgeCheckAir` 0.3 s.
+- Camera: `heightNear` 2.1 → 2.35, `heightFar` 2.6 → 4.85.
+- Skier look (new): `render.leanBodyShare` 0.5, `hipShift` 0.3, `kneeDrive` 1.6, `turnCounter` 0.25.
