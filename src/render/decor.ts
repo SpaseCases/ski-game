@@ -4,6 +4,7 @@ import {
   InstancedMesh,
   Matrix4,
   Mesh,
+  MeshBasicMaterial,
   MeshLambertMaterial,
   Quaternion,
   Vector3,
@@ -24,6 +25,8 @@ const TILE = 64;
 const SINK = 0.15;
 
 const material = new MeshLambertMaterial({ vertexColors: true, flatShading: true });
+/** Lamp faces ignore lighting, so they look lit. */
+const glowMaterial = new MeshBasicMaterial({ vertexColors: true });
 /** Lines dyed into the snow sit right on it; draw them on top. */
 const decalMaterial = new MeshLambertMaterial({
   vertexColors: true,
@@ -39,17 +42,19 @@ export function createDecor(layout: DecorLayout, hf: Heightfield): Group {
 
   const kits = new TiledKit(TILE);
   const decals = new TiledKit(TILE);
+  const glows = new TiledKit(TILE);
   for (const line of layout.lines) drawLine(line, hf, line.kind === 'dyeLine' ? decals : kits);
   for (const p of layout.props) {
     const yaw = (p.heading * Math.PI) / 180;
     p.points.forEach((at, i) => {
       const color = p.color ? new Color(p.color) : FLAG_COLORS[i % FLAG_COLORS.length]!;
       const k = kits.near(at.x, at.z).at(at.x, drawnHeightAt(hf, at.x, at.z), at.z, yaw);
-      drawProp(k, p.kind, color);
+      drawProp(k, p.kind, color, glows.near(at.x, at.z));
     });
   }
   for (const mesh of kits.meshes(material)) group.add(mesh);
   for (const mesh of decals.meshes(decalMaterial)) group.add(mesh);
+  for (const mesh of glows.meshes(glowMaterial)) group.add(mesh);
   return group;
 }
 

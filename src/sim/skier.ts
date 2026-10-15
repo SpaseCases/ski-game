@@ -1,6 +1,7 @@
 import { Quaternion, Vector3 } from 'three';
 import { CONFIG } from '../config.ts';
 import { GRAB_ACTIONS, type InputState } from '../core/input.ts';
+import { onPipeWall, pipeInward } from '../maps/shapes.ts';
 import type { Heightfield, RailShape, SpawnDef } from '../maps/types.ts';
 import { collideObstacles, type Course } from './obstacles.ts';
 import { collideRails, railFrame, railUnder, type RailSpot } from './rails.ts';
@@ -285,9 +286,13 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
   const steer = (input.left.held ? 1 : 0) - (input.right.held ? 1 : 0);
 
   // Pop: release the crouch on the snow or a rail (or just after leaving it).
+  // Up a wall it drives up the wall, a little; pushing off along the snow's
+  // normal there would throw the skier out across the pipe.
   if (input.up.released && s.canPop && (s.grounded || s.airTime <= c.popCoyoteTime)) {
-    s.velocity.addScaledVector(s.normal, c.popMin + (c.popMax - c.popMin) * s.crouch);
-    if (s.grounded) takeOff(s, steer);
+    const pop = c.popMin + (c.popMax - c.popMin) * s.crouch;
+    if (onWall(s, course.hf)) s.velocity.y += pop * CONFIG.air.wallPop;
+    else s.velocity.addScaledVector(s.normal, pop);
+    if (s.grounded) takeOff(s, steer, course.hf);
     s.canPop = false;
     s.crouch = 0;
   }
@@ -348,7 +353,7 @@ function slideRail(s: SkierState, course: Course, steer: number, dt: number): vo
   s.yaw = wrapAngle(Math.atan2(-railDir.x, -railDir.z) + s.railAngle);
 
   if (off) {
-    takeOff(s, steer);
+    takeOff(s, steer, course.hf);
     return;
   }
   const h = groundAt(course.hf, s.position.x, s.position.z, contactNormal);
@@ -539,9 +544,16 @@ function airOrient(s: SkierState): void {
   s.orient.copy(s.airFrame).multiply(qTurn).multiply(qPitch).multiply(s.trick);
 }
 
+/** On a wall: steeper than CONFIG.air.wallAngle, or up a halfpipe's transition, and not on a rail. */
+function onWall(s: SkierState, hf: Heightfield): boolean {
+  if (s.rail >= 0) return false;
+  return s.normal.y < Math.cos(CONFIG.air.wallAngle * DEG) || onPipeWall(hf.shapes, s.position.x, s.position.z);
+}
+
 /** Leaves the snow, setting up the air orientation to carry on exactly from the snow. */
-function takeOff(s: SkierState, steer: number): void {
+function takeOff(s: SkierState, steer: number, hf: Heightfield): void {
   const a = CONFIG.air;
+  const wall = onWall(s, hf);
   s.grounded = false;
   s.airTime = 0;
   s.railExit = s.rail >= 0;
@@ -549,18 +561,20 @@ function takeOff(s: SkierState, steer: number): void {
   s.press = 0;
   groundOrient(s);
 
-  // Up a wall (a halfpipe): fly in the wall's plane, measuring heading from
-  // the wall instead of the horizon, and launch straight up, drifting back in
-  // just enough to come down inside the lip.
+  // Up a wall (a halfpipe): launch straight up (no faster than
+  // wallLaunchMax), drifting back in just enough to come down on the wall
+  // again (in a pipe "in" is straight across it), and turn in the plane of
+  // the snow left behind, measuring heading from the wall, not the horizon.
   const n = s.normal;
   const flat = Math.hypot(n.x, n.z);
-  s.airWall = !s.railExit && n.y < Math.cos(a.wallAngle * DEG) && s.velocity.y > 0 && flat > 1e-3;
+  s.airWall = wall && s.velocity.y > 0 && flat > 1e-3;
   if (s.airWall) {
-    frameUp.set(n.x / flat, 0, n.z / flat);
-    s.airFrame.setFromUnitVectors(UP, frameUp);
+    if (pipeInward(hf.shapes, s.position.x, s.position.z, frameUp)) frameUp.y = 0;
+    else frameUp.set(n.x / flat, 0, n.z / flat);
+    s.velocity.y = Math.min(s.velocity.y, a.wallLaunchMax);
     const inward = clamp((a.wallDrift * CONFIG.skier.gravity) / (2 * Math.max(s.velocity.y, 0.5)), 0.2, 3);
-    const vw = s.velocity.dot(frameUp);
-    if (vw < inward) s.velocity.addScaledVector(frameUp, inward - vw);
+    s.velocity.addScaledVector(frameUp, inward - s.velocity.dot(frameUp));
+    s.airFrame.setFromUnitVectors(UP, n);
   } else {
     s.airFrame.identity();
   }
@@ -599,7 +613,7 @@ function moveOnSnow(s: SkierState, course: Course, steer: number, dt: number): v
   if (contactNormal.dot(s.normal) < CREASE_COS && s.velocity.dot(contactNormal) > CREASE_LEAVE) {
     // Over a sharp crest (a lip, a pipe's coping) and moving away from the
     // snow beyond it: airborne, launching off the snow the skis just left.
-    takeOff(s, steer);
+    takeOff(s, steer, hf);
     return;
   }
   if (gap <= 0) {
@@ -622,7 +636,7 @@ function moveOnSnow(s: SkierState, course: Course, steer: number, dt: number): v
     if (contactNormal.dot(s.normal) > CREASE_COS) s.normal.copy(contactNormal);
   } else {
     // The snow fell away faster than gravity could follow: airborne.
-    takeOff(s, steer);
+    takeOff(s, steer, hf);
     return;
   }
   groundOrient(s);

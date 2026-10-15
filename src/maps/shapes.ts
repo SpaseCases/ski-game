@@ -389,6 +389,32 @@ function samplePipe(s: PipeShape, x: number, z: number, out: ShapeSample): boole
   return true;
 }
 
+/** How far (m) past the edge of a pipe's floor the wall counts as a wall, not floor. */
+const PIPE_WALL_START = 0.5;
+
+/** True on a halfpipe's wall: past the edge of its floor, up the transition (or on the deck). */
+export function onPipeWall(shapes: readonly TerrainShape[] | undefined, x: number, z: number): boolean {
+  return pipeInward(shapes, x, z, inwardScratch);
+}
+
+const inwardScratch = { x: 0, z: 0 };
+
+/**
+ * On a halfpipe's wall, writes the level direction straight across the pipe
+ * toward its middle into `out` and returns true. (The wall's own normal tips
+ * a little down the pipe's slope, so it isn't quite square to the pipe.)
+ */
+export function pipeInward(shapes: readonly TerrainShape[] | undefined, x: number, z: number, out: { x: number; z: number }): boolean {
+  const s = pipeAt(shapes, x, z);
+  if (!s) return false;
+  const v = (x - s.x) * s.rightX + (z - s.z) * s.rightZ;
+  if (Math.abs(v) <= s.floorHalf + PIPE_WALL_START) return false;
+  const sign = v < 0 ? 1 : -1;
+  out.x = s.rightX * sign;
+  out.z = s.rightZ * sign;
+  return true;
+}
+
 /** The halfpipe whose inside (floor, walls and decks) holds (x, z), or undefined. */
 export function pipeAt(shapes: readonly TerrainShape[] | undefined, x: number, z: number): PipeShape | undefined {
   if (!shapes) return undefined;

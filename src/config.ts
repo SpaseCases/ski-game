@@ -119,6 +119,10 @@ export const CONFIG = {
     wallAngle: 50,
     /** How far (m) back inside the lip a wall air comes down. */
     wallDrift: 0.6,
+    /** Share of a pop that a wall (or a halfpipe's transition) turns into speed straight up. */
+    wallPop: 0.4,
+    /** Fastest (m/s) a wall air launches upward; about 3.4 m above the lip. Faster is lost, which keeps pipe speed in check. */
+    wallLaunchMax: 9,
   },
 
   landing: {
@@ -220,10 +224,13 @@ export const CONFIG = {
   slalom: {
     /** Pole height (m) above the snow. */
     poleHeight: 1.8,
-    /** A pole closer than this (m) to the skier's line is clipped. */
-    clipReach: 0.45,
-    /** Bend speed (rad/s) a clip gives per m/s of the skier's speed. */
+    /** A pole closer than this (m) to the skier's feet, below the hips, is knocked aside (the body's half width with arms). */
+    clipReach: 0.55,
+    /** Bend speed (rad/s) a knock gives per m/s of the skier's speed. */
     kick: 0.6,
+    /** Each knock costs the skier this much speed (m/s) and pushes them this fast (m/s) away from the pole. */
+    clipSlow: 1,
+    clipPush: 0.8,
     /** How a bent pole springs back (per second², per second), and the most it bends (radians). */
     stiffness: 60,
     damping: 5,

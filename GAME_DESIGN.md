@@ -163,5 +163,5 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - Pole push: `polePushSpeed` 1.8 → 3.1, `poleMaxSpeed` 7 → 8.5, `polePushInterval` 0.55 → 0.73.
 - Pop: `popMin` 3 → 3.2, `popMax` 5.2 → 5.5.
 - Camera: `heightNear` 2.1 → 2.35, `heightFar` 2.6 → 4.85.
-- Slalom: `kick` 0.25 → 0.6 (clipped poles bend 30–40°).
+- Slalom: `kick` 0.25 → 0.6, `clipReach` 0.45 → 0.55 (knocked poles bend 25–75° and cost 1 m/s).
 - Added along the way: landing tolerances (loosened so edge landings stick), rail values and checkpoint timings (both still untuned), skier pose values, and in 5a the wall air, curve load, rough landing, ride-on and decoration density values (untuned).

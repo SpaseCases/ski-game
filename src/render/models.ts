@@ -25,7 +25,8 @@ export const PALETTE = {
   net: c('#d8342c'),
   netDark: c('#9c1f18'),
   dye: c('#2f6fe0'),
-  lamp: c('#fff4c8'),
+  /** Lit lamp faces, drawn unlit (see drawProp's glow kit) so they read as lights. */
+  lamp: c('#fffbe6'),
   white: c('#f4f6fa'),
   red: c('#c8331f'),
   redDark: c('#9e2616'),
@@ -101,15 +102,23 @@ function rock(seed: number, capped: boolean): BufferGeometry {
   return k.geometry();
 }
 
-/** Draws a prop of `kind` into a kit already placed at its spot (see MeshKit.at). */
-export function drawProp(k: MeshKit, kind: string, color: Color): void {
+/**
+ * Draws a prop of `kind` into a kit already placed at its spot (see
+ * MeshKit.at). Lamp faces go into `glow`, which is drawn unlit.
+ */
+export function drawProp(k: MeshKit, kind: string, color: Color, glow: MeshKit): void {
   const S = DECOR_SIZE;
   switch (kind) {
-    case 'lightPole':
-      k.prism(0, 0, -0.3, S.lightPoleHeight, 0.11, 0.07, 6, PALETTE.post);
-      k.beam(0, S.lightPoleHeight - 0.2, 0, 0, S.lightPoleHeight - 0.2, -1.3, 0.08, PALETTE.post);
-      k.box(0, S.lightPoleHeight - 0.32, -1.4, 0.4, 0.18, 0.6, PALETTE.lamp);
+    case 'lightPole': {
+      const top = S.lightPoleHeight;
+      k.prism(0, 0, -0.3, top, 0.11, 0.07, 6, PALETTE.post);
+      k.beam(0, top - 0.2, 0, 0, top - 0.2, -1.3, 0.08, PALETTE.post);
+      k.box(0, top - 0.3, -1.4, 0.4, 0.16, 0.6, PALETTE.post);
+      // The lit underside.
+      const y = top - 0.385;
+      glow.quad(k.p(-0.16, y, -1.65), k.p(0.16, y, -1.65), k.p(0.16, y, -1.15), k.p(-0.16, y, -1.15), PALETTE.lamp, k.p(0, y - 1, -1.4).sub(k.p(0, y, -1.4)));
       break;
+    }
     case 'floodlight': {
       const h = S.floodlightHeight;
       for (const [x, z] of [
@@ -126,13 +135,14 @@ export function drawProp(k: MeshKit, kind: string, color: Color): void {
         k.beam(w, y, w, -w, y + 1.2, w, 0.05, PALETTE.metal);
       }
       k.box(0, h, 0, 1.4, 0.15, 1.4, PALETTE.metalDark);
-      // Lamp panel, angled down toward the course.
-      for (let i = 0; i < 3; i++) {
-        for (let j = 0; j < 2; j++) {
-          k.box(-0.9 + i * 0.9, h + 0.9 + j * 0.75, -0.55 + j * 0.25, 0.8, 0.65, 0.25, PALETTE.lamp);
-        }
+      // Two short masts holding two bars of separate lamp heads, each aimed
+      // down at the course with a lit face.
+      for (const x of [-0.55, 0.55]) k.beam(x, h, -0.2, x, h + 2.1, -0.2, 0.09, PALETTE.metalDark);
+      for (let j = 0; j < 2; j++) {
+        const y = h + 0.95 + j * 0.85;
+        k.beam(-1.9, y, -0.2, 1.9, y, -0.2, 0.07, PALETTE.metalDark);
+        for (let i = 0; i < 4; i++) lampHead(k, glow, -1.4 + i * 0.93, y, -0.45);
       }
-      k.box(0, h + 1.27, -0.35, 2.8, 1.6, 0.12, PALETTE.metalDark);
       break;
     }
     case 'banner': {
@@ -155,6 +165,21 @@ export function drawProp(k: MeshKit, kind: string, color: Color): void {
       groomer(k);
       break;
   }
+}
+
+/** A floodlight head at local (x, y, z): a dark housing with a lit face tipped down toward -Z. */
+function lampHead(k: MeshKit, glow: MeshKit, x: number, y: number, z: number): void {
+  k.box(x, y, z, 0.6, 0.48, 0.32, PALETTE.post);
+  const w = 0.25;
+  const front = z - 0.17;
+  glow.quad(
+    k.p(x - w, y - 0.2, front),
+    k.p(x + w, y - 0.2, front),
+    k.p(x + w, y + 0.2, front - 0.12),
+    k.p(x - w, y + 0.2, front - 0.12),
+    PALETTE.lamp,
+    k.p(x, y - 0.45, front - 1).sub(k.p(x, y, front)),
+  );
 }
 
 /** A snow groomer parked to the side: cab, body, tracks, front blade and rear tiller. */

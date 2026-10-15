@@ -8,8 +8,9 @@ import type { SkierState } from './skier.ts';
 // A timed slalom run. Pushing through the race start's timing wand starts
 // the clock; the map's finish stops it. Each slalom gate is a pair of poles
 // the rider must pass between, in order: riding past a gate's line outside
-// its poles, or skipping it, counts as a missed gate. Poles bend away when
-// clipped and spring back.
+// its poles, or skipping it, counts as a missed gate. Poles are hinged:
+// the skier's body knocks them flat out of the way, and they spring back.
+// Each knock costs the skier a little speed and nudges them off the pole.
 
 /** A gate (or the wand): its middle, the direction riders cross it, its right, and half its width. */
 export interface RaceLine {
@@ -46,6 +47,8 @@ export interface RaceState {
   bendZ: Float32Array;
   rateX: Float32Array;
   rateZ: Float32Array;
+  /** Per pole: 1 while the skier's body is against it. */
+  touching: Uint8Array;
 }
 
 export type RaceEvent = 'none' | 'start' | 'gate' | 'missed';
@@ -100,6 +103,7 @@ export function createRace(def: RaceDef): RaceState {
     bendZ: new Float32Array(poles),
     rateX: new Float32Array(poles),
     rateZ: new Float32Array(poles),
+    touching: new Uint8Array(poles),
   };
 }
 
@@ -122,7 +126,8 @@ export function finishRace(race: RaceState): void {
 
 /**
  * One step: the clock, the wand, gates passed or missed between `prev` and
- * the skier's position, and the poles bending where the skier clips them.
+ * the skier's position, and the poles knocked aside where the skier hits
+ * them (which slows and nudges the skier).
  */
 export function stepRace(race: RaceState, def: RaceDef, prev: Vector3, s: SkierState, dt: number): RaceEvent {
   let event: RaceEvent = 'none';
@@ -170,13 +175,16 @@ function crossed(g: RaceLine, a: Vector3, b: Vector3): number {
 }
 
 /**
- * Each pole is a damped spring that leans over when the skier's body brushes
- * it: pushed away from the body, at least as fast as the skier is moving.
+ * Each pole is a damped spring hinged at the snow. Where the skier's body
+ * (a column clipReach wide around the feet, up to the hips) runs into one,
+ * it's pushed out to the edge of the body at once, whipping on at least as
+ * fast as the skier is moving. The first moment of each knock slows the
+ * skier by clipSlow and pushes them clipPush away from the pole.
  */
 function bendPoles(race: RaceState, def: RaceDef, s: SkierState, dt: number): void {
   const c = CONFIG.slalom;
   const p = s.position;
-  const speed = Math.hypot(s.velocity.x, s.velocity.z);
+  const v = s.velocity;
   for (let i = 0; i < def.gates.length * 2; i++) {
     const g = def.gates[i >> 1]!;
     const side = (i & 1) === 0 ? -1 : 1;
@@ -187,19 +195,32 @@ function bendPoles(race: RaceState, def: RaceDef, s: SkierState, dt: number): vo
     let rx = race.rateX[i] ?? 0;
     let rz = race.rateZ[i] ?? 0;
 
-    // Where the bent pole is at the body's height: it hinges at its base.
+    // Where the pole is at the body's height (it leans by its bend there).
     const base = def.poleBase[i] ?? 0;
     const rise = Math.min(c.poleHeight, Math.max(0, s.center.y - base));
     const dx = px + bx * rise - p.x;
     const dz = pz + bz * rise - p.z;
     const d = Math.hypot(dx, dz);
-    if (!s.bailed && p.y < base + c.poleHeight && d < c.clipReach && rise > 0) {
-      const ux = d > 1e-4 ? dx / d : s.velocity.x / Math.max(speed, 1e-4);
-      const uz = d > 1e-4 ? dz / d : s.velocity.z / Math.max(speed, 1e-4);
-      const push = Math.max(speed * c.kick, rx * ux + rz * uz);
-      rx = ux * push;
-      rz = uz * push;
+    const touching = !s.bailed && p.y < base + c.poleHeight && d < c.clipReach && rise > 0.2;
+    if (touching) {
+      // Away from the body (along the skier's travel when dead center).
+      const speed = Math.hypot(v.x, v.z);
+      const ux = d > 1e-4 ? dx / d : v.x / Math.max(speed, 1e-4);
+      const uz = d > 1e-4 ? dz / d : v.z / Math.max(speed, 1e-4);
+      // Lean it out to the edge of the body so it never passes through.
+      bx = (p.x + ux * c.clipReach - px) / rise;
+      bz = (p.z + uz * c.clipReach - pz) / rise;
+      const whip = Math.max(speed * c.kick, rx * ux + rz * uz);
+      rx = ux * whip;
+      rz = uz * whip;
+      if (race.touching[i] === 0) {
+        const total = v.length();
+        if (total > 1e-3) v.multiplyScalar(Math.max(0, total - c.clipSlow) / total);
+        v.x -= ux * c.clipPush;
+        v.z -= uz * c.clipPush;
+      }
     }
+    race.touching[i] = touching ? 1 : 0;
     rx += (-c.stiffness * bx - c.damping * rx) * dt;
     rz += (-c.stiffness * bz - c.damping * rz) * dt;
     bx += rx * dt;
