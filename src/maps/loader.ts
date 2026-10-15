@@ -80,6 +80,20 @@ function parseFeature(raw: unknown, path: string): Feature {
         deckLength: n('deckLength'),
         landingLength: n('landingLength'),
       };
+    case 'rail': {
+      const points = f.points;
+      if (!Array.isArray(points) || points.length < 2) {
+        throw new Error(`Map: ${path}.points must be an array of at least 2 points`);
+      }
+      return {
+        type: 'rail',
+        points: points.map((raw, i) => {
+          const pt = obj(raw, `${path}.points[${i}]`);
+          const m = (key: string): number => num(pt[key], `${path}.points[${i}].${key}`);
+          return { x: m('x'), z: m('z'), height: m('height') };
+        }),
+      };
+    }
     default:
       throw new Error(`Map: ${path} has unknown type ${String(f.type)}`);
   }

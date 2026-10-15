@@ -40,6 +40,8 @@ export interface SkierPose {
   landDepth: number;
   bailed: boolean;
   bailTime: number;
+  /** Sliding a rail or box. */
+  onRail: boolean;
 }
 
 export function createSkierPose(): SkierPose {
@@ -62,6 +64,7 @@ export function createSkierPose(): SkierPose {
     landDepth: 0,
     bailed: false,
     bailTime: 0,
+    onRail: false,
   };
 }
 
@@ -84,6 +87,7 @@ export function interpolateSkier(out: SkierPose, prev: SkierState, curr: SkierSt
   out.landDepth = curr.landDepth;
   out.bailed = curr.bailed;
   out.bailTime = curr.bailTime;
+  out.onRail = curr.rail >= 0;
 }
 
 const UP = new Vector3(0, 1, 0);
@@ -122,6 +126,7 @@ export class SkierView {
   private airWeight = 0;
   private readonly grabWeights = new Float32Array(GRABS.length);
   private bailWeight = 0;
+  private railWeight = 0;
   private readonly hf: Heightfield;
 
   constructor(scene: Scene, hf: Heightfield) {
@@ -161,6 +166,7 @@ export class SkierView {
     this.airWeight = pose.grounded ? 0 : 1;
     this.grabWeights.fill(0);
     this.bailWeight = pose.bailed ? 1 : 0;
+    this.railWeight = pose.onRail ? 1 : 0;
   }
 
   update(state: SkierPose, frameTime: number): void {
@@ -189,6 +195,7 @@ export class SkierView {
     // Blend weights.
     this.airWeight = approach(this.airWeight, state.grounded ? 0 : 1, frameTime / r.grabBlendTime);
     this.bailWeight = approach(this.bailWeight, state.bailed ? 1 : 0, frameTime / r.bailBlendTime);
+    this.railWeight = approach(this.railWeight, state.onRail ? 1 : 0, frameTime / r.railBlendTime);
     let grabTotal = 0;
     for (let i = 0; i < GRABS.length; i++) {
       const w = approach(this.grabWeights[i] ?? 0, state.grab === i ? 1 : 0, frameTime / r.grabBlendTime);
@@ -217,7 +224,7 @@ export class SkierView {
 
     // Body on the snow: stance, sinking into a crouch while ↑ is held, which
     // becomes a speed tuck when going fast. Braking sinks a little, and a
-    // landing absorbs into a quick crouch. In the air: knees up a little,
+    // landing absorbs into a quick crouch. On a rail the knees stay soft. In the air: knees up a little,
     // tucking tighter the faster it rotates.
     const speed = Math.hypot(state.velocity.x, state.velocity.z);
     const tuck = smoothstep(r.tuckSpeedMin, r.tuckSpeedFull, speed);
@@ -225,7 +232,8 @@ export class SkierView {
     const groundCrouch =
       state.crouch * (1 - tuck) +
       state.brake * r.brakeSink * (1 - state.crouch) +
-      squash * (1 - state.crouch);
+      squash * (1 - state.crouch) +
+      this.railWeight * r.railCrouch * (1 - state.crouch);
     const airCrouch = r.airCrouch + r.spinTuck * Math.min(1, state.spinRate / CONFIG.air.flipRate);
     const air = this.airWeight;
     const p = this.pose;
@@ -243,7 +251,8 @@ export class SkierView {
     const counter = -swing * r.brakeCounter - leanTotal * r.turnCounter * onSnow;
     angulate(p, bodyLean, leanTotal - bodyLean, counter, onSnow);
     this.rig.apply(p);
-    this.sitOnDrawnSnow(onSnow);
+    // On a rail the skis rest on the rail, not the snow.
+    this.sitOnDrawnSnow(onSnow * (1 - this.railWeight));
 
     // Shadow sits on the drawn snow under the body and fades as it rises.
     const pos = state.center;

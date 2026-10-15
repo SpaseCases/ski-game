@@ -88,6 +88,22 @@ export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
   land.add(L, 'squashTime', 0.05, 1, 0.01);
   land.close();
 
+  const R = CONFIG.rails;
+  const rails = gui.addFolder('Rails and boxes');
+  rails.add(R, 'snapDistance', 0, 1, 0.01);
+  rails.add(R, 'catchDepth', 0.05, 1, 0.01);
+  rails.add(R, 'angleMax', 0.05, 0.78, 0.01);
+  rails.add(R, 'tiltMax', 0.05, 1.6, 0.01);
+  rails.add(R, 'railFriction', 0, 0.5, 0.005);
+  rails.add(R, 'boxFriction', 0, 0.5, 0.005);
+  rails.add(R, 'turnRate', 1, 20, 0.5);
+  rails.add(R, 'spinCarry', 0, 2, 0.05);
+  rails.add(R, 'slipSpeed', 0, 5, 0.1);
+  rails.add(R, 'bodyRadius', 0.05, 0.6, 0.01);
+  rails.add(R, 'stepTolerance', 0, 0.5, 0.01);
+  rails.add(R, 'crashSpeed', 0, 20, 0.5);
+  rails.close();
+
   const b = CONFIG.bail;
   const bail = gui.addFolder('Crash');
   bail.add(b, 'friction', 0, 2, 0.01);
@@ -111,6 +127,8 @@ export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
   look.add(r, 'airCrouch', 0, 1, 0.01);
   look.add(r, 'spinTuck', 0, 1, 0.01);
   look.add(r, 'bailBlendTime', 0.01, 1, 0.01);
+  look.add(r, 'railCrouch', 0, 1, 0.01);
+  look.add(r, 'railBlendTime', 0.01, 0.5, 0.01);
   look.close();
 
   const cam = gui.addFolder('Camera');
@@ -137,7 +155,13 @@ export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
   return {
     update(pose: SkierPose, skier: SkierState): void {
       readout.speed = `${Math.round(pose.velocity.length() * 3.6)} km/h`;
-      readout.state = skier.bailed ? `crash (${skier.bailReason})` : pose.grounded ? 'riding' : 'air';
+      readout.state = skier.bailed
+        ? `crash (${skier.bailReason})`
+        : skier.rail >= 0
+          ? `rail ${skier.rail} (${Math.round(skier.railAngle * DEG)}°)`
+          : pose.grounded
+            ? 'riding'
+            : 'air';
       readout.landing =
         `${skier.bailReason && skier.bailed ? 'BAIL ' : ''}pitch ${Math.round(skier.landPitch * DEG)}° roll ${Math.round(skier.landRoll * DEG)}° ` +
         `side ${Math.round(skier.landSide * DEG)}° ${skier.landImpact.toFixed(1)} m/s`;

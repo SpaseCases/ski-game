@@ -4,7 +4,8 @@ export function mountControlsHint(hud: HTMLElement): void {
   el.className = 'controls-hint';
   el.innerText =
     '← → turn · hold ↑ crouch, release to pop · ↓ brake · Shift pole push · R restart · drag to look around\n' +
-    'In the air: ← → spin · ↑ ↓ flip · Q E Lincoln loop · grabs A S D F (left hand) Z X C V (right hand)';
+    'In the air: ← → spin · ↑ ↓ flip · Q E Lincoln loop · grabs A S D F (left hand) Z X C V (right hand)\n' +
+    'On a rail or box (land on it): ← → turn skis straight or sideways · hold and release ↑ to pop off';
   hud.appendChild(el);
 }
 

@@ -74,7 +74,23 @@ export interface JumpFeature {
   landingLength: number;
 }
 
-export type Feature = BoxFeature | JumpFeature;
+/** A point on a rail: where it is, and how high its top is above the snow there. */
+export interface RailPoint {
+  x: number;
+  z: number;
+  height: number;
+}
+
+/**
+ * A metal rail: a polyline the rider slides along, on posts down to the snow.
+ * Flat, down, and flat-down rails are all just different points.
+ */
+export interface RailFeature {
+  type: 'rail';
+  points: RailPoint[];
+}
+
+export type Feature = BoxFeature | JumpFeature | RailFeature;
 
 export interface SpawnDef {
   x: number;
@@ -127,4 +143,20 @@ export interface JumpShape {
   lipAt: number;
   deckEnd: number;
   landingEnd: number;
+}
+
+/**
+ * Something to slide on (a rail or a box), built from its feature for the
+ * simulation: the line along its top that the skis ride, in world space.
+ */
+export interface RailShape {
+  kind: 'rail' | 'box';
+  /** Points along the top, x y z per point. */
+  points: Float32Array;
+  /** Distance along the top (3D) from the first point to each point. */
+  dist: Float32Array;
+  /** Total length along the top. */
+  length: number;
+  /** Half the width of the top: the rail's radius, or half the box's width. */
+  halfWidth: number;
 }

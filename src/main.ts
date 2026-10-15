@@ -5,6 +5,7 @@ import { PointerOrbit } from './core/pointerOrbit.ts';
 import { buildJumpShapes } from './maps/jumps.ts';
 import { parseMap } from './maps/loader.ts';
 import { generateSlope } from './maps/terrain.ts';
+import { buildRailShapes } from './sim/rails.ts';
 import testSlope from './maps/test-slope.json';
 import { CONFIG } from './config.ts';
 import { ChaseCamera, type OrbitDrag } from './render/chaseCamera.ts';
@@ -25,6 +26,7 @@ const hud = byId('hud');
 const map = parseMap(testSlope);
 const heightfield = generateSlope(map.terrain);
 heightfield.jumps = buildJumpShapes(map.features);
+const rails = buildRailShapes(map.features, heightfield);
 
 let view: View;
 try {
@@ -37,7 +39,7 @@ try {
 const { renderer, scene, camera } = view;
 
 scene.add(createTerrainMesh(heightfield, map.terrain.seed));
-scene.add(createFeatureMeshes(map.features, heightfield));
+scene.add(createFeatureMeshes(heightfield, rails));
 
 mountWindowButtons(hud);
 mountControlsHint(hud);
@@ -75,7 +77,7 @@ if (import.meta.env.DEV) {
     devPanel = mountDevPanel({ respawn });
   });
   // Handle for inspecting the sim from the browser console while testing.
-  Object.assign(window, { parkLaps: { skier, respawn, config: CONFIG, skierView, camera } });
+  Object.assign(window, { parkLaps: { skier, respawn, config: CONFIG, skierView, camera, rails, heightfield } });
 }
 
 startLoop(
@@ -87,7 +89,7 @@ startLoop(
       return;
     }
     copySkierState(skierPrev, skier);
-    stepSkier(skier, keys, heightfield, dt);
+    stepSkier(skier, keys, heightfield, rails, dt);
     // After a crash, let the tumble play out, then fade and respawn.
     if (skier.bailed && skier.bailTime >= CONFIG.bail.respawnDelay && !fader.busy) fader.fadeOut(respawn);
   },

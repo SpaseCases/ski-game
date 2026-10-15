@@ -121,6 +121,37 @@ export const CONFIG = {
     squashTime: 0.35,
   },
 
+  rails: {
+    /** Radius (m) of a round rail. */
+    radius: 0.045,
+    /**
+     * Light magnet: skis coming down within this distance (m) of a rail's
+     * line, or of a box's edge, lock onto it.
+     */
+    snapDistance: 0.35,
+    /** How far (m) below the top the skis can already be in one step and still lock on. */
+    catchDepth: 0.3,
+    /** Biggest angle (radians) between the skis and straight or sideways that still locks on. Past it they slip off. */
+    angleMax: 0.6,
+    /** Biggest tilt (radians) of the body away from upright on the rail that still locks on. */
+    tiltMax: 0.75,
+    /** Sliding friction coefficient on a metal rail and on a box. */
+    railFriction: 0.05,
+    boxFriction: 0.09,
+    /** How fast (rad/s) ←/→ turns the skis a quarter turn on a rail, and how fast they settle to straight or sideways. */
+    turnRate: 7,
+    /** Share of that turning speed that carries into a spin when leaving the rail mid-turn. */
+    spinCarry: 0.5,
+    /** Sideways speed (m/s) given when slipping off, so the skier falls clear of the rail. */
+    slipSpeed: 1.2,
+    /** Radius (m) of the body when bumping into rails and boxes. */
+    bodyRadius: 0.25,
+    /** Skis this far (m) below the top of a rail or box are hitting its side, not riding over it. */
+    stepTolerance: 0.12,
+    /** Speed (m/s) into the side of a rail or box that crashes; slower bumps just stop. */
+    crashSpeed: 5,
+  },
+
   bail: {
     /** Friction coefficient of a tumbling body sliding on snow. */
     friction: 0.7,
@@ -214,6 +245,11 @@ export const CONFIG = {
     spinTuck: 0.4,
     /** Seconds to blend into the crash tumble. */
     bailBlendTime: 0.2,
+    /** How far toward a crouch the skier sits while sliding a rail or box, and seconds to blend in and out. */
+    railCrouch: 0.35,
+    railBlendTime: 0.1,
+    /** Thickness (m) of the posts under a rail. */
+    railPostWidth: 0.07,
   },
 
   light: {

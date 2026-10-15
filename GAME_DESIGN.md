@@ -113,13 +113,16 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - 0, scaffold and deploy: Vite + Three.js, GitHub Pages via Actions, `embed-test.html`.
 - 1, skiing: carving, hockey-stop brake, pole push, crouch and pop, chase camera with drag orbit, dev tuning panel.
 - 2, air: spins, flips, corks and misty flips, Lincoln loops, the 8 grabs, carve-into-the-lip spin, landing check, crash tumble, fade and respawn. The test slope has three jumps.
+- 3, rails and boxes: land on a rail or box to lock on (light magnet), slide with friction, ←/→ turn the skis straight ↔ sideways, pop or spin off, ride off the end. Missing the line or landing off-angle slips off. Hitting a rail or box below its top bumps you, or crashes you if hard. The test slope has a flat box, a flat rail, a down rail and a flat-down rail.
 - Also done early: the Park Laps name, the low-poly skier and all its poses (`poses.html`), turns driven from the knees.
-- Next: milestone 3 (rails and boxes).
+- Next: milestone 4 (checkpoints).
 
 **Known issues**
 - Not yet tested on a real school Chromebook.
 - The test slope ends in an invisible wall.
-- The box has no collision yet, and hitting an obstacle isn't a crash trigger yet (milestone 3).
+- Riding off a rail sideways crashes unless you turn the skis back first (the landing checks sideways however short the drop).
+- A full pop carries 6–9 m, so you pop well before a rail. Lower `popMin`/`popMax` if rails feel hard to hit.
+- No ride-on (snow-level) boxes or rails yet; every feature needs a pop to get on.
 - Respawn goes to the map spawn until checkpoints arrive (milestone 4).
 - The large test jump: a full pop above ~15 m/s overshoots the landing and crashes, and a 720 needs a little more air than it gives. The real maps (milestone 5) get properly sized jumps.
 - In the japan grab the ski hangs low.
@@ -132,4 +135,5 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - Pop: `popMin` 3 → 3.2, `popMax` 5.2 → 5.5.
 - Landing (new, loosened for edges): `pitchMax` 0.6, `rollMax` 0.9, `sideMax` 1.0 rad, `sideSpeed` 6 m/s, `edgeCheckAir` 0.3 s.
 - Camera: `heightNear` 2.1 → 2.35, `heightFar` 2.6 → 4.85.
+- Rails (new, untuned): `snapDistance` 0.35 m, `angleMax` 0.6 rad, `tiltMax` 0.75 rad, `railFriction` 0.05, `boxFriction` 0.09, `turnRate` 7 rad/s, `spinCarry` 0.5, `crashSpeed` 5 m/s.
 - Skier look (new): `render.leanBodyShare` 0.5, `hipShift` 0.3, `kneeDrive` 1.6, `turnCounter` 0.25.
