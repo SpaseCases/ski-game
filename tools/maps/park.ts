@@ -188,7 +188,7 @@ function kicker(x: number, d: number, lip: number, angle: number, width = 3): nu
  * instead of flying over it.
  */
 function kickerTo(kind: 'rail' | 'box', x: number, d: number, pts: Pt[], o: { lip?: number; angle?: number; gap?: number; width?: number } = {}): void {
-  const lip = kicker(x, d, o.lip ?? 0.6, o.angle ?? 14, kind === 'box' ? 3.5 : 3);
+  const lip = kicker(x, d, o.lip ?? 0.6, o.angle ?? 10, kind === 'box' ? 3.5 : 3);
   slide(kind, x, lip + (o.gap ?? 1), pts, o.width ?? 0.7);
 }
 
@@ -292,7 +292,7 @@ const lanes: Json[] = [];
   const j = X.jib;
   slide('rail', j - 8, d0 + 40, SLIDES.flat(24, 0.5));
   slide('box', j + 8, d0 + 40, SLIDES.flat(20), 0.9);
-  kickerTo('box', j, d0 + 120, [[0, 0, FED], [8, 0, 1.0], [18, 0, 0.5]], { angle: 10, width: 0.8 });
+  kickerTo('box', j, d0 + 120, [[0, 0, FED], [8, 0, 1.0], [18, 0, 0.5]], { width: 0.8 });
   slide('rail', j - 8, d0 + 190, SLIDES.rainbow(14, 0.5, 0.8, 10));
   slide('rail', j + 8, d0 + 190, SLIDES.downFlatDown(26));
 
@@ -310,7 +310,7 @@ const lanes: Json[] = [];
   for (const x of [X.jib, X.jump, X.mid]) flag(x, d0 - 20);
   const j = X.jib;
   slide('box', j - 8, d0 + 40, SLIDES.flat(22, 0.45), 1.0);
-  kickerTo('rail', j + 8, d0 + 40, [[0, 0, FED], [18, 0, FED]], { angle: 10 });
+  kickerTo('rail', j + 8, d0 + 40, [[0, 0, FED], [18, 0, FED]]);
   slide('rail', j, d0 + 120, SLIDES.kinked(26, 2));
   slide('box', j - 8, d0 + 190, SLIDES.rainbow(14, 0.4, 0.8, 10), 1.0);
   slide('rail', j + 8, d0 + 190, SLIDES.flat(30, 0.5));

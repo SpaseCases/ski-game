@@ -150,13 +150,13 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - Esc opens the map menu as a stand-in pause until milestone 6.
 - The Park's huge jumps are sized for tucking the in-run from their flag. Tucking straight down a line through the 21° steeps (35+ m/s) overshoots whatever comes next.
 - The long rail has no brake (about 23 m/s standing through the steeps).
-- Kicker-fed rails catch riders rolling off at about 6 to 18 m/s; much faster flies over them.
+- Kicker-fed rails catch riders rolling off at about 6 to 22 m/s (26 in the steeps); faster flies over them.
 - The Test slope ends in an invisible wall at the top of the side berms and at the bottom.
 - Riding off a rail sideways crashes unless you turn the skis back first.
 - In the japan grab the ski hangs low.
 
 **Tuned config values** (`src/config.ts`, start → now)
-- Riding: `gravity` 11 → 12, `skiFriction` 0.05 → 0.042, `dragStand` 0.0055 → 0.0066, `dragCrouch` 0.003 → 0.002, `brakeDecel` 6 → 9.5, `brakeRampTime` 0.15 → 0.12.
+- Riding: `gravity` 11 → 12, `skiFriction` 0.05 → 0.035, `dragStand` 0.0055 → 0.0066 → 0.0055 (lowered after play-testing for easier speed), `dragCrouch` 0.003 → 0.002, `brakeDecel` 6 → 9.5, `brakeRampTime` 0.15 → 0.12.
 - Turning: `grip` 1.8 → 2.0, `turnRateSlow` 2.8 → 2.3, `turnRateFast` 1.5 → 1.25, `turnResponse` 14 → 10.
 - Pole push: `polePushSpeed` 1.8 → 3.1, `poleMaxSpeed` 7 → 8.5, `polePushInterval` 0.55 → 0.73.
 - Pop: `popMin` 3 → 3.2, `popMax` 5.2 → 5.5.

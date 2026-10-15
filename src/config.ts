@@ -13,9 +13,9 @@ export const CONFIG = {
     /** m/s². Above real gravity so the slope pulls hard and airs feel snappy. */
     gravity: 12,
     /** Kinetic friction coefficient along the skis. */
-    skiFriction: 0.042,
+    skiFriction: 0.035,
     /** Quadratic air drag (per meter) standing up and fully crouched. */
-    dragStand: 0.0066,
+    dragStand: 0.0055,
     dragCrouch: 0.002,
     /** Quadratic air drag (per meter) in the air. */
     dragAir: 0.004,
