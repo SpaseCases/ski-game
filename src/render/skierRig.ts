@@ -164,7 +164,7 @@ export class SkierRig {
     for (const side of [-1, 1]) {
       this.upperArms.push(add(buildUpperArm(jacket)));
       this.forearms.push(add(buildForearm(jacket)));
-      this.thighs.push(add(buildThigh(pants, side)));
+      this.thighs.push(add(buildThigh(pants)));
       this.shins.push(add(buildShin(pants)));
       this.feet.push(add(buildFoot(side)));
       this.poles.push(add(buildPole()));
@@ -636,7 +636,7 @@ function pushOutOfThigh(p: Vector3, hip: Vector3, knee: Vector3): void {
 const GOGGLE_SPAN = 1.62;
 const LENS_SPAN = 1.28;
 const GOGGLE_DEPTH = 1.12;
-const goggleHalf: AngleFn = (a) => 0.03 + 0.01 * Math.max(0, Math.cos((a * Math.PI) / (2 * GOGGLE_SPAN)));
+const goggleHalf: AngleFn = (a) => 0.034 + 0.011 * Math.max(0, Math.cos((a * Math.PI) / (2 * GOGGLE_SPAN)));
 const goggleNose: AngleFn = (a) => 0.016 * Math.max(0, 1 - Math.abs(a) / 0.28) ** 2;
 const goggleOuter: AngleFn = (a) => 0.122 - 0.016 * smooth01((Math.abs(a) - 1.1) / 0.5);
 
@@ -782,15 +782,12 @@ function buildForearm(jacket: Color): BufferGeometry {
   ]);
 }
 
-/** Baggy thigh with a cargo pocket on the outside (`side` -1 left, 1 right) and a knee. */
-function buildThigh(pants: Color, side: number): BufferGeometry {
+/** Baggy thigh and a knee. */
+function buildThigh(pants: Color): BufferGeometry {
   const t = BODY.thigh;
-  // In the segment frame +X points to the skier's left when standing, so the
-  // outside of the left leg is +X.
   return merge([
     paint(prism(0.096, 0.097, t, 12), pants),
     paint(new IcosahedronGeometry(0.099, 1).translate(0, t, 0), pants),
-    paint(new BoxGeometry(0.026, 0.13, 0.11).translate(-side * 0.098, t * 0.45, 0), shade(pants, 0.85)),
   ]);
 }
 

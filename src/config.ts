@@ -13,9 +13,9 @@ export const CONFIG = {
     /** m/s². Above real gravity so the slope pulls hard and airs feel snappy. */
     gravity: 12,
     /** Kinetic friction coefficient along the skis. */
-    skiFriction: 0.055,
+    skiFriction: 0.042,
     /** Quadratic air drag (per meter) standing up and fully crouched. */
-    dragStand: 0.0075,
+    dragStand: 0.0066,
     dragCrouch: 0.002,
     /** Quadratic air drag (per meter) in the air. */
     dragAir: 0.004,
@@ -44,7 +44,7 @@ export const CONFIG = {
     turnResponse: 10,
 
     /** Extra deceleration (m/s²) at full brake. */
-    brakeDecel: 11,
+    brakeDecel: 9.5,
     /** Seconds to reach full brake. */
     brakeRampTime: 0.12,
 
@@ -107,7 +107,7 @@ export const CONFIG = {
     /** Biggest nose-up or nose-down angle (radians) between the skis and the snow that still lands. */
     pitchMax: 0.6,
     /** Biggest roll onto an edge (radians) that still lands; past it the edge catches. */
-    rollMax: 0.9,
+    rollMax: 1.15,
     /** Biggest angle (radians) between the skis and the direction of travel (or its reverse) that still lands. */
     sideMax: 1,
     /** Below this speed (m/s) along the snow, landing sideways is fine. */
@@ -162,7 +162,7 @@ export const CONFIG = {
     rollRadius: 0.5,
     tumbleScale: 0.6,
     /** Height (m) of the tumbling body's center above the snow. */
-    centerHeight: 0.42,
+    centerHeight: 0.5,
     /** Seconds after a crash before the screen fades and the skier respawns; then the fade time. */
     respawnDelay: 1.5,
     fadeTime: 0.3,

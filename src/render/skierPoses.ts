@@ -244,24 +244,24 @@ export const GRABS: readonly PoseDef[] = [
 ];
 
 /**
- * Crash tumble: balled up with the knees pulled in and the arms flung out.
- * In game the whole body rolls around TUMBLE_CENTER.
+ * Crash tumble: a simple tight ball, skis together under the body and both
+ * arms wrapped forward around the knees, poles trailing. In game the whole
+ * body rolls around TUMBLE_CENTER.
  */
 export const TUMBLE: PoseDef = {
-  pelvis: [0, 0.62, 0.12],
-  pelvisPitch: 0.6,
-  chestPitch: 0.75,
-  chestRoll: 0.15,
-  headPitch: -0.1,
+  pelvis: [0, 0.62, 0.14],
+  pelvisPitch: 0.45,
+  chestPitch: 0.45,
+  headPitch: -0.45,
   feet: [
-    { ankle: [-0.18, 0.42, -0.28], pitch: 0.5, roll: 0.2, knee: [-0.3, 0.8, -0.6] },
-    { ankle: [0.2, 0.3, -0.12], pitch: -0.2, yaw: -0.3, roll: -0.3, knee: [0.4, 0.6, -0.8] },
+    { ankle: [-0.1, 0.2, -0.02], pitch: 0.15 },
+    { ankle: [0.1, 0.2, -0.02], pitch: 0.15 },
   ],
   hands: [
-    { at: [-0.62, 0.95, -0.15], pole: [-0.6, 0.3, 0.7], elbow: [-0.5, 0.6, 0.5] },
-    { at: [0.5, 0.95, -0.1], pole: [0.5, 0.7, 0.4], elbow: [0.6, 0.4, 0.6] },
+    { at: [-0.19, 0.72, -0.36], pole: [-0.12, -0.25, 1], elbow: [-0.8, -0.4, 0.2] },
+    { at: [0.19, 0.72, -0.36], pole: [0.12, -0.25, 1], elbow: [0.8, -0.4, 0.2] },
   ],
 };
 
 /** Middle of the balled-up tumble pose, in skier space. */
-export const TUMBLE_CENTER: Vec3 = [0, 0.62, -0.05];
+export const TUMBLE_CENTER: Vec3 = [0, 0.62, -0.08];

@@ -128,11 +128,11 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - In the japan grab the ski hangs low.
 
 **Tuned config values** (`src/config.ts`, starting value → now)
-- Riding: `gravity` 11 → 12, `skiFriction` 0.05 → 0.055, `dragStand` 0.0055 → 0.0075, `dragCrouch` 0.003 → 0.002, `brakeDecel` 6 → 11, `brakeRampTime` 0.15 → 0.12.
+- Riding: `gravity` 11 → 12, `skiFriction` 0.05 → 0.042, `dragStand` 0.0055 → 0.0066, `dragCrouch` 0.003 → 0.002, `brakeDecel` 6 → 9.5, `brakeRampTime` 0.15 → 0.12.
 - Turning: `grip` 1.8 → 2.0 (plus new `carveFriction` 0.08), `turnRateSlow` 2.8 → 2.3, `turnRateFast` 1.5 → 1.25, `turnResponse` 14 → 10.
 - Pole push: `polePushSpeed` 1.8 → 3.1, `poleMaxSpeed` 7 → 8.5, `polePushInterval` 0.55 → 0.73.
 - Pop: `popMin` 3 → 3.2, `popMax` 5.2 → 5.5.
-- Landing (new, loosened for edges): `pitchMax` 0.6, `rollMax` 0.9, `sideMax` 1.0 rad, `sideSpeed` 6 m/s, `edgeCheckAir` 0.3 s.
+- Landing (new, loosened for edges): `pitchMax` 0.6, `rollMax` 1.15, `sideMax` 1.0 rad, `sideSpeed` 6 m/s, `edgeCheckAir` 0.3 s.
 - Camera: `heightNear` 2.1 → 2.35, `heightFar` 2.6 → 4.85.
 - Rails (new, untuned): `snapDistance` 0.35 m, `angleMax` 0.6 rad, `tiltMax` 0.75 rad, `railFriction` 0.05, `boxFriction` 0.09, `turnRate` 4 rad/s with `turnAccel` 30, `spinCarry` 0.5, `crashSpeed` 5 m/s.
 - Skier look (new): `render.leanBodyShare` 0.5, `hipShift` 0.3, `kneeDrive` 1.1, `turnCounter` 0.25, `crouchAngulation` 0.25 (in a crouch or tuck most of the lean tilts the whole body).
