@@ -13,9 +13,13 @@ import {
   MeshLambertMaterial,
   PerspectiveCamera,
   Scene,
+  CylinderGeometry,
+  Vector3,
   WebGLRenderer,
 } from 'three';
 import { CONFIG } from './config.ts';
+import type { Heightfield } from './maps/types.ts';
+import { createSkierPose, SkierView, type SkierPose } from './render/skierView.ts';
 import { SkierRig } from './render/skierRig.ts';
 import {
   CROUCH,
@@ -36,9 +40,24 @@ import {
 interface Entry {
   name: string;
   note: string;
-  pose: PoseDef;
+  /** A pose drawn straight from the rig, or a riding state drawn the way the game draws it. */
+  pose?: PoseDef;
+  ride?: Partial<RideState>;
   airborne: boolean;
 }
+
+/** The riding state the game turns into a pose (see SkierView). */
+interface RideState {
+  speed: number;
+  crouch: number;
+  lean: number;
+  brake: number;
+  brakeSide: number;
+  onRail: boolean;
+  railYaw: number;
+}
+
+const RAIL_HEIGHT = 0.45;
 
 // Grid order, left to right and top to bottom; null is the info card.
 const ENTRIES: (Entry | null)[] = [
@@ -55,9 +74,15 @@ const ENTRIES: (Entry | null)[] = [
   { name: 'Left tail', note: 'Left hand back to the left ski’s tail', pose: LEFT_TAIL, airborne: true },
   { name: 'Right tail', note: 'Right hand back to the right ski’s tail', pose: RIGHT_TAIL, airborne: true },
   { name: 'Tumble', note: 'Crash: balled up, rolling to a stop', pose: TUMBLE, airborne: true },
+  { name: 'Carve', note: 'In game: hard left turn at speed', ride: { speed: 12, lean: 0.85 }, airborne: false },
+  { name: 'Crouch carve', note: 'In game: loading a pop mid-turn', ride: { speed: 5, crouch: 1, lean: 0.6 }, airborne: false },
+  { name: 'Tuck', note: 'In game: holding ↑ fast', ride: { speed: 15, crouch: 1 }, airborne: false },
+  { name: 'Tuck carve', note: 'In game: tucked in a hard left turn', ride: { speed: 15, crouch: 1, lean: 0.85 }, airborne: false },
+  { name: 'Hockey stop', note: 'In game: full brake', ride: { speed: 8, brake: 1, brakeSide: 1 }, airborne: false },
+  { name: 'Rail', note: 'In game: sliding a rail sideways', ride: { speed: 6, onRail: true, railYaw: Math.PI / 2 }, airborne: false },
 ];
 
-const COLS = 4;
+const COLS = 5;
 const ROWS = 4;
 const AIR_HEIGHT = 0.55;
 
@@ -71,41 +96,96 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setScissorTest(true);
 app.appendChild(renderer.domElement);
 
-const scene = new Scene();
-scene.background = new Color('#dce8f3');
-scene.add(new HemisphereLight('#9fc3e6', '#7d8796', CONFIG.light.hemiIntensity));
-const sun = new DirectionalLight('#fff6e8', CONFIG.light.sunIntensity);
-const from = CONFIG.light.sunFrom;
-sun.position.set(from.x, from.y, from.z).normalize();
-scene.add(sun);
-
-// A faceted snow pad and a soft shadow under the one skier drawn per view.
-const snow = new Mesh(
-  new CircleGeometry(1.4, 9).rotateX(-Math.PI / 2),
-  new MeshLambertMaterial({ color: '#f5f8fc', flatShading: true }),
-);
-scene.add(snow);
+// Every view has its own scene: lights, a faceted snow pad and a soft shadow.
+const snowGeometry = new CircleGeometry(1.4, 9).rotateX(-Math.PI / 2);
+const snowMaterial = new MeshLambertMaterial({ color: '#f5f8fc', flatShading: true });
 const shadowDisc = new CircleGeometry(0.6, 16).rotateX(-Math.PI / 2);
 const shadowAlpha = new Float32Array(shadowDisc.getAttribute('position').count * 4).fill(1);
 for (let i = 1; i < shadowAlpha.length / 4; i++) shadowAlpha[i * 4 + 3] = 0;
 shadowDisc.setAttribute('color', new BufferAttribute(shadowAlpha, 4));
-const shadow = new Mesh(
-  shadowDisc,
-  new MeshBasicMaterial({ color: '#0b1a2a', vertexColors: true, transparent: true, opacity: 0.4, depthWrite: false }),
-);
-shadow.position.y = 0.005;
-scene.add(shadow);
+const shadowMaterial = new MeshBasicMaterial({
+  color: '#0b1a2a',
+  vertexColors: true,
+  transparent: true,
+  opacity: 0.4,
+  depthWrite: false,
+});
+const railGeometry = new CylinderGeometry(0.045, 0.045, 2.4, 6).rotateX(Math.PI / 2);
+const railMaterial = new MeshLambertMaterial({ color: '#b4bec8', flatShading: true });
+
+function makeScene(): Scene {
+  const scene = new Scene();
+  scene.background = new Color('#dce8f3');
+  scene.add(new HemisphereLight('#9fc3e6', '#7d8796', CONFIG.light.hemiIntensity));
+  const sun = new DirectionalLight('#fff6e8', CONFIG.light.sunIntensity);
+  const from = CONFIG.light.sunFrom;
+  sun.position.set(from.x, from.y, from.z).normalize();
+  scene.add(sun);
+  scene.add(new Mesh(snowGeometry, snowMaterial));
+  return scene;
+}
+
+// Flat snow for the riding views.
+const flat: Heightfield = {
+  cols: 5,
+  rows: 5,
+  cellSize: 2,
+  originX: -4,
+  originZ: -4,
+  heights: new Float32Array(25),
+};
+
+const RIDE_DEFAULTS: RideState = { speed: 0, crouch: 0, lean: 0, brake: 0, brakeSide: 1, onRail: false, railYaw: 0 };
+
+/** The interpolated state the game would hand SkierView while riding like this. */
+function ridePose(r: RideState): SkierPose {
+  const pose = createSkierPose();
+  pose.position.set(0, r.onRail ? RAIL_HEIGHT : 0, 0);
+  pose.center.copy(pose.position).add(new Vector3(0, CONFIG.air.comHeight, 0));
+  pose.velocity.set(0, 0, -r.speed);
+  pose.crouch = r.crouch;
+  pose.lean = r.lean;
+  pose.brake = r.brake;
+  pose.brakeSide = r.brakeSide;
+  pose.onRail = r.onRail;
+  pose.yaw = r.railYaw;
+  return pose;
+}
 
 const camera = new PerspectiveCamera(30, 1, 0.1, 50);
 
-const rigs = ENTRIES.map((entry) => {
+interface View {
+  scene: Scene;
+  rig: SkierRig;
+  /** Height the skier is lifted off the snow. */
+  lift: number;
+}
+
+const views: (View | null)[] = ENTRIES.map((entry) => {
   if (!entry) return null;
-  const rig = new SkierRig();
-  rig.apply(entry.pose);
-  rig.root.position.y = entry.airborne ? AIR_HEIGHT : 0;
-  rig.root.visible = false;
-  scene.add(rig.root);
-  return rig;
+  const scene = makeScene();
+  if (entry.pose) {
+    const rig = new SkierRig();
+    rig.apply(entry.pose);
+    const lift = entry.airborne ? AIR_HEIGHT : 0;
+    rig.root.position.y = lift;
+    scene.add(rig.root);
+    const shadow = new Mesh(shadowDisc, shadowMaterial);
+    shadow.position.y = 0.005;
+    scene.add(shadow);
+    return { scene, rig, lift };
+  }
+  // Riding states go through SkierView, which adds its own shadow.
+  const view = new SkierView(scene, flat);
+  const pose = ridePose({ ...RIDE_DEFAULTS, ...entry.ride });
+  view.snap(pose);
+  view.update(pose, 1);
+  if (pose.onRail) {
+    const rail = new Mesh(railGeometry, railMaterial);
+    rail.position.y = RAIL_HEIGHT - 0.045;
+    scene.add(rail);
+  }
+  return { scene, rig: view.rig, lift: pose.onRail ? RAIL_HEIGHT : 0 };
 });
 
 // Labels laid over the grid.
@@ -118,8 +198,8 @@ ENTRIES.forEach((entry, i) => {
     const title = document.createElement('strong');
     title.textContent = entry.name;
     label.append(title, entry.note);
-    const reach = rigs[i]?.reachError ?? 0;
-    const ankle = rigs[i]?.ankleError ?? 0;
+    const reach = views[i]?.rig.reachError ?? 0;
+    const ankle = views[i]?.rig.ankleError ?? 0;
     const problems: string[] = [];
     if (reach > 0.02) problems.push(`Hand or foot ${Math.round(reach * 100)} cm short of its target`);
     if (ankle > 0) problems.push(`Boot bent ${Math.round(ankle)}° past what an ankle allows`);
@@ -165,6 +245,7 @@ window.addEventListener('keyup', (e) => held.delete(e.key));
 window.addEventListener('blur', () => held.clear());
 window.addEventListener('resize', () => renderer.setSize(window.innerWidth, window.innerHeight));
 
+const focus = new Vector3();
 let last = performance.now();
 function frame(now: number): void {
   requestAnimationFrame(frame);
@@ -180,8 +261,8 @@ function frame(now: number): void {
   camera.updateProjectionMatrix();
 
   ENTRIES.forEach((entry, i) => {
-    const rig = rigs[i];
-    if (!entry || !rig) return;
+    const view = views[i];
+    if (!entry || !view) return;
     const col = i % COLS;
     const row = Math.floor(i / COLS);
     const x = col * w;
@@ -190,11 +271,12 @@ function frame(now: number): void {
     renderer.setScissor(x, y, w, h);
 
     // Aim at the body; zooming in slides the aim to this pose's head (or feet).
-    const lift = entry.airborne ? AIR_HEIGHT : 0;
+    const lift = view.lift;
     const toFocus = Math.min(1, (zoom - 1) / 1.5);
-    const focus = focusFeet ? rig.feetCenter : rig.headCenter;
+    view.rig.root.updateWorldMatrix(true, false);
+    focus.copy(focusFeet ? view.rig.feetCenter : view.rig.headCenter).applyMatrix4(view.rig.root.matrixWorld);
     const tx = focus.x * toFocus;
-    const ty = (0.92 + lift * 0.55) * (1 - toFocus) + (focus.y + lift) * toFocus;
+    const ty = (0.92 + lift * 0.55) * (1 - toFocus) + focus.y * toFocus;
     const tz = focus.z * toFocus;
     const dist = 4.1 / zoom;
     camera.position.set(
@@ -204,9 +286,7 @@ function frame(now: number): void {
     );
     camera.lookAt(tx, ty, tz);
 
-    rig.root.visible = true;
-    renderer.render(scene, camera);
-    rig.root.visible = false;
+    renderer.render(view.scene, camera);
   });
 }
 requestAnimationFrame(frame);

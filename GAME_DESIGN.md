@@ -14,7 +14,7 @@ The right hand works the arrow keys. The left hand handles grabs, pole push, and
 
 | Key | On the ground | In the air | On a rail |
 |---|---|---|---|
-| ← / → | Turn | Spin left / right | Rotate skis (straight ↔ sideways) |
+| ← / → | Turn | Spin left / right | Rotate skis (free, any angle) |
 | ↑ hold, then release | Crouch (less drag), then pop | Front flip | Crouch, then pop off |
 | ↓ | Brake | Back flip | — |
 | Shift | Pole push | — | — |
@@ -45,7 +45,7 @@ Grabs (hold in the air, release to let go):
 ## Rails and boxes
 - **Physics feel with a light magnet.** If the skis come down onto a rail or box within a small snap distance (set in config), the skier locks onto the rail's line and slides along it, with friction slowing them.
 - There is no grind button. You get on by landing on the rail.
-- Ski orientation carries over from how you landed: straight (parallel) or sideways (perpendicular). ←/→ adjusts it on the rail.
+- You land on with the skis roughly straight (parallel) or sideways (perpendicular), and that angle carries over. On the rail ←/→ rotate the skis freely; they stay at whatever angle you leave them.
 - You leave by riding off the end or by popping off with ↑. Spinning off is allowed.
 - Too far off-angle or off-center and you slip off. That's not a bail unless you then land badly.
 - v1 features: flat box, flat rail, down rail, flat-down rail. Rails are defined as polylines in the map JSON.
@@ -113,8 +113,8 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - 0, scaffold and deploy: Vite + Three.js, GitHub Pages via Actions, `embed-test.html`.
 - 1, skiing: carving, hockey-stop brake, pole push, crouch and pop, chase camera with drag orbit, dev tuning panel.
 - 2, air: spins, flips, corks and misty flips, Lincoln loops, the 8 grabs, carve-into-the-lip spin, landing check, crash tumble, fade and respawn. The test slope has three jumps.
-- 3, rails and boxes: land on a rail or box to lock on (light magnet), slide with friction, ←/→ turn the skis straight ↔ sideways, pop or spin off, ride off the end. Missing the line or landing off-angle slips off. Hitting a rail or box below its top bumps you, or crashes you if hard. The test slope has a flat box, a flat rail, a down rail and a flat-down rail.
-- Also done early: the Park Laps name, the low-poly skier and all its poses (`poses.html`), turns driven from the knees.
+- 3, rails and boxes: land on a rail or box to lock on (light magnet), slide with friction, ←/→ rotate the skis freely, pop or spin off, ride off the end. Missing the line or landing off-angle slips off. Hitting a rail or box below its top bumps you, or crashes you if hard. The test slope has a flat box, a flat rail, a down rail, a flat-down rail, and a 65 m test rail on the right.
+- Also done early: the Park Laps name, the low-poly skier and all its poses (`poses.html`, which also shows the in-game riding states), turns driven from the knees. Skier look: snug matte black helmet, small goggles, black gaiter (no face showing), a straight hip-length shell jacket whose lower part rides up over the thighs.
 - Next: milestone 4 (checkpoints).
 
 **Known issues**
@@ -126,14 +126,13 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - Respawn goes to the map spawn until checkpoints arrive (milestone 4).
 - The large test jump: a full pop above ~15 m/s overshoots the landing and crashes, and a 720 needs a little more air than it gives. The real maps (milestone 5) get properly sized jumps.
 - In the japan grab the ski hangs low.
-- In a full tuck the thighs poke up to ~1 cm through the jacket front (hidden by the body).
 
 **Tuned config values** (`src/config.ts`, starting value → now)
-- Riding: `gravity` 11 → 12, `skiFriction` 0.05 → 0.025, `dragCrouch` 0.003 → 0.002, `brakeDecel` 6 → 7.
+- Riding: `gravity` 11 → 12, `skiFriction` 0.05 → 0.055, `dragStand` 0.0055 → 0.0075, `dragCrouch` 0.003 → 0.002, `brakeDecel` 6 → 11, `brakeRampTime` 0.15 → 0.12.
 - Turning: `grip` 1.8 → 2.0 (plus new `carveFriction` 0.08), `turnRateSlow` 2.8 → 2.3, `turnRateFast` 1.5 → 1.25, `turnResponse` 14 → 10.
 - Pole push: `polePushSpeed` 1.8 → 3.1, `poleMaxSpeed` 7 → 8.5, `polePushInterval` 0.55 → 0.73.
 - Pop: `popMin` 3 → 3.2, `popMax` 5.2 → 5.5.
 - Landing (new, loosened for edges): `pitchMax` 0.6, `rollMax` 0.9, `sideMax` 1.0 rad, `sideSpeed` 6 m/s, `edgeCheckAir` 0.3 s.
 - Camera: `heightNear` 2.1 → 2.35, `heightFar` 2.6 → 4.85.
-- Rails (new, untuned): `snapDistance` 0.35 m, `angleMax` 0.6 rad, `tiltMax` 0.75 rad, `railFriction` 0.05, `boxFriction` 0.09, `turnRate` 7 rad/s, `spinCarry` 0.5, `crashSpeed` 5 m/s.
-- Skier look (new): `render.leanBodyShare` 0.5, `hipShift` 0.3, `kneeDrive` 1.6, `turnCounter` 0.25.
+- Rails (new, untuned): `snapDistance` 0.35 m, `angleMax` 0.6 rad, `tiltMax` 0.75 rad, `railFriction` 0.05, `boxFriction` 0.09, `turnRate` 4 rad/s with `turnAccel` 30, `spinCarry` 0.5, `crashSpeed` 5 m/s.
+- Skier look (new): `render.leanBodyShare` 0.5, `hipShift` 0.3, `kneeDrive` 1.1, `turnCounter` 0.25, `crouchAngulation` 0.25 (in a crouch or tuck most of the lean tilts the whole body).

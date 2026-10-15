@@ -96,7 +96,8 @@ export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
   rails.add(R, 'tiltMax', 0.05, 1.6, 0.01);
   rails.add(R, 'railFriction', 0, 0.5, 0.005);
   rails.add(R, 'boxFriction', 0, 0.5, 0.005);
-  rails.add(R, 'turnRate', 1, 20, 0.5);
+  rails.add(R, 'turnRate', 0.5, 15, 0.1);
+  rails.add(R, 'turnAccel', 1, 100, 1);
   rails.add(R, 'spinCarry', 0, 2, 0.05);
   rails.add(R, 'slipSpeed', 0, 5, 0.1);
   rails.add(R, 'bodyRadius', 0.05, 0.6, 0.01);
@@ -123,6 +124,10 @@ export function mountDevPanel(actions: { respawn: () => void }): DevPanel {
   look.add(r, 'brakeLean', 0, 0.8, 0.01);
   look.add(r, 'brakeSink', 0, 1, 0.01);
   look.add(r, 'tiltSmoothing', 1, 30, 0.5);
+  look.add(r, 'leanBodyShare', 0, 1, 0.01);
+  look.add(r, 'crouchAngulation', 0, 1, 0.01);
+  look.add(r, 'hipShift', 0, 1, 0.01);
+  look.add(r, 'kneeDrive', 0, 3, 0.05);
   look.add(r, 'grabBlendTime', 0.01, 0.5, 0.01);
   look.add(r, 'airCrouch', 0, 1, 0.01);
   look.add(r, 'spinTuck', 0, 1, 0.01);

@@ -107,9 +107,8 @@ export interface SkierState {
   /** Distance along the rail's top, and speed along it (negative going toward its start). */
   railS: number;
   railSpeed: number;
-  /** Ski angle against the rail's direction (radians; 0 straight, ±π/2 sideways), and the angle it is turning to. */
+  /** Ski angle against the rail's direction (radians; 0 straight, ±π/2 sideways). */
   railAngle: number;
-  railTarget: number;
   /** In the air after leaving a rail or box; the landing then checks edges and sideways however short the drop. */
   railExit: boolean;
 }
@@ -153,7 +152,6 @@ export function createSkierState(): SkierState {
     railS: 0,
     railSpeed: 0,
     railAngle: 0,
-    railTarget: 0,
     railExit: false,
   };
 }
@@ -196,7 +194,6 @@ export function copySkierState(dst: SkierState, src: SkierState): void {
   dst.railS = src.railS;
   dst.railSpeed = src.railSpeed;
   dst.railAngle = src.railAngle;
-  dst.railTarget = src.railTarget;
   dst.railExit = src.railExit;
 }
 
@@ -262,7 +259,7 @@ export function stepSkier(
   s.crouch = approach(s.crouch, crouchTarget, dt / (crouchTarget > s.crouch ? c.crouchTime : c.standTime));
 
   if (s.rail >= 0) {
-    slideRail(s, input, hf, rails, steer, dt);
+    slideRail(s, hf, rails, steer, dt);
     return;
   }
   if (s.grounded) rideSnow(s, input, dt);
@@ -274,13 +271,11 @@ export function stepSkier(
 
 /**
  * Sliding a rail or box: locked to its line, pulled along it by gravity and
- * slowed by friction. ←/→ turn the skis a quarter turn between straight and
- * sideways. Leaves off either end, onto snow that rises to meet the skis, or
+ * slowed by friction. ←/→ turn the skis freely, to any angle. Leaves off either end, onto snow that rises to meet the skis, or
  * with a pop (see stepSkier).
  */
 function slideRail(
   s: SkierState,
-  input: InputState,
   hf: Heightfield,
   rails: readonly RailShape[],
   steer: number,
@@ -292,16 +287,9 @@ function slideRail(
   s.brake = approach(s.brake, 0, dt / c.brakeRampTime);
   s.lean += (0 - s.lean) * (1 - Math.exp(-c.leanResponse * dt));
 
-  if (input.left.pressed) s.railTarget += Math.PI / 2;
-  if (input.right.pressed) s.railTarget -= Math.PI / 2;
-  const before = s.railAngle;
-  s.railAngle = approach(s.railAngle, s.railTarget, R.turnRate * dt);
-  s.yawRate = (s.railAngle - before) / dt; // carries into a spin off the rail
-  if (Math.abs(s.railTarget) > 2 * Math.PI) {
-    const wrap = 2 * Math.PI * Math.sign(s.railTarget);
-    s.railTarget -= wrap;
-    s.railAngle -= wrap;
-  }
+  // Free rotation: ←/→ turn the skis at any angle, and they stay where they're left.
+  s.yawRate = approach(s.yawRate, steer * R.turnRate, R.turnAccel * dt); // carries into a spin off the rail
+  s.railAngle = wrapAngle(s.railAngle + s.yawRate * dt);
 
   // Along the rail: gravity's pull down it, friction from the load on it, air drag.
   railFrame(rail, s.railS, s.position, railDir);
@@ -631,7 +619,6 @@ function catchRail(s: SkierState, rails: readonly RailShape[]): boolean {
   s.railS = spot.s;
   s.railSpeed = s.velocity.dot(railDir);
   s.railAngle = angle;
-  s.railTarget = target;
   s.velocity.copy(railDir).multiplyScalar(s.railSpeed);
   s.yaw = wrapAngle(railYaw + angle);
   s.yawRate = 0;

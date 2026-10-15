@@ -5,6 +5,7 @@ import {
   CapsuleGeometry,
   Color,
   CylinderGeometry,
+  DoubleSide,
   Euler,
   ExtrudeGeometry,
   Float32BufferAttribute,
@@ -16,6 +17,7 @@ import {
   MeshLambertMaterial,
   Quaternion,
   Shape,
+  Sphere,
   SphereGeometry,
   Vector2,
   Vector3,
@@ -23,12 +25,13 @@ import {
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { PoseDef, Vec3 } from './skierPoses.ts';
 
-// Low-poly freeskier: long baggy jacket, wide pants over chunky boots, a
-// helmet with goggles, a neck gaiter pulled over the face, twin-tip skis and
-// poles. Each body segment is its own mesh (vertex colors, flat shading, one
-// shared material) placed every pose by a small solver: hips, chest and head
-// are rigid; knees and elbows come from two-bone IK so hands and feet land
-// where the pose says.
+// Low-poly freeskier: a straight hip-length shell jacket, wide pants over
+// chunky boots, a snug matte helmet, small goggles and a neck gaiter that
+// close up the face, twin-tip skis and poles. Each body segment is its own
+// mesh (vertex colors, flat shading, one shared material) placed every pose
+// by a small solver: hips, chest and head are rigid; knees and elbows come
+// from two-bone IK so hands and feet land where the pose says. The jacket's
+// hem is the one part rebuilt every pose, so it rides up over the thighs.
 
 export interface Outfit {
   jacket: string;
@@ -36,17 +39,16 @@ export interface Outfit {
   helmet: string;
 }
 
-export const DEFAULT_OUTFIT: Outfit = { jacket: '#30343c', pants: '#677a52', helmet: '#e2445f' };
+export const DEFAULT_OUTFIT: Outfit = { jacket: '#2c3037', pants: '#677a52', helmet: '#2a2d32' };
 
 const FIXED = {
-  skin: '#d9a07c',
-  gaiter: '#3e66b0',
-  gaiterSeam: '#2f5293',
-  trim: '#1c1f25',
-  goggleFrame: '#f1f3f5',
-  lensTop: '#ffb43c',
-  lensBottom: '#e8467f',
-  strap: '#22252b',
+  gaiter: '#1b1d21',
+  gaiterSeam: '#2a2d33',
+  vent: '#0e0f12',
+  goggleFrame: '#30343a',
+  /** Dark smoke lens, a shade lighter at the top. */
+  lensTop: '#5a6676',
+  lensBottom: '#45505e',
   glove: '#3a3f47',
   gloveCuff: '#2a2e35',
   zip: '#16181c',
@@ -69,7 +71,7 @@ export const BODY = {
   ankleBack: 0.02,
   shin: 0.43,
   thigh: 0.43,
-  hipWidth: 0.1,
+  hipWidth: 0.088,
   hipDrop: 0.03,
   /** Pelvis center to the base of the neck. */
   spine: 0.52,
@@ -112,7 +114,7 @@ export class SkierRig {
   readonly root = new Group();
   private readonly pelvis: Mesh;
   private readonly torso: Mesh;
-  private readonly skirt: Mesh;
+  private readonly hem: JacketLower;
   private readonly head: Mesh;
   private readonly upperArms: Mesh[] = [];
   private readonly forearms: Mesh[] = [];
@@ -153,10 +155,11 @@ export class SkierRig {
     const pants = new Color(outfit.pants);
     const helmet = new Color(outfit.helmet);
 
-    // The long jacket covers the hips, so the pelvis wears the jacket color.
-    this.pelvis = add(buildPelvis(jacket));
+    // The seat of the pants, under the jacket's hem.
+    this.pelvis = add(buildPelvis(pants));
     this.torso = add(buildTorso(jacket));
-    this.skirt = add(buildSkirt(jacket));
+    this.hem = new JacketLower(jacket);
+    this.root.add(this.hem.mesh);
     this.head = add(buildHead(helmet));
     for (const side of [-1, 1]) {
       this.upperArms.push(add(buildUpperArm(jacket)));
@@ -232,14 +235,8 @@ export class SkierRig {
 
     this.feetCenter.addVectors(this.ankles[0]!, this.ankles[1]!).multiplyScalar(0.5);
 
-    // Jacket skirt hangs from the waist, swinging most of the way toward the
-    // thighs so bent legs push it forward instead of poking through it.
-    const hinge = v1.set(0, 0.05, 0).applyQuaternion(this.pelvisQ).add(this.pelvisPos);
-    v2.copy(DOWN).applyQuaternion(this.pelvisQ);
-    v3.subVectors(this.knees[0]!, this.hips[0]!).add(v4.subVectors(this.knees[1]!, this.hips[1]!)).normalize();
-    v2.lerp(v3, 0.7).normalize();
-    hint.set(0, 0, -1).applyQuaternion(this.pelvisQ);
-    segment(this.skirt, hinge, v4.copy(hinge).add(v2), hint);
+    place(this.hem.mesh, this.pelvisPos, this.pelvisQ);
+    this.hem.fit(this.pelvisPos, this.pelvisQ, this.chestQ, this.hips, this.knees);
   }
 
   /**
@@ -288,7 +285,6 @@ const q1 = new Quaternion();
 const v1 = new Vector3();
 const v2 = new Vector3();
 const v3 = new Vector3();
-const v4 = new Vector3();
 const hint = new Vector3();
 const dir = new Vector3();
 const side = new Vector3();
@@ -430,20 +426,23 @@ const constant =
   () =>
     v;
 
-function buildPelvis(jacket: Color): BufferGeometry {
-  return paint(prism(0.15, 0.17, 0.2, 12).translate(0, -0.13, 0).scale(1, 1, 0.72), jacket);
+function buildPelvis(pants: Color): BufferGeometry {
+  return paint(prism(0.13, 0.15, 0.2, 12).translate(0, -0.13, 0).scale(1, 1, 0.72), pants);
 }
 
+/**
+ * Upper jacket, from the belly up: a straight shell, a touch narrower at the
+ * waist, with a high collar, the hood rolled down behind the neck, a zip and
+ * a chest pocket. Below the belly the jacket is a JacketLower.
+ */
 function buildTorso(jacket: Color): BufferGeometry {
   const dark = shade(jacket, 0.78);
   const parts = [
-    paint(prism(0.214, 0.222, 0.5, 12).translate(0, 0.02, 0).scale(1, 1, 0.66), jacket),
-    // High collar and the hood bunched behind the neck.
+    paint(prism(0.205, 0.222, BODY.spine - TORSO_BOTTOM, 12).translate(0, TORSO_BOTTOM, 0).scale(1, 1, 0.66), jacket),
     paint(prism(0.112, 0.102, 0.09, 12).translate(0, 0.49, 0.008).scale(1, 1, 0.95), jacket),
-    paint(new SphereGeometry(0.13, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1.25, 0.6, 0.85).translate(0, 0.5, 0.115), dark),
-    // Zip and a chest pocket.
-    paint(new BoxGeometry(0.014, 0.46, 0.012).translate(0, 0.27, -0.146), FIXED.zip),
-    paint(new BoxGeometry(0.11, 0.085, 0.012).translate(-0.1, 0.38, -0.141), dark),
+    paint(new SphereGeometry(0.12, 12, 8).scale(1.2, 0.55, 0.7).translate(0, 0.53, 0.12), dark),
+    paint(new BoxGeometry(0.014, 0.21, 0.012).translate(0, 0.405, -0.144), FIXED.zip),
+    paint(new BoxGeometry(0.11, 0.085, 0.012).translate(-0.1, 0.38, -0.14), dark),
   ];
   for (const s of [-1, 1]) {
     parts.push(paint(new IcosahedronGeometry(0.09, 1).translate(s * BODY.shoulderWidth, BODY.spine - BODY.shoulderDrop, 0), jacket));
@@ -451,47 +450,220 @@ function buildTorso(jacket: Color): BufferGeometry {
   return merge(parts);
 }
 
+/** Height (chest frame) where the rigid upper jacket ends and the rebuilt lower jacket takes over. */
+const TORSO_BOTTOM = 0.3;
+
+// Lower jacket: rings of points from inside the upper jacket, down past the
+// waist to a straight hem that drops a little lower at the back, then
+// turned under. The top rings follow the chest, the rest the hips. Angle 0
+// is the front.
+const LOWER_SEGMENTS = 18;
+const hemLow = (a: number): number => -0.16 - 0.07 * ((1 - Math.cos(a)) / 2) ** 1.5;
+interface LowerRing {
+  /** Built in the chest's frame (else the hips'). */
+  chest: boolean;
+  /** Kept out of the thighs. */
+  push: boolean;
+  /** Height, radius and front-to-back depth at angle a. */
+  at: (a: number) => [number, number, number];
+}
+const LOWER_RINGS: readonly LowerRing[] = [
+  { chest: true, push: false, at: () => [0.35, 0.2, 0.64] },
+  { chest: true, push: true, at: () => [0.25, 0.205, 0.66] },
+  { chest: true, push: true, at: () => [0.12, 0.202, 0.67] },
+  { chest: false, push: true, at: () => [-0.01, 0.198, 0.7] },
+  { chest: false, push: true, at: (a) => [hemLow(a) + 0.032, 0.2, 0.72] },
+  { chest: false, push: true, at: (a) => [hemLow(a), 0.201, 0.72] },
+  { chest: false, push: true, at: (a) => [hemLow(a) + 0.008, 0.184, 0.7] },
+];
+/** Rings the zip runs between (it carries on up the upper jacket), and its half-width. */
+const ZIP_FIRST = 1;
+const ZIP_LAST = 5;
+const ZIP_HALF = 0.007;
+/** Thigh radius plus a little room, for keeping the jacket outside the legs. */
+const THIGH_ROOM = 0.11;
+/** Furthest (m) a raised thigh lifts any point of the jacket. */
+const MAX_RIDE_UP = 0.12;
+
 /**
- * The long jacket below the waist, built along +Y from the waist down to
- * mid-thigh. It flares quickly over the hips and stays roomy below, so the
- * thighs and their pockets stay inside in every riding pose (measured
- * against the rig in stance, crouch, tuck, carves, hockey stops and landings).
+ * The jacket from the belly down, rebuilt every pose. A straight jacket on
+ * rigid hips would let raised thighs poke straight through it: instead every
+ * point inside a thigh is moved out of it (onto the thigh's top side when the
+ * thigh is raised), so the jacket bunches up over the legs like real fabric.
+ * Drawn from both sides, so looking up under the hem never sees through it.
  */
-function buildSkirt(jacket: Color): BufferGeometry {
-  const depth = 0.82;
-  const band = shade(jacket, 0.78);
-  return merge([
-    paint(prism(0.228, 0.285, 0.1, 12).scale(1, 1, depth), jacket),
-    paint(prism(0.285, 0.305, 0.26, 12).translate(0, 0.1, 0).scale(1, 1, depth), jacket),
-    // Drawcord band at the waist and a darker hem.
-    paint(prism(0.232, 0.24, 0.028, 12).scale(1, 1, depth), band),
-    paint(prism(0.307, 0.309, 0.03, 12).translate(0, 0.335, 0).scale(1, 1, depth), band),
-  ]);
+class JacketLower {
+  readonly mesh: Mesh;
+  /** Ring points then zip points, in pelvis space, and which point each mesh vertex is. */
+  private readonly points: Float32Array;
+  private readonly vertexPoint: Uint16Array;
+  private readonly position: BufferAttribute;
+  private readonly ringPoints = LOWER_RINGS.length * LOWER_SEGMENTS;
+
+  constructor(jacket: Color) {
+    const band = shade(jacket, 0.78);
+    const under = shade(jacket, 0.6);
+    const zip = new Color(FIXED.zip);
+    const index: number[] = [];
+    const colors: number[] = [];
+    const quad = (a: number, b: number, c: number, d: number, color: Color): void => {
+      index.push(a, b, c, a, c, d);
+      for (let k = 0; k < 6; k++) colors.push(color.r, color.g, color.b);
+    };
+    const point = (ring: number, seg: number): number => ring * LOWER_SEGMENTS + (seg % LOWER_SEGMENTS);
+    const last = LOWER_RINGS.length - 1;
+    for (let ring = 0; ring < last; ring++) {
+      const color = ring < last - 2 ? jacket : ring === last - 2 ? band : under;
+      for (let seg = 0; seg < LOWER_SEGMENTS; seg++) {
+        // Wound so the outside faces out (and the turned-under band faces down).
+        quad(point(ring, seg), point(ring, seg + 1), point(ring + 1, seg + 1), point(ring + 1, seg), color);
+      }
+    }
+    // Zip: a strip just proud of the front, two points per ring.
+    const zipPoint = (ring: number, side: number): number => this.ringPoints + (ring - ZIP_FIRST) * 2 + side;
+    for (let ring = ZIP_FIRST; ring < ZIP_LAST; ring++) {
+      quad(zipPoint(ring, 0), zipPoint(ring, 1), zipPoint(ring + 1, 1), zipPoint(ring + 1, 0), zip);
+    }
+    this.points = new Float32Array((this.ringPoints + (ZIP_LAST - ZIP_FIRST + 1) * 2) * 3);
+    this.vertexPoint = new Uint16Array(index);
+    this.position = new BufferAttribute(new Float32Array(index.length * 3), 3);
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', this.position);
+    geometry.setAttribute('color', new Float32BufferAttribute(colors, 3));
+    // It moves every pose; a fixed sphere around the hips covers it.
+    geometry.boundingSphere = new Sphere(new Vector3(0, 0, 0), 0.6);
+    this.mesh = new Mesh(geometry, lowerMaterial);
+  }
+
+  /** Rebuilds the lower jacket for a solved pose (all inputs in skier space). */
+  fit(pelvisPos: Vector3, pelvisQ: Quaternion, chestQ: Quaternion, hips: Vector3[], knees: Vector3[]): void {
+    lowerInv.copy(pelvisQ).invert();
+    lowerChest.copy(lowerInv).multiply(chestQ);
+    for (let i = 0; i < 2; i++) {
+      lowerHips[i]!.copy(hips[i]!).sub(pelvisPos).applyQuaternion(lowerInv);
+      lowerKnees[i]!.copy(knees[i]!).sub(pelvisPos).applyQuaternion(lowerInv);
+    }
+    const pts = this.points;
+    for (let ring = 0; ring < LOWER_RINGS.length; ring++) {
+      for (let seg = 0; seg < LOWER_SEGMENTS; seg++) {
+        this.ringPoint(ring, (seg / LOWER_SEGMENTS) * Math.PI * 2, 1);
+        lowerP.toArray(pts, (ring * LOWER_SEGMENTS + seg) * 3);
+      }
+      if (ring < ZIP_FIRST || ring > ZIP_LAST) continue;
+      for (let side = 0; side < 2; side++) {
+        const r = LOWER_RINGS[ring]!.at(0)[1];
+        this.ringPoint(ring, (side === 0 ? -ZIP_HALF : ZIP_HALF) / r, 1.012);
+        lowerP.toArray(pts, (this.ringPoints + (ring - ZIP_FIRST) * 2 + side) * 3);
+      }
+    }
+    const out = this.position.array as Float32Array;
+    const map = this.vertexPoint;
+    for (let v = 0; v < map.length; v++) {
+      const k = (map[v] ?? 0) * 3;
+      out[v * 3] = pts[k] ?? 0;
+      out[v * 3 + 1] = pts[k + 1] ?? 0;
+      out[v * 3 + 2] = pts[k + 2] ?? 0;
+    }
+    this.position.needsUpdate = true;
+  }
+
+  /** One point of a ring at angle `a`, scaled out by `grow`, into lowerP (pelvis space). */
+  private ringPoint(ring: number, a: number, grow: number): void {
+    const def = LOWER_RINGS[ring]!;
+    const [y, r, depth] = def.at(a);
+    lowerP.set(r * grow * Math.sin(a), y, -r * grow * Math.cos(a) * depth);
+    if (def.chest) lowerP.applyQuaternion(lowerChest);
+    if (!def.push) return;
+    // Twice, so a point pushed out of one thigh into the other ends up clear of both.
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 0; i < 2; i++) pushOutOfThigh(lowerP, lowerHips[i]!, lowerKnees[i]!);
+    }
+  }
 }
 
-// Goggles: how far they wrap around (radians from straight ahead) and their
-// half-height, tallest in front and tapering toward the temples.
-const GOGGLE_SPAN = 1.75;
-const goggleHalf: AngleFn = (a) => 0.034 + 0.02 * Math.max(0, Math.cos((a * Math.PI) / (2 * GOGGLE_SPAN))) ** 0.8;
+const lowerMaterial = new MeshLambertMaterial({ vertexColors: true, flatShading: true, side: DoubleSide });
+const lowerInv = new Quaternion();
+const lowerChest = new Quaternion();
+const lowerHips = [new Vector3(), new Vector3()];
+const lowerKnees = [new Vector3(), new Vector3()];
+const lowerP = new Vector3();
+const hemAxis = new Vector3();
+const hemNear = new Vector3();
+const hemOff = new Vector3();
+const hemUp = new Vector3();
+const hemRadial = new Vector3();
 
-// Helmet shell: a squashed, elongated dome. Across the front its edge rests
-// on top of the goggle frame; past the lens it drops to cover the ears.
-const HELMET = { r: 0.148, y: 0.212, squash: 0.96, long: 1.12, back: 0.008 };
-const LENS_SPAN = 1.45;
+/**
+ * Moves `p` out of the thigh running from `hip` to `knee` (pelvis space).
+ * Beside a hanging thigh the jacket is pushed straight out from it. A raised
+ * thigh lifts the jacket straight up toward the waist instead, the way a
+ * jacket rides up when you pull your knees in, rather than wrapping the leg.
+ */
+function pushOutOfThigh(p: Vector3, hip: Vector3, knee: Vector3): void {
+  hemAxis.subVectors(knee, hip);
+  const len2 = hemAxis.lengthSq();
+  const t = Math.min(1, Math.max(0, hemOff.subVectors(p, hip).dot(hemAxis) / (len2 || 1)));
+  hemNear.copy(hip).addScaledVector(hemAxis, t);
+  hemOff.subVectors(p, hemNear);
+  const dist = hemOff.length();
+  const room = THIGH_ROOM;
+  if (dist >= room) return;
+
+  // Straight out from the thigh's axis.
+  if (dist > 1e-6) hemRadial.copy(hemOff).multiplyScalar(room / dist - 1);
+  else hemRadial.set(room, 0, 0);
+
+  // Straight up until clear of the thigh (as a cylinder): solve
+  // |offset + lift * up| = room across the thigh's axis.
+  hemAxis.normalize();
+  hemUp.set(0, 1, 0).addScaledVector(hemAxis, -hemAxis.y); // up, across the thigh
+  const a = hemUp.lengthSq();
+  const raised = smooth01((Math.sqrt(a) - 0.25) / 0.35);
+  if (raised > 0) {
+    hemOff.addScaledVector(hemAxis, -hemOff.dot(hemAxis)); // offset across the thigh
+    const b = hemOff.dot(hemUp);
+    const c = hemOff.lengthSq() - room * room;
+    // Fabric only rides up so far; past that it stays bunched against the leg.
+    const lift = Math.min(MAX_RIDE_UP, (-b + Math.sqrt(Math.max(0, b * b - a * c))) / a);
+    hemRadial.lerp(hemUp.set(0, lift, 0), raised);
+  }
+  p.add(hemRadial);
+}
+
+// Goggles: a compact frame, tallest in front and tapering toward the
+// temples, where it draws in and slips under the helmet (the strap runs
+// inside the helmet, out of sight). Angles are radians from straight ahead.
+const GOGGLE_SPAN = 1.62;
+const LENS_SPAN = 1.28;
+const GOGGLE_DEPTH = 1.12;
+const goggleHalf: AngleFn = (a) => 0.03 + 0.01 * Math.max(0, Math.cos((a * Math.PI) / (2 * GOGGLE_SPAN)));
+const goggleNose: AngleFn = (a) => 0.016 * Math.max(0, 1 - Math.abs(a) / 0.28) ** 2;
+const goggleOuter: AngleFn = (a) => 0.122 - 0.016 * smooth01((Math.abs(a) - 1.1) / 0.5);
+
+// Helmet: a snug, rounded low-profile shell. Across the front its edge
+// rests on the goggle frame; past the lens it sweeps down over the ears and
+// rises a little toward the back of the head.
+const HELMET = { r: 0.13, y: 0.205, squash: 0.95, long: 1.1, back: 0.006 };
 const helmetEdge: AngleFn = (a) => {
-  const t = Math.min(1, Math.max(0, (Math.abs(a) - LENS_SPAN) / 0.5));
-  const front = GOGGLE_Y + goggleHalf(Math.min(Math.abs(a), LENS_SPAN)) + 0.002;
-  return front + (0.152 - front) * t * t * (3 - 2 * t);
+  const abs = Math.abs(a);
+  const front = GOGGLE_Y + goggleHalf(Math.min(abs, LENS_SPAN)) + 0.001;
+  const low = 0.135 + 0.02 * smooth01((abs - 2.2) / 0.7);
+  return front + (low - front) * smooth01((abs - LENS_SPAN) / 0.45);
 };
 /** Horizontal radius of the (unstretched) helmet dome at height `y`. */
 const helmetRadiusAt = (y: number): number =>
   HELMET.r * Math.sqrt(Math.max(0, 1 - ((y - HELMET.y) / (HELMET.r * HELMET.squash)) ** 2));
 
-/** Head, built up from the base of the neck: gaiter, goggles, helmet. */
+function smooth01(t: number): number {
+  const c = Math.min(1, Math.max(0, t));
+  return c * c * (3 - 2 * c);
+}
+
+/** Head, built up from the base of the neck: gaiter, goggles, helmet. Nothing of the face shows. */
 function buildHead(helmet: Color): BufferGeometry {
   const parts = [
     // Head under everything, in case any gap shows.
-    paint(new SphereGeometry(0.105, 16, 12).scale(1, 1.08, 1.1).translate(0, 0.2, 0), FIXED.skin),
+    paint(new SphereGeometry(0.105, 16, 12).scale(1, 1.08, 1.1).translate(0, 0.2, 0), FIXED.gaiter),
     ...buildGaiter(),
     ...buildHelmet(helmet),
     ...buildGoggles(),
@@ -499,24 +671,24 @@ function buildHead(helmet: Color): BufferGeometry {
   return merge(parts);
 }
 
-/** Neck gaiter pulled up over the chin and nose, following the jaw, with a patterned band. */
+/** Neck gaiter pulled up over the chin and nose, following the jaw, tucked under the goggles and helmet. */
 function buildGaiter(): BufferGeometry[] {
   const profile = [
     [0.074, -0.02],
     [0.078, 0.02],
     [0.086, 0.06],
-    [0.098, 0.1],
-    [0.103, 0.135],
-    [0.102, 0.165],
-    [0.096, 0.19],
+    [0.097, 0.1],
+    [0.102, 0.135],
+    [0.103, 0.165],
+    [0.1, 0.19],
+    [0.097, 0.205],
   ].map(([r, y]) => new Vector2(r, y));
   const face = (g: BufferGeometry): BufferGeometry => g.scale(1, 1, 1.13).translate(0, 0, -0.006);
   return [
     paint(face(new LatheGeometry(profile, 18)), FIXED.gaiter),
-    paint(face(prism(0.0835, 0.0875, 0.014, 18).translate(0, 0.048, 0)), FIXED.gaiterSeam),
-    paint(face(prism(0.1, 0.1015, 0.01, 18).translate(0, 0.114, 0)), FIXED.gaiterSeam),
+    paint(face(prism(0.0835, 0.0875, 0.012, 18).translate(0, 0.048, 0)), FIXED.gaiterSeam),
     // Nose under the fabric, just below the goggles.
-    paint(new IcosahedronGeometry(0.03, 0).scale(0.7, 0.9, 0.85).translate(0, 0.168, -0.12), FIXED.gaiter),
+    paint(new IcosahedronGeometry(0.028, 0).scale(0.7, 0.9, 0.85).translate(0, 0.166, -0.118), FIXED.gaiter),
   ];
 }
 
@@ -524,7 +696,7 @@ function buildHelmet(helmet: Color): BufferGeometry[] {
   const fit = (g: BufferGeometry): BufferGeometry => g.scale(1, 1, HELMET.long).translate(0, 0, HELMET.back);
 
   // Dome, with every vertex below the edge line lifted onto it.
-  const shell = new SphereGeometry(HELMET.r, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.62)
+  const shell = new SphereGeometry(HELMET.r, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.66)
     .scale(1, HELMET.squash, 1)
     .translate(0, HELMET.y, 0);
   const p = shell.getAttribute('position');
@@ -533,55 +705,60 @@ function buildHelmet(helmet: Color): BufferGeometry[] {
     if (p.getY(i) < edge) p.setY(i, edge);
   }
 
+  const edgeColor = shade(helmet, 0.72);
   const parts = [paint(fit(shell), helmet)];
-  // Dark trim along the edge.
-  const trimR: AngleFn = (a) => helmetRadiusAt(helmetEdge(a)) + 0.004;
+  // A slim rolled edge all round, a touch proud of the shell.
+  const trimR: AngleFn = (a) => helmetRadiusAt(helmetEdge(a)) + 0.003;
   parts.push(
     paint(
-      fit(curvedPanel((a) => trimR(a) - 0.012, trimR, (a) => helmetEdge(a) + 0.007, (a) => helmetEdge(a) - 0.005, -Math.PI, Math.PI, 36)),
-      FIXED.trim,
+      fit(curvedPanel((a) => trimR(a) - 0.01, trimR, (a) => helmetEdge(a) + 0.006, (a) => helmetEdge(a) - 0.003, -Math.PI, Math.PI, 40)),
+      edgeColor,
     ),
   );
-  // Ear pads, below the goggle strap.
-  const padY = 0.15;
-  for (const s of [-1, 1]) {
-    parts.push(
-      paint(fit(new CylinderGeometry(0.04, 0.04, 0.018, 14).rotateZ(Math.PI / 2).translate(s * (helmetRadiusAt(padY) + 0.006), padY, 0.015)), shade(helmet, 0.75)),
-    );
-  }
-  // Vent slots set into the top, tilted to follow the dome.
-  for (const x of [-0.045, 0, 0.045]) {
-    const y = HELMET.y + HELMET.squash * Math.sqrt(HELMET.r ** 2 - x ** 2) - 0.003;
-    parts.push(paint(fit(new BoxGeometry(0.016, 0.01, 0.05).rotateZ(-Math.asin(x / HELMET.r)).translate(x, y, 0)), FIXED.trim));
+  // Small vents set into the shell: an arc of five over the forehead and two at the back.
+  const vents: [number, number][] = [
+    [0, 0.7],
+    [-0.38, 0.74],
+    [0.38, 0.74],
+    [-0.76, 0.84],
+    [0.76, 0.84],
+    [Math.PI - 0.32, 0.95],
+    [Math.PI + 0.32, 0.95],
+  ];
+  for (const [around, down] of vents) {
+    // `down` is the angle from the crown; `around` turns from the front.
+    const x = Math.sin(down) * Math.sin(around);
+    const y = Math.cos(down) * HELMET.squash;
+    const z = -Math.sin(down) * Math.cos(around);
+    const normal = new Vector3(x, y, z).normalize();
+    const slot = new BoxGeometry(0.011, 0.006, 0.03);
+    slot.applyQuaternion(new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), normal));
+    const sink = HELMET.r - 0.002;
+    slot.translate(x * sink, HELMET.y + y * sink, z * sink);
+    parts.push(paint(fit(slot), FIXED.vent));
   }
   return parts;
 }
 
 /**
- * Goggles sitting on the face, tucked under the helmet's front edge: a frame
- * that's tallest in front and tapers to the temples with a notch for the
- * nose, a two-tone mirrored lens standing slightly proud of it, and a strap
- * around the outside of the helmet.
+ * Goggles under the helmet's front edge: a matte frame with a notch for the
+ * nose, and a dark tinted lens set just proud of it.
  */
 function buildGoggles(): BufferGeometry[] {
   const half = goggleHalf;
-  const nose: AngleFn = (a) => 0.02 * Math.max(0, 1 - Math.abs(a) / 0.3) ** 2;
-  const onFace = (g: BufferGeometry): BufferGeometry => g.scale(1, 1, 1.15).translate(0, GOGGLE_Y, 0);
-  const span = GOGGLE_SPAN;
-  const lens = LENS_SPAN;
+  const nose = goggleNose;
+  const onFace = (g: BufferGeometry): BufferGeometry => g.scale(1, 1, GOGGLE_DEPTH).translate(0, GOGGLE_Y, 0);
+  const lensIn: AngleFn = (a) => goggleOuter(a) - 0.002;
+  const lensOut: AngleFn = (a) => goggleOuter(a) + 0.003;
   return [
-    paint(onFace(curvedPanel(constant(0.116), constant(0.134), half, (a) => -half(a) + nose(a), -span, span, 24)), FIXED.goggleFrame),
-    paint(onFace(curvedPanel(constant(0.131), constant(0.139), (a) => half(a) - 0.008, constant(0), -lens, lens, 22)), FIXED.lensTop),
     paint(
-      onFace(curvedPanel(constant(0.131), constant(0.139), constant(0), (a) => -half(a) + nose(a) + 0.008, -lens, lens, 22)),
-      FIXED.lensBottom,
+      onFace(curvedPanel((a) => goggleOuter(a) - 0.012, goggleOuter, half, (a) => -half(a) + nose(a), -GOGGLE_SPAN, GOGGLE_SPAN, 26)),
+      FIXED.goggleFrame,
     ),
-    // Strap runs round the outside of the helmet from where the goggle ends tuck under it.
+    paint(onFace(curvedPanel(lensIn, lensOut, (a) => half(a) - 0.006, constant(-0.002), -LENS_SPAN, LENS_SPAN, 22)), FIXED.lensTop),
     paint(
-      curvedPanel(constant(0.151), constant(0.159), constant(0.018), constant(-0.018), 1.8, Math.PI * 2 - 1.8, 16)
-        .scale(1, 1, HELMET.long)
-        .translate(0, GOGGLE_Y + 0.004, HELMET.back),
-      FIXED.strap,
+      onFace(curvedPanel(lensIn, lensOut, constant(-0.002), (a) => -half(a) + nose(a) + 0.006, -LENS_SPAN, LENS_SPAN, 22)),
+      FIXED.lensBottom,
     ),
   ];
 }
@@ -611,9 +788,9 @@ function buildThigh(pants: Color, side: number): BufferGeometry {
   // In the segment frame +X points to the skier's left when standing, so the
   // outside of the left leg is +X.
   return merge([
-    paint(prism(0.106, 0.104, t, 12), pants),
-    paint(new IcosahedronGeometry(0.106, 1).translate(0, t, 0), pants),
-    paint(new BoxGeometry(0.03, 0.13, 0.12).translate(-side * 0.11, t * 0.45, 0), shade(pants, 0.85)),
+    paint(prism(0.096, 0.097, t, 12), pants),
+    paint(new IcosahedronGeometry(0.099, 1).translate(0, t, 0), pants),
+    paint(new BoxGeometry(0.026, 0.13, 0.11).translate(-side * 0.098, t * 0.45, 0), shade(pants, 0.85)),
   ]);
 }
 

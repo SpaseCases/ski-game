@@ -13,9 +13,9 @@ export const CONFIG = {
     /** m/s². Above real gravity so the slope pulls hard and airs feel snappy. */
     gravity: 12,
     /** Kinetic friction coefficient along the skis. */
-    skiFriction: 0.025,
+    skiFriction: 0.055,
     /** Quadratic air drag (per meter) standing up and fully crouched. */
-    dragStand: 0.0055,
+    dragStand: 0.0075,
     dragCrouch: 0.002,
     /** Quadratic air drag (per meter) in the air. */
     dragAir: 0.004,
@@ -44,9 +44,9 @@ export const CONFIG = {
     turnResponse: 10,
 
     /** Extra deceleration (m/s²) at full brake. */
-    brakeDecel: 7,
+    brakeDecel: 11,
     /** Seconds to reach full brake. */
-    brakeRampTime: 0.15,
+    brakeRampTime: 0.12,
 
     /** Speed (m/s) one pole push adds from a standstill; it shrinks to zero at poleMaxSpeed. */
     polePushSpeed: 3.1,
@@ -138,8 +138,9 @@ export const CONFIG = {
     /** Sliding friction coefficient on a metal rail and on a box. */
     railFriction: 0.05,
     boxFriction: 0.09,
-    /** How fast (rad/s) ←/→ turns the skis a quarter turn on a rail, and how fast they settle to straight or sideways. */
-    turnRate: 7,
+    /** Top speed (rad/s) ←/→ turns the skis on a rail, and how fast that speed builds and stops (rad/s²). */
+    turnRate: 4,
+    turnAccel: 30,
     /** Share of that turning speed that carries into a spin when leaving the rail mid-turn. */
     spinCarry: 0.5,
     /** Sideways speed (m/s) given when slipping off, so the skier falls clear of the rail. */
@@ -231,9 +232,11 @@ export const CONFIG = {
      * roll onto their edges by the full lean.
      */
     leanBodyShare: 0.5,
+    /** Share of that knee-and-hip angulation kept in a full crouch or tuck; the rest tilts the whole body. */
+    crouchAngulation: 0.25,
     /** Hips move into the turn (m per radian of knee-and-hip lean); knees point into it this hard. */
     hipShift: 0.3,
-    kneeDrive: 1.6,
+    kneeDrive: 1.1,
     /** Hips sink in a turn (m per radian of lean). */
     turnSink: 0.1,
     /** Upper body turns to face down the hill in a turn (radians per radian of lean). */

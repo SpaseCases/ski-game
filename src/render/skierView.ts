@@ -13,7 +13,7 @@ import type { Heightfield } from '../maps/types.ts';
 import { wrapAngle, type SkierState } from '../sim/skier.ts';
 import { groundAt } from '../sim/terrain.ts';
 import { addPoseDelta, createPoseBuffer, setPose, type PoseBuffer } from './poseBlend.ts';
-import { CROUCH, GRABS, STANCE, TUCK, TUMBLE, TUMBLE_CENTER } from './skierPoses.ts';
+import { CROUCH, GRABS, STANCE, STANCE_HALF_WIDTH, TUCK, TUMBLE, TUMBLE_CENTER } from './skierPoses.ts';
 import { SkierRig } from './skierRig.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
 
@@ -105,7 +105,8 @@ const POLE_PUSHED: readonly [number, number, number] = [-0.2, -0.42, 0.88];
  *   └ swing (hockey-stop yaw) └ lean (roll into the turn) └ rig
  */
 export class SkierView {
-  private readonly rig = new SkierRig();
+  /** The posed model; its root sits inside this view's groups. */
+  readonly rig = new SkierRig();
   private readonly root = new Group();
   private readonly swing = new Group();
   private readonly lean = new Group();
@@ -212,20 +213,10 @@ export class SkierView {
     this.root.position.lerpVectors(state.position, state.center, bw);
     this.rig.root.position.set(-TUMBLE_CENTER[0] * bw, -TUMBLE_CENTER[1] * bw, -TUMBLE_CENTER[2] * bw);
 
-    // Hockey stop: the skis swing sideways and the skier leans away from the
-    // skid. Only part of a lean tilts the whole body; the rest comes from the
-    // knees and hips (see angulate).
-    const swing = state.brake * r.brakeTwist * state.brakeSide * live;
-    const leanTotal = (state.lean + state.brake * r.brakeLean * state.brakeSide) * live;
-    const onSnow = (1 - this.airWeight) * live;
-    const bodyLean = leanTotal * (1 - (1 - r.leanBodyShare) * onSnow);
-    this.swing.rotation.y = swing;
-    this.lean.rotation.z = bodyLean;
-
     // Body on the snow: stance, sinking into a crouch while ↑ is held, which
     // becomes a speed tuck when going fast. Braking sinks a little, and a
-    // landing absorbs into a quick crouch. On a rail the knees stay soft. In the air: knees up a little,
-    // tucking tighter the faster it rotates.
+    // landing absorbs into a quick crouch. On a rail the knees stay soft. In
+    // the air: knees up a little, tucking tighter the faster it rotates.
     const speed = Math.hypot(state.velocity.x, state.velocity.z);
     const tuck = smoothstep(r.tuckSpeedMin, r.tuckSpeedFull, speed);
     const squash = state.landDepth * landCurve(state.landTime);
@@ -234,6 +225,20 @@ export class SkierView {
       state.brake * r.brakeSink * (1 - state.crouch) +
       squash * (1 - state.crouch) +
       this.railWeight * r.railCrouch * (1 - state.crouch);
+
+    // Hockey stop: the skis swing sideways and the skier leans away from the
+    // skid. Only part of a lean tilts the whole body; the rest comes from the
+    // knees and hips (see angulate). Folded up in a crouch or tuck the legs
+    // have no room for that, so more of the lean tilts the whole body.
+    const swing = state.brake * r.brakeTwist * state.brakeSide * live;
+    const leanTotal = (state.lean + state.brake * r.brakeLean * state.brakeSide) * live;
+    const onSnow = (1 - this.airWeight) * live;
+    const deep = Math.min(1, groundCrouch + state.crouch * tuck);
+    const legShare = (1 - r.leanBodyShare) * (1 - (1 - r.crouchAngulation) * deep);
+    const bodyLean = leanTotal * (1 - legShare * onSnow);
+    this.swing.rotation.y = swing;
+    this.lean.rotation.z = bodyLean;
+
     const airCrouch = r.airCrouch + r.spinTuck * Math.min(1, state.spinRate / CONFIG.air.flipRate);
     const air = this.airWeight;
     const p = this.pose;
@@ -248,8 +253,8 @@ export class SkierView {
     if (!state.bailed) poleStroke(p, state.polePhase);
     // The upper body turns back against the hockey-stop swing to keep facing
     // down the hill, and a little against each turn.
-    const counter = -swing * r.brakeCounter - leanTotal * r.turnCounter * onSnow;
-    angulate(p, bodyLean, leanTotal - bodyLean, counter, onSnow);
+    const counter = -swing * r.brakeCounter - leanTotal * r.turnCounter * onSnow * (1 - deep);
+    angulate(p, bodyLean, leanTotal - bodyLean, counter, onSnow, deep);
     this.rig.apply(p);
     // On a rail the skis rest on the rail, not the snow.
     this.sitOnDrawnSnow(onSnow * (1 - this.railWeight));
@@ -287,12 +292,12 @@ export class SkierView {
 
 /** Points along the bottom of each ski (skier space x, z): tail, middle and tip where they touch the snow. */
 const SKI_POINTS: readonly (readonly [number, number])[] = [
-  [-0.13, 0.7],
-  [-0.13, 0],
-  [-0.13, -0.7],
-  [0.13, 0.7],
-  [0.13, 0],
-  [0.13, -0.7],
+  [-STANCE_HALF_WIDTH, 0.7],
+  [-STANCE_HALF_WIDTH, 0],
+  [-STANCE_HALF_WIDTH, -0.7],
+  [STANCE_HALF_WIDTH, 0.7],
+  [STANCE_HALF_WIDTH, 0],
+  [STANCE_HALF_WIDTH, -0.7],
 ];
 const skiPoint = new Vector3();
 
@@ -303,10 +308,11 @@ const skiPoint = new Vector3();
  * - the skis roll onto their edges by the full lean,
  * - the hips move into the turn and sink, the knees point into it,
  * - the upper body turns by `counter` to face down the hill,
- * and the hands travel with the upper body. `weight` fades it all out in
+ * and the hands travel with the upper body. `deep` (0..1) is how far into a
+ * crouch or tuck the skier is, which keeps the hips from sinking further. `weight` fades it all out in
  * the air and in a crash.
  */
-function angulate(p: PoseBuffer, bodyLean: number, legLean: number, counter: number, weight: number): void {
+function angulate(p: PoseBuffer, bodyLean: number, legLean: number, counter: number, weight: number, deep: number): void {
   const r = CONFIG.render;
   if (weight > 0) {
     const tilt = Math.tan(bodyLean);
@@ -319,7 +325,9 @@ function angulate(p: PoseBuffer, bodyLean: number, legLean: number, counter: num
     }
     // Inside of a left turn (lean > 0) is the skier's left, -X.
     const shiftX = -legLean * r.hipShift * weight;
-    const drop = (Math.abs(0.13 * tilt) + Math.abs(bodyLean + legLean) * r.turnSink) * weight;
+    // Folded into a crouch or tuck the hips are already low: they don't sink
+    // further, and the outside leg reaches down to the snow instead.
+    const drop = (Math.abs(STANCE_HALF_WIDTH * tilt) + Math.abs(bodyLean + legLean) * r.turnSink) * (1 - deep) * weight;
     p.pelvis[0] += shiftX;
     p.pelvis[1] -= drop;
     for (let i = 0; i < 2; i++) {

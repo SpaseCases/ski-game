@@ -57,7 +57,13 @@ export interface PoseDef {
 const EDGE = 0.06;
 const TOP = 0.035;
 
-const SNOW_FEET: PoseDef['feet'] = [{ ankle: [-0.13, 0.16, 0.02] }, { ankle: [0.13, 0.16, 0.02] }];
+/** Half the distance between the feet on the snow (m). */
+export const STANCE_HALF_WIDTH = 0.105;
+
+const SNOW_FEET: PoseDef['feet'] = [
+  { ankle: [-STANCE_HALF_WIDTH, 0.16, 0.02] },
+  { ankle: [STANCE_HALF_WIDTH, 0.16, 0.02] },
+];
 
 /**
  * Athletic riding stance: ankles flexed so the shins press forward into the
@@ -89,9 +95,9 @@ export const CROUCH: PoseDef = {
 };
 
 export const TUCK: PoseDef = {
-  pelvis: [0, 0.6, 0.24],
-  pelvisPitch: 0.6,
-  chestPitch: 0.62,
+  pelvis: [0, 0.64, 0.25],
+  pelvisPitch: 0.62,
+  chestPitch: 0.48,
   headPitch: -1.05,
   feet: SNOW_FEET,
   hands: [
@@ -117,7 +123,7 @@ export const LEFT_MUTE: PoseDef = {
   chestRoll: -0.15,
   headPitch: -0.4,
   headYaw: 0.25,
-  feet: [TUCKED_LEFT, { ankle: [0, 0, 0], yaw: 0.3, pitch: 0.2, roll: -0.1, knee: [0.05, 0.5, -1] }],
+  feet: [TUCKED_LEFT, { ankle: [0, 0, 0], yaw: 0.3, pitch: 0.2, roll: -0.1, knee: [0.6, 0.3, -1] }],
   hands: [
     { at: [0.02, 0.62, -0.45], grab: 1, on: [EDGE, TOP, -0.32], pole: [-0.3, -0.4, 0.85], elbow: [-0.3, -0.6, 0.3] },
     BALANCE_RIGHT,
@@ -132,7 +138,7 @@ export const LEFT_SAFETY: PoseDef = {
   chestYaw: 0.05,
   chestRoll: 0.3,
   headPitch: -0.35,
-  feet: [{ ankle: [0, 0, 0], roll: 0.15, knee: [-0.3, 0.4, -1] }, TUCKED_RIGHT],
+  feet: [{ ankle: [0, 0, 0], roll: 0.15, knee: [-1, -0.3, -0.6] }, TUCKED_RIGHT],
   hands: [
     { at: [-0.3, 0.6, -0.16], grab: 0, on: [-EDGE, TOP, -0.06], pole: [-0.35, -0.3, 0.9], elbow: [-0.9, -0.1, 0.3] },
     BALANCE_RIGHT,
@@ -243,8 +249,8 @@ export const GRABS: readonly PoseDef[] = [
  */
 export const TUMBLE: PoseDef = {
   pelvis: [0, 0.62, 0.12],
-  pelvisPitch: 0.9,
-  chestPitch: 0.55,
+  pelvisPitch: 0.6,
+  chestPitch: 0.75,
   chestRoll: 0.15,
   headPitch: -0.1,
   feet: [
