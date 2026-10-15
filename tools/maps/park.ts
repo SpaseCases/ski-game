@@ -31,18 +31,18 @@ const r2 = (v: number): number => Math.round(v * 100) / 100;
 // ---------------------------------------------------------------- sections
 /** Where each stretch starts (d, m down from the top). s* are sections, f* the flats after them. */
 const D = {
-  s1: 60, // warm-up, 7°
-  f1: 560,
-  s2: 600, // main park, 10°
-  f2: 1060,
-  s3: 1100, // pro zone one, 21°
-  f3: 1340,
-  s4: 1420, // pro zone two, 21°
-  f4: 1660,
-  s5: 1720, // cruise and jib garden, 7.5°
-  run: 2360, // finish flat, 3°
-  stop: 2570, // climbs, to stop riders
-  end: 2660,
+  s1: 60, // warm-up, 11°
+  f1: 440,
+  s2: 480, // main park, 13°
+  f2: 820,
+  s3: 860, // pro zone one, 21°
+  f3: 1100,
+  s4: 1180, // pro zone two, 21°
+  f4: 1420,
+  s5: 1480, // cruise and jib garden, 11°
+  run: 1940, // finish flat, 3°
+  stop: 2060, // climbs, to stop riders
+  end: 2150,
 };
 const X = { longRail: -128, jib: -94, jump: -38, mid: 30, pro: 102 };
 /** Fences between the lines. */
@@ -51,18 +51,19 @@ const FENCES = [-121, -67, -8, 69];
 const sec = (length: number, pitch: number | undefined, ease = 20): Json =>
   pitch === undefined ? { length, ease } : { length, pitch, ease };
 
+const PITCH = { top: 5, warmup: 11, main: 13, pro: 21, cruise: 11, flat: 6, finish: 3 };
 const profile = [
-  sec(D.s1, 3),
-  sec(D.f1 - D.s1, 7, 40),
-  sec(D.s2 - D.f1, 4, 30),
-  sec(D.f2 - D.s2, 10, 30),
-  sec(D.s3 - D.f2, 4, 30),
-  sec(D.f3 - D.s3, 21, 36),
-  sec(D.s4 - D.f3, 3.5, 36),
-  sec(D.f4 - D.s4, 21, 36),
-  sec(D.s5 - D.f4, 4, 36),
-  sec(D.run - D.s5, 7.5, 36),
-  sec(D.stop - D.run, 3, 40),
+  sec(D.s1, PITCH.top),
+  sec(D.f1 - D.s1, PITCH.warmup, 40),
+  sec(D.s2 - D.f1, PITCH.flat, 30),
+  sec(D.f2 - D.s2, PITCH.main, 30),
+  sec(D.s3 - D.f2, PITCH.flat, 30),
+  sec(D.f3 - D.s3, PITCH.pro, 36),
+  sec(D.s4 - D.f3, PITCH.flat, 36),
+  sec(D.f4 - D.s4, PITCH.pro, 36),
+  sec(D.s5 - D.f4, PITCH.flat, 36),
+  sec(D.run - D.s5, PITCH.cruise, 36),
+  sec(D.stop - D.run, PITCH.finish, 40),
   sec(D.end - D.stop, -6, 40),
 ];
 
@@ -181,10 +182,14 @@ function kicker(x: number, d: number, lip: number, angle: number, width = 3): nu
   return d + (2 * lip) / Math.tan((angle * Math.PI) / 180);
 }
 
-/** A kicker onto a rail or box: the slide starts `gap` m past the lip, `height` up. */
+/**
+ * A kicker onto a rail or box: the slide starts `gap` m past the lip. Low
+ * and mellow by default, so rolling off it at speed drops onto the slide
+ * instead of flying over it.
+ */
 function kickerTo(kind: 'rail' | 'box', x: number, d: number, pts: Pt[], o: { lip?: number; angle?: number; gap?: number; width?: number } = {}): void {
-  const lip = kicker(x, d, o.lip ?? 0.8, o.angle ?? 22, kind === 'box' ? 3.5 : 3);
-  slide(kind, x, lip + (o.gap ?? 2.2), pts, o.width ?? 0.7);
+  const lip = kicker(x, d, o.lip ?? 0.6, o.angle ?? 14, kind === 'box' ? 3.5 : 3);
+  slide(kind, x, lip + (o.gap ?? 1), pts, o.width ?? 0.7);
 }
 
 // Slide shapes (the first point at height 0 is a ride-on from the snow).
@@ -194,12 +199,16 @@ const SLIDES = {
   flatDown: (len: number, h = 0.45): Pt[] => [[0, 0, 0], [3.5, 0, h], [len * 0.55, 0, h + 0.15], [len, 0, h * 0.5]],
   downFlatDown: (len: number, h = 0.5): Pt[] => [[0, 0, 0], [3.5, 0, h], [len * 0.35, 0, h * 0.6], [len * 0.6, 0, h + 0.45], [len, 0, h * 0.7]],
   kinked: (len: number, side: number, h = 0.5): Pt[] => [[0, 0, 0], [3.5, 0, h], [len * 0.45, 0, h], [len * 0.7, side, h], [len, side * 2, h * 0.7]],
-  rainbow: (len: number, base: number, rise: number, n = 8): Pt[] => {
-    const pts: Pt[] = [[0, 0, 0]];
-    for (let i = 1; i <= n; i++) pts.push([len * (i / n), 0, base + rise * Math.sin((Math.PI * i) / n)]);
+  rainbow: (len: number, base: number, rise: number, n = 8): Pt[] => [[0, 0, 0], ...SLIDES.arc(len, base, rise, n).slice(1)],
+  /** An arc starting in the air at `base` (for jumping onto). */
+  arc: (len: number, base: number, rise: number, n = 8): Pt[] => {
+    const pts: Pt[] = [];
+    for (let i = 0; i <= n; i++) pts.push([len * (i / n), 0, base + rise * Math.sin((Math.PI * i) / n)]);
     return pts;
   },
 };
+/** Kicker-fed rails start at about the lip's height, so a slow rider can't hit the front and a fast one still comes down onto it. */
+const FED = 0.65;
 
 // ---------------------------------------------------------------- start
 features.push({ type: 'start', style: 'deck', x: -70, z: -14, heading: 0, height: 0.6 });
@@ -209,70 +218,70 @@ const spawn = { x: -70, z: -14, heading: 0 };
 // Ride on at the top, along the left edge, off at the finish flat.
 slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.run - 51, 0, 0]], 0, 4);
 
-// ---------------------------------------------------------------- S1 warm-up (7°)
+// ---------------------------------------------------------------- S1 warm-up (11°)
 {
   const d0 = D.s1;
-  for (const x of [X.jib, X.jump, X.mid, X.pro]) flag(x, d0 + 10);
+  for (const x of [X.jib, X.jump, X.mid, X.pro]) flag(x, d0 + 7);
   const j = X.jib;
-  slide('box', j - 8, d0 + 40, SLIDES.flat(14, 0.3), 0.8);
-  slide('rail', j + 8, d0 + 40, SLIDES.flat(14));
-  slide('box', j, d0 + 100, SLIDES.flatDown(15, 0.35), 0.6);
-  slide('rail', j - 9, d0 + 160, SLIDES.flatDown(16));
-  slide('box', j + 9, d0 + 160, SLIDES.flat(15), 1.0);
-  kickerTo('rail', j, d0 + 230, [[0, 0, 1.0], [10, 0, 1.0]], { lip: 0.7, angle: 20, gap: 2.1 });
-  slide('rail', j - 8, d0 + 300, SLIDES.flat(18, 0.5));
-  kickerTo('box', j + 8, d0 + 300, [[0, 0, 1.0], [10, 0, 1.0]], { lip: 0.7, angle: 20, gap: 2.0 });
-  slide('box', j, d0 + 370, SLIDES.rainbow(10, 0.3, 0.5), 0.8);
-  slide('rail', j - 8, d0 + 440, SLIDES.downFlatDown(18, 0.45));
-  slide('box', j + 8, d0 + 440, SLIDES.flatDown(16, 0.4), 0.8);
+  slide('box', j - 8, d0 + 28, SLIDES.flat(14, 0.3), 0.8);
+  slide('rail', j + 8, d0 + 28, SLIDES.flat(14));
+  slide('box', j, d0 + 70, SLIDES.flatDown(15, 0.35), 0.6);
+  slide('rail', j - 9, d0 + 112, SLIDES.flatDown(16));
+  slide('box', j + 9, d0 + 112, SLIDES.flat(15), 1.0);
+  kickerTo('rail', j, d0 + 161, [[0, 0, FED], [15, 0, FED]]);
+  slide('rail', j - 8, d0 + 210, SLIDES.flat(18, 0.5));
+  kickerTo('box', j + 8, d0 + 210, [[0, 0, FED], [14, 0, FED]]);
+  slide('box', j, d0 + 259, SLIDES.rainbow(10, 0.3, 0.5), 0.8);
+  slide('rail', j - 8, d0 + 308, SLIDES.downFlatDown(18, 0.45));
+  slide('box', j + 8, d0 + 308, SLIDES.flatDown(16, 0.4), 0.8);
 
-  jump(X.jump, d0 + 50, { lip: 1, angle: 15, gap: 4, land: 13, knuckle: 2, transition: 4, width: 6 });
-  jump(X.jump, d0 + 130, { lip: 1.3, angle: 16, gap: 6, land: 13, width: 6 });
-  jump(X.jump, d0 + 220, { lip: 1.6, angle: 17, gap: 7, land: 13 });
-  jump(X.jump, d0 + 310, { lip: 1.8, angle: 18, gap: 8, land: 13 });
-  jump(X.jump, d0 + 390, { lip: 1.6, angle: 18, gap: 8, land: 13 });
-  jump(X.jump, d0 + 460, { lip: 1.8, angle: 19, gap: 8, land: 13 });
+  jump(X.jump, d0 + 35, { lip: 1, angle: 15, gap: 4, land: 13, knuckle: 2, transition: 4, width: 6 });
+  jump(X.jump, d0 + 91, { lip: 1.3, angle: 16, gap: 6, land: 13, width: 6 });
+  jump(X.jump, d0 + 154, { lip: 1.6, angle: 17, gap: 7, land: 13 });
+  jump(X.jump, d0 + 217, { lip: 1.8, angle: 18, gap: 8, land: 13 });
+  jump(X.jump, d0 + 273, { lip: 1.6, angle: 18, gap: 8, land: 13 });
+  jump(X.jump, d0 + 322, { lip: 1.8, angle: 19, gap: 8, land: 13 });
 
-  hip(X.mid, d0 + 60, 1, 1);
-  jump(X.mid, d0 + 150, { lip: 1.4, angle: 18, gap: 7, land: 13 });
-  hip(X.mid, d0 + 240, -1, 1);
-  jump(X.mid, d0 + 330, { lip: 1.8, angle: 18, gap: 9, land: 13 });
-  hip(X.mid, d0 + 430, 1, 1);
+  hip(X.mid, d0 + 42, 1, 1);
+  jump(X.mid, d0 + 105, { lip: 1.4, angle: 18, gap: 7, land: 13 });
+  hip(X.mid, d0 + 168, -1, 1);
+  jump(X.mid, d0 + 231, { lip: 1.8, angle: 18, gap: 9, land: 13 });
+  hip(X.mid, d0 + 301, 1, 1);
 
-  jump(X.pro, d0 + 70, { lip: 1.8, angle: 18, gap: 8, land: 13, width: 8 });
-  jump(X.pro, d0 + 170, { lip: 2.2, angle: 19, gap: 10, land: 13, width: 8 });
-  jump(X.pro, d0 + 280, { lip: 2.4, angle: 20, gap: 11, land: 13, width: 8 });
-  jump(X.pro, d0 + 380, { lip: 2.2, angle: 20, gap: 6, deck: false, landingHeight: 1.6, land: 12, width: 8 });
-  jump(X.pro, d0 + 460, { lip: 2.2, angle: 19, gap: 10, land: 13, width: 8 });
+  jump(X.pro, d0 + 49, { lip: 1.8, angle: 18, gap: 8, land: 13, width: 8 });
+  jump(X.pro, d0 + 119, { lip: 2.2, angle: 19, gap: 10, land: 13, width: 8 });
+  jump(X.pro, d0 + 196, { lip: 2.4, angle: 20, gap: 11, land: 13, width: 8 });
+  jump(X.pro, d0 + 266, { lip: 2.2, angle: 20, gap: 6, deck: false, landingHeight: 1.6, land: 12, width: 8 });
+  jump(X.pro, d0 + 322, { lip: 2.2, angle: 19, gap: 10, land: 13, width: 8 });
 }
 
-// ---------------------------------------------------------------- S2 main park (10°)
+// ---------------------------------------------------------------- S2 main park (13°)
 {
   const d0 = D.s2;
   for (const x of [X.jib, X.jump, X.mid, X.pro]) flag(x, d0 - 15);
   const j = X.jib;
-  kickerTo('rail', j - 9, d0 + 30, [[0, 0, 1.2], [5, 0, 1.2], [13, 0, 0.5]]);
-  kickerTo('box', j + 9, d0 + 30, [[0, 0, 1.1], [6, 0, 1.6], [14, 0, 0.7]]);
-  slide('rail', j, d0 + 110, SLIDES.downFlatDown(21));
-  slide('rail', j - 9, d0 + 190, SLIDES.kinked(21, 1.8));
-  slide('box', j + 9, d0 + 190, SLIDES.downFlatDown(18, 0.4), 0.8);
-  kickerTo('box', j, d0 + 270, SLIDES.rainbow(11, 1.0, 0.6).slice(1).map(([a, b, h]) => [a - 11 / 8, b, h] as Pt), { lip: 0.9, gap: 2.4, width: 0.9 });
-  slide('rail', j - 8, d0 + 350, SLIDES.kinked(22, -1.5));
-  kickerTo('rail', j + 8, d0 + 350, [[0, 0, 1.1], [4, 0, 1.4], [8, 0, 1.6], [16, 0, 0.6]]);
+  kickerTo('rail', j - 9, d0 + 22, [[0, 0, FED], [6, 0, 0.75], [15, 0, 0.4]]);
+  kickerTo('box', j + 9, d0 + 22, [[0, 0, FED], [7, 0, 1.0], [15, 0, 0.45]]);
+  slide('rail', j, d0 + 79, SLIDES.downFlatDown(21));
+  slide('rail', j - 9, d0 + 137, SLIDES.kinked(21, 1.8));
+  slide('box', j + 9, d0 + 137, SLIDES.downFlatDown(18, 0.4), 0.8);
+  kickerTo('box', j, d0 + 194, SLIDES.arc(14, FED, 0.45), { width: 0.9 });
+  slide('rail', j - 8, d0 + 252, SLIDES.kinked(22, -1.5));
+  kickerTo('rail', j + 8, d0 + 252, [[0, 0, FED], [5, 0, 0.9], [10, 0, 1.0], [16, 0, 0.45]]);
 
-  jump(X.jump, d0 + 40, { lip: 2, angle: 20, gap: 9, land: 14, width: 8 });
-  jump(X.jump, d0 + 140, { lip: 2.2, angle: 22, gap: 6, deck: false, landingHeight: 3.2, land: 13, width: 8 });
-  jump(X.jump, d0 + 240, { lip: 3, angle: 19, gap: 7, deck: false, landingHeight: 2.2, land: 12, width: 8 });
-  jump(X.jump, d0 + 340, { lip: 2.6, angle: 21, gap: 12, land: 14, width: 9 });
+  jump(X.jump, d0 + 29, { lip: 2, angle: 20, gap: 9, land: 14, width: 8 });
+  jump(X.jump, d0 + 101, { lip: 2.2, angle: 22, gap: 6, deck: false, landingHeight: 3.2, land: 13, width: 8 });
+  jump(X.jump, d0 + 173, { lip: 3, angle: 19, gap: 7, deck: false, landingHeight: 2.2, land: 12, width: 8 });
+  jump(X.jump, d0 + 245, { lip: 2.6, angle: 21, gap: 12, land: 14, width: 9 });
 
-  features.push({ type: 'halfpipe', x: X.mid, z: -(d0 + 40), yaw: 0, length: 190, floorWidth: 12, radius: 4.6, wallAngle: 82, deckWidth: 3, outerWidth: 6, dropIn: 6, entry: 12, back: 26, exit: 12 });
-  jump(X.mid, d0 + 300, { lip: 2.2, angle: 20, gap: 10, land: 14, width: 8 });
-  hip(X.mid, d0 + 390, 1, 1.2);
+  features.push({ type: 'halfpipe', x: X.mid, z: -(d0 + 29), yaw: 0, length: 150, floorWidth: 12, radius: 4.6, wallAngle: 82, deckWidth: 3, outerWidth: 6, dropIn: 6, entry: 12, back: 26, exit: 12 });
+  jump(X.mid, d0 + 205, { lip: 2, angle: 16, gap: 10, land: 14, width: 8 });
+  hip(X.mid, d0 + 300, 1, 1.2);
 
-  jump(X.pro, d0 + 40, { lip: 2.4, angle: 20, gap: 11, land: 14, width: 9 });
-  jump(X.pro, d0 + 150, { lip: 2.8, angle: 21, gap: 13, land: 14, width: 10 });
-  jump(X.pro, d0 + 260, { lip: 3, angle: 20, gap: 8, deck: false, landingHeight: 1.8, land: 13, width: 10 });
-  jump(X.pro, d0 + 370, { lip: 3, angle: 22, gap: 14, land: 14, width: 10 });
+  jump(X.pro, d0 + 29, { lip: 2.4, angle: 20, gap: 11, land: 14, width: 9 });
+  jump(X.pro, d0 + 108, { lip: 2.8, angle: 21, gap: 13, land: 14, width: 10 });
+  jump(X.pro, d0 + 187, { lip: 3, angle: 20, gap: 8, deck: false, landingHeight: 1.8, land: 13, width: 10 });
+  jump(X.pro, d0 + 266, { lip: 3, angle: 22, gap: 14, land: 14, width: 10 });
 }
 
 // ---------------------------------------------------------------- S3 pro zone one (21°)
@@ -283,7 +292,7 @@ const lanes: Json[] = [];
   const j = X.jib;
   slide('rail', j - 8, d0 + 40, SLIDES.flat(24, 0.5));
   slide('box', j + 8, d0 + 40, SLIDES.flat(20), 0.9);
-  kickerTo('box', j, d0 + 120, [[0, 0, 1.0], [8, 0, 1.4], [18, 0, 0.6]], { lip: 0.6, angle: 12, gap: 3, width: 0.8 });
+  kickerTo('box', j, d0 + 120, [[0, 0, FED], [8, 0, 1.0], [18, 0, 0.5]], { angle: 10, width: 0.8 });
   slide('rail', j - 8, d0 + 190, SLIDES.rainbow(14, 0.5, 0.8, 10));
   slide('rail', j + 8, d0 + 190, SLIDES.downFlatDown(26));
 
@@ -301,7 +310,7 @@ const lanes: Json[] = [];
   for (const x of [X.jib, X.jump, X.mid]) flag(x, d0 - 20);
   const j = X.jib;
   slide('box', j - 8, d0 + 40, SLIDES.flat(22, 0.45), 1.0);
-  kickerTo('rail', j + 8, d0 + 40, [[0, 0, 1.0], [16, 0, 1.0]], { lip: 0.6, angle: 12, gap: 3 });
+  kickerTo('rail', j + 8, d0 + 40, [[0, 0, FED], [18, 0, FED]], { angle: 10 });
   slide('rail', j, d0 + 120, SLIDES.kinked(26, 2));
   slide('box', j - 8, d0 + 190, SLIDES.rainbow(14, 0.4, 0.8, 10), 1.0);
   slide('rail', j + 8, d0 + 190, SLIDES.flat(30, 0.5));
@@ -309,60 +318,60 @@ const lanes: Json[] = [];
   jump(X.jump, d0 + 50, { lip: 2.6, angle: 14, gap: 16, land: 14, width: 10, transition: 10 });
   jump(X.jump, d0 + 160, { lip: 2.8, angle: 15, gap: 11, deck: false, landingHeight: 2.0, land: 14, width: 10, transition: 10 });
 
-  hip(X.mid, d0 + 40, -1, 1);
+  hip(X.mid + 14, d0 + 40, -1, 1);
   jump(X.mid, d0 + 140, { lip: 2.4, angle: 14, gap: 15, land: 14, width: 10, transition: 10 });
 
   lanes.push(proJump(d0, D.f4));
 }
 
-// ---------------------------------------------------------------- S5 cruise and jib garden (7.5°)
+// ---------------------------------------------------------------- S5 cruise and jib garden (11°)
 {
   const d0 = D.s5;
   for (const x of [X.jib, X.jump, X.mid, X.pro]) flag(x, d0 - 15);
   const j = X.jib;
-  slide('box', j - 9, d0 + 40, SLIDES.flat(15, 0.35), 0.8);
-  slide('rail', j + 9, d0 + 40, SLIDES.kinked(22, 1.5));
-  kickerTo('rail', j, d0 + 120, SLIDES.rainbow(10, 1.0, 0.6).slice(1).map(([a, b, h]) => [a - 10 / 8, b, h] as Pt));
-  slide('box', j - 8, d0 + 200, SLIDES.downFlatDown(21, 0.4), 0.9);
-  slide('rail', j + 8, d0 + 200, SLIDES.downFlatDown(20));
-  kickerTo('box', j, d0 + 290, [[0, 0, 1.1], [7, 0, 1.6], [15, 0, 0.6]], { lip: 0.9, gap: 2.4, width: 0.8 });
-  slide('rail', j, d0 + 380, SLIDES.flat(16, 0.5));
-  kickerTo('rail', j - 8, d0 + 470, [[0, 0, 1.0], [12, 0, 1.0]]);
-  slide('box', j + 8, d0 + 470, SLIDES.flat(16), 0.9);
-  slide('rail', j, d0 + 560, SLIDES.rainbow(12, 0.4, 0.6));
+  slide('box', j - 9, d0 + 27, SLIDES.flat(15, 0.35), 0.8);
+  slide('rail', j + 9, d0 + 27, SLIDES.kinked(22, 1.5));
+  kickerTo('rail', j, d0 + 82, SLIDES.arc(14, FED, 0.45));
+  slide('box', j - 8, d0 + 136, SLIDES.downFlatDown(21, 0.4), 0.9);
+  slide('rail', j + 8, d0 + 136, SLIDES.downFlatDown(20));
+  kickerTo('box', j, d0 + 197, [[0, 0, FED], [7, 0, 1.0], [15, 0, 0.45]], { width: 0.8 });
+  slide('rail', j, d0 + 258, SLIDES.flat(16, 0.5));
+  kickerTo('rail', j - 8, d0 + 320, [[0, 0, FED], [15, 0, FED]]);
+  slide('box', j + 8, d0 + 320, SLIDES.flat(16), 0.9);
+  slide('rail', j, d0 + 381, SLIDES.rainbow(12, 0.4, 0.6));
 
-  jump(X.jump, d0 + 60, { lip: 2, angle: 19, gap: 9, land: 14, width: 8 });
-  jump(X.jump, d0 + 170, { lip: 2.2, angle: 22, gap: 6, deck: false, landingHeight: 3.0, land: 13, width: 8 });
-  jump(X.jump, d0 + 280, { lip: 2.4, angle: 20, gap: 10, land: 14, width: 8 });
-  hip(X.jump, d0 + 380, 1, 1.1);
-  jump(X.jump, d0 + 480, { lip: 2, angle: 19, gap: 9, land: 14, width: 8 });
-  jump(X.jump, d0 + 570, { lip: 1.6, angle: 18, gap: 7, land: 13, width: 8 });
+  jump(X.jump, d0 + 41, { lip: 2, angle: 19, gap: 9, land: 14, width: 8 });
+  jump(X.jump, d0 + 116, { lip: 2.2, angle: 22, gap: 6, deck: false, landingHeight: 3.0, land: 13, width: 8 });
+  jump(X.jump, d0 + 190, { lip: 2.4, angle: 20, gap: 10, land: 14, width: 8 });
+  hip(X.jump, d0 + 258, 1, 1.1);
+  jump(X.jump, d0 + 326, { lip: 2, angle: 19, gap: 9, land: 14, width: 8 });
+  jump(X.jump, d0 + 388, { lip: 1.6, angle: 18, gap: 7, land: 13, width: 8 });
 
   // Middle: a jib garden, everything ride-on and side by side.
   const m = X.mid;
-  slide('box', m - 18, d0 + 50, SLIDES.flat(14, 0.3), 1.2);
-  slide('rail', m - 6, d0 + 50, SLIDES.flat(14));
-  slide('box', m + 6, d0 + 50, SLIDES.downFlatDown(19, 0.35), 0.8);
-  slide('rail', m + 18, d0 + 50, SLIDES.rainbow(12, 0.4, 0.6));
-  slide('rail', m - 12, d0 + 140, SLIDES.kinked(19, 1.6));
-  slide('box', m + 12, d0 + 140, SLIDES.flat(16), 0.6);
-  kickerTo('rail', m, d0 + 220, [[0, 0, 1.1], [10, 0, 1.1]]);
-  slide('box', m - 14, d0 + 300, SLIDES.rainbow(10, 0.3, 0.6), 1.0);
-  slide('rail', m + 14, d0 + 300, SLIDES.downFlatDown(21));
-  kickerTo('box', m, d0 + 380, [[0, 0, 1.0], [10, 0, 1.0]], { width: 0.8 });
-  slide('rail', m - 12, d0 + 470, SLIDES.flat(18, 0.45));
-  slide('box', m + 12, d0 + 470, SLIDES.rainbow(12, 0.35, 0.6), 1.0);
-  jump(X.mid, d0 + 560, { lip: 1.8, angle: 18, gap: 8, land: 13, width: 8 });
+  slide('box', m - 18, d0 + 34, SLIDES.flat(14, 0.3), 1.2);
+  slide('rail', m - 6, d0 + 34, SLIDES.flat(14));
+  slide('box', m + 6, d0 + 34, SLIDES.downFlatDown(19, 0.35), 0.8);
+  slide('rail', m + 18, d0 + 34, SLIDES.rainbow(12, 0.4, 0.6));
+  slide('rail', m - 12, d0 + 95, SLIDES.kinked(19, 1.6));
+  slide('box', m + 12, d0 + 95, SLIDES.flat(16), 0.6);
+  kickerTo('rail', m, d0 + 150, [[0, 0, FED], [15, 0, FED]]);
+  slide('box', m - 14, d0 + 204, SLIDES.rainbow(10, 0.3, 0.6), 1.0);
+  slide('rail', m + 14, d0 + 204, SLIDES.downFlatDown(21));
+  kickerTo('box', m, d0 + 258, [[0, 0, FED], [14, 0, FED]], { width: 0.8 });
+  slide('rail', m - 12, d0 + 320, SLIDES.flat(18, 0.45));
+  slide('box', m + 12, d0 + 320, SLIDES.rainbow(12, 0.35, 0.6), 1.0);
+  jump(X.mid, d0 + 381, { lip: 1.8, angle: 18, gap: 8, land: 13, width: 8 });
 
-  jump(X.pro, d0 + 60, { lip: 2, angle: 19, gap: 9, land: 14, width: 9 });
-  jump(X.pro, d0 + 180, { lip: 2.4, angle: 20, gap: 11, land: 14, width: 9 });
-  jump(X.pro, d0 + 300, { lip: 2.2, angle: 21, gap: 6, deck: false, landingHeight: 2.8, land: 13, width: 9 });
-  jump(X.pro, d0 + 410, { lip: 1.8, angle: 18, gap: 8, land: 13, width: 9 });
-  jump(X.pro, d0 + 510, { lip: 2.2, angle: 20, gap: 10, land: 14, width: 9 });
-  jump(X.pro, d0 + 590, { lip: 1.6, angle: 18, gap: 7, land: 13, width: 9 });
+  jump(X.pro, d0 + 41, { lip: 2, angle: 19, gap: 9, land: 14, width: 9 });
+  jump(X.pro, d0 + 122, { lip: 2.4, angle: 20, gap: 11, land: 14, width: 9 });
+  jump(X.pro, d0 + 204, { lip: 2.2, angle: 21, gap: 6, deck: false, landingHeight: 2.8, land: 13, width: 9 });
+  jump(X.pro, d0 + 279, { lip: 1.8, angle: 18, gap: 8, land: 13, width: 9 });
+  jump(X.pro, d0 + 347, { lip: 2.2, angle: 20, gap: 10, land: 14, width: 9 });
+  jump(X.pro, d0 + 401, { lip: 1.6, angle: 18, gap: 7, land: 13, width: 9 });
 }
 
-const finish = { x: 0, z: -(D.run + 40), heading: 0, width: 270, length: 150 };
+const finish = { x: 0, z: -(D.run + 20), heading: 0, width: 270, length: 90 };
 
 // ---------------------------------------------------------------- terrain
 const terrain = {
@@ -406,10 +415,10 @@ for (const d of [D.s1 + 6, D.s2 - 24, D.s3 - 30, D.s4 - 30, D.s5 - 24]) {
 decor.push({ kind: 'bunting', points: [{ x: -86, z: -3 }, { x: -78, z: -3 }, { x: -62, z: -3 }, { x: -54, z: -3 }] });
 decor.push({ kind: 'flag', points: [{ x: -80, z: -4 }, { x: -60, z: -4 }, { x: -84, z: -18 }, { x: -56, z: -18 }], heading: 0 });
 // Finish banners.
-decor.push({ kind: 'banner', points: [{ x: -100, z: -(D.run + 30) }, { x: -40, z: -(D.run + 30) }, { x: 40, z: -(D.run + 30) }, { x: 100, z: -(D.run + 30) }], heading: 0 });
+decor.push({ kind: 'banner', points: [{ x: -100, z: -(D.run + 12) }, { x: -40, z: -(D.run + 12) }, { x: 40, z: -(D.run + 12) }, { x: 100, z: -(D.run + 12) }], heading: 0 });
 // Groomers parked to the side: on the flat between the pro zones, and at the bottom.
 decor.push({ kind: 'groomer', points: [{ x: 132, z: -(D.f3 + 40) }], heading: 60 });
-decor.push({ kind: 'groomer', points: [{ x: -110, z: -(D.run + 130) }], heading: -40 });
+decor.push({ kind: 'groomer', points: [{ x: -110, z: -(D.run + 80) }], heading: -40 });
 // A chairlift up the hillside on the right, out of reach.
 decor.push({ kind: 'chairlift', points: [{ x: 192, z: 60 }, { x: 192, z: -(D.end + 60) }] });
 // Trees and rocks on the hillsides on both sides.

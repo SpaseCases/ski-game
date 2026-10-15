@@ -60,7 +60,7 @@ Grabs (hold in the air, release to let go):
 ## Maps (v1: four maps plus the Test slope, all unlocked from the start)
 Every map has a start gate themed to its kind of skiing, checkpoint flags, a finish zone, and enough decoration to feel like a real place. Decoration stays inside the performance budget: instanced and merged meshes, and the Low preset thins it out. No real brand names or logos anywhere. Every map is picked from the map-select menu.
 
-1. **Park:** a huge terrain park, about 4 to 5 minutes top to bottom, with several lines side by side so you can pick a route, and flatter stretches between sections so speed stays under control.
+1. **Park:** a big, dense terrain park, about 2 to 3 minutes top to bottom, with several lines side by side so you can pick a route, features packed close together, and flatter stretches between sections so speed stays under control. Steep enough everywhere that speed comes easily.
    - Jumps in every size, from small tables to a pro line of huge jumps. The biggest jumps clear a clean 720 (see Jump sizing).
    - Every jump has a rounded knuckle, and landing on it is rideable rather than an instant crash. Include step-ups, step-downs, and hips.
    - Rails and boxes of every kind: flat, down, flat-down, down-flat-down, kinked, and rainbow. Plenty are ride-on at snow level, and plenty are reached off a kicker (jumps onto rails and onto boxes).
@@ -143,14 +143,14 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 
 ## Status (2026-10-15)
 
-**Done:** 0 scaffold and deploy, 1 skiing, 2 air, 3 rails and boxes, 4 checkpoints, 5a map features, 5b map select and the Park (`tools/maps/park.ts` writes `src/maps/park.json`; `tools/sim/line.ts` rides a whole line headlessly). **Next:** 5c, the Freeride map.
+**Done:** 0 scaffold and deploy, 1 skiing, 2 air, 3 rails and boxes, 4 checkpoints, 5a map features, 5b map select and the Park (`tools/maps/park.ts` writes `src/maps/park.json`; `tools/sim/line.ts` rides a whole line headlessly). After play-testing, the Park was made steeper (11° and 13° sections, 6° flats) and shorter (1.94 km) with the same features packed closer; a straight standing run takes the bots about 2 to 2.5 minutes. **Next:** 5c, the Freeride map.
 
 **Known issues**
 - Not yet tested on a real school Chromebook. On a PC with the CPU slowed 4×, the Park on Low uses ~0.6 ms of CPU per frame.
 - Esc opens the map menu as a stand-in pause until milestone 6.
-- The Park's huge jumps are sized for tucking the in-run from their flag; tucking straight in from the section above overshoots.
+- The Park's huge jumps are sized for tucking the in-run from their flag. Tucking straight down a line through the 21° steeps (35+ m/s) overshoots whatever comes next.
 - The long rail has no brake (about 23 m/s standing through the steeps).
-- Kicker-fed rails are built to roll onto; a full pop flies over them.
+- Kicker-fed rails catch riders rolling off at about 6 to 18 m/s; much faster flies over them.
 - The Test slope ends in an invisible wall at the top of the side berms and at the bottom.
 - Riding off a rail sideways crashes unless you turn the skis back first.
 - In the japan grab the ski hangs low.

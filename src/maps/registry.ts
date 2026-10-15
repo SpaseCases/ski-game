@@ -16,7 +16,7 @@ export const MAPS: readonly MapEntry[] = [
   {
     id: 'park',
     name: 'Park',
-    blurb: 'A huge terrain park: jump lines from small to huge, rails and boxes, two halfpipes and one very long rail.',
+    blurb: 'A big terrain park: jump lines from small to huge, rails and boxes, two halfpipes and one very long rail.',
     load: () => import('./park.json').then((m) => m.default),
   },
   {
