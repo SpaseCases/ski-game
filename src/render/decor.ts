@@ -11,18 +11,21 @@ import {
 } from 'three';
 import { alongLine, DECOR_SIZE, type DecorLayout, type ScatterItem } from '../maps/decor.ts';
 import type { Heightfield, LineDecor, XZ } from '../maps/types.ts';
+import type { DistanceCuller } from './culling.ts';
 import { MeshKit, TiledKit } from './meshKit.ts';
 import { drawProp, FLAG_COLORS, PALETTE, scatterModels } from './models.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
 
 // Draws a map's decoration: trees, snags and rocks as instanced meshes (one
-// draw call per model in each band across the map), everything else merged
-// into meshes per 64 m tile, so whole bands and tiles drop out when off
-// screen or past the fog.
+// draw call per model in each square tile of the map), everything else
+// merged into meshes per 64 m tile. The culler hides tiles past the fog, and
+// Three.js skips the ones off screen.
 
 const TILE = 64;
-/** Depth (m, down the slope) of one band of instanced trees and rocks. */
-const BAND = 160;
+/** Side (m) of one tile of instanced trees and rocks. */
+const SCATTER_TILE = 160;
+/** Tallest scatter model (m), so a tile's reach covers its treetops. */
+const SCATTER_TOP = 10;
 /** How far (m) posts, trunks and rocks sink below the drawn snow so bumps never show a gap. */
 const SINK = 0.15;
 
@@ -38,9 +41,13 @@ const decalMaterial = new MeshLambertMaterial({
   polygonOffsetUnits: -3,
 });
 
-export function createDecor(layout: DecorLayout, hf: Heightfield): Group {
+/** Draws the decoration; every tile goes to `culler` to be hidden when far away. */
+export function createDecor(layout: DecorLayout, hf: Heightfield, culler: DistanceCuller): Group {
   const group = new Group();
-  for (const mesh of scatterMeshes(layout.scatter, hf)) group.add(mesh);
+  for (const tile of scatterTiles(layout.scatter, hf)) {
+    group.add(tile.group);
+    culler.add(tile.group, tile.x, tile.z, tile.radius);
+  }
 
   const kits = new TiledKit(TILE);
   const decals = new TiledKit(TILE);
@@ -54,31 +61,61 @@ export function createDecor(layout: DecorLayout, hf: Heightfield): Group {
       drawProp(k, p.kind, color, glows.near(at.x, at.z));
     });
   }
-  for (const mesh of kits.meshes(material)) group.add(mesh);
-  for (const mesh of decals.meshes(decalMaterial)) group.add(mesh);
-  for (const mesh of glows.meshes(glowMaterial)) group.add(mesh);
+  for (const [kit, mat] of [
+    [kits, material],
+    [decals, decalMaterial],
+    [glows, glowMaterial],
+  ] as const) {
+    for (const mesh of kit.meshes(mat)) {
+      group.add(mesh);
+      culler.addMesh(mesh);
+    }
+  }
   return group;
 }
 
-function scatterMeshes(items: readonly ScatterItem[], hf: Heightfield): InstancedMesh[] {
+/** A tile of instanced scatter: its group, and the middle and reach of the ground it covers. */
+interface ScatterTile {
+  group: Group;
+  x: number;
+  z: number;
+  radius: number;
+}
+
+/** Sorts scatter into square tiles, each a group with one instanced mesh per model used in it. */
+function scatterTiles(items: readonly ScatterItem[], hf: Heightfield): ScatterTile[] {
   const models = scatterModels();
-  const meshes: InstancedMesh[] = [];
-  for (const kind of ['pine', 'snag', 'rock', 'boulder'] as const) {
-    const variants = models[kind];
-    variants.forEach((geometry, v) => {
-      const bands = new Map<number, ScatterItem[]>();
-      for (const t of items) {
-        if (t.kind !== kind || Math.min(variants.length - 1, Math.floor(t.tint * variants.length)) !== v) continue;
-        const band = Math.floor(t.z / BAND);
-        const list = bands.get(band);
-        if (list) list.push(t);
-        else bands.set(band, [t]);
-      }
-      if (bands.size === 0) geometry.dispose();
-      for (const mine of bands.values()) meshes.push(scatterMesh(geometry, mine, hf));
+  const tiles = new Map<number, Map<BufferGeometry, ScatterItem[]>>();
+  const used = new Set<BufferGeometry>();
+  for (const t of items) {
+    const variants = models[t.kind];
+    const geometry = variants[Math.min(variants.length - 1, Math.floor(t.tint * variants.length))]!;
+    used.add(geometry);
+    const key = (Math.floor(t.x / SCATTER_TILE) + 32768) * 65536 + (Math.floor(t.z / SCATTER_TILE) + 32768);
+    let tile = tiles.get(key);
+    if (!tile) {
+      tile = new Map();
+      tiles.set(key, tile);
+    }
+    const list = tile.get(geometry);
+    if (list) list.push(t);
+    else tile.set(geometry, [t]);
+  }
+  for (const variants of Object.values(models)) for (const g of variants) if (!used.has(g)) g.dispose();
+  const out: ScatterTile[] = [];
+  for (const [key, tile] of tiles) {
+    const group = new Group();
+    for (const [geometry, mine] of tile) group.add(scatterMesh(geometry, mine, hf));
+    const i = Math.floor(key / 65536) - 32768;
+    const j = (key % 65536) - 32768;
+    out.push({
+      group,
+      x: (i + 0.5) * SCATTER_TILE,
+      z: (j + 0.5) * SCATTER_TILE,
+      radius: Math.hypot(SCATTER_TILE / 2, SCATTER_TILE / 2, SCATTER_TOP),
     });
   }
-  return meshes;
+  return out;
 }
 
 /** One instanced mesh drawing `geometry` at every item. */
@@ -91,7 +128,7 @@ function scatterMesh(geometry: BufferGeometry, mine: readonly ScatterItem[], hf:
   const tint = new Color();
   const mesh = new InstancedMesh(geometry, material, mine.length);
   mine.forEach((t, i) => {
-    pos.set(t.x, drawnHeightAt(hf, t.x, t.z) - SINK * t.scale, t.z);
+    pos.set(t.x, baseHeight(hf, t) - SINK * t.scale, t.z);
     q.setFromAxisAngle(up, t.yaw);
     scale.setScalar(t.scale);
     m.compose(pos, q, scale);
@@ -104,6 +141,24 @@ function scatterMesh(geometry: BufferGeometry, mine: readonly ScatterItem[], hf:
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   mesh.computeBoundingSphere();
   return mesh;
+}
+
+/**
+ * Height to stand a scatter item at: trees on the snow at their trunk; rocks
+ * at the lowest snow under them, so on steep ground they sit into the slope
+ * instead of hanging off it.
+ */
+function baseHeight(hf: Heightfield, t: ScatterItem): number {
+  const y = drawnHeightAt(hf, t.x, t.z);
+  if (t.kind !== 'rock' && t.kind !== 'boulder') return y;
+  const r = (t.kind === 'rock' ? 0.8 : 1.1) * t.scale;
+  return Math.min(
+    y,
+    drawnHeightAt(hf, t.x + r, t.z),
+    drawnHeightAt(hf, t.x - r, t.z),
+    drawnHeightAt(hf, t.x, t.z + r),
+    drawnHeightAt(hf, t.x, t.z - r),
+  );
 }
 
 /** Snow height under a spot, for sitting things on it. */

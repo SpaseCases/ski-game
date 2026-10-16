@@ -1,39 +1,49 @@
 import { Group, InstancedMesh, Mesh, type Material, type Object3D } from 'three';
 import type { BuiltMap } from '../maps/build.ts';
-import { layoutDecor } from '../maps/decor.ts';
+import { thinDecor } from '../maps/decor.ts';
 import type { RunState } from '../sim/checkpoints.ts';
 import type { RaceState } from '../sim/race.ts';
 import { CheckpointView } from './checkpointMeshes.ts';
+import { DistanceCuller } from './culling.ts';
 import { createDecor } from './decor.ts';
 import { createFeatureMeshes } from './features.ts';
 import { SlalomView } from './slalomView.ts';
 import { StartGateView } from './startGates.ts';
-import { createTerrainMesh } from './terrainMesh.ts';
+import { TerrainView } from './terrainMesh.ts';
+
+/** Terrain chunks built per frame while riding (after a jump to a new spot, everything in view is built at once). */
+const CHUNKS_PER_FRAME = 3;
 
 /**
  * Everything drawn for one map: the snow, the features on it, start gates,
- * slalom poles, flags and the finish, and the decoration. Added to the scene
- * as one group, and freed in one go when another map is picked.
+ * slalom poles, flags and the finishes, and the decoration. Added to the
+ * scene as one group, and freed in one go when another map is picked. The
+ * snow is built around the camera as it moves, and decoration past the
+ * camera's view range is hidden.
  */
 export class WorldView {
   readonly group = new Group();
   private readonly built: BuiltMap;
+  private readonly terrain: TerrainView;
   private readonly startView: StartGateView;
   private readonly slalomView: SlalomView | null;
   private readonly checkpointView: CheckpointView;
   private decor: Group;
+  private culler = new DistanceCuller();
 
   /** `density`: the share of scenery decoration to draw (see decorDensity). */
   constructor(built: BuiltMap, density: number) {
     this.built = built;
+    this.group.matrixAutoUpdate = false;
     const { map, hf, starts, course, race } = built;
-    this.group.add(createTerrainMesh(hf, map.terrain.seed));
+    this.terrain = new TerrainView(hf, map.terrain.seed);
+    this.group.add(still(this.terrain.group));
     this.group.add(createFeatureMeshes(hf, course.rails));
     this.startView = new StartGateView(starts, hf);
     this.group.add(this.startView.group);
     this.slalomView = race && race.gates.length > 0 ? new SlalomView(race, hf) : null;
     if (this.slalomView) this.group.add(this.slalomView.mesh);
-    this.decor = createDecor(layoutDecor(map, hf, density), hf);
+    this.decor = still(createDecor(thinDecor(built.decor, density), hf, this.culler));
     this.group.add(this.decor);
     this.checkpointView = new CheckpointView(map, hf);
     this.group.add(this.checkpointView.group);
@@ -41,10 +51,22 @@ export class WorldView {
 
   /** Redraws the decoration at another density. */
   setDensity(density: number): void {
+    this.culler.attachAll();
     this.group.remove(this.decor);
     disposeTree(this.decor);
-    this.decor = createDecor(layoutDecor(this.built.map, this.built.hf, density), this.built.hf);
+    this.culler = new DistanceCuller();
+    this.decor = still(createDecor(thinDecor(this.built.decor, density), this.built.hf, this.culler));
     this.group.add(this.decor);
+  }
+
+  /**
+   * Builds the snow and shows the decoration within `range` of the camera
+   * at (x, z). `all`: build every missing chunk now (after a jump to a new
+   * spot), not just a few.
+   */
+  view(x: number, z: number, range: number, all: boolean): void {
+    this.terrain.update(x, z, range, all ? Infinity : CHUNKS_PER_FRAME);
+    this.culler.update(x, z, range);
   }
 
   update(run: RunState, race: RaceState | null, frameTime: number): void {
@@ -55,9 +77,18 @@ export class WorldView {
 
   /** Frees every geometry and material. Shared materials just get rebuilt the next time they're drawn. */
   dispose(): void {
+    this.culler.attachAll();
     this.group.removeFromParent();
     disposeTree(this.group);
   }
+}
+
+/** Marks a group that never moves, all the way down: its matrices stay identity and are never recomputed. */
+function still(group: Group): Group {
+  group.traverse((o) => {
+    o.matrixAutoUpdate = false;
+  });
+  return group;
 }
 
 function disposeTree(root: Object3D): void {

@@ -33,6 +33,10 @@ export function createView(container: HTMLElement): View {
   container.appendChild(renderer.domElement);
 
   const scene = new Scene();
+  // The scene itself never moves. Left on, it would recompute its matrix
+  // every frame and force every object under it to recompute theirs too;
+  // off, only things that move (with matrixAutoUpdate on) update.
+  scene.matrixAutoUpdate = false;
   const fogColor = new Color(DEFAULT_FOG);
   scene.background = fogColor;
   scene.fog = new Fog(fogColor.clone(), CONFIG.render.fogNear, CONFIG.render.fogFar);

@@ -1,6 +1,7 @@
 // Map data shapes. Maps are plain data: a heightfield plus a list of features.
-// World axes: +Y is up, downhill runs toward -Z, and +X is to the rider's
-// right when facing downhill. Headings follow Three.js: 0 faces -Z and
+// World axes: +Y is up, and on a slope downhill runs toward -Z, with +X to
+// the rider's right when facing downhill (a mountain falls away from its
+// summit in every direction). Headings follow Three.js: 0 faces -Z and
 // positive angles turn left (counter-clockwise seen from above).
 
 /** A run of smooth rollers across the slope. Distances are measured down from the top. */
@@ -85,7 +86,216 @@ export interface GeneratedTerrainDef {
   margin: number;
 }
 
-export type TerrainDef = GeneratedTerrainDef;
+/**
+ * One spoke of a mountain: a line from the summit down a face (or along a
+ * ridge between two faces), with its own fall line as pitch sections
+ * measured out from the summit. Between two spokes the height blends from
+ * one to the other, so faces drop away below the ridges beside them.
+ */
+export interface SpokeDef {
+  name: string;
+  /** Heading (degrees) from the summit, at the summit; 0 runs toward -Z. */
+  heading: number;
+  /** Degrees the spoke swings left per km out from the summit (curved valleys and ridges). */
+  bend: number;
+  /**
+   * How sharp the crest (or valley) is across the spoke at the summit: 0
+   * rounds it (a U-shaped valley floor, a broad ridge), up to 2 for a
+   * knife-edge ridge or a V-shaped valley. It fades to round by `sharpTo` (m out).
+   */
+  sharp: number;
+  sharpTo: number;
+  /** Pitch sections out from the summit; past the last one its pitch carries on. */
+  sections: PitchSection[];
+}
+
+/** A point on a terrain element's line, with a height (what it means depends on the element). */
+export interface HeightPoint {
+  x: number;
+  z: number;
+  height: number;
+}
+
+/** A raised crest along a line: a rock rib between chutes, an arête, a spine. */
+export interface RidgeElement {
+  type: 'ridge';
+  /** The crest line; each point's height is the crest's height there above the slope. */
+  points: HeightPoint[];
+  /** Half the width of the crest's top, and the width of each side falling away from it. */
+  crest: number;
+  side: number;
+  /** Length over which it grows from nothing at each end. */
+  taper: number;
+}
+
+/** A channel dug down a line: a gully (a natural halfpipe), or a narrow chute. */
+export interface GullyElement {
+  type: 'gully';
+  points: XZ[];
+  /** Width of the flat floor, depth below the slope, and width of each curved wall. */
+  floor: number;
+  depth: number;
+  wall: number;
+  taper: number;
+}
+
+/**
+ * A cliff band: a line across the slope where the snow drops away. Above the
+ * line the slope rolls over into a bench; heights vary along it, and a
+ * height of 0 leaves a gap to ride through.
+ */
+export interface CliffsElement {
+  type: 'cliffs';
+  /** The cliff's foot line; each point's height is the drop there. */
+  points: HeightPoint[];
+  /** Heading (degrees) riders go over it. */
+  heading: number;
+  /** Horizontal width of the drop, and length of the bench above it. */
+  face: number;
+  bench: number;
+  taper: number;
+}
+
+/**
+ * A wind lip or cornice along a line: a ramp up on the windward side to a
+ * sharp crest, then a steep drop on the lee side (toward `heading`).
+ */
+export interface LipElement {
+  type: 'lip';
+  points: XZ[];
+  heading: number;
+  height: number;
+  /** Length of the windward ramp, and horizontal width of the lee drop. */
+  ramp: number;
+  drop: number;
+  taper: number;
+}
+
+/** A cirque: a bowl dug into a face, U-shaped from above with a curved headwall at the back, opening downhill. */
+export interface BowlElement {
+  type: 'bowl';
+  /** Middle of its top edge (the rim at the back). */
+  x: number;
+  z: number;
+  /** Heading (degrees) it opens toward. */
+  heading: number;
+  length: number;
+  width: number;
+  depth: number;
+  /** Width of the headwall at the back, length of the floor's rise back to the slope at the front, and width of the side walls. */
+  head: number;
+  exit: number;
+  rim: number;
+}
+
+/** A field of pillows: rounded snow-capped rocks, steeper on their downhill side. */
+export interface PillowsElement {
+  type: 'pillows';
+  /** Middle of the field, the heading downhill, and its size. */
+  x: number;
+  z: number;
+  heading: number;
+  width: number;
+  length: number;
+  count: number;
+  /** Radius range (m) and height range (m) of the pillows. */
+  size: [number, number];
+  height: [number, number];
+  seed: number;
+}
+
+/** Rolling terrain in a round area: smooth bumps and side hits. */
+export interface BumpsElement {
+  type: 'bumps';
+  x: number;
+  z: number;
+  /** Full strength within radius - fade, none past radius. */
+  radius: number;
+  fade: number;
+  /** Half the crest-to-trough height, and the distance between bumps. */
+  amplitude: number;
+  wavelength: number;
+  seed: number;
+}
+
+/** A broad, shallow dip that draws the ground around it in: a run-out basin where a face's lines come together. */
+export interface DipElement {
+  type: 'dip';
+  x: number;
+  z: number;
+  radius: number;
+  /** How far the middle sinks; the dip eases out to nothing at the radius. */
+  depth: number;
+}
+
+/**
+ * A flat pad: a ledge for a flag, the summit's start area, a town site. The
+ * snow blends into a plane through the terrain's height at the middle,
+ * tilted down `heading` by `pitch` degrees.
+ */
+export interface FlatElement {
+  type: 'flat';
+  x: number;
+  z: number;
+  heading: number;
+  pitch: number;
+  /** A circle of this radius, or (when 0) a width × length rectangle. */
+  radius: number;
+  width: number;
+  length: number;
+  /** Distance over which it blends back into the terrain around it. */
+  blend: number;
+}
+
+export type TerrainElement =
+  | RidgeElement
+  | GullyElement
+  | CliffsElement
+  | LipElement
+  | BowlElement
+  | PillowsElement
+  | BumpsElement
+  | DipElement
+  | FlatElement;
+
+/**
+ * A mountain built around a summit at x = z = 0: spokes give each face and
+ * ridge its fall line, then terrain elements are laid on top, in order.
+ */
+export interface PeakTerrainDef {
+  type: 'peak';
+  /** Side (m) of the square heightfield, centered on the summit. */
+  size: number;
+  cellSize: number;
+  /** Height (m) of the summit. */
+  summit: number;
+  /** Spokes in any order (sorted by heading when built). */
+  spokes: SpokeDef[];
+  /** Gentle undulation everywhere: half its height (m) and its wavelength (m). */
+  roll: { amplitude: number; wavelength: number };
+  /**
+   * Big, slow folds over the faces (spurs and hollows), the same way. They
+   * scale with the steepness of the ground under them, so run-outs stay smooth.
+   */
+  relief: { amplitude: number; wavelength: number };
+  elements: TerrainElement[];
+  /** Where the skier can go: a polygon around the summit (each ray out from the summit crosses it once). */
+  bounds: XZ[];
+  /**
+   * The hills around the mountain: the ground starts climbing `inset` m
+   * inside the bounds, steepening over `ramp` m to a grade of `rise`, so
+   * riders near the edge roll back in rather than meet a wall.
+   */
+  rim: { inset: number; ramp: number; rise: number };
+  /** Snow steeper than this (degrees) is drawn as rock. */
+  rockSlope: number;
+  /** Visual-only facet jitter (m) on snow, and the extra on rock. */
+  noise: number;
+  rockNoise: number;
+  seed: number;
+}
+
+export type TerrainDef = GeneratedTerrainDef | PeakTerrainDef;
 
 /** A point on the snow. */
 export interface XZ {
@@ -344,7 +554,43 @@ export interface PropDecor {
   color?: string;
 }
 
-export type DecorDef = ScatterDecor | LineDecor | PropDecor;
+/** A range for terrain placement: none below a, ramping up to full at b, full to c, none past d. */
+export type Ramp4 = [number, number, number, number];
+
+/**
+ * Things placed by the terrain: candidate spots on a jittered grid over the
+ * whole map, kept where the height and steepness suit them (trees thinning
+ * to a treeline, rocks on steep ground), gathered into stands with
+ * clearings between. Ones a rider can reach (inside the bounds) are solid if
+ * the set is, and always drawn; ones outside are scenery that lower presets
+ * thin out.
+ */
+export interface TerrainScatterDecor {
+  kind: ScatterKind;
+  /** Average distance (m) between candidate spots. */
+  spacing: number;
+  /** Heights (m) and steepness (degrees) where they grow. */
+  height: Ramp4;
+  slope: Ramp4;
+  /** Stands and clearings: the size (m) of a stand, and the share of the ground left clear (0..1). */
+  clumps: { size: number; clear: number };
+  seed: number;
+  minScale: number;
+  maxScale: number;
+  solid: boolean;
+}
+
+export type DecorDef = ScatterDecor | TerrainScatterDecor | LineDecor | PropDecor;
+
+/**
+ * A named line down the map (a run): ridden by the headless tools, offered
+ * as a test spot, and kept clear of trees for `clear` meters on each side.
+ */
+export interface RunDef {
+  name: string;
+  points: XZ[];
+  clear: number;
+}
 
 export interface MapDef {
   name: string;
@@ -352,8 +598,10 @@ export interface MapDef {
   features: Feature[];
   spawn: SpawnDef;
   flags: FlagDef[];
-  finish: FinishDef;
+  /** Finish zones: one at the bottom of each way down. */
+  finishes: FinishDef[];
   decor: DecorDef[];
+  runs: RunDef[];
   colors: {
     sky: string;
     fog: string;
@@ -374,12 +622,14 @@ export interface ObstacleDef {
   height: number;
 }
 
-/** The part of the map the skier can reach. */
+/** The part of the map the skier can reach: a rectangle, cut down to a polygon when there is one. */
 export interface Bounds {
   minX: number;
   maxX: number;
   minZ: number;
   maxZ: number;
+  /** The polygon's corners as x, z, x, z..., or empty. */
+  polygon: Float32Array;
 }
 
 /** Height samples on a regular grid. Row-major: heights[row * cols + col]. */
@@ -397,6 +647,8 @@ export interface Heightfield {
   detail?: Float32Array;
   /** Where the skier can go; the rest is scenery. */
   bounds: Bounds;
+  /** Snow steeper than this (degrees) is drawn as rock; absent, none is. */
+  rockSlope?: number;
   /** Shapes built on top of the slope (jumps, pipes, decks), sampled exactly so lips stay sharp. */
   shapes?: TerrainShape[];
 }

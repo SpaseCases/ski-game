@@ -20,7 +20,7 @@ export interface RunState {
   velocity: Vector3;
   /** Per flag: ridden through since the last trip to the top. */
   passed: boolean[];
-  /** Inside the finish zone since the last respawn. */
+  /** Inside a finish zone since the last respawn. */
   finished: boolean;
 }
 
@@ -90,11 +90,19 @@ export function updateRun(run: RunState, map: MapDef, prev: Vector3, s: SkierSta
       return 'flag';
     }
   }
-  if (!run.finished && inFinish(map.finish, s.position)) {
+  if (!run.finished && finishAt(map, s.position) >= 0) {
     run.finished = true;
     return 'finish';
   }
   return 'none';
+}
+
+/** Index of the finish zone a point is in, or -1. */
+export function finishAt(map: MapDef, p: { x: number; z: number }): number {
+  for (let i = 0; i < map.finishes.length; i++) {
+    if (inFinish(map.finishes[i]!, p)) return i;
+  }
+  return -1;
 }
 
 /** True when the step from a to b crosses the gate's line forward, between its poles. */
@@ -109,7 +117,7 @@ function crossedGate(f: FlagDef, a: Vector3, b: Vector3): boolean {
   return Math.abs(across) <= f.width / 2;
 }
 
-function inFinish(f: FinishDef, p: Vector3): boolean {
+function inFinish(f: FinishDef, p: { x: number; z: number }): boolean {
   const h = (f.heading * Math.PI) / 180;
   const dx = -Math.sin(h);
   const dz = -Math.cos(h);

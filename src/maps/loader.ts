@@ -4,15 +4,21 @@ import type {
   Feature,
   FinishDef,
   FlagDef,
+  HeightPoint,
   LineKind,
   MapDef,
+  PeakTerrainDef,
   PitchSection,
   PropKind,
   RailPoint,
+  Ramp4,
   RollersDef,
+  RunDef,
   ScatterKind,
+  SpokeDef,
   StartStyle,
   TerrainDef,
+  TerrainElement,
   TerrainLane,
   XZ,
 } from './types.ts';
@@ -42,8 +48,9 @@ export function parseMap(raw: unknown): MapDef {
       heading: num(spawn.heading, 'spawn.heading'),
     },
     flags: arr(map.flags, 'flags').map((f, i) => parseFlag(f, `flags[${i}]`)),
-    finish: parseFinish(map.finish),
+    finishes: nonEmpty(map.finishes, 'finishes').map((f, i) => parseFinish(f, `finishes[${i}]`)),
     decor: map.decor === undefined ? [] : arr(map.decor, 'decor').map((d, i) => parseDecor(d, `decor[${i}]`)),
+    runs: map.runs === undefined ? [] : arr(map.runs, 'runs').map((r, i) => parseRun(r, `runs[${i}]`)),
     colors: {
       sky: str(colors.sky, 'colors.sky'),
       fog: str(colors.fog, 'colors.fog'),
@@ -53,6 +60,7 @@ export function parseMap(raw: unknown): MapDef {
 
 function parseTerrain(raw: unknown): TerrainDef {
   const t = obj(raw, 'terrain');
+  if (t.type === 'peak') return parsePeak(t);
   if (t.type !== 'generated') throw new Error(`Map: unknown terrain type ${String(t.type)}`);
   const n = reader(t, 'terrain');
   const profile = t.profile === undefined ? undefined : sections(t.profile, 'terrain.profile', false);
@@ -75,6 +83,121 @@ function parseTerrain(raw: unknown): TerrainDef {
     rollers: t.rollers === undefined ? undefined : parseRollers(t.rollers),
     margin: n('margin', 0),
   };
+}
+
+function parsePeak(t: Record<string, unknown>): PeakTerrainDef {
+  const n = reader(t, 'terrain');
+  const r = reader(obj(t.roll, 'terrain.roll'), 'terrain.roll');
+  const f = reader(obj(t.relief, 'terrain.relief'), 'terrain.relief');
+  const m = reader(obj(t.rim, 'terrain.rim'), 'terrain.rim');
+  return {
+    type: 'peak',
+    size: n('size'),
+    cellSize: n('cellSize'),
+    summit: n('summit'),
+    spokes: nonEmpty(t.spokes, 'terrain.spokes').map((s, i) => parseSpoke(s, `terrain.spokes[${i}]`)),
+    roll: { amplitude: r('amplitude'), wavelength: r('wavelength') },
+    relief: { amplitude: f('amplitude'), wavelength: f('wavelength') },
+    elements: arr(t.elements, 'terrain.elements').map((e, i) => parseElement(e, `terrain.elements[${i}]`)),
+    bounds: xzPoints(t.bounds, 'terrain.bounds', 3),
+    rim: { inset: m('inset'), ramp: m('ramp'), rise: m('rise') },
+    rockSlope: n('rockSlope', 50),
+    noise: n('noise'),
+    rockNoise: n('rockNoise', 0),
+    seed: n('seed'),
+  };
+}
+
+function parseSpoke(raw: unknown, path: string): SpokeDef {
+  const o = obj(raw, path);
+  const n = reader(o, path);
+  return {
+    name: str(o.name, `${path}.name`),
+    heading: n('heading'),
+    bend: n('bend', 0),
+    sharp: n('sharp', 0),
+    sharpTo: n('sharpTo', 600),
+    sections: sections(o.sections, `${path}.sections`, false),
+  };
+}
+
+function parseElement(raw: unknown, path: string): TerrainElement {
+  const e = obj(raw, path);
+  const n = reader(e, path);
+  switch (e.type) {
+    case 'ridge':
+      return { type: 'ridge', points: heightPoints(e.points, `${path}.points`), crest: n('crest'), side: n('side'), taper: n('taper', 20) };
+    case 'gully':
+      return { type: 'gully', points: xzPoints(e.points, `${path}.points`, 2), floor: n('floor'), depth: n('depth'), wall: n('wall'), taper: n('taper', 30) };
+    case 'cliffs': {
+      const points = heightPoints(e.points, `${path}.points`);
+      const tallest = Math.max(...points.map((p) => p.height));
+      return { type: 'cliffs', points, heading: n('heading'), face: n('face', 3), bench: n('bench', 4 * tallest + 8), taper: n('taper', 12) };
+    }
+    case 'lip':
+      return {
+        type: 'lip',
+        points: xzPoints(e.points, `${path}.points`, 2),
+        heading: n('heading'),
+        height: n('height'),
+        ramp: n('ramp'),
+        drop: n('drop'),
+        taper: n('taper', 15),
+      };
+    case 'bowl':
+      return {
+        type: 'bowl',
+        x: n('x'),
+        z: n('z'),
+        heading: n('heading'),
+        length: n('length'),
+        width: n('width'),
+        depth: n('depth'),
+        head: n('head'),
+        exit: n('exit'),
+        rim: n('rim'),
+      };
+    case 'pillows':
+      return {
+        type: 'pillows',
+        x: n('x'),
+        z: n('z'),
+        heading: n('heading'),
+        width: n('width'),
+        length: n('length'),
+        count: n('count'),
+        size: pair(e.size, `${path}.size`),
+        height: pair(e.height, `${path}.height`),
+        seed: n('seed', 1),
+      };
+    case 'bumps':
+      return {
+        type: 'bumps',
+        x: n('x'),
+        z: n('z'),
+        radius: n('radius'),
+        fade: n('fade'),
+        amplitude: n('amplitude'),
+        wavelength: n('wavelength'),
+        seed: n('seed', 1),
+      };
+    case 'dip':
+      return { type: 'dip', x: n('x'), z: n('z'), radius: n('radius'), depth: n('depth') };
+    case 'flat':
+      return {
+        type: 'flat',
+        x: n('x'),
+        z: n('z'),
+        heading: n('heading', 0),
+        pitch: n('pitch', 0),
+        radius: n('radius', 0),
+        width: n('width', 0),
+        length: n('length', 0),
+        blend: n('blend'),
+      };
+    default:
+      throw new Error(`Map: ${path} has unknown type ${String(e.type)}`);
+  }
 }
 
 /** Pitch sections; `solveLast` lets the last one leave its pitch out. */
@@ -115,9 +238,14 @@ function parseFlag(raw: unknown, path: string): FlagDef {
   return { x: n('x'), z: n('z'), heading: n('heading'), width: n('width') };
 }
 
-function parseFinish(raw: unknown): FinishDef {
-  const n = reader(obj(raw, 'finish'), 'finish');
+function parseFinish(raw: unknown, path: string): FinishDef {
+  const n = reader(obj(raw, path), path);
   return { x: n('x'), z: n('z'), heading: n('heading'), width: n('width'), length: n('length') };
+}
+
+function parseRun(raw: unknown, path: string): RunDef {
+  const o = obj(raw, path);
+  return { name: str(o.name, `${path}.name`), points: xzPoints(o.points, `${path}.points`, 2), clear: reader(o, path)('clear', 0) };
 }
 
 function parseFeature(raw: unknown, path: string): Feature {
@@ -229,6 +357,26 @@ function railPoints(raw: unknown, path: string): RailPoint[] {
   });
 }
 
+function heightPoints(raw: unknown, path: string): HeightPoint[] {
+  return railPoints(raw, path);
+}
+
+/** Two numbers, low then high. */
+function pair(raw: unknown, path: string): [number, number] {
+  const list = arr(raw, path);
+  if (list.length !== 2) throw new Error(`Map: ${path} must be [low, high]`);
+  return [num(list[0], `${path}[0]`), num(list[1], `${path}[1]`)];
+}
+
+/** Four rising numbers: a terrain placement range. */
+function ramp4(raw: unknown, path: string): Ramp4 {
+  const list = arr(raw, path);
+  if (list.length !== 4) throw new Error(`Map: ${path} must be four numbers`);
+  const r = list.map((v, i) => num(v, `${path}[${i}]`)) as Ramp4;
+  if (!(r[0] <= r[1] && r[1] <= r[2] && r[2] <= r[3])) throw new Error(`Map: ${path} must rise from first to last`);
+  return r;
+}
+
 function xzPoints(raw: unknown, path: string, min: number): XZ[] {
   const points = arr(raw, path);
   if (points.length < min) throw new Error(`Map: ${path} needs at least ${min} point(s)`);
@@ -242,6 +390,20 @@ function parseDecor(raw: unknown, path: string): DecorDef {
   const d = obj(raw, path);
   const n = reader(d, path);
   const kind = str(d.kind, `${path}.kind`);
+  if ((SCATTER_KINDS as readonly string[]).includes(kind) && d.spacing !== undefined) {
+    const clumps = d.clumps === undefined ? undefined : reader(obj(d.clumps, `${path}.clumps`), `${path}.clumps`);
+    return {
+      kind: kind as ScatterKind,
+      spacing: n('spacing'),
+      height: ramp4(d.height, `${path}.height`),
+      slope: ramp4(d.slope, `${path}.slope`),
+      clumps: { size: clumps ? clumps('size') : 100, clear: clumps ? clumps('clear') : 0 },
+      seed: n('seed', 1),
+      minScale: n('minScale', 0.8),
+      maxScale: n('maxScale', 1.2),
+      solid: d.solid === undefined ? false : bool(d.solid, `${path}.solid`),
+    };
+  }
   if ((SCATTER_KINDS as readonly string[]).includes(kind)) {
     const a = reader(obj(d.area, `${path}.area`), `${path}.area`);
     const area: AreaDef = { x: a('x'), z: a('z'), width: a('width'), length: a('length') };
@@ -284,6 +446,12 @@ function obj(value: unknown, path: string): Record<string, unknown> {
 function arr(value: unknown, path: string): unknown[] {
   if (!Array.isArray(value)) throw new Error(`Map: ${path} must be an array`);
   return value;
+}
+
+function nonEmpty(value: unknown, path: string): unknown[] {
+  const list = arr(value, path);
+  if (list.length === 0) throw new Error(`Map: ${path} needs at least one entry`);
+  return list;
 }
 
 function num(value: unknown, path: string): number {

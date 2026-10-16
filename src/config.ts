@@ -113,10 +113,11 @@ export const CONFIG = {
     /**
      * Snow steeper than this (degrees) is a wall: riding up it and off the
      * top launches straight up, rotating in the wall's plane, so the skier
-     * comes back down into the halfpipe. The skis' heading then follows the
-     * path along the wall instead of their pitch.
+     * comes back down into the halfpipe (or a gully: the snow rounds off at
+     * a gully's lip, so this sits a little under its steepest walls). The
+     * skis' heading then follows the path along the wall instead of their pitch.
      */
-    wallAngle: 50,
+    wallAngle: 44,
     /** How far (m) back inside the lip a wall air comes down. */
     wallDrift: 0.6,
     /** Share of a pop that a wall (or a halfpipe's transition) turns into speed straight up. */

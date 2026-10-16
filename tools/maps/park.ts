@@ -431,7 +431,7 @@ decor.push({ kind: 'rock', area: { x: -180, z: midZ, width: 70, length: len }, c
 decor.push({ kind: 'boulder', area: { x: 180, z: midZ, width: 60, length: len }, count: 140, seed: 9, minScale: 0.8, maxScale: 1.6 });
 decor.push({ kind: 'snag', area: { x: -175, z: midZ, width: 50, length: len }, count: 60, seed: 10, minScale: 0.8, maxScale: 1.2 });
 
-const map = { name: 'Park', terrain, features, spawn, flags, finish, decor, colors: { sky: '#8fbde9', fog: '#d9e7f3' } };
+const map = { name: 'Park', terrain, features, spawn, flags, finishes: [finish], decor, colors: { sky: '#8fbde9', fog: '#d9e7f3' } };
 
 // ---------------------------------------------------------------- report
 const parsed = parseMap(map);

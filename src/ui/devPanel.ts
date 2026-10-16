@@ -32,9 +32,9 @@ export interface TestSpot {
 }
 
 /**
- * Places to try each feature from: every start gate and flag, a run-up
- * before each jump, kicker, landing, rail and box, the halfpipe's drop-in
- * deck, and the slalom's first gate.
+ * Places to try each feature from: every start gate and flag, the top of
+ * each run, a run-up before each jump, kicker, landing, rail and box, the
+ * halfpipe's drop-in deck, and the slalom's first gate.
  */
 export function testSpots(map: MapDef): Record<string, TestSpot> {
   const spots: Record<string, TestSpot> = { spawn: { x: map.spawn.x, z: map.spawn.z, heading: map.spawn.heading / DEG } };
@@ -51,6 +51,10 @@ export function testSpots(map: MapDef): Record<string, TestSpot> {
   map.flags.forEach((f, i) => {
     spots[`flag ${i + 1}`] = before(f.x, f.z, f.heading, 8);
   });
+  for (const run of map.runs) {
+    const [a, b] = run.points;
+    if (a && b) spots[`run: ${run.name}`] = { x: a.x, z: a.z, heading: Math.atan2(-(b.x - a.x), -(b.z - a.z)) };
+  }
   for (const f of map.features) {
     switch (f.type) {
       case 'start':

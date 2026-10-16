@@ -3,6 +3,7 @@ import { CONFIG } from '../config.ts';
 import { GRAB_ACTIONS, type InputState } from '../core/input.ts';
 import { onPipeWall, pipeInward } from '../maps/shapes.ts';
 import type { Heightfield, RailShape, SpawnDef } from '../maps/types.ts';
+import { keepInside } from './bounds.ts';
 import { collideObstacles, type Course } from './obstacles.ts';
 import { collideRails, railFrame, railUnder, type RailSpot } from './rails.ts';
 import { groundAt, heightAt } from './terrain.ts';
@@ -986,27 +987,7 @@ function toSurface(hf: Heightfield, p: Vector3): void {
 
 /** Keeps the skier inside the play area. */
 function keepInsideMap(s: SkierState, hf: Heightfield): void {
-  const margin = 1;
-  const minX = hf.bounds.minX + margin;
-  const maxX = hf.bounds.maxX - margin;
-  const minZ = hf.bounds.minZ + margin;
-  const maxZ = hf.bounds.maxZ - margin;
-  const p = s.position;
-  const v = s.velocity;
-  if (p.x < minX) {
-    p.x = minX;
-    if (v.x < 0) v.x = 0;
-  } else if (p.x > maxX) {
-    p.x = maxX;
-    if (v.x > 0) v.x = 0;
-  }
-  if (p.z < minZ) {
-    p.z = minZ;
-    if (v.z < 0) v.z = 0;
-  } else if (p.z > maxZ) {
-    p.z = maxZ;
-    if (v.z > 0) v.z = 0;
-  }
+  keepInside(hf.bounds, s.position, s.velocity);
 }
 
 function approach(value: number, target: number, maxDelta: number): number {

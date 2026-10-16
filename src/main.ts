@@ -215,6 +215,7 @@ if (import.meta.env.DEV) {
       skier,
       keys,
       camera,
+      scene,
       renderer,
       config: CONFIG,
       respawn,
@@ -309,6 +310,7 @@ startLoop(
   (alpha, frameTime) => {
     if (level && skierView && chase) {
       interpolateSkier(pose, skierPrev, skier, alpha);
+      const snapped = snapView;
       if (snapView) {
         skierView.snap(pose);
         chase.snap(pose);
@@ -322,6 +324,7 @@ startLoop(
         camera.position.copy(freeCamera.from);
         camera.lookAt(freeCamera.at);
       }
+      level.world.view(camera.position.x, camera.position.z, camera.far, snapped || freeCamera !== null);
       level.world.update(level.run, level.race, frameTime);
     }
 

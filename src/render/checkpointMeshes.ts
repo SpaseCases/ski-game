@@ -20,8 +20,8 @@ import { drawnHeightAt } from './terrainMesh.ts';
 import { TriBuilder } from './triBuilder.ts';
 
 // Flag gates (instanced: one draw call for all poles, one for all pennants),
-// the finish arch with a checkered banner and line on the snow (one merged
-// mesh), and a small marker over the personal checkpoint.
+// each finish arch with a checkered banner and line on the snow (one merged
+// mesh each), and a small marker over the personal checkpoint.
 
 const POLE = new Color('#3a4450');
 const PENNANT_NEW = new Color('#ff7a1a');
@@ -97,7 +97,7 @@ export class CheckpointView {
     }
     this.shown = map.flags.map(() => false);
 
-    this.group.add(createFinish(map.finish, hf));
+    for (const f of map.finishes) this.group.add(createFinish(f, hf));
 
     this.marker = new Mesh(new OctahedronGeometry(0.16), new MeshLambertMaterial({ color: MARKER, flatShading: true }));
     this.marker.visible = false;

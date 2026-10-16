@@ -78,7 +78,7 @@
     { "x": 22, "z": -118, "heading": 0, "width": 18 },
     { "x": -20, "z": -175, "heading": 0, "width": 22 }
   ],
-  "finish": { "x": 0, "z": -440, "heading": 0, "width": 190, "length": 70 },
+  "finishes": [{ "x": 0, "z": -440, "heading": 0, "width": 190, "length": 70 }],
   "decor": [
     { "kind": "pine", "area": { "x": -128, "z": -250, "width": 46, "length": 640 }, "count": 650, "seed": 3, "minScale": 0.8, "maxScale": 1.5 },
     { "kind": "pine", "area": { "x": 114, "z": -250, "width": 16, "length": 640 }, "count": 220, "seed": 5, "minScale": 0.8, "maxScale": 1.4 },

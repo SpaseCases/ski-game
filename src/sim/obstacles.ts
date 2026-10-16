@@ -54,8 +54,12 @@ export function buildObstacles(defs: readonly ObstacleDef[], hf: Heightfield): O
     start: new Int32Array(0),
     items: new Int32Array(0),
   };
-  const cells: number[][] = Array.from({ length: o.cols * o.rows }, () => []);
+  // Every cell an obstacle could touch a body in: count them per cell, then
+  // fill each cell's slice of one array (big maps have too many cells for a
+  // list each).
   const reach = CONFIG.rails.bodyRadius;
+  const span = new Int32Array(n * 4);
+  const counts = new Int32Array(o.cols * o.rows + 1);
   defs.forEach((d, i) => {
     o.ax[i] = d.ax;
     o.az[i] = d.az;
@@ -66,25 +70,24 @@ export function buildObstacles(defs: readonly ObstacleDef[], hf: Heightfield): O
     const hb = heightAt(hf, d.bx, d.bz);
     o.bottom[i] = Math.min(ha, hb) - 0.5;
     o.top[i] = Math.max(ha, hb) + d.height;
-    // Every cell the obstacle could touch a body in.
     const r = d.radius + reach;
-    const c0 = cellOf(o, Math.min(d.ax, d.bx) - r, o.originX, o.cols);
-    const c1 = cellOf(o, Math.max(d.ax, d.bx) + r, o.originX, o.cols);
-    const r0 = cellOf(o, Math.min(d.az, d.bz) - r, o.originZ, o.rows);
-    const r1 = cellOf(o, Math.max(d.az, d.bz) + r, o.originZ, o.rows);
-    for (let row = r0; row <= r1; row++) {
-      for (let col = c0; col <= c1; col++) cells[row * o.cols + col]!.push(i);
+    span[i * 4] = cellOf(o, Math.min(d.ax, d.bx) - r, o.originX, o.cols);
+    span[i * 4 + 1] = cellOf(o, Math.max(d.ax, d.bx) + r, o.originX, o.cols);
+    span[i * 4 + 2] = cellOf(o, Math.min(d.az, d.bz) - r, o.originZ, o.rows);
+    span[i * 4 + 3] = cellOf(o, Math.max(d.az, d.bz) + r, o.originZ, o.rows);
+    for (let row = span[i * 4 + 2]!; row <= span[i * 4 + 3]!; row++) {
+      for (let col = span[i * 4]!; col <= span[i * 4 + 1]!; col++) counts[row * o.cols + col]!++;
     }
   });
-  o.start = new Int32Array(cells.length + 1);
-  let total = 0;
-  cells.forEach((list, k) => {
-    o.start[k] = total;
-    total += list.length;
-  });
-  o.start[cells.length] = total;
-  o.items = new Int32Array(total);
-  cells.forEach((list, k) => o.items.set(list, o.start[k] ?? 0));
+  o.start = new Int32Array(o.cols * o.rows + 1);
+  for (let k = 0; k < o.cols * o.rows; k++) o.start[k + 1] = o.start[k]! + counts[k]!;
+  o.items = new Int32Array(o.start[o.cols * o.rows]!);
+  const fill = o.start.slice(0, o.cols * o.rows);
+  for (let i = 0; i < n; i++) {
+    for (let row = span[i * 4 + 2]!; row <= span[i * 4 + 3]!; row++) {
+      for (let col = span[i * 4]!; col <= span[i * 4 + 1]!; col++) o.items[fill[row * o.cols + col]!++] = i;
+    }
+  }
   return o;
 }
 

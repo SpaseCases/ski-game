@@ -97,7 +97,7 @@ export function generateSlope(def: GeneratedTerrainDef): Heightfield {
     originZ,
     heights,
     detail,
-    bounds: { minX: -halfWidth, maxX: halfWidth, minZ: -def.length, maxZ: 0 },
+    bounds: { minX: -halfWidth, maxX: halfWidth, minZ: -def.length, maxZ: 0, polygon: new Float32Array(0) },
   };
 }
 
@@ -125,7 +125,7 @@ function baseGrade(def: GeneratedTerrainDef): (d: number) => number {
  * begins at `before` and eases into each section's pitch in turn. Sections
  * must have their pitch set.
  */
-function sectionPitch(sections: readonly PitchSection[], start: number, d: number, before: number): number {
+export function sectionPitch(sections: readonly PitchSection[], start: number, d: number, before: number): number {
   let p = before;
   let at = start;
   for (const s of sections) {

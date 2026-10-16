@@ -22,7 +22,8 @@ export const MAPS: readonly MapEntry[] = [
   {
     id: 'freeride',
     name: 'Freeride',
-    blurb: 'A big open mountain with bowls, cliffs, chutes and tree runs.',
+    blurb: 'Start on the summit and ride down any side: steep couloirs and cliffs, a corniced bowl, glades, and a long gully.',
+    load: () => import('./freeride.json').then((m) => m.default),
   },
   {
     id: 'slalom',

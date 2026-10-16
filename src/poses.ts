@@ -133,7 +133,7 @@ const flat: Heightfield = {
   originX: -4,
   originZ: -4,
   heights: new Float32Array(25),
-  bounds: { minX: -4, maxX: 4, minZ: -4, maxZ: 4 },
+  bounds: { minX: -4, maxX: 4, minZ: -4, maxZ: 4, polygon: new Float32Array(0) },
 };
 
 const RIDE_DEFAULTS: RideState = { speed: 0, crouch: 0, lean: 0, brake: 0, brakeSide: 1, onRail: false, railYaw: 0 };
