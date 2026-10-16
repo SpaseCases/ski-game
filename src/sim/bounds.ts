@@ -83,6 +83,25 @@ export function keepInside(b: Bounds, p: Vec3Like, v: Vec3Like): boolean {
   return true;
 }
 
+/** Flat distance (m) from (x, z) to the nearest edge of the play area's polygon (or rectangle when there's none). */
+export function boundsDistance(b: Bounds, x: number, z: number): number {
+  const poly = b.polygon;
+  if (poly.length < 6) return Math.min(Math.abs(x - b.minX), Math.abs(x - b.maxX), Math.abs(z - b.minZ), Math.abs(z - b.maxZ));
+  let best = Infinity;
+  const n = poly.length / 2;
+  for (let i = 0; i < n; i++) {
+    const ax = poly[i * 2]!;
+    const az = poly[i * 2 + 1]!;
+    const j = (i + 1) % n;
+    const sx = poly[j * 2]! - ax;
+    const sz = poly[j * 2 + 1]! - az;
+    const len2 = sx * sx + sz * sz;
+    const t = len2 > 0 ? Math.min(1, Math.max(0, ((x - ax) * sx + (z - az) * sz) / len2)) : 0;
+    best = Math.min(best, (x - ax - sx * t) ** 2 + (z - az - sz * t) ** 2);
+  }
+  return Math.sqrt(best);
+}
+
 /** Even-odd test against a polygon given as x, z, x, z... */
 function insidePolygon(poly: Float32Array, x: number, z: number): boolean {
   let inside = false;

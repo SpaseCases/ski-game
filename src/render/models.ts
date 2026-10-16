@@ -13,6 +13,10 @@ export const PALETTE = {
   needles: c('#2f5a3c'),
   needlesDark: c('#244a31'),
   needlesSnow: c('#e8eef5'),
+  aspenBark: c('#e4e1d6'),
+  aspenMark: c('#3e3b37'),
+  twigs: c('#b6aaa0'),
+  twigsDark: c('#9d9188'),
   snag: c('#8b7c6c'),
   rock: c('#7d848c'),
   rockDark: c('#666d75'),
@@ -39,14 +43,31 @@ export const PALETTE = {
 /** Flag and banner colors, cycled through when a map doesn't pick one. */
 export const FLAG_COLORS = ['#2f7de1', '#ff7a1a', '#33c26a', '#e0c21f', '#d8342c', '#8a4fd6'].map(c);
 
-/** Scatter prototypes: two pines, a snag, three rocks, two boulders. Picked per item by its tint. */
-export function scatterModels(): Record<'pine' | 'snag' | 'rock' | 'boulder', BufferGeometry[]> {
+/** Scatter prototypes: two pines, two aspens, a snag, three rocks, two boulders. Picked per item by its tint. */
+export function scatterModels(): Record<'pine' | 'aspen' | 'snag' | 'rock' | 'boulder', BufferGeometry[]> {
   return {
     pine: [pine(false), pine(true)],
+    aspen: [aspen(false), aspen(true)],
     snag: [snag()],
     rock: [rock(11, false), rock(23, false), rock(37, false)],
     boulder: [rock(51, true), rock(67, true)],
   };
+}
+
+/**
+ * Stand-ins for trees far away, a handful of triangles each: a pine as one
+ * dark cone, an aspen as a pale spike on a white stick, a snag as a stick.
+ * Rocks have none (they're too small to see that far).
+ */
+export function farScatterModels(): Record<'pine' | 'aspen' | 'snag', BufferGeometry> {
+  const pineFar = new MeshKit();
+  pineFar.prism(0, 0, 0.5, 5.8, 1.75, 0, 5, PALETTE.needlesDark);
+  const aspenFar = new MeshKit();
+  aspenFar.prism(0, 0, -0.3, 4.2, 0.14, 0.1, 3, PALETTE.aspenBark);
+  aspenFar.prism(0, 0, 4, 8.6, 0.9, 0, 4, PALETTE.twigs, true);
+  const snagFar = new MeshKit();
+  snagFar.prism(0, 0, -0.3, 6, 0.24, 0.05, 3, PALETTE.snag);
+  return { pine: pineFar.geometry(), aspen: aspenFar.geometry(), snag: snagFar.geometry() };
 }
 
 /** A pine: a short trunk under stacked cones, snow on the top tier. */
@@ -64,6 +85,35 @@ function pine(tall: boolean): BufferGeometry {
     k.prism(0, 0, y * s, (y + h) * s, r, 0, n, color, true);
   }
   k.prism(0, 0, 4.9 * s, 5.6 * s, 0.32, 0, n, PALETTE.needlesSnow, true);
+  return k.geometry();
+}
+
+/**
+ * A bare winter aspen: a slim white trunk with dark bark marks, and a few
+ * pale branches reaching up and out from its upper half, with twigs.
+ */
+function aspen(tall: boolean): BufferGeometry {
+  const k = new MeshKit();
+  const s = tall ? 1.2 : 1;
+  const top = 8.4 * s;
+  k.prism(0, 0, -0.3, top, 0.14, 0.035, 6, PALETTE.aspenBark);
+  for (const y of [0.9, 1.8, 2.8, 3.9]) k.prism(0, 0, y * s, (y + 0.14) * s, 0.15, 0.14, 6, PALETTE.aspenMark);
+  // Branches: [height up the trunk, direction around it, reach out, rise].
+  const branches: [number, number, number, number][] = [
+    [4.2, 0.3, 1.3, 1.6],
+    [4.9, 2.4, 1.5, 1.7],
+    [5.6, 4.3, 1.2, 1.5],
+    [6.3, 1.4, 1.0, 1.3],
+    [6.9, 3.4, 0.9, 1.1],
+    [7.5, 5.4, 0.6, 0.9],
+  ];
+  for (const [y, a, out, rise] of branches) {
+    const x = Math.cos(a) * out * s;
+    const z = Math.sin(a) * out * s;
+    k.beam(0, y * s, 0, x, (y + rise) * s, z, 0.07, PALETTE.twigs);
+    // A twig forking off near the end.
+    k.beam(x * 0.6, (y + rise * 0.6) * s, z * 0.6, x * 0.75 - z * 0.35, (y + rise * 1.25) * s, z * 0.75 + x * 0.35, 0.04, PALETTE.twigsDark);
+  }
   return k.geometry();
 }
 

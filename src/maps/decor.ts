@@ -1,4 +1,4 @@
-import { insideBounds } from '../sim/bounds.ts';
+import { boundsDistance, insideBounds } from '../sim/bounds.ts';
 import { fbm } from './peak.ts';
 import { sampleShape, type ShapeSample } from './shapes.ts';
 import { startFrames } from './startGates.ts';
@@ -43,11 +43,13 @@ export const DECOR_SIZE = {
 /** Per scatter kind: obstacle radius and height at scale 1. */
 const SCATTER_SOLID: Record<ScatterKind, { radius: number; height: number }> = {
   pine: { radius: 0.5, height: 7 },
+  aspen: { radius: 0.2, height: 8 },
   snag: { radius: 0.25, height: 6 },
   rock: { radius: 0.6, height: 0.8 },
   boulder: { radius: 1.3, height: 2 },
 };
 
+const DEG = Math.PI / 180;
 /** Size (m) of the cells that sort keep-out spots, so checking a spot looks at only the few nearby. */
 const KEEP_OUT_CELL = 32;
 
@@ -202,17 +204,21 @@ function terrainSet(d: TerrainScatterDecor, hf: Heightfield, keepOut: KeepOut, o
   const cl = length / nz;
   // Stands: noise over the ground, kept where it's above a level that leaves about `clear` of it open.
   const level = (d.clumps.clear - 0.5) * 0.7;
-  const at = { h: 0, slope: 0 };
+  // Steepness compared as gradients (rise per meter), to skip an arctangent per spot.
+  const slope = d.slope.map((deg) => Math.tan(Math.min(deg, 89.9) * DEG)) as Ramp4;
+  const at = { h: 0, grade: 0 };
   for (let i = 0; i < nx; i++) {
     for (let j = 0; j < nz; j++) {
       const r = (k: number): number => 0.5 + 0.5 * hash2(i * 7 + k, j * 13 + k * 3, d.seed);
       const x = hf.originX + (i + 0.1 + 0.8 * r(1)) * cw;
       const z = hf.originZ + (j + 0.1 + 0.8 * r(2)) * cl;
       gridSample(hf, x, z, at);
-      let w = ramp(d.height, at.h) * ramp(d.slope, at.slope);
+      let w = ramp(d.height, at.h) * ramp(slope, at.grade);
       if (w <= 0) continue;
       if (d.clumps.clear > 0) w *= smoothstep(level - 0.08, level + 0.08, fbm(x / d.clumps.size, z / d.clumps.size, d.seed + 7));
       if (r(0) >= w || !clear(x, z, hf, keepOut)) continue;
+      const inside = insideBounds(hf.bounds, x, z);
+      if (!inside && boundsDistance(hf.bounds, x, z) > d.reach) continue;
       out.push({
         kind: d.kind,
         x,
@@ -220,7 +226,7 @@ function terrainSet(d: TerrainScatterDecor, hf: Heightfield, keepOut: KeepOut, o
         yaw: r(3) * Math.PI * 2,
         scale: d.minScale + (d.maxScale - d.minScale) * r(4),
         tint: r(5),
-        solid: d.solid && insideBounds(hf.bounds, x, z),
+        solid: d.solid && inside,
         rank: r(6),
       });
     }
@@ -234,15 +240,17 @@ function ramp(r: Ramp4, v: number): number {
   return 1;
 }
 
-/** Height and steepness (degrees) of the grid at the sample nearest (x, z): quick, for placing things. */
-function gridSample(hf: Heightfield, x: number, z: number, out: { h: number; slope: number }): void {
+/** Height and steepness (rise per meter) of the grid at the sample nearest (x, z): quick, for placing things. */
+function gridSample(hf: Heightfield, x: number, z: number, out: { h: number; grade: number }): void {
   const col = Math.min(hf.cols - 2, Math.max(1, Math.round((x - hf.originX) / hf.cellSize)));
   const row = Math.min(hf.rows - 2, Math.max(1, Math.round((z - hf.originZ) / hf.cellSize)));
   const i = row * hf.cols + col;
   const h = hf.heights;
   const c2 = 2 * hf.cellSize;
   out.h = h[i]!;
-  out.slope = (Math.atan(Math.hypot((h[i + 1]! - h[i - 1]!) / c2, (h[i + hf.cols]! - h[i - hf.cols]!) / c2)) * 180) / Math.PI;
+  const gx = (h[i + 1]! - h[i - 1]!) / c2;
+  const gz = (h[i + hf.cols]! - h[i - hf.cols]!) / c2;
+  out.grade = Math.sqrt(gx * gx + gz * gz);
 }
 
 function onMap(hf: Heightfield, x: number, z: number): boolean {

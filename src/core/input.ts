@@ -12,6 +12,7 @@ export type Action =
   | 'respawn'
   | 'checkpoint'
   | 'confirm'
+  | 'trailMap'
   | GrabAction;
 
 /** Grab keys, in the order of the GRABS list (render/skierPoses.ts): left hand first. */
@@ -39,6 +40,7 @@ export const ACTIONS: readonly Action[] = [
   'respawn',
   'checkpoint',
   'confirm',
+  'trailMap',
   ...GRAB_ACTIONS,
 ];
 
@@ -55,6 +57,7 @@ export const DEFAULT_BINDINGS: Bindings = {
   respawn: ['KeyR'],
   checkpoint: ['Tab'],
   confirm: ['Enter', 'NumpadEnter'],
+  trailMap: ['KeyM'],
   grabLeftMute: ['KeyA'],
   grabLeftSafety: ['KeyS'],
   grabLeftJapan: ['KeyD'],
@@ -121,6 +124,11 @@ export class Keyboard {
   setEnabled(on: boolean): void {
     this.enabled = on;
     this.releaseAll();
+  }
+
+  /** True when the key with this code is bound to `action` (whether or not game keys are on). */
+  isBound(action: Action, code: string): boolean {
+    return this.actionsByCode.get(code)?.includes(action) ?? false;
   }
 
   /** Copies the current state into `out` and clears the latched edges. */

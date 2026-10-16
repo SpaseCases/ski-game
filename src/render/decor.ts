@@ -13,17 +13,21 @@ import { alongLine, DECOR_SIZE, type DecorLayout, type ScatterItem } from '../ma
 import type { Heightfield, LineDecor, XZ } from '../maps/types.ts';
 import type { DistanceCuller } from './culling.ts';
 import { MeshKit, TiledKit } from './meshKit.ts';
-import { drawProp, FLAG_COLORS, PALETTE, scatterModels } from './models.ts';
+import { drawProp, farScatterModels, FLAG_COLORS, PALETTE, scatterModels } from './models.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
 
 // Draws a map's decoration: trees, snags and rocks as instanced meshes (one
 // draw call per model in each square tile of the map), everything else
-// merged into meshes per 64 m tile. The culler hides tiles past the fog, and
-// Three.js skips the ones off screen.
+// merged into meshes per 64 m tile. The culler takes tiles past the fog out
+// of the scene, and Three.js skips the ones off screen. For long view
+// ranges, each block of 2 × 2 tree tiles also gets a stand-in of simple far
+// trees, drawn instead of the tiles once the block is far away.
 
 const TILE = 64;
 /** Side (m) of one tile of instanced trees and rocks. */
 const SCATTER_TILE = 160;
+/** Tree tiles per side of a block that shares one set of far trees. */
+const FAR_BLOCK = 2;
 /** Tallest scatter model (m), so a tile's reach covers its treetops. */
 const SCATTER_TOP = 10;
 /** How far (m) posts, trunks and rocks sink below the drawn snow so bumps never show a gap. */
@@ -41,12 +45,26 @@ const decalMaterial = new MeshLambertMaterial({
   polygonOffsetUnits: -3,
 });
 
-/** Draws the decoration; every tile goes to `culler` to be hidden when far away. */
-export function createDecor(layout: DecorLayout, hf: Heightfield, culler: DistanceCuller): Group {
+/**
+ * Draws the decoration; every tile goes to `culler` to be dropped when far
+ * away. `farTrees`: also build simple far trees for long view ranges.
+ */
+export function createDecor(layout: DecorLayout, hf: Heightfield, culler: DistanceCuller, farTrees: boolean): Group {
   const group = new Group();
+  const blocks = new Map<number, number>();
+  const block = SCATTER_TILE * FAR_BLOCK;
+  const far = farTrees ? farTreeBlocks(layout.scatter, hf) : new Map<number, Group>();
   for (const tile of scatterTiles(layout.scatter, hf)) {
+    const key = cellKey(Math.floor(tile.x / block), Math.floor(tile.z / block));
+    let id = blocks.get(key);
+    if (id === undefined) {
+      const stand = far.get(key) ?? null;
+      if (stand) group.add(stand);
+      id = culler.addGroup(stand, (Math.floor(tile.x / block) + 0.5) * block, (Math.floor(tile.z / block) + 0.5) * block, block / 2);
+      blocks.set(key, id);
+    }
     group.add(tile.group);
-    culler.add(tile.group, tile.x, tile.z, tile.radius);
+    culler.add(tile.group, tile.x, tile.z, tile.radius, id);
   }
 
   const kits = new TiledKit(TILE);
@@ -82,6 +100,36 @@ interface ScatterTile {
   radius: number;
 }
 
+function cellKey(i: number, j: number): number {
+  return (i + 32768) * 65536 + (j + 32768);
+}
+
+/** Simple far trees for each block of tiles, keyed like cellKey: a group with one instanced mesh per kind of tree in it. */
+function farTreeBlocks(items: readonly ScatterItem[], hf: Heightfield): Map<number, Group> {
+  const models = farScatterModels();
+  const block = SCATTER_TILE * FAR_BLOCK;
+  const sorted = new Map<number, Map<'pine' | 'aspen' | 'snag', ScatterItem[]>>();
+  for (const t of items) {
+    if (t.kind !== 'pine' && t.kind !== 'aspen' && t.kind !== 'snag') continue;
+    const key = cellKey(Math.floor(t.x / block), Math.floor(t.z / block));
+    let kinds = sorted.get(key);
+    if (!kinds) {
+      kinds = new Map();
+      sorted.set(key, kinds);
+    }
+    const list = kinds.get(t.kind);
+    if (list) list.push(t);
+    else kinds.set(t.kind, [t]);
+  }
+  const out = new Map<number, Group>();
+  for (const [key, kinds] of sorted) {
+    const g = new Group();
+    for (const [kind, mine] of kinds) g.add(scatterMesh(models[kind], mine, hf));
+    out.set(key, g);
+  }
+  return out;
+}
+
 /** Sorts scatter into square tiles, each a group with one instanced mesh per model used in it. */
 function scatterTiles(items: readonly ScatterItem[], hf: Heightfield): ScatterTile[] {
   const models = scatterModels();
@@ -91,7 +139,7 @@ function scatterTiles(items: readonly ScatterItem[], hf: Heightfield): ScatterTi
     const variants = models[t.kind];
     const geometry = variants[Math.min(variants.length - 1, Math.floor(t.tint * variants.length))]!;
     used.add(geometry);
-    const key = (Math.floor(t.x / SCATTER_TILE) + 32768) * 65536 + (Math.floor(t.z / SCATTER_TILE) + 32768);
+    const key = cellKey(Math.floor(t.x / SCATTER_TILE), Math.floor(t.z / SCATTER_TILE));
     let tile = tiles.get(key);
     if (!tile) {
       tile = new Map();

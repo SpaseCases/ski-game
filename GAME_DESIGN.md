@@ -21,6 +21,7 @@ The right hand works the arrow keys. The left hand handles grabs, pole push, and
 | Q / E | — | Lincoln loop left / right | — |
 | Tab | Set personal checkpoint | — | — |
 | R | Respawn at last checkpoint (hold 1s: back to top) | same | same |
+| M | Trail map (the game waits; M or Esc closes it) | same | same |
 | Esc | Pause menu | same | same |
 
 Grabs (hold in the air, release to let go):
@@ -96,7 +97,7 @@ Every map has a start gate themed to its kind of skiing, checkpoint flags, a fin
 ### Mechanics the maps need
 - Done in 5a: the halfpipe (wall riding follows the surface normal; airs launch straight up and land back in the transition), ride-on rails and boxes at snow level, slalom gates with flex, the missed-gate check and the run timer.
 - Done in 5b: terrain with varied pitch (the fall line as pitch sections, plus lanes: bands with their own fall line that start and end level with the slope beside them), rails that follow the snow, and the map-select menu.
-- Done in 5c-1: terrain built around a peak that can be ridden down in any direction (spokes for each face and ridge, then ridges, gullies, cliff bands, wind lips and cornices, bowls, pillows, bumps and flat pads, with a rim of hills past the edge), a play area shaped as a polygon, several finish zones on one map, named runs, and decoration placed by height and steepness. The snow is built in chunks around the camera, and decoration is culled in 2D tiles.
+- Done in 5c-1: terrain built around a peak that can be ridden down in any direction (spokes for each face and ridge, then ridges, gullies, cliff bands, wind lips and cornices, bowls, pillows and pillow lines, bumps, run-out dips and flat pads, with a rim of hills past the edge), a play area shaped as a polygon, several finish zones on one map, named runs, decoration placed by height and steepness, and the trail map. The snow is built in chunks around the camera, coarser in the distance, and decoration is culled in 2D tiles, with simple stand-in trees far away. Each quality preset sees its own distance: Low 240 m, Medium and Auto 450 m, High 800 m.
 - Still to build: log rails, rideable buildings, more than one timed course on a map, and giant slalom gates with panels.
 
 Each map defines: name, heightfield (generated from parameters or loaded from a small grayscale PNG), features, spawn, start gate type, flags, finish zone, decoration sets, and sky and fog colors. Large maps split their terrain into chunks with frustum culling, so only what's inside the fog distance gets drawn.
@@ -128,6 +129,7 @@ Each map defines: name, heightfield (generated from parameters or loaded from a 
 - **Controls:** the tables above
 - **Pause (Esc):** Resume, Respawn, Back to top, Map select, Settings, Controls
 - **HUD:** minimal and with no score. A brief "Checkpoint set" toast, the Back to top button at the finish, and "Open in new tab" when the game is embedded.
+- **Trail map (M, or its HUD button):** a drawn map of the whole map, oriented like a piste map (the start's way down points down the page): shaded ground with rock, steep slopes and forests, the faces' names, every named run, flags (green once passed), finishes, the start, and you with your heading.
 
 ## Not in v1 (later ideas)
 Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ragdoll crashes, the full grab set, replays and photo mode, a level editor, gamepad support, music, multiplayer, riding a chairlift back up.
@@ -151,10 +153,11 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 
 ## Status (2026-10-16)
 
-**Done:** 0 scaffold and deploy, 1 skiing, 2 air, 3 rails and boxes, 4 checkpoints, 5a map features, 5b map select and the Park, 5c-1 the Freeride mountain. Maps are written by scripts: `tools/maps/park.ts` and `tools/maps/freeride.ts`. Checks: `tools/sim/line.ts` rides a Park line, `tools/sim/face.ts` rides every named run or the fall line off the summit, `tools/maps/sinks.ts` finds spots a rider can't roll out of, and `tools/maps/overview.ts` draws a map from above. Freeride has four faces dropping 520 to 1080 m from a 3150 m summit. North has couloirs between rock ribs, two cliff bands with 2 to 9 m drops, and pillows. East has a corniced bowl and a pillow field. South has glades, small drops, a creek and the town site. West has rolling side hits and a long gully that throws wall airs. Wind lips sit on the ridges. Bots capped at 20 m/s take 1.8 to 2.7 minutes from the summit to a finish. **Next:** 5c-2, the town and natural features.
+**Done:** 0 scaffold and deploy, 1 skiing, 2 air, 3 rails and boxes, 4 checkpoints, 5a map features, 5b map select and the Park, 5c-1 the Freeride mountain. Maps are written by scripts: `tools/maps/park.ts` and `tools/maps/freeride.ts`. Checks: `tools/sim/line.ts` rides a Park line, `tools/sim/face.ts` rides every named run or the fall line off the summit, `tools/maps/sinks.ts` finds spots a rider can't roll out of, and `tools/maps/overview.ts` draws a map from above. Freeride has four faces dropping 780 to 1380 m from a 3150 m summit. North has couloirs between rock ribs, cliff bands with 2 to 9 m drops, a pillow line and a pillow field. East has a corniced bowl and two pillow fields. South has glades, small drops, a creek and the town site. West has rolling side hits, a creek, and a long gully that throws wall airs. Wind lips sit on the ridges. Forests grow in dense stands with open ground between, with groves of bare aspens lower down. Bots capped at 20 m/s take 2.2 to 3 minutes from the summit to a finish down any named run. **Next:** 5c-2, the town and natural features.
 
 **Known issues**
-- Not yet tested on a real school Chromebook. On a PC with the CPU slowed 4×, a frame on Low takes ~1.4 ms of CPU in the Park and ~1 ms in Freeride's forests (60 draw calls, up to 160k triangles). Freeride loads in 0.6 s, or 3.4 s with the CPU slowed 4×.
+- Not yet tested on a real school Chromebook. On a PC with the CPU slowed 4×, a frame takes ~1.4 ms of CPU in the Park on Low, and in Freeride's forests ~1.1 ms on Low (60 draw calls, up to 90k triangles), ~1.35 ms on Medium and Auto (110 draw calls, 170k triangles) and ~1.5 ms on High (145 draw calls, 210k triangles). The GPU side of the longer views is unmeasured. Freeride loads in 0.6 s, or 3.2 s with the CPU slowed 4×.
+- Auto sees as far as Medium (450 m) until milestone 8's frame-rate scaling can pull it in. Until the Settings menu (milestone 6), other presets are picked with `?quality=low|medium|high`.
 - Esc opens the map menu as a stand-in pause until milestone 6.
 - The Park's huge jumps are sized for tucking the in-run from their flag. Tucking straight down a line through the 21° steeps (35+ m/s) overshoots whatever comes next.
 - The long rail has no brake (about 23 m/s standing through the steeps).
@@ -162,7 +165,7 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - The Test slope ends in an invisible wall at the top of the side berms and at the bottom.
 - Riding off a rail sideways crashes unless you turn the skis back first.
 - In the japan grab the ski hangs low.
-- Freeride's town site is an empty flat inside the south finish zone until 5c-2. The forests are dense; the named runs are kept clear of trees.
+- Freeride's town site is an empty flat inside the south finish zone until 5c-2. The named runs are kept clear of trees. Riding straight down the Northwest ridge ends on gentle ground that takes a while to cross. The pillow line is a staircase of rounded rock steps rather than domes (domes left flat landings).
 
 **Tuned config values** (`src/config.ts`, start → now)
 - Riding: `gravity` 11 → 12, `skiFriction` 0.05 → 0.035, `dragStand` 0.0055 → 0.0066 → 0.0055 (lowered after play-testing for easier speed), `dragCrouch` 0.003 → 0.002, `brakeDecel` 6 → 9.5, `brakeRampTime` 0.15 → 0.12.
@@ -170,5 +173,5 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - Pole push: `polePushSpeed` 1.8 → 3.1, `poleMaxSpeed` 7 → 8.5, `polePushInterval` 0.55 → 0.73.
 - Pop: `popMin` 3 → 3.2, `popMax` 5.2 → 5.5.
 - Camera: `heightNear` 2.1 → 2.35, `heightFar` 2.6 → 4.85.
-- Slalom poles: `kick` 0.25 → 0.6, `clipReach` 0.45 → 0.55. Halfpipe: `wallPop` 0.4, `wallLaunchMax` 9 m/s. Walls: `wallAngle` 50 → 44, so a gully's rounded lip still throws wall airs.
+- Slalom poles: `kick` 0.25 → 0.6, `clipReach` 0.45 → 0.55. Halfpipe: `wallPop` 0.4, `wallLaunchMax` 9 m/s. Walls: `wallAngle` 50 → 44, so a gully's rounded lip still throws wall airs. New: `quality.viewDistance` (240 / 450 / 800 m), `quality.fogStart`, `quality.treeDetail` (220 m).
 - Landing tolerances loosened so edge landings stick. Still untuned: rail values, checkpoint timings, curve load, rough landings, decoration density.

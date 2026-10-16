@@ -24,7 +24,7 @@ const rgb = new Uint8Array(W * H * 3);
 // +X right, -Z up (north up).
 const toPx = (x: number, z: number): [number, number] => [Math.round((x - x0!) / scale), Math.round((z - z0!) / scale)];
 const DEG = Math.PI / 180;
-const rock = hf.rockSlope ?? 90;
+const rock = hf.rock;
 
 // Shaded relief, lit from the northwest.
 const light = { x: -0.5, y: 0.7, z: -0.5 };
@@ -39,9 +39,11 @@ for (let py = 0; py < H; py++) {
     const len = Math.hypot(hx, 1, hz);
     const shade = Math.max(0, (-hx * light.x + light.y - hz * light.z) / (len * ll));
     const slope = Math.atan(Math.hypot(hx, hz)) / DEG;
-    let c: [number, number, number] = slope > rock ? [120, 112, 108] : slope > 38 ? [205, 215, 235] : [240, 245, 252];
-    // Steeper than 30° tinted a little blue, like a piste map's blacks.
-    if (slope > 30 && slope <= rock) c = [190, 205, 235];
+    const col = Math.min(hf.cols - 1, Math.max(0, Math.round((x - hf.originX) / hf.cellSize)));
+    const row = Math.min(hf.rows - 1, Math.max(0, Math.round((z - hf.originZ) / hf.cellSize)));
+    const rocky = (rock?.[row * hf.cols + col] ?? 0) > 127;
+    // Rock gray; steeper than 30° tinted a little blue, like a piste map's blacks.
+    const c: [number, number, number] = rocky ? [120, 112, 108] : slope > 30 ? [190, 205, 235] : [240, 245, 252];
     const k = 0.45 + 0.65 * shade;
     const h = heightAt(hf, x, z);
     const contour = Math.abs(((h + 1000) % 50) - 25) > 24.2 ? 0.8 : 1;
@@ -75,8 +77,18 @@ function line(ax: number, az: number, bx: number, bz: number, c: [number, number
 
 for (const t of decor.scatter) {
   const color: [number, number, number] =
-    t.kind === 'pine' ? (t.solid ? [40, 92, 58] : [90, 130, 100]) : t.kind === 'snag' ? [130, 110, 90] : t.kind === 'boulder' ? [70, 70, 75] : [100, 96, 92];
-  dot(t.x, t.z, t.kind === 'pine' ? 1.5 : 0.5, color);
+    t.kind === 'pine'
+      ? t.solid
+        ? [40, 92, 58]
+        : [90, 130, 100]
+      : t.kind === 'aspen'
+        ? [205, 160, 70]
+        : t.kind === 'snag'
+          ? [130, 110, 90]
+          : t.kind === 'boulder'
+            ? [70, 70, 75]
+            : [100, 96, 92];
+  dot(t.x, t.z, t.kind === 'pine' || t.kind === 'aspen' ? 1.5 : 0.5, color);
 }
 const poly = hf.bounds.polygon;
 for (let i = 0; i < poly.length / 2; i++) {

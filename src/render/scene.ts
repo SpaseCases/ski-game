@@ -65,6 +65,16 @@ export function createView(container: HTMLElement): View {
   return { renderer, scene, camera, hemi };
 }
 
+/** Sets how far the camera sees: the fog fades in from `fogStart` to `far` (m), and nothing past `far` is drawn. */
+export function setViewRange(view: View, far: number, fogStart: number): void {
+  if (view.scene.fog instanceof Fog) {
+    view.scene.fog.near = fogStart;
+    view.scene.fog.far = far;
+  }
+  view.camera.far = far;
+  view.camera.updateProjectionMatrix();
+}
+
 /** Sets the sky, fog and sky light to a map's colors. */
 export function applyMapColors(view: View, map: MapDef): void {
   const fog = new Color(map.colors.fog);

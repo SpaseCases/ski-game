@@ -23,6 +23,11 @@ export function saveQuality(q: Quality): void {
   writeStored('quality', q);
 }
 
+/** How far (m) a preset sees, and where its fog starts. */
+export function viewRange(q: Quality): { far: number; fogStart: number } {
+  return { far: CONFIG.quality.viewDistance[q], fogStart: CONFIG.quality.fogStart[q] };
+}
+
 /** Share (0..1) of scenery decoration a preset draws. Solid decoration is always drawn. */
 export function decorDensity(q: Quality): number {
   return CONFIG.quality.decorDensity[q];

@@ -5,8 +5,9 @@
 // edge of the play area, and which finish it reached.
 //   node tools/sim/face.ts <map.json> [run names...]   ride the map's named runs (default: all of them)
 //   node tools/sim/face.ts <map.json> --fall [n]       n riders (default 16) off the spawn in every direction, each following the fall line
-// Options: --max <m/s> brake above this speed (default 20). After a crash the
-// rider starts again from a standstill 20 m further on.
+// Options: --max <m/s> brake above this speed (default 20); --trace prints
+// where each rider is every 20 s. After a crash the rider starts again from
+// a standstill 20 m further on.
 
 import { CONFIG } from '../../src/config.ts';
 import type { Action } from '../../src/core/input.ts';
@@ -25,6 +26,7 @@ const option = (name: string): string | undefined => {
 };
 const maxSpeed = Number(option('--max') ?? 20);
 const fall = args.includes('--fall');
+const trace = args.includes('--trace');
 const fallCount = Number(option('--fall') ?? 16) || 16;
 const names = args.slice(1).filter((a, i, all) => !a.startsWith('--') && !['--max', '--fall'].includes(all[i - 1] ?? ''));
 const sim = loadMap(file);
@@ -176,7 +178,12 @@ function ride(def: Ride): Result {
   let takeoff: { t: number; y: number; at: XZ; speed: number } | null = null;
   let lastEdge = -Infinity;
   let keys: Action[] = [];
+  let nextTrace = 0;
   while (r.t < TIME_LIMIT) {
+    if (trace && r.t >= nextTrace) {
+      console.log(`    t=${r.t.toFixed(0)} s ${r.speed.toFixed(1)} m/s at ${spot(r.s.position)}`);
+      nextTrace += 20;
+    }
     const target = def.guide(r);
     if (target === null) break;
     const p = r.s.position;

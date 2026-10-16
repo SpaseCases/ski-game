@@ -36,23 +36,40 @@ export function generatePeak(def: PeakTerrainDef): Heightfield {
   const originZ = -half;
   const sampler = new PeakSampler(def, originX, originZ, (cols - 1) * def.cellSize);
   const heights = new Float32Array(cols * rows);
+  // The broad shape (spokes, folds, roll, the rim of hills) has nothing
+  // finer than tens of meters, so it's worked out at every other sample and
+  // filled in between; the elements on it are exact at every sample.
+  broadShape(sampler, heights, cols, rows, originX, originZ, def.cellSize);
+  // Samples a gully or wind lip shaped: their walls stay snow however steep.
+  const snowy = new Uint8Array(cols * rows);
   for (let row = 0; row < rows; row++) {
     const z = originZ + row * def.cellSize;
-    for (let col = 0; col < cols; col++) heights[row * cols + col] = sampler.height(originX + col * def.cellSize, z);
+    for (let col = 0; col < cols; col++) {
+      const i = row * cols + col;
+      heights[i] = sampler.addElements(originX + col * def.cellSize, z, heights[i]!);
+      snowy[i] = sampler.snowy ? 1 : 0;
+    }
   }
 
-  // Facet jitter, rougher on rock: steep ground gets craggy.
+  // Rock where a sample sits on ground steeper than rockSlope (the steeper
+  // way to each neighbor, so a narrow rock wall counts); the renderer colors
+  // whole cells from their corners, so a wall reads as one face rather than
+  // a stripe of single steep triangles. Facet jitter is rougher on rock:
+  // steep ground gets craggy.
+  const rock = new Uint8Array(cols * rows);
   const detail = new Float32Array(cols * rows);
-  const c2 = 2 * def.cellSize;
-  const craggy0 = Math.tan((def.rockSlope - 12) * DEG);
-  const craggy1 = Math.tan((def.rockSlope + 4) * DEG);
+  const rock0 = Math.tan((def.rockSlope - 4) * DEG);
+  const rock1 = Math.tan((def.rockSlope + 4) * DEG);
+  const h = (i: number): number => heights[i] ?? 0;
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       const i = row * cols + col;
-      const gx = ((heights[i + (col < cols - 1 ? 1 : 0)] ?? 0) - (heights[i - (col > 0 ? 1 : 0)] ?? 0)) / c2;
-      const gz = ((heights[i + (row < rows - 1 ? cols : 0)] ?? 0) - (heights[i - (row > 0 ? cols : 0)] ?? 0)) / c2;
-      const rock = smoothstep(craggy0, craggy1, Math.sqrt(gx * gx + gz * gz));
-      detail[i] = hash2(col, row, def.seed) * (def.noise + def.rockNoise * rock);
+      const here = h(i);
+      const gx = Math.max(col < cols - 1 ? Math.abs(h(i + 1) - here) : 0, col > 0 ? Math.abs(here - h(i - 1)) : 0) / def.cellSize;
+      const gz = Math.max(row < rows - 1 ? Math.abs(h(i + cols) - here) : 0, row > 0 ? Math.abs(here - h(i - cols)) : 0) / def.cellSize;
+      const r = snowy[i] ? 0 : smoothstep(rock0, rock1, Math.sqrt(gx * gx + gz * gz));
+      rock[i] = Math.round(r * 255);
+      detail[i] = hash2(col, row, def.seed) * (def.noise + def.rockNoise * r);
     }
   }
 
@@ -78,8 +95,47 @@ export function generatePeak(def: PeakTerrainDef): Heightfield {
     heights,
     detail,
     bounds: { minX: Math.max(minX, -half), maxX: Math.min(maxX, half), minZ: Math.max(minZ, -half), maxZ: Math.min(maxZ, half), polygon },
-    rockSlope: def.rockSlope,
+    rock,
   };
+}
+
+/**
+ * Fills `heights` with the sampler's broad shape: worked out at every other
+ * sample (and a ring past the edge) and filled in between along Catmull-Rom
+ * curves, which halfway between samples weigh the four nearest -1, 9, 9, -1
+ * (sixteenths).
+ */
+function broadShape(sampler: PeakSampler, heights: Float32Array, cols: number, rows: number, originX: number, originZ: number, cell: number): void {
+  // Coarse node k sits at fine index 2 (k - 1), from one coarse step before the first sample to one past the last.
+  const kx = Math.ceil((cols - 1) / 2) + 3;
+  const kz = Math.ceil((rows - 1) / 2) + 3;
+  const coarse = new Float32Array(kx * kz);
+  for (let m = 0; m < kz; m++) {
+    const z = originZ + 2 * (m - 1) * cell;
+    for (let k = 0; k < kx; k++) coarse[m * kx + k] = sampler.shape(originX + 2 * (k - 1) * cell, z);
+  }
+  // Along x first: every fine column for each coarse row.
+  const across = new Float32Array(kz * cols);
+  for (let m = 0; m < kz; m++) {
+    const at = m * kx;
+    for (let col = 0; col < cols; col++) {
+      const k = (col >> 1) + 1;
+      across[m * cols + col] =
+        (col & 1) === 0
+          ? coarse[at + k]!
+          : (9 * (coarse[at + k]! + coarse[at + k + 1]!) - coarse[at + k - 1]! - coarse[at + k + 2]!) / 16;
+    }
+  }
+  // Then along z.
+  for (let row = 0; row < rows; row++) {
+    const m = (row >> 1) + 1;
+    for (let col = 0; col < cols; col++) {
+      heights[row * cols + col] =
+        (row & 1) === 0
+          ? across[m * cols + col]!
+          : (9 * (across[m * cols + col]! + across[(m + 1) * cols + col]!) - across[(m - 1) * cols + col]! - across[(m + 2) * cols + col]!) / 16;
+    }
+  }
 }
 
 /** An element ready to sample: the ground it reaches, and what it does to the height there. */
@@ -89,6 +145,8 @@ interface Compiled {
   minZ: number;
   maxZ: number;
   apply(x: number, z: number, h: number): number;
+  /** Ground it shapes is always drawn as snow (gully walls, wind lips). */
+  snowy?: boolean;
 }
 
 /** Height of the mountain at any point: spokes, roll, then elements in order. */
@@ -114,6 +172,8 @@ class PeakSampler {
   private readonly binRows: number;
   private readonly binOrigin: number;
   private readonly bins: number[][];
+  /** After height(): whether a snowy element (a gully, a wind lip) shaped that spot. */
+  snowy = false;
 
   constructor(def: PeakTerrainDef, originX: number, originZ: number, extent: number) {
     this.def = def;
@@ -170,11 +230,25 @@ class PeakSampler {
   }
 
   height(x: number, z: number): number {
-    let h = this.base(x, z);
+    return this.addElements(x, z, this.base(x, z));
+  }
+
+  /** The broad shape at (x, z): spokes, folds, roll and the rim, before any element. */
+  shape(x: number, z: number): number {
+    return this.base(x, z);
+  }
+
+  /** The elements laid on height h at (x, z), in order. Sets `snowy`. */
+  addElements(x: number, z: number, base: number): number {
+    let h = base;
+    this.snowy = false;
     const list = this.bins[this.bin(z) * this.binCols + this.bin(x)]!;
     for (let k = 0; k < list.length; k++) {
       const e = this.elements[list[k]!]!;
-      if (x >= e.minX && x <= e.maxX && z >= e.minZ && z <= e.maxZ) h = e.apply(x, z, h);
+      if (x < e.minX || x > e.maxX || z < e.minZ || z > e.maxZ) continue;
+      const next = e.apply(x, z, h);
+      if (e.snowy && next !== h) this.snowy = true;
+      h = next;
     }
     return h;
   }
@@ -287,6 +361,7 @@ class PeakSampler {
         const reach = edge + e.wall;
         return {
           ...line.box(reach),
+          snowy: true,
           apply: (x, z, h) => {
             line.nearest(x, z);
             if (line.dist >= reach) return h;
@@ -315,6 +390,7 @@ class PeakSampler {
         const dir = headingDir(e.heading);
         return {
           ...line.box(Math.max(e.ramp, e.drop)),
+          snowy: true,
           apply: (x, z, h) => {
             line.nearest(x, z);
             const s = (x - line.qx) * dir.x + (z - line.qz) * dir.z;

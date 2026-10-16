@@ -244,6 +244,16 @@ export const CONFIG = {
      * each preset. Solid decoration is always drawn. Auto draws Medium's.
      */
     decorDensity: { auto: 0.7, low: 0.35, medium: 0.7, high: 1 },
+    /**
+     * How far (m) each preset sees (the fog's end and the camera's far
+     * plane), and where its fog starts. Ground past about 330 m is drawn
+     * coarser (see render/terrainMesh.ts). Auto sees as far as Medium until
+     * milestone 8's frame-rate scaling can pull it in.
+     */
+    viewDistance: { auto: 450, low: 240, medium: 450, high: 800 },
+    fogStart: { auto: 160, low: 70, medium: 160, high: 320 },
+    /** Trees farther than this (m) are drawn as simple stand-ins, when the view reaches that far. */
+    treeDetail: 220,
   },
 
   camera: {
@@ -288,7 +298,7 @@ export const CONFIG = {
     antialias: false,
     fov: 60,
     near: 0.1,
-    /** Fog start and end distance in meters. The camera far plane follows fogFar. */
+    /** Fog start and end distance in meters before a quality preset applies its own (see quality.viewDistance). The camera far plane follows fogFar. */
     fogNear: 70,
     fogFar: 240,
     /** Radians the skis swing sideways for a hockey stop at full brake. */

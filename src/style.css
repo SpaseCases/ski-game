@@ -265,7 +265,8 @@ body {
 
 .menu-open .focus-hint,
 .menu-open .controls-hint,
-.menu-open .window-buttons > :first-child,
+/* The Trail map and Maps buttons; the open menu has its own way back. */
+.menu-open .window-buttons > :nth-child(-n + 2),
 .menu-open .lil-gui.autoPlace {
   display: none;
 }
@@ -421,4 +422,66 @@ body {
   color: rgb(255 255 255 / 0.7);
   font-size: 13px;
   text-align: center;
+}
+
+/* Trail map: the menu panel, sized to the drawn map. */
+.trail-map-panel {
+  width: auto;
+  max-width: 100%;
+}
+
+.trail-map-canvas {
+  display: block;
+  /* Fit the screen below the header and legend, keeping the map's shape. */
+  max-width: min(100%, calc((100vh - 215px) * var(--map-aspect, 1)));
+  width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 8px;
+  background: #dce8f3;
+}
+
+.trail-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 16px;
+}
+
+.trail-map-legend i {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+
+.trail-map-legend .tm-you {
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #e53935;
+}
+
+.trail-map-legend .tm-flag {
+  background: #ff7a1a;
+  clip-path: polygon(0 0, 100% 35%, 0 70%);
+}
+
+.trail-map-legend .tm-finish {
+  height: 6px;
+  background: repeating-linear-gradient(90deg, #1b2430 0 4px, #fff 4px 8px);
+  vertical-align: 2px;
+}
+
+.trail-map-legend .tm-steep {
+  background: #c4d6f0;
+}
+
+.trail-map-legend .tm-rock {
+  background: #8a8f96;
+}
+
+.trail-map-legend .tm-trees {
+  background: radial-gradient(circle, #22523a 0 2px, transparent 2.5px) 0 0 / 6px 6px #f4f8fc;
 }

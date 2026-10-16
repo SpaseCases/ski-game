@@ -33,7 +33,7 @@ const DEG = Math.PI / 180;
  * layout was drawn at 1, and this sizes it so a run down any face takes a
  * player 2 to 3 minutes.
  */
-const K = 1.2;
+const K = 1.5;
 
 // ---------------------------------------------------------------- spokes
 const sec = (length: number, pitch: number, ease = 40): Json => ({ length: length * K, pitch, ease });
@@ -67,7 +67,7 @@ const SPOKES: Record<string, Spoke> = {
   east: {
     name: 'East bowl',
     heading: -95,
-    bend: 6,
+    bend: 2,
     sharp: 0,
     sections: [TOP, sec(45, 18, 24), sec(260, 28, 24), sec(380, 18, 60), sec(100, 27, 40), sec(230, 31, 40), sec(450, 21, 60), sec(260, 12, 60), sec(140, 5, 60), sec(200, -14, 60)],
   },
@@ -97,7 +97,7 @@ const SPOKES: Record<string, Spoke> = {
   west: {
     name: 'West gully',
     heading: 88,
-    bend: 6,
+    bend: 0,
     sharp: 0,
     sections: [TOP, sec(100, 27, 24), sec(380, 23, 40), sec(800, 18, 60), sec(330, 12, 60), sec(140, 5, 60), sec(200, -14, 60)],
   },
@@ -155,6 +155,28 @@ function pillows(s: SpokeId, r: number, across: number, width: number, length: n
   const p = P(s, r, across);
   elements.push({ type: 'pillows', x: r1(p.x), z: r1(p.z), heading: r1(angle(s, r)), width, length, count, size, height, seed });
 }
+/**
+ * A pillow line: `count` rounded steps in single file down a spoke from r
+ * = top to bottom at `across`, wandering a little side to side, each 2.5 to 3.8 m tall
+ * and 11 to 16 m wide.
+ */
+function pillowLine(s: SpokeId, top: number, bottom: number, across: number, count: number, seed: number): void {
+  for (let i = 0; i < count; i++) {
+    const rnd = (k: number): number => 0.5 + 0.5 * Math.sin(seed * 12.9898 + i * 78.233 + k * 37.719) * 0.999;
+    const r = top + ((bottom - top) * i) / Math.max(1, count - 1);
+    const a = across + (rnd(1) - 0.5) * 10;
+    const w = 11 + 5 * rnd(2);
+    const h = 2.5 + 1.3 * rnd(3);
+    const drops: [number, number][] = [
+      [a - w / 2, 0],
+      [a - w / 4, h * 0.8],
+      [a, h],
+      [a + w / 4, h * 0.8],
+      [a + w / 2, 0],
+    ];
+    elements.push({ type: 'cliffs', points: drops.map(([x, hh]) => xzh(P(s, r, x), r1(hh))), heading: r1(angle(s, r)), face: 2.5, bench: r1(2.5 * h + 6), taper: 2 });
+  }
+}
 function bumps(s: SpokeId, r: number, across: number, radius: number, amplitude: number, wavelength: number, seed: number): void {
   const p = P(s, r, across);
   elements.push({ type: 'bumps', x: r1(p.x), z: r1(p.z), radius: radius * K, fade: radius * K * 0.35, amplitude, wavelength, seed });
@@ -171,26 +193,38 @@ rib('north', 14, [[85, 3], [150, 7], [250, 8], [335, 3]]);
 rib('north', 58, [[95, 2], [160, 8], [260, 10], [320, 3]], 3, 5);
 gully('north', [[90, 0], [200, 0], [345, 0]], 8, 2.5, 7, 30);
 gully('north', [[90, -29], [200, -29], [345, -29]], 4, 2, 5, 30);
-cliffs('north', 330, [[-175, 1], [-145, 5], [-112, 8], [-82, 6], [-58, 3]]);
-cliffs('north', 330, [[32, 2], [60, 5], [92, 8], [122, 4], [150, 6], [178, 2]]);
+cliffs('north', 305, [[-175, 1], [-145, 5], [-112, 8], [-82, 6], [-58, 3]]);
+cliffs('north', 305, [[32, 2], [60, 5], [92, 8], [122, 4], [150, 6], [178, 2]]);
 cliffs('north', 625, [[-205, 2], [-165, 4], [-125, 3], [-95, 0], [-62, 6], [-30, 9], [2, 5], [24, 0], [60, 0], [92, 3], [130, 7], [168, 4], [205, 2]]);
 pillows('north', 755, -150, 120, 140, 26, [4, 7], [1.5, 3.5], 5);
+// The pillow line: snow-capped rocks stacked down the steep upper face,
+// east of the cliff band. Each is a short rounded step whose top slopes
+// downhill, so every drop lands on the next one's top, never on a flat.
+pillowLine('north', 205, 330, 245, 9, 31);
 bumps('north', 1060, 0, 320, 1.6, 46, 7);
+// The apron: a low rock band with gaps, and wind-drifted lips to boost off.
+cliffs('north', 1150, [[-150, 0], [-120, 3], [-90, 5], [-62, 3], [-40, 0]]);
+cliffs('north', 1150, [[55, 0], [80, 4], [108, 3], [135, 0]]);
+for (const [r, a] of [[970, -80], [1040, 120], [1250, -30], [1330, 70]] as const) lip('north', [[r, a - 9], [r + 2, a], [r, a + 9]], angle('north', r), 1.6, 10, 4);
 
 // Northeast ridge: a knife-edge arête, wind lips along it facing the bowl.
 lip('northeast', [[210, 8], [260, 9], [320, 8]], angle('northeast', 260) - 90, 1.8, 10, 4);
 lip('northeast', [[400, 10], [470, 12], [540, 10]], angle('northeast', 470) - 90, 2.2, 12, 4);
 lip('northeast', [[640, -10], [700, -12], [760, -10]], angle('northeast', 700) + 90, 2, 12, 4);
+lip('northeast', [[900, 12], [950, 14], [1000, 12]], angle('northeast', 950) - 90, 2, 12, 4);
 
 // East face, The Bowl: a cornice along the rim (with a gap to roll in
 // through), the cirque itself, a little cliff island in the floor, and a
 // pillow field on the rollover below it.
 lip('east', [[96, -125], [80, -90], [72, -55], [70, -22]], angle('east', 75), 3.2, 14, 5);
 lip('east', [[70, 22], [72, 55], [80, 90], [96, 125]], angle('east', 75), 3.2, 14, 5);
-elements.push({ type: 'bowl', ...xz(P('east', 82)), heading: r1(angle('east', 82)), length: 640 * K, width: 570, depth: 55, head: 230, exit: 300 * K, rim: 150 });
+elements.push({ type: 'bowl', ...xz(P('east', 82)), heading: r1(angle('east', 82)), length: 640 * K, width: 640, depth: 60, head: 280, exit: 300 * K, rim: 160 });
 cliffs('east', 520, [[40, 0], [60, 3], [85, 4], [105, 3], [125, 0]]);
 pillows('east', 915, -40, 240, 200, 40, [4, 8], [1.5, 4], 9);
 bumps('east', 1250, 0, 300, 1.4, 50, 11);
+// Lower down: a smaller pillow cluster and a little rock band.
+pillows('east', 1150, 120, 120, 100, 14, [3, 6], [1.2, 3], 21);
+cliffs('east', 1330, [[-150, 0], [-125, 3], [-95, 4], [-70, 2], [-50, 0]]);
 
 // Southeast ridge: broad, a few lips facing the glades.
 lip('southeast', [[300, 12], [350, 14], [400, 12]], angle('southeast', 350) + 90, 1.8, 10, 4);
@@ -202,20 +236,31 @@ bumps('south', 1050, 0, 420, 1.8, 40, 13);
 cliffs('south', 960, [[-70, 0], [-50, 2], [-25, 3], [0, 2], [20, 0]]);
 cliffs('south', 1210, [[40, 0], [60, 3], [85, 4], [110, 3], [130, 0]]);
 gully('south', [[880, 150], [1050, 165], [1220, 140], [1420, 155]], 6, 3, 8, 50);
+cliffs('south', 1400, [[-125, 0], [-100, 3], [-70, 4], [-45, 3], [-20, 0]]);
+for (const [r, a] of [[920, -90], [1100, 60], [1260, -110]] as const) lip('south', [[r, a - 8], [r + 2, a], [r, a + 8]], angle('south', r), 1.5, 9, 4);
 
 // Southwest ridge: lips facing the gully side.
 lip('southwest', [[320, -12], [380, -14], [440, -12]], angle('southwest', 380) - 90, 2, 12, 4);
 lip('southwest', [[700, -14], [760, -16], [820, -14]], angle('southwest', 760) - 90, 2.4, 12, 4);
+lip('southwest', [[1000, -14], [1050, -16], [1100, -14]], angle('southwest', 1050) - 90, 2, 12, 4);
 
 // West face, The Gully: rolling terrain with side hits everywhere, a long
 // winding gully dug into it (a natural halfpipe), rollers at the bottom.
 bumps('west', 760, 0, 620, 2.2, 48, 17);
 gully('west', [[470, 10], [640, -6], [840, 14], [1040, 0], [1240, 12], [1360, 0]], 14, 7, 8, 60);
 bumps('west', 1450, 0, 220, 1.5, 34, 19);
+// A creek down the rollers, and lips to boost off beside it.
+gully('west', [[1300, -180], [1420, -200], [1560, -170]], 5, 2.5, 7, 40);
+for (const [r, a] of [[1000, -220], [1150, -160]] as const) lip('west', [[r, a - 9], [r + 2, a], [r, a + 9]], angle('west', r), 1.6, 10, 4);
 
 // Northwest ridge: lips facing west.
 lip('northwest', [[230, -8], [290, -10], [350, -8]], angle('northwest', 290) - 90, 1.8, 10, 4);
 lip('northwest', [[520, -12], [580, -14], [640, -12]], angle('northwest', 580) - 90, 2.2, 12, 4);
+// Where the ridge's rounded end meets the hills, tip it down toward the North valley so it can't hold a hollow.
+{
+  const p = P('northwest', 1600, 150);
+  elements.push({ type: 'dip', x: r1(p.x), z: r1(p.z), radius: 350, depth: 18 });
+}
 
 // The summit: a flat top for the start, where a rider can turn to face any way down.
 elements.push({ type: 'flat', x: 0, z: 0, heading: 0, pitch: 0, radius: 16, blend: 18 });
@@ -239,6 +284,7 @@ flag('north', 70, 80, 16); // big face
 flag('north', 400, -40, 18);
 flag('north', 400, 90, 18);
 flag('north', 870, 0, 24);
+flag('north', 180, 245, 18); // pillow line
 flag('northeast', 130, 0, 16);
 flag('east', 50, 0, 18); // bowl entrance
 flag('east', 600, 0, 24);
@@ -259,7 +305,7 @@ flag('northwest', 130, 0, 16);
 const FINISH: Partial<Record<SpokeId, { r: number; length: number }>> = {
   north: { r: 1730, length: 110 },
   east: { r: 1765, length: 110 },
-  south: { r: 1650, length: 380 },
+  south: { r: 1650, length: 420 },
   west: { r: 1650, length: 110 },
 };
 
@@ -273,14 +319,15 @@ for (const [s, f] of Object.entries(FINISH) as [SpokeId, { r: number; length: nu
   // town site, which stays flat.)
   if (s === 'south') continue;
   const mid = P(s, f.r + f.length / 2 / K);
-  elements.push({ type: 'dip', x: r1(mid.x), z: r1(mid.z), radius: 700, depth: 30 });
+  elements.push({ type: 'dip', x: r1(mid.x), z: r1(mid.z), radius: 875, depth: 35 });
 }
 
 /**
  * The play area's edge: past each finish along the faces, and along each
- * ridge a little past the col where its spur meets the hills around the
- * mountain (so a rider coming down a ridge finds the ground rising, not a
- * wall), straight between.
+ * ridge a little short of the col where its spur meets the hills around the
+ * mountain, so the rim of hills lifts the end of the ridge and a rider
+ * coming down it finds the ground rising ahead and falling away to either
+ * side, not a wall or a hollow. Straight between.
  */
 function boundsPolygon(): XZ[] {
   const reach: { a: number; r: number }[] = [];
@@ -292,7 +339,7 @@ function boundsPolygon(): XZ[] {
     } else {
       // The col: where the spoke's last section (the climb) starts.
       const sections = SPOKES[s]!.sections as { length: number }[];
-      r = sections.slice(0, -1).reduce((sum, x) => sum + x.length, 0) + 60;
+      r = sections.slice(0, -1).reduce((sum, x) => sum + x.length, 0) - 60;
     }
     reach.push({ a: ((angle(s, r / K) % 360) + 360) % 360, r });
   }
@@ -315,7 +362,7 @@ function boundsPolygon(): XZ[] {
 
 const terrain = {
   type: 'peak',
-  size: 4900,
+  size: 6200,
   cellSize: 3,
   summit: 3150,
   spokes: Object.values(SPOKES),
@@ -323,7 +370,7 @@ const terrain = {
   relief: { amplitude: 16, wavelength: 300 },
   elements,
   bounds: boundsPolygon(),
-  rim: { inset: 50, ramp: 90, rise: 0.4 },
+  rim: { inset: 80, ramp: 90, rise: 0.4 },
   rockSlope: 56,
   noise: 0.2,
   rockNoise: 0.9,
@@ -340,6 +387,7 @@ function run(name: string, spots: XZ[], clear = 7): void {
 const along = (s: SpokeId, list: [number, number][]): XZ[] => list.map(([r, a]) => P(s, r, a));
 run('Steeps: Main couloir', along('north', [[18, 0], [62, 0], [200, 0], [340, 0], [400, 10], [520, 40], [625, 42], [760, 20], [1000, 0], [1300, 0], [1600, 0], [1800, 0]]));
 run('Steeps: Narrow chute', along('north', [[18, -10], [62, -29], [200, -29], [345, -29], [400, -60], [560, -95], [640, -95], [755, -150], [900, -120], [1200, -60], [1600, -20], [1800, 0]]));
+run('Steeps: Pillow line', along('north', [[18, 20], [70, 80], [130, 200], [165, 245], [270, 245], [340, 245], [420, 230], [520, 205], [700, 180], [900, 120], [1300, 30], [1800, 0]]));
 run('Steeps: Cliff line', along('north', [[18, 20], [70, 80], [200, 90], [300, 92], [400, 110], [560, 130], [640, 130], [900, 80], [1300, 30], [1800, 0]]));
 run('Bowl: Cornice', along('east', [[18, -20], [55, -60], [100, -60], [300, -40], [600, -20], [800, -40], [1000, -40], [1300, 0], [1830, 0]]));
 run('Bowl: Entrance', along('east', [[18, 0], [50, 0], [150, 0], [400, 30], [600, 60], [850, 120], [1100, 60], [1400, 0], [1830, 0]]));
@@ -351,12 +399,16 @@ run('Northeast ridge', [...along('northeast', [[18, 0], [130, 0], [400, 0], [700
 run('Northwest ridge', [...along('northwest', [[18, 0], [130, 0], [400, 0], [700, 0]]), ...along('west', [[1000, 150], [1300, 80], [1720, 0]])]);
 
 // ---------------------------------------------------------------- decoration
-/** Trees thin out from here up to the treeline. */
-const TREELINE = 2850;
+/** Trees thin out from here up to the treeline (as far below the summit as the layout is stretched). */
+const TREELINE = 2775;
+// Forests: big dense stands with open ground between them, where a few
+// pines stand alone; groves of bare white aspens lower down.
 const decor: Json[] = [
-  { kind: 'pine', spacing: 8, height: [0, 0, TREELINE - 90, TREELINE], slope: [0, 0, 26, 34], clumps: { size: 70, clear: 0.42 }, seed: 3, minScale: 0.8, maxScale: 1.5, solid: true },
+  { kind: 'pine', spacing: 11, height: [0, 0, TREELINE - 90, TREELINE], slope: [0, 0, 26, 34], clumps: { size: 220, clear: 0.76 }, seed: 3, minScale: 0.8, maxScale: 1.5, solid: true },
+  { kind: 'pine', spacing: 38, height: [0, 0, TREELINE - 60, TREELINE + 20], slope: [0, 0, 28, 36], clumps: { size: 60, clear: 0.2 }, seed: 13, minScale: 0.9, maxScale: 1.6, solid: true },
+  { kind: 'aspen', spacing: 11, height: [TREELINE - 650, TREELINE - 550, TREELINE - 300, TREELINE - 200], slope: [0, 0, 22, 30], clumps: { size: 80, clear: 0.92 }, seed: 23, minScale: 0.8, maxScale: 1.25, solid: true },
   { kind: 'snag', spacing: 60, height: [TREELINE - 110, TREELINE - 70, TREELINE, TREELINE + 50], slope: [0, 0, 32, 40], clumps: { size: 50, clear: 0.55 }, seed: 4, minScale: 0.8, maxScale: 1.2, solid: true },
-  { kind: 'rock', spacing: 6, height: [0, 0, 4000, 4000], slope: [46, 54, 90, 90], clumps: { size: 30, clear: 0.2 }, seed: 5, minScale: 1.2, maxScale: 3, solid: false },
+  { kind: 'rock', spacing: 8, height: [0, 0, 4000, 4000], slope: [46, 54, 90, 90], clumps: { size: 30, clear: 0.2 }, seed: 5, minScale: 1.2, maxScale: 3, solid: false },
   { kind: 'boulder', spacing: 40, height: [TREELINE - 140, TREELINE - 40, 4000, 4000], slope: [8, 14, 36, 44], clumps: { size: 80, clear: 0.5 }, seed: 6, minScale: 0.8, maxScale: 1.6, solid: true },
 ];
 

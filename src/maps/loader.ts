@@ -23,7 +23,7 @@ import type {
   XZ,
 } from './types.ts';
 
-const SCATTER_KINDS: readonly ScatterKind[] = ['pine', 'snag', 'rock', 'boulder'];
+const SCATTER_KINDS: readonly ScatterKind[] = ['pine', 'aspen', 'snag', 'rock', 'boulder'];
 const LINE_KINDS: readonly LineKind[] = ['fence', 'netting', 'barrier', 'dyeLine', 'bunting', 'chairlift'];
 const PROP_KINDS: readonly PropKind[] = ['lightPole', 'floodlight', 'banner', 'flag', 'groomer'];
 const START_STYLES: readonly StartStyle[] = ['deck', 'tower', 'ridge', 'race'];
@@ -402,6 +402,7 @@ function parseDecor(raw: unknown, path: string): DecorDef {
       minScale: n('minScale', 0.8),
       maxScale: n('maxScale', 1.2),
       solid: d.solid === undefined ? false : bool(d.solid, `${path}.solid`),
+      reach: n('reach', 450),
     };
   }
   if ((SCATTER_KINDS as readonly string[]).includes(kind)) {

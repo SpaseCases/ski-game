@@ -287,7 +287,10 @@ export interface PeakTerrainDef {
    * riders near the edge roll back in rather than meet a wall.
    */
   rim: { inset: number; ramp: number; rise: number };
-  /** Snow steeper than this (degrees) is drawn as rock. */
+  /**
+   * Ground steeper than this (degrees, measured over a few meters) is drawn
+   * as rock, except gully walls and wind lips, which are always snow.
+   */
   rockSlope: number;
   /** Visual-only facet jitter (m) on snow, and the extra on rock. */
   noise: number;
@@ -510,7 +513,7 @@ export interface FinishDef {
 }
 
 /** Things scattered over an area. */
-export type ScatterKind = 'pine' | 'snag' | 'rock' | 'boulder';
+export type ScatterKind = 'pine' | 'aspen' | 'snag' | 'rock' | 'boulder';
 /** Things built along a line. */
 export type LineKind = 'fence' | 'netting' | 'barrier' | 'dyeLine' | 'bunting' | 'chairlift';
 /** Single props, one at each point. */
@@ -578,6 +581,8 @@ export interface TerrainScatterDecor {
   minScale: number;
   maxScale: number;
   solid: boolean;
+  /** How far (m) past the edge of the play area scenery copies still grow; farther is never seen. */
+  reach: number;
 }
 
 export type DecorDef = ScatterDecor | TerrainScatterDecor | LineDecor | PropDecor;
@@ -647,8 +652,8 @@ export interface Heightfield {
   detail?: Float32Array;
   /** Where the skier can go; the rest is scenery. */
   bounds: Bounds;
-  /** Snow steeper than this (degrees) is drawn as rock; absent, none is. */
-  rockSlope?: number;
+  /** Visual only: how rocky each sample is drawn, 0 (snow) to 255 (rock); absent, all snow. Same layout as heights. */
+  rock?: Uint8Array;
   /** Shapes built on top of the slope (jumps, pipes, decks), sampled exactly so lips stay sharp. */
   shapes?: TerrainShape[];
 }

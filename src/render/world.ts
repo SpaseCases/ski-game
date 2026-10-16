@@ -1,4 +1,5 @@
 import { Group, InstancedMesh, Mesh, type Material, type Object3D } from 'three';
+import { CONFIG } from '../config.ts';
 import type { BuiltMap } from '../maps/build.ts';
 import { thinDecor } from '../maps/decor.ts';
 import type { RunState } from '../sim/checkpoints.ts';
@@ -31,8 +32,8 @@ export class WorldView {
   private decor: Group;
   private culler = new DistanceCuller();
 
-  /** `density`: the share of scenery decoration to draw (see decorDensity). */
-  constructor(built: BuiltMap, density: number) {
+  /** `density`: the share of scenery decoration to draw (see decorDensity); `range`: how far the camera sees (m). */
+  constructor(built: BuiltMap, density: number, range: number) {
     this.built = built;
     this.group.matrixAutoUpdate = false;
     const { map, hf, starts, course, race } = built;
@@ -43,19 +44,19 @@ export class WorldView {
     this.group.add(this.startView.group);
     this.slalomView = race && race.gates.length > 0 ? new SlalomView(race, hf) : null;
     if (this.slalomView) this.group.add(this.slalomView.mesh);
-    this.decor = still(createDecor(thinDecor(built.decor, density), hf, this.culler));
+    this.decor = still(createDecor(thinDecor(built.decor, density), hf, this.culler, range > CONFIG.quality.treeDetail));
     this.group.add(this.decor);
     this.checkpointView = new CheckpointView(map, hf);
     this.group.add(this.checkpointView.group);
   }
 
-  /** Redraws the decoration at another density. */
-  setDensity(density: number): void {
+  /** Redraws the decoration for another quality preset: its density, and far trees if it sees past CONFIG.quality.treeDetail. */
+  setQuality(density: number, range: number): void {
     this.culler.attachAll();
     this.group.remove(this.decor);
     disposeTree(this.decor);
     this.culler = new DistanceCuller();
-    this.decor = still(createDecor(thinDecor(this.built.decor, density), this.built.hf, this.culler));
+    this.decor = still(createDecor(thinDecor(this.built.decor, density), this.built.hf, this.culler, range > CONFIG.quality.treeDetail));
     this.group.add(this.decor);
   }
 
@@ -66,7 +67,7 @@ export class WorldView {
    */
   view(x: number, z: number, range: number, all: boolean): void {
     this.terrain.update(x, z, range, all ? Infinity : CHUNKS_PER_FRAME);
-    this.culler.update(x, z, range);
+    this.culler.update(x, z, range, CONFIG.quality.treeDetail);
   }
 
   update(run: RunState, race: RaceState | null, frameTime: number): void {

@@ -3,14 +3,14 @@ import { Vector3 } from 'three';
 import { createInputState, DEFAULT_BINDINGS, Keyboard } from './core/input.ts';
 import { startLoop } from './core/loop.ts';
 import { PointerOrbit } from './core/pointerOrbit.ts';
-import { decorDensity, loadQuality, saveQuality, type Quality } from './core/settings.ts';
+import { decorDensity, loadQuality, saveQuality, viewRange, type Quality } from './core/settings.ts';
 import { readStored, writeStored } from './core/storage.ts';
 import { buildMap, type BuiltMap } from './maps/build.ts';
 import { parseMap } from './maps/loader.ts';
 import { mapEntry, MAPS, type MapEntry, type MapId } from './maps/registry.ts';
 import { CONFIG } from './config.ts';
 import { ChaseCamera, type OrbitDrag } from './render/chaseCamera.ts';
-import { applyMapColors, createView, type View } from './render/scene.ts';
+import { applyMapColors, createView, setViewRange, type View } from './render/scene.ts';
 import { createSkierPose, interpolateSkier, SkierView } from './render/skierView.ts';
 import { WorldView } from './render/world.ts';
 import {
@@ -34,6 +34,7 @@ import { MapSelect } from './ui/mapSelect.ts';
 import { formatTime, missedText, RaceHud } from './ui/raceHud.ts';
 import { RunHud } from './ui/runHud.ts';
 import { Toast } from './ui/toast.ts';
+import { TrailMap } from './ui/trailMap.ts';
 
 const app = byId('app');
 const hud = byId('hud');
@@ -48,6 +49,7 @@ try {
   throw err;
 }
 const { renderer, scene, camera } = view;
+applyView();
 
 const windowBar = mountWindowButtons(hud);
 mountControlsHint(hud);
@@ -59,12 +61,18 @@ const toast = new Toast(hud);
 const raceHud = new RaceHud(hud);
 const runHud = new RunHud(hud, backToTop);
 const menu = new MapSelect(hud, (entry) => void loadMap(entry), closeMenu);
+const trailMap = new TrailMap(hud, closeTrailMap);
 const mapsButton = document.createElement('button');
 mapsButton.type = 'button';
 mapsButton.className = 'hud-button';
 mapsButton.innerHTML = 'Maps <kbd>Esc</kbd>';
 mapsButton.addEventListener('click', openMenu);
-windowBar.prepend(mapsButton);
+const trailButton = document.createElement('button');
+trailButton.type = 'button';
+trailButton.className = 'hud-button';
+trailButton.innerHTML = 'Trail map <kbd>M</kbd>';
+trailButton.addEventListener('click', openTrailMap);
+windowBar.prepend(trailButton, mapsButton);
 
 // Simulation state: the current step and the one before it, for interpolation.
 const keyboard = new Keyboard(DEFAULT_BINDINGS);
@@ -142,7 +150,7 @@ async function loadMap(entry: MapEntry): Promise<void> {
     level?.world.dispose();
     level = null;
     const built = buildMap(map);
-    const world = new WorldView(built, decorDensity(quality));
+    const world = new WorldView(built, decorDensity(quality), viewRange(quality).far);
     scene.add(world.group);
     applyMapColors(view, map);
     level = { id: entry.id, built, world, run: createRun(map), race: built.race ? createRace(built.race) : null };
@@ -166,6 +174,7 @@ async function loadMap(entry: MapEntry): Promise<void> {
 
 /** Opens the map-select menu; the game waits behind it. */
 function openMenu(): void {
+  trailMap.close();
   keyboard.setEnabled(false);
   menu.open(level?.id ?? null, (mapEntry(readStored('map'))?.id ?? MAPS[0]!.id) as MapId);
 }
@@ -178,17 +187,46 @@ function closeMenu(): void {
   holdTime = 0;
 }
 
+/** Opens the trail map of the map being ridden; the game waits behind it. */
+function openTrailMap(): void {
+  if (!level || menu.isOpen) return;
+  keyboard.setEnabled(false);
+  trailMap.open(level.built, skier.position, skier.yaw, level.run.passed);
+}
+
+function closeTrailMap(): void {
+  if (!trailMap.isOpen) return;
+  trailMap.close();
+  keyboard.setEnabled(true);
+  keyboard.sample(keys);
+  holdTime = 0;
+}
+
 window.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape' || e.repeat) return;
+  if (e.repeat) return;
+  // While the trail map is open, its key or Esc closes it (game keys are off then).
+  if (trailMap.isOpen && (e.key === 'Escape' || keyboard.isBound('trailMap', e.code))) {
+    e.preventDefault();
+    closeTrailMap();
+    return;
+  }
+  if (e.key !== 'Escape') return;
   if (!menu.isOpen) openMenu();
   else if (menu.canGoBack) closeMenu();
 });
 
-/** Redraws the decoration for a quality preset (and remembers it). */
+/** Switches to a quality preset (and remembers it): view range and decoration. */
 function setQuality(q: Quality): void {
   quality = q;
   saveQuality(q);
-  level?.world.setDensity(decorDensity(q));
+  applyView();
+  level?.world.setQuality(decorDensity(q), viewRange(q).far);
+}
+
+/** The current preset's view range on the camera and fog. */
+function applyView(): void {
+  const range = viewRange(quality);
+  setViewRange(view, range.far, range.fogStart);
 }
 
 /** Dev testing: puts the skier at (x, z) facing `heading` (radians), moving along the skis at `speed`. */
@@ -259,9 +297,13 @@ if (fromUrl?.load) void loadMap(fromUrl);
 
 startLoop(
   (dt) => {
-    if (!level || menu.isOpen) return;
+    if (!level || menu.isOpen || trailMap.isOpen) return;
     const { built, run, race } = level;
     keyboard.sample(keys);
+    if (keys.trailMap.pressed) {
+      openTrailMap();
+      return;
+    }
     // R: back to the checkpoint at once. Holding it keeps the skier there,
     // and after a moment goes back to the top instead.
     if (keys.respawn.pressed) {
