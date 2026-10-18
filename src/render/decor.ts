@@ -10,11 +10,15 @@ import {
   type BufferGeometry,
 } from 'three';
 import { alongLine, DECOR_SIZE, type DecorLayout, type ScatterItem } from '../maps/decor.ts';
-import type { Heightfield, LineDecor, XZ } from '../maps/types.ts';
+import type { Feature, Heightfield, LineDecor, XZ } from '../maps/types.ts';
 import type { DistanceCuller } from './culling.ts';
 import { MeshKit, TiledKit } from './meshKit.ts';
 import { drawProp, farScatterModels, FLAG_COLORS, PALETTE, scatterModels } from './models.ts';
-import { drawnHeightAt } from './terrainMesh.ts';
+import { cablePoint, CABLE_ARM, liftLine } from './chairlifts.ts';
+import { clothMaterial } from './cloth.ts';
+import { drawSign } from './signs.ts';
+import { drawnHeightAt, renderedHeightAt } from './terrainMesh.ts';
+import { drawTown } from './town.ts';
 
 // Draws a map's decoration: trees, snags and rocks as instanced meshes (one
 // draw call per model in each square tile of the map), everything else
@@ -28,8 +32,8 @@ const TILE = 64;
 const SCATTER_TILE = 160;
 /** Tree tiles per side of a block that shares one set of far trees. */
 const FAR_BLOCK = 2;
-/** Tallest scatter model (m), so a tile's reach covers its treetops. */
-const SCATTER_TOP = 10;
+/** Tallest scatter model (m), so a tile's reach covers its treetops (and the tallest crags). */
+const SCATTER_TOP = 14;
 /** How far (m) posts, trunks and rocks sink below the drawn snow so bumps never show a gap. */
 const SINK = 0.15;
 
@@ -46,10 +50,11 @@ const decalMaterial = new MeshLambertMaterial({
 });
 
 /**
- * Draws the decoration; every tile goes to `culler` to be dropped when far
- * away. `farTrees`: also build simple far trees for long view ranges.
+ * Draws the decoration and the town's buildings (from `features`); every
+ * tile goes to `culler` to be dropped when far away. `farTrees`: also build
+ * simple far trees for long view ranges.
  */
-export function createDecor(layout: DecorLayout, hf: Heightfield, culler: DistanceCuller, farTrees: boolean): Group {
+export function createDecor(layout: DecorLayout, features: readonly Feature[], hf: Heightfield, culler: DistanceCuller, farTrees: boolean): Group {
   const group = new Group();
   const blocks = new Map<number, number>();
   const block = SCATTER_TILE * FAR_BLOCK;
@@ -70,19 +75,23 @@ export function createDecor(layout: DecorLayout, hf: Heightfield, culler: Distan
   const kits = new TiledKit(TILE);
   const decals = new TiledKit(TILE);
   const glows = new TiledKit(TILE);
-  for (const line of layout.lines) drawLine(line, hf, line.kind === 'dyeLine' ? decals : kits);
+  const cloths = new TiledKit(TILE);
+  for (const line of layout.lines) drawLine(line, hf, line.kind === 'dyeLine' ? decals : kits, cloths);
   for (const p of layout.props) {
     const yaw = (p.heading * Math.PI) / 180;
     p.points.forEach((at, i) => {
       const color = p.color ? new Color(p.color) : FLAG_COLORS[i % FLAG_COLORS.length]!;
       const k = kits.near(at.x, at.z).at(at.x, drawnHeightAt(hf, at.x, at.z), at.z, yaw);
-      drawProp(k, p.kind, color, glows.near(at.x, at.z));
+      drawProp(k, p.kind, color, glows.near(at.x, at.z), cloths.near(at.x, at.z), i);
     });
   }
+  for (const sign of layout.signs) drawSign(kits.near(sign.x, sign.z).at(sign.x, drawnHeightAt(hf, sign.x, sign.z), sign.z, (sign.heading * Math.PI) / 180), sign);
+  drawTown(features, hf, kits, glows);
   for (const [kit, mat] of [
     [kits, material],
     [decals, decalMaterial],
     [glows, glowMaterial],
+    [cloths, clothMaterial],
   ] as const) {
     for (const mesh of kit.meshes(mat)) {
       group.add(mesh);
@@ -214,7 +223,7 @@ function ground(hf: Heightfield, p: XZ): number {
   return drawnHeightAt(hf, p.x, p.z);
 }
 
-function drawLine(line: LineDecor, hf: Heightfield, kits: TiledKit): void {
+function drawLine(line: LineDecor, hf: Heightfield, kits: TiledKit, cloths: TiledKit): void {
   const S = DECOR_SIZE;
   switch (line.kind) {
     case 'fence':
@@ -230,7 +239,7 @@ function drawLine(line: LineDecor, hf: Heightfield, kits: TiledKit): void {
       dyeLine(line.points, hf, kits);
       break;
     case 'bunting':
-      bunting(line.points, hf, kits);
+      bunting(line.points, hf, kits, cloths);
       break;
     case 'chairlift':
       chairlift(line.points, hf, kits);
@@ -288,17 +297,17 @@ function dyeLine(points: readonly XZ[], hf: Heightfield, kits: TiledKit): void {
 }
 
 /** Poles with a sagging string of small colored pennants between each pair. */
-function bunting(points: readonly XZ[], hf: Heightfield, kits: TiledKit): void {
+function bunting(points: readonly XZ[], hf: Heightfield, kits: TiledKit, cloths: TiledKit): void {
   const top = 3.6;
   points.forEach((p, i) => {
     kits.near(p.x, p.z).at(p.x, ground(hf, p), p.z).prism(0, 0, -SINK, top + 0.1, 0.05, 0.04, 5, PALETTE.post);
     const next = points[i + 1];
-    if (next) pennantString(kits.near(p.x, p.z), p, ground(hf, p) + top, next, ground(hf, next) + top, 0.6);
+    if (next) pennantString(kits.near(p.x, p.z), p, ground(hf, p) + top, next, ground(hf, next) + top, 0.6, cloths.near(p.x, p.z));
   });
 }
 
-/** A string from a to b (world heights ya, yb) sagging by `sag` in the middle, hung with pennants. */
-export function pennantString(k: MeshKit, a: XZ, ya: number, b: XZ, yb: number, sag: number): void {
+/** A string from a to b (world heights ya, yb) sagging by `sag` in the middle, hung with pennants (into `cloth`, to flap). */
+export function pennantString(k: MeshKit, a: XZ, ya: number, b: XZ, yb: number, sag: number, cloth: MeshKit): void {
   const len = Math.hypot(b.x - a.x, b.z - a.z);
   const n = Math.max(2, Math.round(len / 0.7));
   const at = (t: number): Vector3 =>
@@ -310,50 +319,86 @@ export function pennantString(k: MeshKit, a: XZ, ya: number, b: XZ, yb: number, 
     const mid = at((i + 0.5) / n);
     const tip = mid.clone();
     tip.y -= 0.35;
-    k.panel(p0.clone().lerp(mid, 0.3), p1.clone().lerp(mid, 0.3), tip, tip, FLAG_COLORS[i % FLAG_COLORS.length]!);
+    const color = FLAG_COLORS[i % FLAG_COLORS.length]!;
+    cloth.panel(p0.clone().lerp(mid, 0.3), p1.clone().lerp(mid, 0.3), tip, tip, color, color, [0, 0, 0.9, 0.9]);
   }
 }
 
-/** A chairlift: towers along the line, a sagging cable each way, and chairs hanging off them. */
+/**
+ * A chairlift's static parts: a station at each end (a roof on pillars),
+ * towers along the line between, and a sagging cable each way. The chairs
+ * and the turning bullwheels move (see render/chairlifts.ts).
+ */
 function chairlift(points: readonly XZ[], hf: Heightfield, kits: TiledKit): void {
   const S = DECOR_SIZE;
-  const towers = alongLine(points, S.chairliftSpacing);
-  const arm = 2.2;
-  towers.forEach((p, i) => {
-    // Facing along the line (either way round: the arm is the same).
-    const next = towers[i + 1] ?? towers[i - 1] ?? p;
+  const st = S.liftStation;
+  const line = liftLine(points, hf);
+  const spots = line.spots;
+  const last = spots.length - 1;
+  spots.forEach((p, i) => {
+    // Facing along the line (either way round: the arm is the same), stations facing out along it.
+    const next = spots[i + 1] ?? spots[i - 1] ?? p;
     const yaw = Math.atan2(-(next.x - p.x), -(next.z - p.z));
+    if (i === 0 || i === last) {
+      // Stations stand level on the lowest snow under them.
+      let y = Infinity;
+      for (const [du, dv] of [
+        [-st.length / 2, -st.width / 2],
+        [-st.length / 2, st.width / 2],
+        [st.length / 2, -st.width / 2],
+        [st.length / 2, st.width / 2],
+        [0, 0],
+      ] as const) {
+        const x = p.x - Math.sin(yaw) * du + Math.cos(yaw) * dv;
+        const z = p.z - Math.cos(yaw) * du - Math.sin(yaw) * dv;
+        y = Math.min(y, renderedHeightAt(hf, x, z));
+      }
+      station(kits.near(p.x, p.z).at(p.x, y, p.z, yaw), ground(hf, p) - y);
+      return;
+    }
     const y = ground(hf, p);
     const k = kits.near(p.x, p.z).at(p.x, y, p.z, yaw);
     k.prism(0, 0, -0.3, S.chairliftHeight, 0.38, 0.26, 6, PALETTE.metal);
-    k.box(0, S.chairliftHeight + 0.2, 0, arm * 2 + 0.6, 0.35, 0.5, PALETTE.metalDark);
-    for (const x of [-arm, arm]) k.box(x, S.chairliftHeight - 0.05, 0, 0.3, 0.3, 1.4, PALETTE.post);
+    k.box(0, S.chairliftHeight + 0.2, 0, CABLE_ARM * 2 + 0.6, 0.35, 0.5, PALETTE.metalDark);
+    for (const x of [-CABLE_ARM, CABLE_ARM]) k.box(x, S.chairliftHeight - 0.05, 0, 0.3, 0.3, 1.4, PALETTE.post);
   });
-  for (let i = 1; i < towers.length; i++) {
-    const a = towers[i - 1]!;
-    const b = towers[i]!;
-    const len = Math.hypot(b.x - a.x, b.z - a.z);
-    const rx = -(b.z - a.z) / len;
-    const rz = (b.x - a.x) / len;
-    const ya = ground(hf, a) + S.chairliftHeight - 0.2;
-    const yb = ground(hf, b) + S.chairliftHeight - 0.2;
+  const p = { x: 0, y: 0, z: 0 };
+  for (let i = 0; i < last; i++) {
+    const k = kits.near(spots[i]!.x, spots[i]!.z);
     for (const side of [-1, 1]) {
-      const k = kits.near(a.x, a.z);
-      const cable = (t: number): Vector3 =>
-        new Vector3(a.x + (b.x - a.x) * t + rx * arm * side, ya + (yb - ya) * t - 1.2 * 4 * t * (1 - t), a.z + (b.z - a.z) * t + rz * arm * side);
       const segs = 6;
-      for (let s = 0; s < segs; s++) k.beamWorld(cable(s / segs), cable((s + 1) / segs), 0.06, PALETTE.dark);
-      // Two chairs per span on each cable.
-      for (const t of side < 0 ? [0.3, 0.75] : [0.15, 0.6]) {
-        const top = cable(t);
-        const seat = top.clone();
-        seat.y -= 1.9;
-        k.beamWorld(top, seat, 0.05, PALETTE.post);
-        const yaw = Math.atan2(-(b.x - a.x), -(b.z - a.z));
-        k.at(seat.x, seat.y, seat.z, yaw);
-        k.box(0, 0, 0, 1.6, 0.1, 0.55, PALETTE.post);
-        k.box(0, 0.35, 0.3, 1.6, 0.6, 0.08, PALETTE.post);
+      for (let s = 0; s < segs; s++) {
+        cablePoint(line, i, s / segs, side, p);
+        const a = new Vector3(p.x, p.y, p.z);
+        cablePoint(line, i, (s + 1) / segs, side, p);
+        k.beamWorld(a, new Vector3(p.x, p.y, p.z), 0.06, PALETTE.dark);
       }
     }
   }
+}
+
+/**
+ * A lift station, in a kit placed level at its floor and facing along the
+ * line (-Z): a concrete deck, pillars holding a snowy roof, the drive house
+ * at the back and the bullwheel the cable turns around. `rise`: how far
+ * the snow at its middle sits above the floor (it's dug in on a slope).
+ */
+function station(k: MeshKit, rise: number): void {
+  const st = DECOR_SIZE.liftStation;
+  const L = st.length;
+  const W = st.width;
+  const floor = 0.8 + rise;
+  k.box(0, floor / 2 - 0.4, 0, W, floor + 0.8, L, PALETTE.metalDark);
+  k.box(0, floor + 0.02, 0, W - 0.2, 0.06, L - 0.2, PALETTE.white);
+  const roof = floor + st.height - 0.8;
+  for (const x of [-W / 2 + 0.3, W / 2 - 0.3]) {
+    for (const z of [-L / 2 + 0.4, 0, L / 2 - 0.4]) k.box(x, (floor + roof) / 2, z, 0.3, roof - floor, 0.3, PALETTE.post);
+  }
+  k.box(0, roof + 0.15, 0, W + 0.8, 0.3, L + 0.8, PALETTE.red);
+  k.box(0, roof + 0.36, 0, W + 0.6, 0.14, L + 0.6, PALETTE.snow);
+  // Drive house at the back end, with a window toward the line.
+  k.box(0, floor + 1.4, L / 2 - 1.3, W - 1.4, 2.8, 2.2, PALETTE.red);
+  k.box(0, floor + 1.7, L / 2 - 2.41, W - 2.6, 1, 0.04, PALETTE.dark);
+  // The bullwheel's shaft down from the roof (the wheel itself turns: render/chairlifts.ts).
+  k.prism(0, 0, roof - 1.2, roof - 0.15, 0.25, 0.25, 6, PALETTE.metalDark);
 }

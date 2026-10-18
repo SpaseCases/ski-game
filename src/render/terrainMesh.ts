@@ -1,5 +1,5 @@
 import { BufferAttribute, BufferGeometry, Color, Group, Mesh, MeshLambertMaterial } from 'three';
-import { sampleShape, type ShapeSample } from '../maps/shapes.ts';
+import { topShape, type ShapeSample } from '../maps/shapes.ts';
 import { hash2 } from '../maps/terrain.ts';
 import type { Heightfield } from '../maps/types.ts';
 
@@ -378,16 +378,10 @@ export function renderedHeightAt(hf: Heightfield, x: number, z: number): number 
 
 const shapeSample: ShapeSample = { height: 0, dhdx: 0, dhdz: 0 };
 
-/** Height the shapes (jumps, pipes, decks) add at world (x, z): the highest one wins, as in the sim. */
+/** Height the shapes (jumps, pipes, decks, roofs) add at world (x, z): the highest one wins, as in the sim. */
 export function shapeHeightAt(hf: Heightfield, x: number, z: number): number {
-  let top = 0;
-  const shapes = hf.shapes;
-  if (shapes) {
-    for (let i = 0; i < shapes.length; i++) {
-      if (sampleShape(shapes[i]!, x, z, shapeSample)) top = Math.max(top, shapeSample.height);
-    }
-  }
-  return top;
+  topShape(hf, x, z, shapeSample);
+  return shapeSample.height;
 }
 
 /** Height of everything drawn as snow at world (x, z): the terrain facets plus any shapes on them. */

@@ -1,6 +1,7 @@
 import { Color, Group, MeshLambertMaterial, Vector3 } from 'three';
 import { DECK, HOUSE, RIDGE, startPoint, TOWER, type StartFrame } from '../maps/startGates.ts';
 import type { Heightfield } from '../maps/types.ts';
+import { clothMaterial } from './cloth.ts';
 import { pennantString } from './decor.ts';
 import { MeshKit } from './meshKit.ts';
 import { FLAG_COLORS, PALETTE } from './models.ts';
@@ -22,13 +23,15 @@ export class StartGateView {
 
   constructor(starts: readonly StartFrame[], hf: Heightfield) {
     const kit = new MeshKit();
+    const cloth = new MeshKit();
     for (const s of starts) {
       if (s.style === 'deck') drawDeck(kit, s, hf);
-      else if (s.style === 'tower') drawTower(kit, s, hf);
-      else if (s.style === 'ridge') drawRidge(kit, s, hf);
+      else if (s.style === 'tower') drawTower(kit, s, hf, cloth);
+      else if (s.style === 'ridge') drawRidge(kit, s, hf, cloth);
       else this.drawRace(kit, s, hf);
     }
     if (!kit.empty) this.group.add(kit.mesh(material));
+    if (!cloth.empty) this.group.add(cloth.mesh(clothMaterial));
   }
 
   /** `wandTime`: seconds since the wand was pushed through (Infinity if never). */
@@ -161,7 +164,7 @@ function rampSides(
 }
 
 /** Scaffold drop-in tower: side boards, a scaffold of poles and braces under the platform and in-run, a railing, flags. */
-function drawTower(kit: MeshKit, s: StartFrame, hf: Heightfield): void {
+function drawTower(kit: MeshKit, s: StartFrame, hf: Heightfield, cloth: MeshKit): void {
   const half = TOWER.width / 2;
   const back = -(TOWER.back + TOWER.behind);
   const runEnd = TOWER.ahead + s.height / Math.tan((TOWER.angle * Math.PI) / 180) + TOWER.transition;
@@ -218,19 +221,22 @@ function drawTower(kit: MeshKit, s: StartFrame, hf: Heightfield): void {
     kit.beamWorld(point(railU[0]!, side * half, deckY + 1.05), point(railU[2]!, side * half, deckY + 1.05), 0.06, PALETTE.metal);
     const flagAt = point(railU[2]!, side * half, deckY);
     kit.beamWorld(flagAt, point(railU[2]!, side * half, deckY + 2.6), 0.05, PALETTE.post);
-    kit.panel(
+    const flagColor = FLAG_COLORS[side < 0 ? 0 : 1]!;
+    cloth.panel(
       point(railU[2]!, side * half, deckY + 1.9),
       point(railU[2]!, side * (half + 1), deckY + 1.95),
       point(railU[2]!, side * (half + 1), deckY + 2.55),
       point(railU[2]!, side * half, deckY + 2.6),
-      FLAG_COLORS[side < 0 ? 0 : 1]!,
+      flagColor,
+      flagColor,
+      [0, 1, 1, 0],
     );
   }
   kit.beamWorld(point(railU[0]!, -half, deckY + 1.05), point(railU[0]!, half, deckY + 1.05), 0.06, PALETTE.metal);
 }
 
 /** Ridgetop start: a small hut off to the side and a line of flags, with pennants strung over the start. */
-function drawRidge(kit: MeshKit, s: StartFrame, hf: Heightfield): void {
+function drawRidge(kit: MeshKit, s: StartFrame, hf: Heightfield, cloth: MeshKit): void {
   const hutAt = startPoint(s, RIDGE.hutBack, RIDGE.hutSide);
   const h = RIDGE.hut;
   const base = drawnHeightAt(hf, hutAt.x, hutAt.z);
@@ -267,16 +273,19 @@ function drawRidge(kit: MeshKit, s: StartFrame, hf: Heightfield): void {
       const y = drawnHeightAt(hf, p.x, p.z);
       kit.at(p.x, y, p.z, s.heading);
       kit.prism(0, 0, -SINK, RIDGE.flagHeight, 0.04, 0.03, 5, PALETTE.post);
-      kit.panel(
+      const flagColor = FLAG_COLORS[(i + (side < 0 ? 0 : 3)) % FLAG_COLORS.length]!;
+      cloth.panel(
         kit.p(0, RIDGE.flagHeight - 0.75, 0),
         kit.p(side * 1.1, RIDGE.flagHeight - 0.8, 0),
         kit.p(side * 1.1, RIDGE.flagHeight - 0.05, 0),
         kit.p(0, RIDGE.flagHeight, 0),
-        FLAG_COLORS[(i + (side < 0 ? 0 : 3)) % FLAG_COLORS.length]!,
+        flagColor,
+        flagColor,
+        [0, 1, 1, 0],
       );
     }
   }
   const a = poleAt(-3);
   const b = poleAt(3);
-  pennantString(kit, a, drawnHeightAt(hf, a.x, a.z) + RIDGE.flagHeight - 0.05, b, drawnHeightAt(hf, b.x, b.z) + RIDGE.flagHeight - 0.05, 0.35);
+  pennantString(kit, a, drawnHeightAt(hf, a.x, a.z) + RIDGE.flagHeight - 0.05, b, drawnHeightAt(hf, b.x, b.z) + RIDGE.flagHeight - 0.05, 0.35, cloth);
 }

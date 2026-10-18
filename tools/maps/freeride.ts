@@ -11,14 +11,22 @@
 // out from the summit, `across` meters to the right of it, facing down.
 //   North face (heading 0, toward -Z)   The Steeps: couloirs between rock ribs, two cliff bands, pillows
 //   East face (heading -95)             The Bowl: a corniced cirque, a pillow field below it
-//   South face (heading 178)            The Glades: mellow tree runs, small drops, a creek; the town site at its base
+//   South face (heading 178)            The Glades: mellow tree runs, logs and stumps, a creek; the town at its base
 //   West face (heading 88)              The Gully: rolling terrain with side hits, a long natural halfpipe
-// The ridges carry wind lips. Each face ends in a run-out basin with a
-// finish, and the land climbs past it into the hills around the mountain.
+// The ridges carry wind lips and booters. Each face ends in a run-out basin
+// with a finish arch and a chairlift's bottom station, and the land climbs
+// past it into the hills around the mountain; the Glades end in the town,
+// whose roofs, stairs, ledges and benches can all be ridden.
+//
+// Features that need the ground's shape (booters facing down the fall line,
+// logs lying on the snow) are placed after the terrain is built, from its
+// heights.
 
 import { writeFileSync } from 'node:fs';
-import { generateTerrain } from '../../src/maps/build.ts';
+import { buildMap, generateTerrain } from '../../src/maps/build.ts';
 import { parseMap } from '../../src/maps/loader.ts';
+import type { Heightfield } from '../../src/maps/types.ts';
+import { insideBounds } from '../../src/sim/bounds.ts';
 import { heightAt } from '../../src/sim/terrain.ts';
 
 type Json = Record<string, unknown>;
@@ -84,7 +92,7 @@ const SPOKES: Record<string, Spoke> = {
     heading: 178,
     bend: -5,
     sharp: 0,
-    sections: [TOP, sec(120, 25, 24), sec(330, 22, 40), sec(600, 19, 60), sec(380, 14, 60), sec(180, 8, 60), sec(330, 3.5, 50), sec(200, -12, 60)],
+    sections: [TOP, sec(120, 25, 24), sec(330, 22, 40), sec(600, 19, 60), sec(380, 14, 60), sec(180, 9, 60), sec(330, 4.5, 50), sec(200, -12, 60)],
   },
   southwest: {
     name: 'Southwest ridge',
@@ -264,10 +272,21 @@ lip('northwest', [[520, -12], [580, -14], [640, -12]], angle('northwest', 580) -
 
 // The summit: a flat top for the start, where a rider can turn to face any way down.
 elements.push({ type: 'flat', x: 0, z: 0, heading: 0, pitch: 0, radius: 16, blend: 18 });
-// The town site at the bottom of the glades (built in milestone 5c-2).
+// The town at the bottom of the glades: a broad flat at the same pitch as
+// the glades' run-out, so riders roll through it at jibbing speed. Places
+// in town are given as T(u, v): u m down the town from its top edge, v m
+// across to the right (facing down).
+const TOWN = { r: 1790, width: 320, length: 400, pitch: 4.5 };
+const TH = angle('south', TOWN.r);
+function T(u: number, v = 0): XZ {
+  const c = P('south', TOWN.r);
+  const a = TH * DEG;
+  const uu = u - TOWN.length / 2;
+  return { x: c.x - Math.sin(a) * uu + Math.cos(a) * v, z: c.z - Math.cos(a) * uu - Math.sin(a) * v };
+}
 {
-  const p = P('south', 1790);
-  elements.push({ type: 'flat', x: r1(p.x), z: r1(p.z), heading: r1(angle('south', 1790)), pitch: 3.5, width: 300, length: 380, blend: 60 });
+  const c = T(TOWN.length / 2);
+  elements.push({ type: 'flat', ...xz(c), heading: r1(TH), pitch: TOWN.pitch, width: TOWN.width, length: TOWN.length, blend: 60 });
 }
 
 // ---------------------------------------------------------------- flags
@@ -294,6 +313,11 @@ flag('southeast', 130, 0, 16);
 flag('south', 60, 0, 18);
 flag('south', 790, 0, 22);
 flag('south', 1180, -30, 22);
+// The top of town, across the street and the drifts up to the roofs on either side.
+{
+  const p = T(14);
+  flags.push({ ...xz(p), heading: r1(TH), width: 64 });
+}
 flag('southwest', 130, 0, 16);
 flag('west', 60, 0, 18);
 flag('west', 445, 10, 18); // gully top
@@ -305,19 +329,29 @@ flag('northwest', 130, 0, 16);
 const FINISH: Partial<Record<SpokeId, { r: number; length: number }>> = {
   north: { r: 1730, length: 110 },
   east: { r: 1765, length: 110 },
-  south: { r: 1650, length: 420 },
+  // The bottom of town (u 335), to just past the town's bottom edge.
+  south: { r: (TOWN.r * K + 335 - TOWN.length / 2) / K, length: 90 },
   west: { r: 1650, length: 110 },
 };
+/** Where the town's finish line crosses the town (u), and its arch's width. */
+const TOWN_FINISH = 335;
+const ARCH = 18;
 
 const finishes: Json[] = [];
 for (const [s, f] of Object.entries(FINISH) as [SpokeId, { r: number; length: number }][]) {
+  if (s === 'south') {
+    // Across the whole bottom of town, with the arch over the main street.
+    const p = T(TOWN_FINISH);
+    finishes.push({ ...xz(p), heading: r1(TH), width: TOWN.width - 20, length: f.length, arch: { ...xz(p), width: ARCH } });
+    continue;
+  }
+  // A wide zone across the basin floor (sized below), with the arch where the runs come together.
   const p = P(s, f.r);
-  finishes.push({ x: r1(p.x), z: r1(p.z), heading: r1(angle(s, f.r)), width: 0, length: f.length });
+  finishes.push({ x: r1(p.x), z: r1(p.z), heading: r1(angle(s, f.r)), width: 0, length: f.length, arch: { x: r1(p.x), z: r1(p.z), width: ARCH } });
   // The run-out basin: a broad dip around the finish zone draws in riders
   // from the whole bottom of the valley, so none are left on flat ground
-  // where the valley side meets the hills around it. (The glades end on the
-  // town site, which stays flat.)
-  if (s === 'south') continue;
+  // where the valley side meets the hills around it. (The glades end in the
+  // town, which stays flat.)
   const mid = P(s, f.r + f.length / 2 / K);
   elements.push({ type: 'dip', x: r1(mid.x), z: r1(mid.z), radius: 875, depth: 35 });
 }
@@ -377,82 +411,504 @@ const terrain = {
   seed: 21,
 };
 
+// ---------------------------------------------------------------- the ground, for placing features
+// Features don't change the terrain, so it's built once here, alone, and
+// the features that follow the ground are placed on it.
+const ground: Heightfield = generateTerrain(
+  parseMap({
+    name: 'Freeride',
+    terrain,
+    features: [],
+    spawn: { x: 0, z: 0, heading: 0 },
+    flags: [],
+    finishes: [{ x: 0, z: 0, heading: 0, width: 1, length: 1 }],
+    colors: { sky: '#000000', fog: '#000000' },
+  }).terrain,
+);
+const gy = (p: XZ): number => heightAt(ground, p.x, p.z);
+/** The way straight down at p (a heading, degrees) and how steep it is there (degrees), measured over `span` m. */
+function fall(p: XZ, span = 6): { heading: number; slope: number } {
+  const gx = (gy({ x: p.x + span, z: p.z }) - gy({ x: p.x - span, z: p.z })) / (2 * span);
+  const gz = (gy({ x: p.x, z: p.z + span }) - gy({ x: p.x, z: p.z - span })) / (2 * span);
+  return { heading: Math.atan2(gx, gz) / DEG, slope: Math.atan(Math.hypot(gx, gz)) / DEG };
+}
+/** The spot `d` m from p along heading h (degrees). */
+const ahead = (p: XZ, h: number, d: number): XZ => ({ x: p.x - Math.sin(h * DEG) * d, z: p.z - Math.cos(h * DEG) * d });
+
+// ---------------------------------------------------------------- features
+const start = { type: 'start', style: 'ridge', x: 0, z: 0, heading: 0 };
+const features: Json[] = [start];
+const warnings: string[] = [];
+
+// ---- the town
+// The main street runs down the middle (v from -10 to 10): benches, a
+// ledge and a kicker to a rail above the plaza; the plaza across the
+// street, with a stair set and handrails down its front; a kinked rail,
+// ledges and a booter below it; the finish arch at the bottom. Left of the
+// street, a row of shops whose flat roofs step down, reached up a drift at
+// the top, with a gap over an alley and a landing drift at the end, and
+// another row below the plaza. Right of it, chalets whose gable roofs kick
+// riders off their ridges onto landing drifts, and the lodge with a roof
+// to drop off. More chalets stand in the trees round the edge of town.
+const TY = r1(TH);
+/** A building with the uphill edge of its roof u m down the town, centered v m across. */
+function building(u: number, v: number, b: Json): void {
+  features.push({ type: 'building', ...xz(T(u, v)), yaw: TY, ...b });
+}
+const townPts = (pts: [number, number, number][]): Json[] => pts.map(([u, v, hh]) => xzh(T(u, v), hh));
+function townBox(style: string, width: number, pts: [number, number, number][]): void {
+  features.push({ type: 'box', style, width, points: townPts(pts) });
+}
+function townRail(pts: [number, number, number][], style = 'metal'): void {
+  features.push({ type: 'rail', style, points: townPts(pts) });
+}
+/** A kicker down the street at u, v, and a rail (or box, `width` > 0) from just past its lip, `length` m long, ending `drop` m lower than it starts. */
+function townKickerRail(u: number, v: number, length: number, drop = 0, width = 0): void {
+  const lip = 0.6;
+  const angle = 14;
+  const lipAt = u + (2 * lip) / Math.tan(angle * DEG);
+  features.push({ type: 'kicker', ...xz(T(u, v)), yaw: TY, width: 2.6, sideWidth: 1.2, lipHeight: lip, lipAngle: angle });
+  const a = lipAt + 1;
+  const pts: [number, number, number][] = drop > 0 ? [[a, v, lip], [a + length / 2, v, lip], [a + length, v, lip - drop]] : [[a, v, lip], [a + length, v, lip]];
+  if (width > 0) townBox('ledge', width, pts);
+  else townRail(pts);
+}
+
+// The rooftops, left of the street: each shop's roof a little lower than the last.
+const ROOF = { v: -22, width: 14 };
+building(48, ROOF.v, { length: 16, width: ROOF.width, eave: 3.8, roof: 'flat', drift: 16, style: 'shop', color: '#c8553d', front: 'right', sign: 'Bakery' });
+building(64, ROOF.v, { length: 16, width: ROOF.width, eave: 3.35, roof: 'flat', style: 'shop', color: '#3f7fbf', front: 'right', sign: 'Ski shop' });
+building(80, ROOF.v, { length: 16, width: ROOF.width, eave: 2.9, roof: 'flat', lip: 0.4, style: 'shop', color: '#e0b84a', front: 'right', sign: 'Cafe' });
+// (a 4 m alley, gapped from the cafe's lip onto a roof 0.8 m lower)
+building(100, ROOF.v, { length: 16, width: ROOF.width, eave: 2.4, roof: 'shed', rise: 0.4, style: 'shop', color: '#6a8f5a', front: 'right', sign: 'Rentals' });
+building(116, ROOF.v, { length: 14, width: ROOF.width, eave: 2.3, roof: 'flat', apron: 14, style: 'shop', color: '#e8e0d0', front: 'right', sign: 'Books' });
+// Below the plaza, another row: up a drift, two steps down, a landing drift.
+building(188, ROOF.v, { length: 14, width: ROOF.width, eave: 3.8, roof: 'flat', drift: 15, style: 'shop', color: '#b8483a', front: 'right', sign: 'Pizza' });
+building(202, ROOF.v, { length: 14, width: ROOF.width, eave: 3.3, roof: 'flat', style: 'shop', color: '#4f6fa8', front: 'right', sign: 'Outfitters' });
+building(216, ROOF.v, { length: 14, width: ROOF.width, eave: 2.9, roof: 'shed', rise: 0.5, apron: 13, style: 'shop', color: '#d9a441', front: 'right', sign: 'Market' });
+
+// Chalets, right of the street: up the drift, up the roof, off the ridge, down the landing drift.
+const chalet = (u: number, v: number, color: string, size = 1): void =>
+  building(u, v, { length: 12 * size, width: 11 * size, eave: 3.0, roof: 'gable', rise: 2.2 * size, drift: 12, apron: 20, style: 'chalet', color, front: v > 0 ? 'left' : 'right' });
+chalet(50, 25, '#7a4f2c');
+chalet(96, 27, '#8a5a32');
+// The lodge: up a long drift onto its flat roof, and down the landing drift below.
+building(190, 30, { length: 28, width: 22, eave: 4.2, roof: 'flat', drift: 17, apron: 16, style: 'lodge', color: '#7a5a3a', front: 'left', sign: 'Lodge' });
+chalet(250, 26, '#6e4a2e');
+/**
+ * A building standing side-on to the street: its near end at `edge` (v),
+ * its length running away from the street, `width` m along it centered on
+ * u, so the door faces the street and the gables face up and down it.
+ * Taller than the ones you ride, for a skyline.
+ */
+function sideOn(u: number, edge: number, b: Json): void {
+  const yaw = r1(TH + (edge < 0 ? 90 : -90));
+  features.push({ type: 'building', ...xz(T(u, edge)), yaw, front: 'up', ...b });
+}
+const tall = (u: number, edge: number, color: string, eave = 6.4, sign = ''): void =>
+  sideOn(u, edge, { length: 14, width: 15, eave, roof: 'gable', rise: 3.8, style: sign ? 'shop' : 'chalet', color, sign, chimney: true });
+// Behind the rooftops and the chalets, a row of taller houses and hotels each side.
+for (const [u, color] of [[52, '#6e4a2e'], [74, '#d8cbb0'], [96, '#7a4f2c'], [118, '#9a6a3c'], [196, '#7a4f2c'], [218, '#c9b48e'], [240, '#6e4a2e']] as const) tall(u, -36, color);
+for (const [u, color] of [[60, '#8a5a32'], [84, '#e2d6bd'], [108, '#6e4a2e'], [132, '#7a4f2c'], [205, '#d8cbb0'], [228, '#8a5a32'], [252, '#6e4a2e']] as const) tall(u, 46, color);
+// The bottom of the street: two shops facing it, a hotel behind each.
+tall(316, -16, '#c8553d', 5.2, 'Tune shop');
+tall(322, 16, '#3f7fbf', 5.2, 'Sports');
+tall(300, -36, '#e2d6bd', 7.2);
+tall(322, 36, '#7a4f2c', 7.2);
+// Round the edge of town, in the trees.
+for (const [u, v, color, size] of [
+  [30, 70, '#7a4f2c', 1],
+  [110, 76, '#6e4a2e', 1.15],
+  [175, 72, '#8a5a32', 1],
+  [240, 80, '#7a4f2c', 1.1],
+  [60, -68, '#6e4a2e', 1],
+  [150, -70, '#8a5a32', 1.15],
+  [225, -72, '#7a4f2c', 1],
+  [290, -66, '#6e4a2e', 1],
+  [290, 70, '#8a5a32', 1],
+] as const) {
+  chalet(u, v, color, size);
+}
+
+// The plaza across the street, level with the snow at its back and 2 m above it at the front.
+const PLAZA = { u: 150, length: 26, width: 26, height: 2 };
+features.push({ type: 'terrace', ...xz(T(PLAZA.u)), yaw: TY, length: PLAZA.length, width: PLAZA.width, height: PLAZA.height, stairs: 6, stairAngle: 30, handrails: true });
+
+// The street's jibs.
+for (const u of [62, 90, 120]) for (const v of [-8.5, 8.5]) townBox('bench', 0.5, [[u, v, 0.45], [u + 2.4, v, 0.45]]);
+townBox('ledge', 0.6, [[95, 0, 0], [98, 0, 0.5], [110, 0, 0.5]]);
+townKickerRail(126, 3, 14);
+// On the plaza: benches either side of a planter.
+for (const v of [-10, 10]) townBox('bench', 0.5, [[PLAZA.u + 6, v, 0.45], [PLAZA.u + 8.4, v, 0.45]]);
+townBox('ledge', 1.2, [[PLAZA.u + 10, 7, 0.45], [PLAZA.u + 18, 7, 0.45]]);
+// Below the plaza: a kinked rail, ledges down both sides, and a booter to finish.
+townKickerRail(198, 0, 16, 0.4);
+for (const v of [-9, 9]) townBox('ledge', 0.5, [[232, v, 0.45], [252, v, 0.45]]);
+features.push({ type: 'jump', natural: true, ...xz(T(278)), yaw: TY, width: 8, sideWidth: 4, lipHeight: 1.2, lipAngle: 22, gap: 6, deck: true, landingAngle: 22, knuckle: 3, transition: 7 });
+
+// ---- natural features
+// Across every face: fallen trees to slide (ride on at the tip, off the
+// root end), stumps and flat rocks to pop onto, booters dug into ridges,
+// the gully floor and the open slopes (facing down the fall line, with a
+// landing of their own where the slope below is too gentle), and a few
+// built jumps and rails. Each is checked by tools/sim/features.ts.
+/** A booter at p: a natural kicker facing down the fall line there (turned `turn` degrees), landing on the slope below; or, given `land`, a jump with a landing of its own. */
+function booter(p: XZ, lip: number, angle: number, o: { turn?: number; width?: number; land?: { gap: number; angle: number } } = {}): void {
+  const yaw = r1(fall(p, 10).heading + (o.turn ?? 0));
+  const base = { natural: true, ...xz(p), yaw, width: o.width ?? 6, sideWidth: 3, lipHeight: lip, lipAngle: angle };
+  // A table: come up short and it's the deck, not the landing's back side.
+  if (o.land) features.push({ type: 'jump', ...base, gap: o.land.gap, deck: true, landingAngle: o.land.angle, knuckle: 3, transition: 8 });
+  else features.push({ type: 'kicker', ...base, back: r1(lip * 2.5) });
+}
+/**
+ * A fallen tree from its tip at p (level with the snow, to ride straight
+ * on) `length` m down the fall line (turned `turn` degrees), its root end
+ * lifted `root` m off the snow on its root plate. Warns if the snow rises
+ * over it anywhere between.
+ */
+function log(p: XZ, length: number, o: { turn?: number; root?: number; radius?: number } = {}): void {
+  const h = fall(p, 8).heading + (o.turn ?? 0);
+  const q = ahead(p, h, length);
+  const root = o.root ?? 0.6;
+  const ya = gy(p);
+  const yb = gy(q) + root;
+  for (let t = 0.1; t < 1; t += 0.1) {
+    const m = { x: p.x + (q.x - p.x) * t, z: p.z + (q.z - p.z) * t };
+    const over = ya + (yb - ya) * t - gy(m);
+    if (over < 0.4 * t * root) warnings.push(`log at (${p.x.toFixed(0)}, ${p.z.toFixed(0)}) dips into the snow ${(t * length).toFixed(0)} m along (${over.toFixed(2)} m)`);
+    if (over > 1.6) warnings.push(`log at (${p.x.toFixed(0)}, ${p.z.toFixed(0)}) stands ${over.toFixed(1)} m off the snow ${(t * length).toFixed(0)} m along`);
+  }
+  features.push({ type: 'rail', style: 'log', radius: o.radius ?? 0.3, points: [xzh(p, 0), xzh(q, root)] });
+}
+/** A tree stump at p, `height` m tall, to pop onto. */
+function stump(p: XZ, height = 0.7, radius = 0.45): void {
+  const h = fall(p).heading;
+  features.push({ type: 'box', style: 'stump', width: radius * 2, points: [xzh(ahead(p, h, -radius * 0.9), height), xzh(ahead(p, h, radius * 0.9), height)] });
+}
+/** A flat-topped rock down the fall line from p, with a drift kicking up to it: ride up, slide its top, drop off. */
+function rockJib(p: XZ, length: number, width: number, height: number): void {
+  const h = fall(p, 8).heading;
+  const lipAngle = 11;
+  const lipAt = (2 * height) / Math.tan(lipAngle * DEG);
+  // The rock starts just past the kicker's short back, a little lower than its lip, so riders come down onto it.
+  features.push({ type: 'kicker', natural: true, ...xz(p), yaw: r1(h), width: width + 0.4, sideWidth: 1.5, lipHeight: height, lipAngle, back: 0.5 });
+  const a = ahead(p, h, lipAt + 0.8);
+  features.push({ type: 'box', style: 'rock', width, points: [xzh(a, height), xzh(ahead(a, h, length), height)] });
+}
+const at = (s: SpokeId, r: number, a: number): XZ => P(s, r, a);
+
+// South, the Glades: a line of logs down the west side, stumps and rocks in the trees, small booters, and a park stop near the bottom.
+const LOG_JAM = -125;
+for (const [r, a, len, turn] of [
+  [860, LOG_JAM, 11, 4],
+  [935, LOG_JAM - 6, 12, -6],
+  [1005, LOG_JAM + 4, 10, 3],
+  [1175, LOG_JAM, 12, -4],
+  [1250, LOG_JAM - 5, 11, 6],
+  [1330, LOG_JAM + 3, 12, -3],
+] as const) {
+  log(at('south', r, a), len, { turn });
+}
+for (const [r, a, len, turn] of [
+  [900, -200, 10, 20],
+  [1120, 40, 9, -15],
+  [1290, 200, 11, 10],
+  [1390, -40, 10, -8],
+] as const) {
+  log(at('south', r, a), len, { turn, root: 0.5 });
+}
+for (const [r, a, hgt] of [
+  [1145, -70, 0.7],
+  [1150, -55, 0.8],
+  [1158, -40, 0.65],
+  [1165, -25, 0.75],
+  [1400, 60, 0.7],
+  [1410, 78, 0.8],
+  [1404, 95, 0.6],
+] as const) {
+  stump(at('south', r, a), hgt);
+}
+rockJib(at('south', 1300, 95), 7, 2.2, 0.7);
+rockJib(at('south', 1030, -175), 6.5, 2, 0.6);
+booter(at('south', 905, 30), 1.2, 22);
+booter(at('south', 1262, -45), 1.1, 20, { land: { gap: 7, angle: 20 } });
+booter(at('south', 1345, 85), 1, 20, { land: { gap: 6, angle: 19 } });
+// The park stop: a table, a kicker to a rail, and a ride-on box, side by side.
+{
+  const s: SpokeId = 'south';
+  const yaw = r1(angle(s, 1480));
+  const table = at(s, 1478, -95);
+  features.push({ type: 'jump', ...xz(table), yaw, width: 6, sideWidth: 3, lipHeight: 1.2, lipAngle: 24, gap: 6, deck: true, landingAngle: 22, knuckle: 3, transition: 7 });
+  const k = at(s, 1480, -70);
+  features.push({ type: 'kicker', ...xz(k), yaw, width: 2.6, sideWidth: 1.2, lipHeight: 0.6, lipAngle: 14 });
+  const lipAt = (2 * 0.6) / Math.tan(14 * DEG);
+  const a = ahead(k, yaw, lipAt + 1);
+  features.push({ type: 'rail', points: [xzh(a, 0.6), xzh(ahead(a, yaw, 14), 0.6)] });
+  const b = at(s, 1476, -50);
+  features.push({ type: 'box', width: 0.6, points: [xzh(b, 0), xzh(ahead(b, yaw, 3), 0.5), xzh(ahead(b, yaw, 13), 0.5)] });
+}
+
+// North, the Steeps: booters on the apron below the cliffs, logs and stumps in the forest at the bottom.
+booter(at('north', 955, 0), 1.3, 20);
+booter(at('north', 1085, 60), 1.2, 20);
+booter(at('north', 1240, 150), 1.1, 19);
+for (const [r, a, len, turn] of [
+  [1300, 60, 12, 5],
+  [1380, 150, 11, -6],
+  [1440, 200, 12, 4],
+  [1520, 60, 10, -10],
+  [1360, -10, 11, 8],
+] as const) {
+  log(at('north', r, a), len, { turn });
+}
+for (const [r, a] of [
+  [1500, -20],
+  [1510, -5],
+  [1520, 10],
+] as const) {
+  stump(at('north', r, a), 0.75);
+}
+rockJib(at('north', 1335, 125), 7, 2.4, 0.7);
+
+// East, the Bowl: booters on the bowl's floor, logs and stumps in the trees below, a hip near the bottom.
+booter(at('east', 610, 60), 1.3, 22);
+booter(at('east', 690, -60), 1.2, 21);
+for (const [r, a, len, turn] of [
+  [1180, -150, 11, 6],
+  [1260, -200, 12, -5],
+  [1350, 80, 11, 4],
+  [1430, -150, 10, -8],
+] as const) {
+  log(at('east', r, a), len, { turn });
+}
+for (const [r, a] of [
+  [1540, -60],
+  [1552, -45],
+  [1546, -30],
+] as const) {
+  stump(at('east', r, a), 0.7);
+}
+// A hip: a kicker angled off the fall line, landing on a built landing beside it.
+{
+  const k = at('east', 1580, -90);
+  const f = fall(k, 10);
+  const yaw = r1(f.heading - 30);
+  features.push({ type: 'kicker', ...xz(k), yaw, width: 5, sideWidth: 2.5, lipHeight: 1.2, lipAngle: 21 });
+  const lipAt = (2 * 1.2) / Math.tan(21 * DEG);
+  // Its landing starts just past the lip, so coming up short lands on its flat top.
+  const l = ahead(k, yaw, lipAt + 1);
+  features.push({ type: 'landing', ...xz(l), yaw: r1(f.heading), width: 7, sideWidth: 3, height: 1.5, angle: 22, back: 2.5, top: 3, knuckle: 3, transition: 7 });
+}
+
+// West, the Gully: booters on the gully's floor, side hits off the rollers, logs, and a big step-down jump near the bottom.
+booter(at('west', 700, -3), 1.1, 18, { width: 7 });
+booter(at('west', 1110, 3), 1.1, 18, { width: 7 });
+booter(at('west', 905, -150), 1.2, 22, { turn: 15 });
+booter(at('west', 1160, -205), 1.2, 22, { turn: -15 });
+for (const [r, a, len, turn] of [
+  [1300, -110, 12, 4],
+  [1380, -250, 11, -5],
+  [1450, -150, 12, 6],
+  [1260, 80, 10, -4],
+] as const) {
+  log(at('west', r, a), len, { turn });
+}
+{
+  const p = at('west', 1430, -60);
+  const yaw = r1(fall(p, 10).heading);
+  features.push({ type: 'jump', ...xz(p), yaw, width: 8, sideWidth: 3, lipHeight: 1.6, lipAngle: 24, gap: 9, deck: false, landingHeight: 1.2, landingAngle: 24, knuckle: 3, transition: 8 });
+  const r = at('west', 1505, 70);
+  const ry = r1(fall(r, 10).heading);
+  features.push({ type: 'rail', points: [xzh(r, 0), xzh(ahead(r, ry, 3), 0.55), xzh(ahead(r, ry, 15), 0.55), xzh(ahead(r, ry, 22), 0.25)] });
+}
+
+// The ridges: booters just off the crest, facing down into the faces either side.
+for (const [s, r, a] of [
+  ['northeast', 430, 32],
+  ['northeast', 820, -32],
+  ['southeast', 460, -30],
+  ['southeast', 900, 32],
+  ['southwest', 500, 30],
+  ['southwest', 950, -30],
+  ['northwest', 450, -32],
+  ['northwest', 860, 30],
+] as const) {
+  booter(at(s, r, a), 1.4, 22);
+}
+
 // ---------------------------------------------------------------- runs
 // Named lines down each face, kept clear of trees, for the headless riders
-// (tools/sim/face.ts), the dev panel's test spots, and trail signs later.
+// (tools/sim/face.ts), the dev panel's test spots, the trail signs and the trail map.
 const runs: Json[] = [];
 function run(name: string, spots: XZ[], clear = 7): void {
   runs.push({ name, points: spots.map(xz), clear });
 }
 const along = (s: SpokeId, list: [number, number][]): XZ[] => list.map(([r, a]) => P(s, r, a));
+const inTown = (list: [number, number][]): XZ[] => list.map(([u, v]) => T(u, v));
+/** Down the main street from the top of town to past the finish. */
+const MAIN_STREET: [number, number][] = [[6, 0], [40, 0], [80, -3], [118, -5], [150, -5], [176, -5], [196, 4], [230, 4], [270, 0], [300, 0], [350, 0]];
 run('Steeps: Main couloir', along('north', [[18, 0], [62, 0], [200, 0], [340, 0], [400, 10], [520, 40], [625, 42], [760, 20], [1000, 0], [1300, 0], [1600, 0], [1800, 0]]));
 run('Steeps: Narrow chute', along('north', [[18, -10], [62, -29], [200, -29], [345, -29], [400, -60], [560, -95], [640, -95], [755, -150], [900, -120], [1200, -60], [1600, -20], [1800, 0]]));
 run('Steeps: Pillow line', along('north', [[18, 20], [70, 80], [130, 200], [165, 245], [270, 245], [340, 245], [420, 230], [520, 205], [700, 180], [900, 120], [1300, 30], [1800, 0]]));
 run('Steeps: Cliff line', along('north', [[18, 20], [70, 80], [200, 90], [300, 92], [400, 110], [560, 130], [640, 130], [900, 80], [1300, 30], [1800, 0]]));
 run('Bowl: Cornice', along('east', [[18, -20], [55, -60], [100, -60], [300, -40], [600, -20], [800, -40], [1000, -40], [1300, 0], [1830, 0]]));
 run('Bowl: Entrance', along('east', [[18, 0], [50, 0], [150, 0], [400, 30], [600, 60], [850, 120], [1100, 60], [1400, 0], [1830, 0]]));
-run('Glades', along('south', [[18, 0], [60, 0], [400, 0], [790, 0], [1000, -20], [1180, -30], [1450, 0], [1720, 0]]));
-run('Glades: Creek', along('south', [[18, 10], [300, 60], [700, 120], [880, 150], [1050, 165], [1220, 140], [1420, 155], [1600, 60], [1720, 0]]));
+run('Glades', [...along('south', [[18, 0], [60, 0], [400, 0], [790, 0], [1000, -20], [1180, -30], [1450, 0], [1640, 0]]), ...inTown(MAIN_STREET)]);
+run('Glades: Creek', [...along('south', [[18, 10], [300, 60], [700, 120], [880, 150], [1050, 165], [1220, 140], [1420, 155], [1600, 60], [1640, 20]]), ...inTown(MAIN_STREET)]);
+run('Glades: Log jam', [...along('south', [[18, -6], [300, -60], [700, -110], [850, LOG_JAM], [1345, LOG_JAM], [1420, -70], [1468, -50], [1500, -50], [1560, -20], [1640, 0]]), ...inTown(MAIN_STREET)]);
 run('Gully', along('west', [[18, 0], [60, 0], [300, 10], [445, 10], [640, -6], [840, 14], [1040, 0], [1240, 12], [1360, 0], [1720, 0]]), 22);
 run('Rollers', along('west', [[18, -10], [60, -40], [400, -150], [800, -170], [1200, -120], [1450, -40], [1720, 0]]));
 run('Northeast ridge', [...along('northeast', [[18, 0], [130, 0], [400, 0], [700, 0]]), ...along('east', [[1000, -150], [1300, -80], [1830, 0]])]);
 run('Northwest ridge', [...along('northwest', [[18, 0], [130, 0], [400, 0], [700, 0]]), ...along('west', [[1000, 150], [1300, 80], [1720, 0]])]);
+// In town, from the bottom of the glades above it.
+run('Main street', [P('south', 1580, 0), ...inTown(MAIN_STREET)], 12);
+run('Rooftops', [P('south', 1580, -12), ...inTown([[6, -8], [26, ROOF.v], [48, ROOF.v], [100, ROOF.v], [131, ROOF.v], [146, ROOF.v], [176, ROOF.v], [188, ROOF.v], [230, ROOF.v], [243, ROOF.v], [270, -12], [300, -6], [350, -4]])], 6);
+run('Chalets', [P('south', 1580, 12), ...inTown([[6, 10], [30, 25], [50, 25], [80, 26], [96, 27], [123, 27], [160, 28], [190, 30], [234, 30], [250, 26], [277, 22], [295, 11], [350, 6]])], 6);
+
+// ---------------------------------------------------------------- trail signs
+// At each fork, a sign facing the riders coming down to it, a board per
+// run with its difficulty and an arrow the way it goes.
+/** Difficulty from a run's steepest stretch (over 20 m) after the sign, unless given. */
+const LEVELS: Record<string, string> = { 'Main street': 'green', Rooftops: 'blue', Chalets: 'blue' };
+function levelOf(name: string, pts: XZ[], from: number): string {
+  if (LEVELS[name]) return LEVELS[name]!;
+  let steepest = 0;
+  for (let i = Math.max(1, from); i < pts.length; i++) {
+    const a = pts[i - 1]!;
+    const b = pts[i]!;
+    const len = Math.hypot(b.x - a.x, b.z - a.z);
+    for (let d = 0; d + 20 <= len; d += 10) {
+      const p = { x: a.x + ((b.x - a.x) * d) / len, z: a.z + ((b.z - a.z) * d) / len };
+      const q = { x: a.x + ((b.x - a.x) * (d + 20)) / len, z: a.z + ((b.z - a.z) * (d + 20)) / len };
+      steepest = Math.max(steepest, Math.atan((gy(p) - gy(q)) / 20) / DEG);
+    }
+  }
+  return steepest < 16 ? 'green' : steepest < 25 ? 'blue' : steepest < 36 ? 'black' : 'double';
+}
+const decor: Json[] = [];
+/** A sign at p facing `heading` (degrees), naming these runs (shown without the face's name before a colon). */
+function sign(p: XZ, heading: number, header: string, names: string[]): void {
+  const lines = names.map((name) => {
+    const r = runs.find((x) => x.name === name) as { name: string; points: { x: number; z: number }[] } | undefined;
+    if (!r) throw new Error(`sign: no run ${name}`);
+    const pts = r.points;
+    // Where the run goes from here: its point nearest the sign, then 45 m on.
+    let best = 0;
+    pts.forEach((q, i) => {
+      if (Math.hypot(q.x - p.x, q.z - p.z) < Math.hypot(pts[best]!.x - p.x, pts[best]!.z - p.z)) best = i;
+    });
+    let target = pts[pts.length - 1]!;
+    for (let i = best; i < pts.length; i++) {
+      if (Math.hypot(pts[i]!.x - p.x, pts[i]!.z - p.z) > 45) {
+        target = pts[i]!;
+        break;
+      }
+    }
+    const bearing = Math.atan2(-(target.x - p.x), -(target.z - p.z)) / DEG;
+    const turn = ((((bearing - heading) % 360) + 540) % 360) - 180;
+    const text = name.includes(': ') ? name.slice(name.indexOf(': ') + 2) : name;
+    return { text, level: levelOf(name, pts, best), arrow: turn > 18 ? -1 : turn < -18 ? 1 : 0 };
+  });
+  decor.push({ kind: 'sign', ...xz(p), heading: r1(heading), header, lines });
+}
+// The summit: one sign at the top of each face.
+sign(P('north', 9, -7), angle('north', 9), 'The Steeps', ['Steeps: Main couloir', 'Steeps: Narrow chute', 'Steeps: Pillow line', 'Steeps: Cliff line']);
+sign(P('east', 9, 7), angle('east', 9), 'The Bowl', ['Bowl: Cornice', 'Bowl: Entrance', 'Northeast ridge']);
+sign(P('south', 9, -7), angle('south', 9), 'The Glades', ['Glades', 'Glades: Creek', 'Glades: Log jam']);
+sign(P('west', 9, 7), angle('west', 9), 'The Gully', ['Gully', 'Rollers', 'Northwest ridge']);
+// Down the faces, where runs part.
+sign(P('north', 48, 40), angle('north', 48), '', ['Steeps: Pillow line', 'Steeps: Cliff line']);
+sign(P('north', 345, -8), angle('north', 345), '', ['Steeps: Main couloir', 'Steeps: Narrow chute']);
+sign(P('south', 40, 14), angle('south', 40), '', ['Glades: Log jam', 'Glades', 'Glades: Creek']);
+sign(P('west', 40, -14), angle('west', 40), '', ['Gully', 'Rollers']);
+// The top of town.
+sign(T(16, -9), TH, 'Town', ['Main street', 'Rooftops', 'Chalets']);
 
 // ---------------------------------------------------------------- decoration
 /** Trees thin out from here up to the treeline (as far below the summit as the layout is stretched). */
 const TREELINE = 2775;
 // Forests: big dense stands with open ground between them, where a few
-// pines stand alone; groves of bare white aspens lower down.
-const decor: Json[] = [
-  { kind: 'pine', spacing: 11, height: [0, 0, TREELINE - 90, TREELINE], slope: [0, 0, 26, 34], clumps: { size: 220, clear: 0.76 }, seed: 3, minScale: 0.8, maxScale: 1.5, solid: true },
-  { kind: 'pine', spacing: 38, height: [0, 0, TREELINE - 60, TREELINE + 20], slope: [0, 0, 28, 36], clumps: { size: 60, clear: 0.2 }, seed: 13, minScale: 0.9, maxScale: 1.6, solid: true },
-  { kind: 'aspen', spacing: 11, height: [TREELINE - 650, TREELINE - 550, TREELINE - 300, TREELINE - 200], slope: [0, 0, 22, 30], clumps: { size: 80, clear: 0.92 }, seed: 23, minScale: 0.8, maxScale: 1.25, solid: true },
+// pines stand alone; groves of bare white aspens lower down. Rock breaks
+// out of every steep face, with crags standing out of the cliffs.
+decor.push(
+  { kind: 'pine', spacing: 10, height: [0, 0, TREELINE - 90, TREELINE], slope: [0, 0, 26, 34], clumps: { size: 220, clear: 0.72 }, seed: 3, minScale: 0.8, maxScale: 1.5, solid: true },
+  { kind: 'pine', spacing: 34, height: [0, 0, TREELINE - 60, TREELINE + 20], slope: [0, 0, 28, 36], clumps: { size: 60, clear: 0.2 }, seed: 13, minScale: 0.9, maxScale: 1.6, solid: true },
+  { kind: 'aspen', spacing: 10, height: [TREELINE - 650, TREELINE - 550, TREELINE - 300, TREELINE - 200], slope: [0, 0, 22, 30], clumps: { size: 80, clear: 0.9 }, seed: 23, minScale: 0.8, maxScale: 1.25, solid: true },
   { kind: 'snag', spacing: 60, height: [TREELINE - 110, TREELINE - 70, TREELINE, TREELINE + 50], slope: [0, 0, 32, 40], clumps: { size: 50, clear: 0.55 }, seed: 4, minScale: 0.8, maxScale: 1.2, solid: true },
-  { kind: 'rock', spacing: 8, height: [0, 0, 4000, 4000], slope: [46, 54, 90, 90], clumps: { size: 30, clear: 0.2 }, seed: 5, minScale: 1.2, maxScale: 3, solid: false },
+  { kind: 'rock', spacing: 6, height: [0, 0, 4000, 4000], slope: [44, 52, 90, 90], clumps: { size: 30, clear: 0.15 }, seed: 5, minScale: 1.3, maxScale: 3.2, solid: false },
+  { kind: 'crag', spacing: 13, height: [0, 0, 4000, 4000], slope: [48, 56, 90, 90], clumps: { size: 40, clear: 0.3 }, seed: 8, minScale: 0.7, maxScale: 1.4, solid: true },
   { kind: 'boulder', spacing: 40, height: [TREELINE - 140, TREELINE - 40, 4000, 4000], slope: [8, 14, 36, 44], clumps: { size: 80, clear: 0.5 }, seed: 6, minScale: 0.8, maxScale: 1.6, solid: true },
-];
+);
 
-// ---------------------------------------------------------------- start and map
-const start = { type: 'start', style: 'ridge', x: 0, z: 0, heading: 0 };
+// The town's street furniture: lamps (each with a banner) down both sides, bunting across, banners at the top.
+{
+  const lampsAt = [44, 62, 80, 98, 116, 134, 188, 206, 224, 242, 260, 278, 296, 314];
+  decor.push({ kind: 'streetLamp', points: lampsAt.map((u) => xz(T(u, -11.5))), heading: r1(TH + 90), color: '#2f7de1' });
+  decor.push({ kind: 'streetLamp', points: lampsAt.map((u) => xz(T(u, 11.5))), heading: r1(TH - 90), color: '#ff7a1a' });
+  decor.push({ kind: 'streetLamp', points: [xz(T(PLAZA.u + 1, -14.5)), xz(T(PLAZA.u + 1, 14.5))], heading: r1(TH + 180), color: '#33c26a' });
+  for (const u of [62, 116, 224, 296]) decor.push({ kind: 'bunting', points: [xz(T(u, -11.5)), xz(T(u, 11.5))] });
+  decor.push({ kind: 'banner', points: [xz(T(30, -13)), xz(T(30, 13))], heading: r1(TH + 180), color: '#c8331f' });
+  decor.push({ kind: 'hut', points: [xz(T(352, -48))], heading: r1(TH + 90) });
+  decor.push({ kind: 'groomer', points: [xz(T(372, 58))], heading: r1(TH + 70) });
+  // People about town: in front of the shops, on the plaza, waiting at the lift; their skis in racks; snowmobiles parked at the base.
+  const spots = (list: [number, number][]): Json[] => list.map(([u, v]) => xz(T(u, v)));
+  decor.push({ kind: 'skier', points: spots([[74, -13.2], [92, -13.2], [PLAZA.u + 4, -11], [PLAZA.u + 5.2, -10.1], [230, -13.2], [314, -13.3], [350, -40], [352, -42.6]]), heading: r1(TH - 90) });
+  decor.push({ kind: 'skier', points: spots([[PLAZA.u + 21, 11.2], [212, 15.2], [214, 15.6], [322, 13.3], [358, 30], [360, 32.2]]), heading: r1(TH + 90) });
+  decor.push({ kind: 'skiRack', points: spots([[70, -13.3], [88, -13.3]]), heading: r1(TH - 90) });
+  decor.push({ kind: 'skiRack', points: spots([[205, 15.3]]), heading: r1(TH + 90) });
+  decor.push({ kind: 'snowmobile', points: spots([[356, -58], [359.5, -60.5]]), heading: r1(TH + 30), color: '#c8331f' });
+  decor.push({ kind: 'snowmobile', points: spots([[362, 50], [364.5, 53.5]]), heading: r1(TH - 20), color: '#2f6fe0' });
+}
+
+// Chairlifts up each face, from a station by its finish to one high on the face, clear of the runs.
+const lift = (a: XZ, b: XZ): void => {
+  decor.push({ kind: 'chairlift', points: [xz(a), xz(b)] });
+};
+lift(T(368, -78), P('south', 560, -190));
+lift(P('east', 1720, 150), P('east', 760, 270));
+lift(P('north', 1700, 230), P('north', 980, 330));
+lift(P('west', 1640, 170), P('west', 820, 290));
+
+// ---------------------------------------------------------------- the map
 const spawn = { x: 0, z: 0, heading: 0 };
+/** The ranges far around the mountain, past the end of its terrain. */
+const peaks = { seed: 7, count: 13, rings: 3, distance: [13000, 32000], base: 1500, height: [3000, 4800], snowLine: 2250 };
 
 function mapJson(): Json {
   return {
     name: 'Freeride',
     terrain,
-    features: [start],
+    features,
     spawn,
     flags,
     finishes,
     decor,
     runs,
     colors: { sky: '#6fa6dd', fog: '#d6e4f1' },
+    peaks,
   };
 }
 
 // ---------------------------------------------------------------- report
-// Finish widths: across the basin floor, out to where it rises 12 m above the middle.
-{
-  const t0 = performance.now();
-  const hf = generateTerrain(parseMap({ ...mapJson(), finishes: finishes.map((f) => ({ ...f, width: 10 })) }).terrain);
-  console.log(`terrain ${hf.cols}×${hf.rows} built in ${((performance.now() - t0) / 1000).toFixed(2)} s`);
-  for (const [i, [s, f]] of (Object.entries(FINISH) as [SpokeId, { r: number }][]).entries()) {
-    const mid = heightAt(hf, P(s, f.r).x, P(s, f.r).z);
-    const edge = (side: number): number => {
-      let a = 0;
-      while (a < 300) {
-        const p = P(s, f.r, side * a);
-        if (heightAt(hf, p.x, p.z) > mid + 12) break;
-        a += 2;
-      }
-      return a;
-    };
-    finishes[i]!.width = Math.min(edge(-1), edge(1)) * 2;
-  }
+// Finish widths: across the basin floor, out to where it rises 12 m above the middle (the town's spans the town).
+for (const [i, [s, f]] of (Object.entries(FINISH) as [SpokeId, { r: number }][]).entries()) {
+  if (s === 'south') continue;
+  const mid = gy(P(s, f.r));
+  const edge = (side: number): number => {
+    let a = 0;
+    while (a < 300) {
+      if (gy(P(s, f.r, side * a)) > mid + 12) break;
+      a += 2;
+    }
+    return a;
+  };
+  finishes[i]!.width = Math.min(edge(-1), edge(1)) * 2;
 }
 const map = mapJson();
-const parsed = parseMap(map);
-const hf = generateTerrain(parsed.terrain);
+const t0 = performance.now();
+const built = buildMap(parseMap(map));
+console.log(`built in ${((performance.now() - t0) / 1000).toFixed(2)} s`);
+const hf = built.hf;
 const h = (p: XZ): number => heightAt(hf, p.x, p.z);
 for (const s of Object.keys(SPOKES) as SpokeId[]) {
   const marks = [100, 400, 800, 1200, 1600];
@@ -460,12 +916,23 @@ for (const s of Object.keys(SPOKES) as SpokeId[]) {
   const base = f ? `, finish at ${h(P(s, f.r)).toFixed(0)} m (${(h(P(s, 0)) - h(P(s, f.r))).toFixed(0)} m below the summit)` : '';
   console.log(`${SPOKES[s]!.name.padEnd(16)} ${marks.map((r) => `${(r * K).toFixed(0)}: ${h(P(s, r)).toFixed(0)}`).join('  ')}${base}`);
 }
-parsed.flags.forEach((f, i) => {
+built.map.flags.forEach((f, i) => {
   const a = f.heading * DEG;
-  const ahead = h({ x: f.x - Math.sin(a) * 4, z: f.z - Math.cos(a) * 4 });
+  const fore = h({ x: f.x - Math.sin(a) * 4, z: f.z - Math.cos(a) * 4 });
   const behind = h({ x: f.x + Math.sin(a) * 4, z: f.z + Math.cos(a) * 4 });
-  console.log(`  flag ${i + 1}: ${h(f).toFixed(0)} m, ${(Math.atan((behind - ahead) / 8) / DEG).toFixed(0)}° down its heading`);
+  console.log(`  flag ${i + 1}: ${h(f).toFixed(0)} m, ${(Math.atan((behind - fore) / 8) / DEG).toFixed(0)}° down its heading`);
 });
-console.log(`${elements.length} terrain elements, ${flags.length} flags, ${finishes.length} finishes (${parsed.finishes.map((f) => f.width).join(', ')} m wide), ${runs.length} runs`);
+// Everything built must be inside the play area.
+for (const f of built.map.features) {
+  const p = 'x' in f ? f : 'points' in f ? f.points[0]! : null;
+  if (p && !insideBounds(hf.bounds, p.x, p.z)) warnings.push(`${f.type} at (${p.x.toFixed(0)}, ${p.z.toFixed(0)}) is outside the play area`);
+}
+const count = (t: string): number => built.map.features.filter((f) => f.type === t).length;
+console.log(
+  `${elements.length} terrain elements, ${flags.length} flags, ${finishes.length} finishes (${built.map.finishes.map((f) => f.width).join(', ')} m wide), ${runs.length} runs; ` +
+    `${count('building')} buildings, ${count('terrace')} terraces, ${count('jump')} jumps, ${count('kicker')} kickers, ${count('rail')} rails, ${count('box')} boxes; ` +
+    `${built.course.obstacles.count} obstacles, ${built.decor.scatter.length} scatter, ${built.decor.signs.length} signs`,
+);
+for (const w of warnings) console.log(`WARNING: ${w}`);
 writeFileSync('src/maps/freeride.json', JSON.stringify(map, null, 1) + '\n');
 console.log('wrote src/maps/freeride.json');

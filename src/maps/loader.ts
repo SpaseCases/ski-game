@@ -1,5 +1,7 @@
 import type {
   AreaDef,
+  BoxStyle,
+  BuildingStyle,
   DecorDef,
   Feature,
   FinishDef,
@@ -8,12 +10,16 @@ import type {
   LineKind,
   MapDef,
   PeakTerrainDef,
+  PeaksDef,
   PitchSection,
   PropKind,
   RailPoint,
+  RailStyle,
   Ramp4,
   RollersDef,
+  RoofStyle,
   RunDef,
+  RunLevel,
   ScatterKind,
   SpokeDef,
   StartStyle,
@@ -23,10 +29,15 @@ import type {
   XZ,
 } from './types.ts';
 
-const SCATTER_KINDS: readonly ScatterKind[] = ['pine', 'aspen', 'snag', 'rock', 'boulder'];
+const SCATTER_KINDS: readonly ScatterKind[] = ['pine', 'aspen', 'snag', 'rock', 'boulder', 'crag'];
 const LINE_KINDS: readonly LineKind[] = ['fence', 'netting', 'barrier', 'dyeLine', 'bunting', 'chairlift'];
-const PROP_KINDS: readonly PropKind[] = ['lightPole', 'floodlight', 'banner', 'flag', 'groomer'];
+const PROP_KINDS: readonly PropKind[] = ['lightPole', 'floodlight', 'banner', 'flag', 'groomer', 'streetLamp', 'hut', 'snowmobile', 'skier', 'skiRack'];
 const START_STYLES: readonly StartStyle[] = ['deck', 'tower', 'ridge', 'race'];
+const RAIL_STYLES: readonly RailStyle[] = ['metal', 'handrail', 'log'];
+const BOX_STYLES: readonly BoxStyle[] = ['wood', 'ledge', 'bench', 'rock', 'stump'];
+const ROOF_STYLES: readonly RoofStyle[] = ['gable', 'shed', 'flat'];
+const BUILDING_STYLES: readonly BuildingStyle[] = ['chalet', 'shop', 'lodge', 'station'];
+const RUN_LEVELS: readonly RunLevel[] = ['green', 'blue', 'black', 'double'];
 
 /**
  * Checks raw JSON against the map format and returns a typed MapDef, filling
@@ -55,6 +66,21 @@ export function parseMap(raw: unknown): MapDef {
       sky: str(colors.sky, 'colors.sky'),
       fog: str(colors.fog, 'colors.fog'),
     },
+    peaks: map.peaks === undefined ? undefined : parsePeaks(map.peaks),
+  };
+}
+
+function parsePeaks(raw: unknown): PeaksDef {
+  const o = obj(raw, 'peaks');
+  const n = reader(o, 'peaks');
+  return {
+    seed: n('seed', 1),
+    count: n('count'),
+    rings: n('rings', 2),
+    distance: pair(o.distance, 'peaks.distance'),
+    base: n('base'),
+    height: pair(o.height, 'peaks.height'),
+    snowLine: n('snowLine'),
   };
 }
 
@@ -239,8 +265,14 @@ function parseFlag(raw: unknown, path: string): FlagDef {
 }
 
 function parseFinish(raw: unknown, path: string): FinishDef {
-  const n = reader(obj(raw, path), path);
-  return { x: n('x'), z: n('z'), heading: n('heading'), width: n('width'), length: n('length') };
+  const o = obj(raw, path);
+  const n = reader(o, path);
+  const f: FinishDef = { x: n('x'), z: n('z'), heading: n('heading'), width: n('width'), length: n('length') };
+  if (o.arch !== undefined) {
+    const a = reader(obj(o.arch, `${path}.arch`), `${path}.arch`);
+    f.arch = { x: a('x'), z: a('z'), width: a('width') };
+  }
+  return f;
 }
 
 function parseRun(raw: unknown, path: string): RunDef {
@@ -253,9 +285,54 @@ function parseFeature(raw: unknown, path: string): Feature {
   const n = reader(f, path);
   switch (f.type) {
     case 'box':
-      return { type: 'box', width: n('width'), points: railPoints(f.points, `${path}.points`), follow: n('follow', 0) };
+      return {
+        type: 'box',
+        width: n('width'),
+        points: railPoints(f.points, `${path}.points`),
+        follow: n('follow', 0),
+        style: f.style === undefined ? 'wood' : oneOf(f.style, BOX_STYLES, `${path}.style`),
+      };
     case 'rail':
-      return { type: 'rail', points: railPoints(f.points, `${path}.points`), follow: n('follow', 0) };
+      return {
+        type: 'rail',
+        points: railPoints(f.points, `${path}.points`),
+        follow: n('follow', 0),
+        style: f.style === undefined ? 'metal' : oneOf(f.style, RAIL_STYLES, `${path}.style`),
+        radius: n('radius', 0),
+      };
+    case 'building':
+      return {
+        type: 'building',
+        x: n('x'),
+        z: n('z'),
+        yaw: n('yaw', 0),
+        length: n('length'),
+        width: n('width'),
+        eave: n('eave'),
+        roof: oneOf(f.roof, ROOF_STYLES, `${path}.roof`),
+        rise: n('rise', 0),
+        drift: n('drift', 0),
+        apron: n('apron', 0),
+        lip: f.roof === 'gable' ? 0 : n('lip', 0),
+        style: oneOf(f.style, BUILDING_STYLES, `${path}.style`),
+        color: f.color === undefined ? '#a87443' : str(f.color, `${path}.color`),
+        front: f.front === undefined ? 'down' : oneOf(f.front, ['left', 'right', 'up', 'down'] as const, `${path}.front`),
+        sign: f.sign === undefined ? '' : str(f.sign, `${path}.sign`),
+        chimney: f.chimney === undefined ? false : bool(f.chimney, `${path}.chimney`),
+      };
+    case 'terrace':
+      return {
+        type: 'terrace',
+        x: n('x'),
+        z: n('z'),
+        yaw: n('yaw', 0),
+        length: n('length'),
+        width: n('width'),
+        height: n('height'),
+        stairs: n('stairs', 0),
+        stairAngle: n('stairAngle', 30),
+        handrails: f.handrails === undefined ? true : bool(f.handrails, `${path}.handrails`),
+      };
     case 'jump': {
       const lipHeight = n('lipHeight');
       const deck = f.deck === undefined ? true : bool(f.deck, `${path}.deck`);
@@ -274,6 +351,7 @@ function parseFeature(raw: unknown, path: string): Feature {
         landingAngle: n('landingAngle'),
         knuckle: n('knuckle', 3),
         transition: n('transition', 5),
+        natural: natural(f, path),
       };
     }
     case 'kicker': {
@@ -288,6 +366,7 @@ function parseFeature(raw: unknown, path: string): Feature {
         lipHeight,
         lipAngle: n('lipAngle'),
         back: n('back', Math.max(1, 1.2 * lipHeight)),
+        natural: natural(f, path),
       };
     }
     case 'landing': {
@@ -305,6 +384,7 @@ function parseFeature(raw: unknown, path: string): Feature {
         top: n('top', 2),
         knuckle: n('knuckle', 3),
         transition: n('transition', 5),
+        natural: natural(f, path),
       };
     }
     case 'halfpipe':
@@ -346,6 +426,11 @@ function parseFeature(raw: unknown, path: string): Feature {
     default:
       throw new Error(`Map: ${path} has unknown type ${String(f.type)}`);
   }
+}
+
+/** A jump, kicker or landing dug out of the snow (no dyed lip). */
+function natural(f: Record<string, unknown>, path: string): boolean {
+  return f.natural === undefined ? false : bool(f.natural, `${path}.natural`);
 }
 
 function railPoints(raw: unknown, path: string): RailPoint[] {
@@ -390,6 +475,20 @@ function parseDecor(raw: unknown, path: string): DecorDef {
   const d = obj(raw, path);
   const n = reader(d, path);
   const kind = str(d.kind, `${path}.kind`);
+  if (kind === 'sign') {
+    return {
+      kind: 'sign',
+      x: n('x'),
+      z: n('z'),
+      heading: n('heading', 0),
+      header: d.header === undefined ? '' : str(d.header, `${path}.header`),
+      lines: arr(d.lines, `${path}.lines`).map((l, i) => {
+        const p = `${path}.lines[${i}]`;
+        const o = obj(l, p);
+        return { text: str(o.text, `${p}.text`), level: oneOf(o.level, RUN_LEVELS, `${p}.level`), arrow: reader(o, p)('arrow', 0) };
+      }),
+    };
+  }
   if ((SCATTER_KINDS as readonly string[]).includes(kind) && d.spacing !== undefined) {
     const clumps = d.clumps === undefined ? undefined : reader(obj(d.clumps, `${path}.clumps`), `${path}.clumps`);
     return {

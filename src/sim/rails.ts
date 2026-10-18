@@ -7,14 +7,19 @@ import { heightAt, type Vec3Like } from './terrain.ts';
 // seen from above: a point is "over" a segment when it projects inside it,
 // and its distance across is measured to the right of the segment's direction.
 
+/** Radius (m) of a fallen tree, unless its rail gives one. */
+const LOG_RADIUS = 0.3;
+
 /** Builds the slide lines for every rail and box in the map, sitting on the snow (and on any shapes built on it). */
 export function buildRailShapes(features: readonly Feature[], hf: Heightfield): RailShape[] {
   const shapes: RailShape[] = [];
   for (const f of features) {
     if (f.type !== 'box' && f.type !== 'rail') continue;
-    const halfWidth = f.type === 'box' ? f.width / 2 : CONFIG.rails.radius;
+    const halfWidth = f.type === 'box' ? f.width / 2 : f.radius > 0 ? f.radius : f.style === 'log' ? LOG_RADIUS : CONFIG.rails.radius;
+    // Logs, benches and stumps are wood, ledges and rocks stone; park box decks and rails are metal.
+    const metal = f.type === 'rail' ? f.style !== 'log' : f.style === 'wood';
     const points = f.points.map((p) => [p.x, p.z, p.height] as const);
-    shapes.push(makeShape(f.type, halfWidth, f.follow > 0 ? followSnow(points, f.follow) : points, hf));
+    shapes.push(makeShape(f.type, f.style, metal, halfWidth, f.follow > 0 ? followSnow(points, f.follow) : points, hf));
   }
   return shapes;
 }
@@ -36,7 +41,7 @@ function followSnow(points: readonly LinePoint[], spacing: number): LinePoint[] 
   return out;
 }
 
-function makeShape(kind: RailShape['kind'], halfWidth: number, points: readonly LinePoint[], hf: Heightfield): RailShape {
+function makeShape(kind: RailShape['kind'], look: RailShape['look'], metal: boolean, halfWidth: number, points: readonly LinePoint[], hf: Heightfield): RailShape {
   const xyz = new Float32Array(points.length * 3);
   const dist = new Float32Array(points.length);
   let px = 0;
@@ -55,7 +60,7 @@ function makeShape(kind: RailShape['kind'], halfWidth: number, points: readonly 
     box.minZ = Math.min(box.minZ, z);
     box.maxZ = Math.max(box.maxZ, z);
   });
-  return { kind, points: xyz, dist, length: dist[points.length - 1] ?? 0, halfWidth, ...box };
+  return { kind, look, metal, points: xyz, dist, length: dist[points.length - 1] ?? 0, halfWidth, ...box };
 }
 
 /** True when (x, z) is more than `reach` beyond a rail's bounding box. */

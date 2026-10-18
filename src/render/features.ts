@@ -1,12 +1,14 @@
 import { BufferAttribute, BufferGeometry, Color, Group, Mesh, MeshLambertMaterial } from 'three';
-import { pipeHalfWidth, sampleShape, type ShapeSample } from '../maps/shapes.ts';
+import { pipeHalfWidth, sampleShape, SURFACE, type ShapeSample } from '../maps/shapes.ts';
 import { hash2 } from '../maps/terrain.ts';
 import type { Heightfield, PipeShape, RailShape, RampShape, TerrainShape } from '../maps/types.ts';
 import { createRailMesh } from './railMesh.ts';
 import { renderedHeightAt } from './terrainMesh.ts';
 
-// Shapes are snow, with dyed blue lines along lips (and along the top of a
-// halfpipe's walls) so they read from a distance. Start decks are wood.
+// Shapes are snow, with dyed blue lines along park lips (and along the top
+// of a halfpipe's walls) so they read from a distance. Start decks are
+// wood. Ramps (jumps, decks, roofs, drifts, terraces) are merged into one
+// mesh per 64 m tile; each halfpipe is its own mesh.
 const SNOW = new Color('#f7f9fd');
 const SNOW_SHADE = new Color('#c9d6e8');
 const LIP_LINE = new Color('#3f7fe0');
@@ -15,12 +17,18 @@ const WOOD_DARK = new Color('#8f5f35');
 const LIP_LINE_WIDTH = 0.6;
 /** Plank width (m) on wooden decks. */
 const PLANK = 0.3;
-/** Grid spacing (m) of ramp meshes, fine enough for a round takeoff. */
+/** Grid spacing (m) of ramp meshes where they curve, fine enough for a round takeoff, and where they run straight. */
 const RAMP_STEP = 0.5;
+const RAMP_STEP_STRAIGHT = 2;
+/** Curved stretches longer than RAMP_LONG (m) use steps of RAMP_STEP_LONG. */
+const RAMP_LONG = 9;
+const RAMP_STEP_LONG = 1;
 /** Pipe grid: steps along it (fine near the ends, coarse in the middle), and facets per wall transition. */
 const PIPE_STEP_FINE = 1;
 const PIPE_STEP = 2;
 const PIPE_TRANSITION_STEPS = 14;
+/** Size (m) of a tile of merged ramp meshes. */
+const TILE = 64;
 
 const material = new MeshLambertMaterial({
   vertexColors: true,
@@ -38,15 +46,46 @@ const material = new MeshLambertMaterial({
  */
 export function createFeatureMeshes(hf: Heightfield, rails: readonly RailShape[]): Group {
   const group = new Group();
+  const tiles = new Map<string, Tris>();
   for (const [i, shape] of (hf.shapes ?? []).entries()) {
-    group.add(shape.kind === 'ramp' ? createRamp(shape, hf, i) : createPipe(shape, hf, i));
+    if (shape.kind === 'pipe') {
+      const t: Tris = { positions: [], colors: [] };
+      createPipe(shape, hf, i, t);
+      group.add(toMesh(t));
+      continue;
+    }
+    const key = `${Math.floor((shape.minX + shape.maxX) / 2 / TILE)},${Math.floor((shape.minZ + shape.maxZ) / 2 / TILE)}`;
+    let t = tiles.get(key);
+    if (!t) {
+      t = { positions: [], colors: [] };
+      tiles.set(key, t);
+    }
+    createRamp(shape, hf, i, t);
   }
+  for (const t of tiles.values()) if (t.positions.length > 0) group.add(toMesh(t));
   if (rails.length > 0) group.add(createRailMesh(rails, hf));
   return group;
 }
 
-/** Face color for one cell of a shape's grid. */
-type FaceColor = (a: number, b: number, tri: number, out: Color) => void;
+/** Triangles collected for one mesh: positions and colors, three numbers a vertex. */
+interface Tris {
+  positions: number[];
+  colors: number[];
+}
+
+function toMesh(t: Tris): Mesh {
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(new Float32Array(t.positions), 3));
+  geometry.setAttribute('color', new BufferAttribute(new Float32Array(t.colors), 3));
+  // No normals: flat shading works them out per face on the GPU.
+  geometry.computeBoundingSphere();
+  const mesh = new Mesh(geometry, material);
+  mesh.matrixAutoUpdate = false;
+  return mesh;
+}
+
+/** Face color for one cell of a shape's grid, or false to leave the cell out. */
+type FaceColor = (a: number, b: number, tri: number, out: Color) => boolean;
 
 /**
  * A grid laid over the snow: vertex (a, b) sits at world (x, z) from
@@ -54,13 +93,7 @@ type FaceColor = (a: number, b: number, tri: number, out: Color) => void;
  * the slope seamlessly. Where another shape is higher, that one's mesh
  * covers this one, matching the sim's "highest wins".
  */
-function gridMesh(
-  shape: TerrainShape,
-  hf: Heightfield,
-  us: readonly number[],
-  vs: readonly number[],
-  color: FaceColor,
-): Mesh {
+function gridMesh(shape: TerrainShape, hf: Heightfield, us: readonly number[], vs: readonly number[], color: FaceColor, out: Tris): void {
   const nu = us.length - 1;
   const nv = vs.length - 1;
   const sample: ShapeSample = { height: 0, dhdx: 0, dhdz: 0 };
@@ -80,49 +113,34 @@ function gridMesh(
     }
   }
 
-  const positions = new Float32Array(nu * nv * 18);
-  const colors = new Float32Array(nu * nv * 18);
-  let p = 0;
-  let c = 0;
   const face = new Color();
+  const { positions, colors } = out;
   const vertex = (a: number, b: number): void => {
     const k = a * (nv + 1) + b;
-    positions[p++] = gx[k] ?? 0;
-    positions[p++] = gy[k] ?? 0;
-    positions[p++] = gz[k] ?? 0;
+    positions.push(gx[k] ?? 0, gy[k] ?? 0, gz[k] ?? 0);
   };
-  const paint = (a: number, b: number, tri: number): void => {
-    color(a, b, tri, face);
-    for (let k = 0; k < 3; k++) {
-      colors[c++] = face.r;
-      colors[c++] = face.g;
-      colors[c++] = face.b;
-    }
+  const paint = (): void => {
+    for (let k = 0; k < 3; k++) colors.push(face.r, face.g, face.b);
   };
 
   // a runs along the shape and b to its right; this order winds each
   // triangle counter-clockwise seen from above, so faces point up.
   for (let a = 0; a < nu; a++) {
     for (let b = 0; b < nv; b++) {
-      vertex(a, b);
-      vertex(a + 1, b + 1);
-      vertex(a + 1, b);
-      paint(a, b, 0);
-      vertex(a, b);
-      vertex(a, b + 1);
-      vertex(a + 1, b + 1);
-      paint(a, b, 1);
+      if (color(a, b, 0, face)) {
+        vertex(a, b);
+        vertex(a + 1, b + 1);
+        vertex(a + 1, b);
+        paint();
+      }
+      if (color(a, b, 1, face)) {
+        vertex(a, b);
+        vertex(a, b + 1);
+        vertex(a + 1, b + 1);
+        paint();
+      }
     }
   }
-
-  const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new BufferAttribute(colors, 3));
-  // No normals: flat shading works them out per face on the GPU.
-  geometry.computeBoundingSphere();
-  const mesh = new Mesh(geometry, material);
-  mesh.matrixAutoUpdate = false;
-  return mesh;
 }
 
 function snowShade(a: number, b: number, tri: number, seed: number, out: Color): void {
@@ -136,31 +154,52 @@ function steps(out: number[], from: number, to: number, step: number): void {
   for (let i = 1; i <= n; i++) out.push(from + ((to - from) * i) / n);
 }
 
-function createRamp(r: RampShape, hf: Heightfield, seed: number): Mesh {
+/** True when knot segment k (from knot k - 1 to k) of a ramp is a straight line (a roof, a deck, a stair). */
+function straight(r: RampShape, k: number): boolean {
+  const len = (r.ku[k] ?? 0) - (r.ku[k - 1] ?? 0);
+  const m = ((r.kh[k] ?? 0) - (r.kh[k - 1] ?? 0)) / len;
+  return Math.abs((r.kOut[k - 1] ?? 0) - m) < 1e-3 && Math.abs((r.kIn[k] ?? 0) - m) < 1e-3;
+}
+
+function createRamp(r: RampShape, hf: Heightfield, seed: number, out: Tris): void {
   // Grid lines land exactly on every knot, so a lip stays a sharp edge.
   const us = [r.ku[0] ?? 0];
-  for (let k = 1; k < r.ku.length; k++) steps(us, r.ku[k - 1] ?? 0, r.ku[k] ?? 0, RAMP_STEP);
+  for (let k = 1; k < r.ku.length; k++) {
+    // Long gentle curves (drifts, landing drifts) bend slowly enough for a coarser grid than a lip.
+    const len = (r.ku[k] ?? 0) - (r.ku[k - 1] ?? 0);
+    steps(us, r.ku[k - 1] ?? 0, r.ku[k] ?? 0, straight(r, k) ? RAMP_STEP_STRAIGHT : len > RAMP_LONG ? RAMP_STEP_LONG : RAMP_STEP);
+  }
   const edge = r.sides ? r.halfWidth + r.sideWidth : r.halfWidth;
   const vs = [-edge];
   if (r.sides) steps(vs, -edge, -r.halfWidth, RAMP_STEP);
-  steps(vs, -r.halfWidth, r.halfWidth, RAMP_STEP);
+  steps(vs, -r.halfWidth, r.halfWidth, RAMP_STEP_STRAIGHT);
   if (r.sides) steps(vs, r.halfWidth, edge, RAMP_STEP);
 
-  return gridMesh(r, hf, us, vs, (a, b, tri, out) => {
-    const uMid = ((us[a] ?? 0) + (us[a + 1] ?? 0)) / 2;
-    let k = 1;
-    while (k < r.ku.length - 1 && uMid > (r.ku[k] ?? 0)) k++;
-    if (r.wood[k]) {
-      out.copy(Math.floor(uMid / PLANK) % 2 === 0 ? WOOD : WOOD_DARK);
-    } else if (r.lips.some((lip) => uMid > lip - LIP_LINE_WIDTH && uMid < lip)) {
-      out.copy(LIP_LINE);
-    } else {
-      snowShade(a, b, tri, seed + 211, out);
-    }
-  });
+  gridMesh(
+    r,
+    hf,
+    us,
+    vs,
+    (a, b, tri, color) => {
+      const uMid = ((us[a] ?? 0) + (us[a + 1] ?? 0)) / 2;
+      let k = 1;
+      while (k < r.ku.length - 1 && uMid > (r.ku[k] ?? 0)) k++;
+      const surface = r.surface[k];
+      if (surface === SURFACE.hidden) return false;
+      if (surface === SURFACE.wood) {
+        color.copy(Math.floor(uMid / PLANK) % 2 === 0 ? WOOD : WOOD_DARK);
+      } else if (r.lips.some((lip) => uMid > lip - LIP_LINE_WIDTH && uMid < lip)) {
+        color.copy(LIP_LINE);
+      } else {
+        snowShade(a, b, tri, seed + 211, color);
+      }
+      return true;
+    },
+    out,
+  );
 }
 
-function createPipe(s: PipeShape, hf: Heightfield, seed: number): Mesh {
+function createPipe(s: PipeShape, hf: Heightfield, seed: number, out: Tris): void {
   const us = [-s.back];
   steps(us, -s.back, s.dropIn + s.entry, PIPE_STEP_FINE);
   steps(us, s.dropIn + s.entry, s.length - s.exit, PIPE_STEP);
@@ -181,12 +220,20 @@ function createPipe(s: PipeShape, hf: Heightfield, seed: number): Mesh {
   steps(half, deck, pipeHalfWidth(s), 1);
   const vs = [...half.slice(1).reverse().map((v) => -v), ...half];
 
-  return gridMesh(s, hf, us, vs, (a, b, tri, out) => {
-    const vMid = Math.abs(((vs[b] ?? 0) + (vs[b + 1] ?? 0)) / 2);
-    const uMid = ((us[a] ?? 0) + (us[a + 1] ?? 0)) / 2;
-    const coping = vMid > top && vMid < top + LIP_LINE_WIDTH && uMid > s.dropIn;
-    const dropEdge = uMid > s.dropIn - LIP_LINE_WIDTH && uMid < s.dropIn && vMid < top;
-    if (coping || dropEdge) out.copy(LIP_LINE);
-    else snowShade(a, b, tri, seed + 307, out);
-  });
+  gridMesh(
+    s,
+    hf,
+    us,
+    vs,
+    (a, b, tri, color) => {
+      const vMid = Math.abs(((vs[b] ?? 0) + (vs[b + 1] ?? 0)) / 2);
+      const uMid = ((us[a] ?? 0) + (us[a + 1] ?? 0)) / 2;
+      const coping = vMid > top && vMid < top + LIP_LINE_WIDTH && uMid > s.dropIn;
+      const dropEdge = uMid > s.dropIn - LIP_LINE_WIDTH && uMid < s.dropIn && vMid < top;
+      if (coping || dropEdge) color.copy(LIP_LINE);
+      else snowShade(a, b, tri, seed + 307, color);
+      return true;
+    },
+    out,
+  );
 }

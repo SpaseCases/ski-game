@@ -1,12 +1,15 @@
 import type { BuiltMap } from '../maps/build.ts';
+import { framePoint, townFrame } from '../maps/town.ts';
 import type { MapDef, XZ } from '../maps/types.ts';
 import { insideBounds } from '../sim/bounds.ts';
 
 // The trail map: a drawn map of the whole mountain, opened with M (or the
 // HUD button) and closed with M or Esc. The game waits behind it, like the
 // map menu. It shows the ground (shaded, rock in gray, steep slopes tinted
-// blue like a piste map's black runs, forests as dots), the faces' names,
-// every named run, the flags, the finishes, the start, and where you are.
+// blue like a piste map's black runs, forests as dots), the town's
+// buildings, the chairlifts, the faces' names, every named run, jumps and
+// booters, rails and logs, the flags, the finishes, the start, and where
+// you are.
 // Like a piste map it's drawn as if seen from the valley: the start's way
 // down points down the page, with a north arrow in the corner.
 
@@ -81,8 +84,9 @@ export class TrailMap {
     foot.className = 'menu-foot trail-map-legend';
     foot.innerHTML =
       '<span><i class="tm-you"></i>You</span><span><i class="tm-flag"></i>Flag (checkpoint)</span>' +
-      '<span><i class="tm-finish"></i>Finish</span><span><i class="tm-steep"></i>Steeper than 30°</span>' +
-      '<span><i class="tm-rock"></i>Rock</span><span><i class="tm-trees"></i>Trees</span>';
+      '<span><i class="tm-finish"></i>Finish</span><span><i class="tm-jump"></i>Jump or booter</span>' +
+      '<span><i class="tm-rail"></i>Rail, box or log</span><span><i class="tm-lift"></i>Chairlift</span>' +
+      '<span><i class="tm-steep"></i>Steeper than 30°</span><span><i class="tm-rock"></i>Rock</span><span><i class="tm-trees"></i>Trees</span>';
     panel.append(head, this.canvas, foot);
     this.root.appendChild(panel);
     hud.appendChild(this.root);
@@ -227,6 +231,55 @@ function drawRelief(built: BuiltMap): { built: BuiltMap; image: HTMLCanvasElemen
     const [x, y] = toPage(frame, t.x, t.z);
     g.fillRect(x - dot / 2, y - dot / 2, dot, dot);
   }
+
+  // Buildings and terraces, at least a couple of pixels across so the town shows.
+  for (const f of built.map.features) {
+    if (f.type !== 'building' && f.type !== 'terrace') continue;
+    const t = townFrame(f);
+    const grow = Math.max(0, 2.2 / frame.scale - Math.min(f.length, f.width)) / 2;
+    const corners = [
+      framePoint(t, -grow, -f.width / 2 - grow),
+      framePoint(t, f.length + grow, -f.width / 2 - grow),
+      framePoint(t, f.length + grow, f.width / 2 + grow),
+      framePoint(t, -grow, f.width / 2 + grow),
+    ].map((p) => toPage(frame, p.x, p.z));
+    g.beginPath();
+    corners.forEach(([x, y], i) => (i === 0 ? g.moveTo(x, y) : g.lineTo(x, y)));
+    g.closePath();
+    g.fillStyle = f.type === 'building' ? '#5b4636' : '#9aa0a6';
+    g.fill();
+  }
+
+  // Chairlifts: a dark line with a tick at each tower and a block at each station.
+  for (const d of built.map.decor) {
+    if (d.kind !== 'chairlift' || !('points' in d)) continue;
+    const pts = d.points.map((p) => toPage(frame, p.x, p.z));
+    g.beginPath();
+    pts.forEach(([x, y], i) => (i === 0 ? g.moveTo(x, y) : g.lineTo(x, y)));
+    g.lineWidth = 1.5;
+    g.strokeStyle = '#1b2430';
+    g.stroke();
+    for (let i = 1; i < pts.length; i++) {
+      const [ax, ay] = pts[i - 1]!;
+      const [bx, by] = pts[i]!;
+      const len = Math.hypot(bx - ax, by - ay);
+      const nx = (-(by - ay) / len) * 3;
+      const ny = ((bx - ax) / len) * 3;
+      for (let s = 0; s <= len; s += 9) {
+        const x = ax + ((bx - ax) * s) / len;
+        const y = ay + ((by - ay) * s) / len;
+        g.beginPath();
+        g.moveTo(x - nx, y - ny);
+        g.lineTo(x + nx, y + ny);
+        g.lineWidth = 1;
+        g.stroke();
+      }
+    }
+    for (const [x, y] of [pts[0]!, pts[pts.length - 1]!]) {
+      g.fillStyle = '#c8331f';
+      g.fillRect(x - 3, y - 3, 6, 6);
+    }
+  }
   return { built, image, frame };
 }
 
@@ -296,15 +349,77 @@ function drawOverlay(g: CanvasRenderingContext2D, map: MapDef, f: Frame, at: XZ,
     label(run.name, spot[0], spot[1], font, color);
   });
 
-  // Finishes: a checkered bar across each finish line.
+  // Jumps and booters: a small chevron pointing the way off them. Rails, boxes and logs: a short bar along them.
+  for (const feat of map.features) {
+    if (feat.type === 'jump' || feat.type === 'kicker') {
+      const h = feat.yaw * DEG;
+      const fx = -Math.sin(h);
+      const fz = -Math.cos(h);
+      const dx = fx * f.rightX + fz * f.rightZ;
+      const dy = fx * f.downX + fz * f.downZ;
+      const [x, y] = px(feat);
+      g.beginPath();
+      g.moveTo(x - dy * 4 - dx * 2, y + dx * 4 - dy * 2);
+      g.lineTo(x + dx * 4, y + dy * 4);
+      g.lineTo(x + dy * 4 - dx * 2, y - dx * 4 - dy * 2);
+      g.lineWidth = 2;
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      g.strokeStyle = feat.natural ? '#1b2430' : '#2f6fe0';
+      g.stroke();
+    } else if (feat.type === 'rail' || feat.type === 'box') {
+      const a = px(feat.points[0]!);
+      const b = px(feat.points[feat.points.length - 1]!);
+      const len = Math.max(1e-6, Math.hypot(b[0] - a[0], b[1] - a[1]));
+      // Long enough to see, however short it is on the page.
+      const grow = Math.max(0, 6 - len) / 2;
+      g.beginPath();
+      g.moveTo(a[0] - ((b[0] - a[0]) / len) * grow, a[1] - ((b[1] - a[1]) / len) * grow);
+      g.lineTo(b[0] + ((b[0] - a[0]) / len) * grow, b[1] + ((b[1] - a[1]) / len) * grow);
+      g.lineWidth = 2.5;
+      g.lineCap = 'round';
+      g.strokeStyle = feat.type === 'rail' && feat.style === 'log' ? '#7a4f2c' : '#56606b';
+      g.stroke();
+    }
+  }
+
+  // The town's name over its buildings.
+  const buildings = map.features.filter((ft) => ft.type === 'building');
+  if (buildings.length >= 6) {
+    const cx = buildings.reduce((sum, b) => sum + b.x, 0) / buildings.length;
+    const cz = buildings.reduce((sum, b) => sum + b.z, 0) / buildings.length;
+    const [x, y] = px({ x: cx, z: cz });
+    label('TOWN', x, y, '800 13px system-ui, sans-serif', 'rgba(20, 32, 48, 0.75)');
+  }
+
+  // Finishes: a checkered bar across each finish line, or across its arch on a wide run-out (the zone outlined faintly).
   for (const fin of map.finishes) {
     const h = fin.heading * DEG;
     const rx = Math.cos(h);
     const rz = -Math.sin(h);
-    const n = Math.max(2, Math.round((fin.width * f.scale) / 6));
+    if (fin.arch) {
+      const dx = -Math.sin(h);
+      const dz = -Math.cos(h);
+      const c = (a: number, s: number): [number, number] => px({ x: fin.x + dx * a + rx * s, z: fin.z + dz * a + rz * s });
+      const corners = [c(0, -fin.width / 2), c(0, fin.width / 2), c(fin.length, fin.width / 2), c(fin.length, -fin.width / 2)];
+      g.beginPath();
+      corners.forEach(([x, y], i) => (i === 0 ? g.moveTo(x, y) : g.lineTo(x, y)));
+      g.closePath();
+      g.fillStyle = 'rgba(27, 36, 48, 0.08)';
+      g.fill();
+      g.setLineDash([4, 4]);
+      g.lineWidth = 1;
+      g.strokeStyle = 'rgba(27, 36, 48, 0.45)';
+      g.stroke();
+      g.setLineDash([]);
+    }
+    const line = fin.arch ?? fin;
+    // At least a few checks wide, so a narrow arch still shows.
+    const width = Math.max(line.width, 26 / f.scale);
+    const n = Math.max(2, Math.round((width * f.scale) / 6));
     for (let i = 0; i < n; i++) {
-      const a = px({ x: fin.x + rx * (-fin.width / 2 + (fin.width * i) / n), z: fin.z + rz * (-fin.width / 2 + (fin.width * i) / n) });
-      const b = px({ x: fin.x + rx * (-fin.width / 2 + (fin.width * (i + 1)) / n), z: fin.z + rz * (-fin.width / 2 + (fin.width * (i + 1)) / n) });
+      const a = px({ x: line.x + rx * (-width / 2 + (width * i) / n), z: line.z + rz * (-width / 2 + (width * i) / n) });
+      const b = px({ x: line.x + rx * (-width / 2 + (width * (i + 1)) / n), z: line.z + rz * (-width / 2 + (width * (i + 1)) / n) });
       g.beginPath();
       g.moveTo(a[0], a[1]);
       g.lineTo(b[0], b[1]);

@@ -8,7 +8,8 @@ import {
   WebGLRenderer,
 } from 'three';
 import { CONFIG } from '../config.ts';
-import type { MapDef } from '../maps/types.ts';
+import type { BuiltMap } from '../maps/build.ts';
+import { Backdrop } from './backdrop.ts';
 
 export interface View {
   renderer: WebGLRenderer;
@@ -16,6 +17,8 @@ export interface View {
   camera: PerspectiveCamera;
   /** Sky light; its sky color follows the map's. */
   hemi: HemisphereLight;
+  /** The sky and far ranges, drawn first each frame. */
+  backdrop: Backdrop;
 }
 
 /** Sky and fog before any map is loaded (the map-select menu). */
@@ -30,6 +33,8 @@ export function createView(container: HTMLElement): View {
   });
   renderer.setPixelRatio(CONFIG.render.pixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
+  // Each frame clears once, draws the backdrop, then the world over it (see renderFrame).
+  renderer.autoClear = false;
   container.appendChild(renderer.domElement);
 
   const scene = new Scene();
@@ -38,7 +43,6 @@ export function createView(container: HTMLElement): View {
   // off, only things that move (with matrixAutoUpdate on) update.
   scene.matrixAutoUpdate = false;
   const fogColor = new Color(DEFAULT_FOG);
-  scene.background = fogColor;
   scene.fog = new Fog(fogColor.clone(), CONFIG.render.fogNear, CONFIG.render.fogFar);
 
   // Nothing past the fog is visible, so the far plane stops there too.
@@ -62,23 +66,36 @@ export function createView(container: HTMLElement): View {
     camera.updateProjectionMatrix();
   });
 
-  return { renderer, scene, camera, hemi };
+  return { renderer, scene, camera, hemi, backdrop: new Backdrop() };
 }
 
-/** Sets how far the camera sees: the fog fades in from `fogStart` to `far` (m), and nothing past `far` is drawn. */
-export function setViewRange(view: View, far: number, fogStart: number): void {
+/** Draws a frame: the backdrop, then the world over it. */
+export function renderFrame(view: View): void {
+  view.backdrop.render(view.renderer, view.camera);
+  view.renderer.clearDepth();
+  view.renderer.render(view.scene, view.camera);
+}
+
+/**
+ * Sets how far the camera sees: nothing past `far` (m) is drawn in the
+ * world (the backdrop's coarse stand-in carries on past it), and the haze
+ * fades in from `fogStart` to complete at `hazeEnd`.
+ */
+export function setViewRange(view: View, far: number, fogStart: number, hazeEnd: number): void {
   if (view.scene.fog instanceof Fog) {
     view.scene.fog.near = fogStart;
-    view.scene.fog.far = far;
+    view.scene.fog.far = hazeEnd;
   }
+  view.backdrop.setHaze(fogStart, hazeEnd, far);
   view.camera.far = far;
   view.camera.updateProjectionMatrix();
 }
 
-/** Sets the sky, fog and sky light to a map's colors. */
-export function applyMapColors(view: View, map: MapDef): void {
+/** Sets the sky, fog and sky light to a map's colors, and builds its backdrop. */
+export function applyMap(view: View, built: BuiltMap): void {
+  const { map, hf } = built;
   const fog = new Color(map.colors.fog);
-  view.scene.background = fog;
   view.scene.fog?.color.copy(fog);
   view.hemi.color.set(map.colors.sky);
+  view.backdrop.setMap(map, hf, built.decor.scatter);
 }

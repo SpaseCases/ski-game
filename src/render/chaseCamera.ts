@@ -30,6 +30,8 @@ export class ChaseCamera {
   private orbitYaw = 0;
   private orbitPitch = 0;
   private sinceDrag = Infinity;
+  /** Height (m) added for the snow rising behind the skier (see CONFIG.camera.slopeLift), smoothed. */
+  private lift = 0;
 
   constructor(camera: PerspectiveCamera, hf: Heightfield) {
     this.camera = camera;
@@ -42,6 +44,7 @@ export class ChaseCamera {
     this.focusY = focusHeight(pose);
     this.orbitYaw = 0;
     this.orbitPitch = 0;
+    this.lift = this.targetLift(pose);
     this.place(pose);
   }
 
@@ -69,29 +72,45 @@ export class ChaseCamera {
     const rate = pose.grounded ? c.heightSmoothingGround : c.heightSmoothingAir;
     const lead = pose.velocity.y / rate;
     this.focusY += (focusHeight(pose) + lead - this.focusY) * smoothing(rate, frameTime);
+    this.lift += (this.targetLift(pose) - this.lift) * smoothing(c.heightSmoothingGround, frameTime);
 
     this.place(pose);
+  }
+
+  /** How much to lift the camera for the snow rising between the skier and where the camera sits. */
+  private targetLift(pose: SkierPose): number {
+    const c = CONFIG.camera;
+    const p = pose.center;
+    const { x, z } = this.spot(pose);
+    const rise = heightAt(this.hf, x, z) - heightAt(this.hf, p.x, p.z);
+    return Math.min(c.slopeLiftMax, Math.max(0, rise * c.slopeLift));
+  }
+
+  /** Where the camera sits seen from above: behind the skier along the chase heading and orbit. */
+  private spot(pose: SkierPose): { x: number; z: number; flat: number; range: number; elevation: number } {
+    const c = CONFIG.camera;
+    const p = pose.center;
+    const speed = Math.hypot(pose.velocity.x, pose.velocity.z);
+    const far = Math.min(1, speed / c.speedForFar);
+    const dist = c.distNear + (c.distFar - c.distNear) * far;
+    const height = c.heightNear + (c.heightFar - c.heightNear) * far;
+    const range = Math.hypot(dist, height);
+    const elevation = Math.atan2(height, dist) + this.orbitPitch;
+    const flat = range * Math.cos(elevation);
+    const heading = this.yaw + this.orbitYaw;
+    return { x: p.x + Math.sin(heading) * flat, z: p.z + Math.cos(heading) * flat, flat, range, elevation };
   }
 
   private place(pose: SkierPose): void {
     const c = CONFIG.camera;
     // Follow the body, not the feet, which swing around it in flips.
     const p = pose.center;
-    const speed = Math.hypot(pose.velocity.x, pose.velocity.z);
-    const far = Math.min(1, speed / c.speedForFar);
-    const dist = c.distNear + (c.distFar - c.distNear) * far;
-    const height = c.heightNear + (c.heightFar - c.heightNear) * far;
-
-    // Same distance from the skier, swung around by the orbit.
-    const range = Math.hypot(dist, height);
-    const elevation = Math.atan2(height, dist) + this.orbitPitch;
-    const flat = range * Math.cos(elevation);
+    // Same distance from the skier, swung around by the orbit, lifted where the snow behind rises.
+    const { x: cx, z: cz, range, elevation } = this.spot(pose);
     const heading = this.yaw + this.orbitYaw;
     const fx = -Math.sin(heading);
     const fz = -Math.cos(heading);
-    const cx = p.x - fx * flat;
-    const cz = p.z - fz * flat;
-    let cy = this.focusY + range * Math.sin(elevation);
+    let cy = this.focusY + range * Math.sin(elevation) + this.lift;
 
     // Stay above the snow at the camera and halfway back to the skier.
     cy = Math.max(cy, heightAt(this.hf, cx, cz) + c.clearance);

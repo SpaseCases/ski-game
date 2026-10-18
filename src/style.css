@@ -478,6 +478,25 @@ body {
   background: #c4d6f0;
 }
 
+.trail-map-legend .tm-jump {
+  border-radius: 0;
+  background: #1b2430;
+  clip-path: polygon(0 100%, 50% 0, 100% 100%);
+}
+
+.trail-map-legend .tm-rail {
+  height: 4px;
+  background: #7a4f2c;
+  vertical-align: 3px;
+}
+
+.trail-map-legend .tm-lift {
+  height: 2px;
+  background: #1b2430;
+  vertical-align: 4px;
+  box-shadow: -4px 0 0 1px #c8331f;
+}
+
 .trail-map-legend .tm-rock {
   background: #8a8f96;
 }

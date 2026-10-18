@@ -1,4 +1,4 @@
-import { sampleShape, type ShapeSample } from '../maps/shapes.ts';
+import { topShape, type ShapeSample } from '../maps/shapes.ts';
 import type { Heightfield } from '../maps/types.ts';
 
 // Physics surface: a smooth Catmull-Rom (bicubic) surface through the
@@ -57,7 +57,7 @@ function sampleRow(hf: Heightfield, row: number, c0: number, c1: number, c2: num
   rowSlope = wx.d0 * v0 + wx.d1 * v1 + wx.d2 * v2 + wx.d3 * v3;
 }
 
-function sampleSurface(hf: Heightfield, x: number, z: number): typeof surface {
+function sampleSurface(hf: Heightfield, x: number, z: number, withShapes = true): typeof surface {
   const gx = clamp((x - hf.originX) / hf.cellSize, 0, hf.cols - 1);
   const gz = clamp((z - hf.originZ) / hf.cellSize, 0, hf.rows - 1);
   const col = Math.min(Math.floor(gx), hf.cols - 2);
@@ -94,22 +94,12 @@ function sampleSurface(hf: Heightfield, x: number, z: number): typeof surface {
   surface.dhdx = dx / hf.cellSize;
   surface.dhdz = dz / hf.cellSize;
 
-  // Jumps, pipes and decks sit on top of the smooth slope; where two
+  // Jumps, pipes, decks and roofs sit on top of the smooth slope; where two
   // overlap, the higher one is the snow.
-  const shapes = hf.shapes;
-  if (shapes) {
-    let top = 0;
-    let gx = 0;
-    let gz = 0;
-    for (let i = 0; i < shapes.length; i++) {
-      if (!sampleShape(shapes[i]!, x, z, shape) || shape.height <= top) continue;
-      top = shape.height;
-      gx = shape.dhdx;
-      gz = shape.dhdz;
-    }
-    surface.height += top;
-    surface.dhdx += gx;
-    surface.dhdz += gz;
+  if (withShapes && topShape(hf, x, z, shape)) {
+    surface.height += shape.height;
+    surface.dhdx += shape.dhdx;
+    surface.dhdz += shape.dhdz;
   }
   return surface;
 }
@@ -117,6 +107,11 @@ function sampleSurface(hf: Heightfield, x: number, z: number): typeof surface {
 /** Snow height at world (x, z). Points outside the map use the nearest edge. */
 export function heightAt(hf: Heightfield, x: number, z: number): number {
   return sampleSurface(hf, x, z).height;
+}
+
+/** Height of the ground itself at world (x, z): the slope without any shape built on it. */
+export function terrainHeightAt(hf: Heightfield, x: number, z: number): number {
+  return sampleSurface(hf, x, z, false).height;
 }
 
 /** Writes the unit snow normal at world (x, z) into `out` and returns the snow height. */

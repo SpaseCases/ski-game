@@ -314,9 +314,15 @@ export interface RailPoint {
 }
 
 /**
- * A metal rail: a polyline the rider slides along, on posts down to the snow.
- * Flat, down, flat-down, kinked and rainbow rails are all just different
- * points. A first point at height 0 starts at snow level: ride straight on.
+ * What a rail is: a park rail (metal, on posts), a handrail (metal, on
+ * posts down stairs), or a fallen tree (a log lying on the snow; wood).
+ */
+export type RailStyle = 'metal' | 'handrail' | 'log';
+
+/**
+ * A rail: a polyline the rider slides along. Flat, down, flat-down, kinked
+ * and rainbow rails are all just different points. A first point at height
+ * 0 starts at snow level: ride straight on.
  */
 export interface RailFeature {
   type: 'rail';
@@ -327,14 +333,24 @@ export interface RailFeature {
    * instead of cutting straight between its points. 0 keeps the points as given.
    */
   follow: number;
+  style: RailStyle;
+  /** Radius (m) of the tube or log; 0 uses the style's own (CONFIG.rails.radius, or a log's). */
+  radius: number;
 }
 
-/** A box: a wide wooden-sided deck along a polyline, like a rail. */
+/**
+ * What a box is: a park box (wooden sides, a metal deck), a concrete ledge,
+ * a bench, a flat-topped rock, or a tree stump.
+ */
+export type BoxStyle = 'wood' | 'ledge' | 'bench' | 'rock' | 'stump';
+
+/** A box: a wide deck along a polyline, like a rail. */
 export interface BoxFeature {
   type: 'box';
   width: number;
   points: RailPoint[];
   follow: number;
+  style: BoxStyle;
 }
 
 /**
@@ -369,6 +385,8 @@ export interface JumpFeature {
   /** Lengths over which the knuckle rounds over, and the face eases back into the slope. */
   knuckle: number;
   transition: number;
+  /** A booter dug out of the snow: no dyed lip line. */
+  natural: boolean;
 }
 
 /** A takeoff with no landing (into a rail, or a hip). Its back drops to the slope. */
@@ -383,6 +401,7 @@ export interface KickerFeature {
   lipAngle: number;
   /** Length of the back side, from the lip down to the slope. */
   back: number;
+  natural: boolean;
 }
 
 /** A landing on its own (a hip's landing, or after a natural drop). */
@@ -403,6 +422,75 @@ export interface LandingFeature {
   top: number;
   knuckle: number;
   transition: number;
+  natural: boolean;
+}
+
+/**
+ * Roofs: a gable whose ridge runs across the building (so riding down its
+ * length goes up one slope, over the ridge and down the other), a shed roof
+ * sloping down the building's length, or a flat roof.
+ */
+export type RoofStyle = 'gable' | 'shed' | 'flat';
+/** How a building looks: a timber chalet, a painted shop, a stone-based lodge, a lift station. */
+export type BuildingStyle = 'chalet' | 'shop' | 'lodge' | 'station';
+
+/**
+ * A building whose snowy roof can be ridden: up a snow drift against its
+ * uphill wall, along the roof, and off the downhill eave (a drop), or down
+ * a landing drift piled below it. Its walls are solid. Heights are above
+ * the snow under it; the length runs along `yaw`, usually down the hill.
+ */
+export interface BuildingFeature {
+  type: 'building';
+  /** Middle of the uphill edge of the roof. */
+  x: number;
+  z: number;
+  yaw: number;
+  /** The roof's size along yaw and across it (the walls stand a little inside). */
+  length: number;
+  width: number;
+  /** Wall height at the downhill eave. */
+  eave: number;
+  roof: RoofStyle;
+  /** Gable: ridge height above the eaves. Shed: how much higher the uphill eave is. */
+  rise: number;
+  /** Length (m) of a snow drift up the uphill wall to the eave; 0 for none (a plain wall). */
+  drift: number;
+  /** Length (m) of a landing drift down from the downhill eave; 0 for none (a drop). */
+  apron: number;
+  /** Height (m) of a snow lip kicking up along the downhill eave of a flat or shed roof (for gaps to the next roof); 0 for none. */
+  lip: number;
+  style: BuildingStyle;
+  /** Wall color. */
+  color: string;
+  /** Which side the door, shop windows and sign face, seen riding down its length. */
+  front: 'left' | 'right' | 'up' | 'down';
+  /** Words on the sign over the door, or '' for none. */
+  sign: string;
+  /** A stone chimney on the roof, smoking (only on roofs nobody rides). */
+  chimney: boolean;
+}
+
+/**
+ * A raised plaza or deck: its back meets the snow, its top runs level (or
+ * at `pitch` degrees down its length) so it stands `height` above the snow
+ * at its front, a wall drop on every side. Stairs can lead down the front,
+ * with handrails down both sides of them.
+ */
+export interface TerraceFeature {
+  type: 'terrace';
+  /** Middle of the back edge. */
+  x: number;
+  z: number;
+  yaw: number;
+  length: number;
+  width: number;
+  /** Height above the snow at the front edge. */
+  height: number;
+  /** Width of the stairs down the middle of the front (0: none), and their steepness (degrees). */
+  stairs: number;
+  stairAngle: number;
+  handrails: boolean;
 }
 
 /**
@@ -476,7 +564,9 @@ export type Feature =
   | LandingFeature
   | HalfpipeFeature
   | SlalomFeature
-  | StartFeature;
+  | StartFeature
+  | BuildingFeature
+  | TerraceFeature;
 
 export interface SpawnDef {
   x: number;
@@ -500,7 +590,11 @@ export interface FlagDef {
   width: number;
 }
 
-/** The finish: a rectangle on the snow. Entering it offers Back to top. */
+/**
+ * The finish: a rectangle on the snow. Entering it offers Back to top. It's
+ * marked by a checkered banner across its whole line, or, on a wide run-out
+ * basin, by a finish arch standing over the main line into it.
+ */
 export interface FinishDef {
   /** Middle of the line where the zone starts (its uphill edge). */
   x: number;
@@ -510,14 +604,37 @@ export interface FinishDef {
   /** Size across, and how far it runs on past the line. */
   width: number;
   length: number;
+  /** The arch: its middle and width, facing the zone's heading. Absent: the banner spans the whole line. */
+  arch?: { x: number; z: number; width: number };
 }
 
 /** Things scattered over an area. */
-export type ScatterKind = 'pine' | 'aspen' | 'snag' | 'rock' | 'boulder';
+export type ScatterKind = 'pine' | 'aspen' | 'snag' | 'rock' | 'boulder' | 'crag';
 /** Things built along a line. */
 export type LineKind = 'fence' | 'netting' | 'barrier' | 'dyeLine' | 'bunting' | 'chairlift';
 /** Single props, one at each point. */
-export type PropKind = 'lightPole' | 'floodlight' | 'banner' | 'flag' | 'groomer';
+export type PropKind = 'lightPole' | 'floodlight' | 'banner' | 'flag' | 'groomer' | 'streetLamp' | 'hut' | 'snowmobile' | 'skier' | 'skiRack';
+
+/** A run's difficulty, for trail signs: easy, intermediate, advanced, expert. */
+export type RunLevel = 'green' | 'blue' | 'black' | 'double';
+
+/** One board on a trail sign: a run's name, its difficulty, and which way it goes (-1 left, 0 ahead, 1 right). */
+export interface SignLine {
+  text: string;
+  level: RunLevel;
+  arrow: number;
+}
+
+/** A trail sign at a fork: boards on a post, facing riders coming down toward `heading`. */
+export interface SignDecor {
+  kind: 'sign';
+  x: number;
+  z: number;
+  heading: number;
+  /** A board on top naming the area (a face, the town), or ''. */
+  header: string;
+  lines: SignLine[];
+}
 
 /** An axis-aligned rectangle on the snow: its middle and size. */
 export interface AreaDef {
@@ -585,7 +702,24 @@ export interface TerrainScatterDecor {
   reach: number;
 }
 
-export type DecorDef = ScatterDecor | TerrainScatterDecor | LineDecor | PropDecor;
+export type DecorDef = ScatterDecor | TerrainScatterDecor | LineDecor | PropDecor | SignDecor;
+
+/**
+ * Mountain ranges far around the map, past the end of its terrain: drawn
+ * behind everything, hazy with distance. Peaks stand in rings between
+ * `distance` (m from the map's middle), rising from `base` to `height` (m).
+ */
+export interface PeaksDef {
+  seed: number;
+  /** Peaks per ring, and rings. */
+  count: number;
+  rings: number;
+  distance: [number, number];
+  base: number;
+  height: [number, number];
+  /** Snow line (m): rock below it, snow above. */
+  snowLine: number;
+}
 
 /**
  * A named line down the map (a run): ridden by the headless tools, offered
@@ -611,6 +745,8 @@ export interface MapDef {
     sky: string;
     fog: string;
   };
+  /** Distant mountains around the map, or none. */
+  peaks?: PeaksDef;
 }
 
 /**
@@ -625,6 +761,9 @@ export interface ObstacleDef {
   bz: number;
   radius: number;
   height: number;
+  /** World heights of its bottom and top, when they aren't the snow at its ends (a wall under a roof). */
+  y0?: number;
+  y1?: number;
 }
 
 /** The part of the map the skier can reach: a rectangle, cut down to a polygon when there is one. */
@@ -654,8 +793,21 @@ export interface Heightfield {
   bounds: Bounds;
   /** Visual only: how rocky each sample is drawn, 0 (snow) to 255 (rock); absent, all snow. Same layout as heights. */
   rock?: Uint8Array;
-  /** Shapes built on top of the slope (jumps, pipes, decks), sampled exactly so lips stay sharp. */
+  /** Shapes built on top of the slope (jumps, pipes, decks, roofs), sampled exactly so lips stay sharp. Set with setShapes. */
   shapes?: TerrainShape[];
+  /** The shapes sorted into square cells (see setShapes), so a sample looks at only the few nearby. */
+  shapeCells?: ShapeCells;
+}
+
+/** A grid over the map: for each cell, its slice of `items` (indices into the shapes). */
+export interface ShapeCells {
+  cell: number;
+  originX: number;
+  originZ: number;
+  cols: number;
+  rows: number;
+  start: Int32Array;
+  items: Int32Array;
 }
 
 /**
@@ -679,11 +831,11 @@ export interface RampShape {
   kh: Float32Array;
   kIn: Float32Array;
   kOut: Float32Array;
-  /** Per knot: the stretch arriving at it is wood (a start deck), not snow. */
-  wood: Uint8Array;
+  /** Per knot: what the stretch arriving at it is (see SURFACE): snow, wood (a start deck), or drawn elsewhere (stairs). */
+  surface: Uint8Array;
   /** Distances along where a lip is dyed blue. */
   lips: number[];
-  /** Draw the side slopes as snow. Structures (towers, decks) draw boards instead. */
+  /** Draw the side slopes as snow. Structures (towers, decks, roofs) draw their own sides. */
   sides: boolean;
   /** Bounding box in world XZ. */
   minX: number;
@@ -729,6 +881,10 @@ export type TerrainShape = RampShape | PipeShape;
  */
 export interface RailShape {
   kind: 'rail' | 'box';
+  /** How it's drawn. */
+  look: RailStyle | BoxStyle;
+  /** What the skis slide on: metal slides faster than wood or stone. */
+  metal: boolean;
   /** Points along the top, x y z per point. */
   points: Float32Array;
   /** Distance along the top (3D) from the first point to each point. */

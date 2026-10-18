@@ -1,6 +1,8 @@
 import { BufferAttribute, BufferGeometry, Color, Mesh, type Material, Vector3 } from 'three';
 import { TriBuilder } from './triBuilder.ts';
 
+const NO_SWAY = [0, 0, 0, 0] as const;
+
 /**
  * Builds low-poly, vertex-colored models out of simple solids (boxes,
  * prisms, beams, panels) into one triangle list. `at` sets a transform
@@ -50,11 +52,15 @@ export class MeshKit {
     return this;
   }
 
-  /** A two-sided quad in world space (cloth, nets, signs). */
-  panel(a: Vector3, b: Vector3, c: Vector3, d: Vector3, color: Color, back: Color = color): this {
+  /**
+   * A two-sided quad in world space (cloth, nets, signs). `sway`: how
+   * freely each corner flaps, for cloth drawn with render/cloth.ts.
+   */
+  panel(a: Vector3, b: Vector3, c: Vector3, d: Vector3, color: Color, back: Color = color, sway: readonly [number, number, number, number] = NO_SWAY): this {
     const n = new Vector3().subVectors(b, a).cross(new Vector3().subVectors(d, a));
-    this.tris.quad(a, b, c, d, color, n);
-    this.tris.quad(a, b, c, d, back, n.negate());
+    const [wa, wb, wc, wd] = sway;
+    this.tris.quad(a, b, c, d, color, n, wa, wb, wc, wd);
+    this.tris.quad(a, b, c, d, back, n.negate(), wa, wb, wc, wd);
     return this;
   }
 
@@ -148,6 +154,7 @@ export class MeshKit {
     const g = new BufferGeometry();
     g.setAttribute('position', new BufferAttribute(new Float32Array(this.tris.positions), 3));
     g.setAttribute('color', new BufferAttribute(new Float32Array(this.tris.colors), 3));
+    if (this.tris.sways.some((w) => w !== 0)) g.setAttribute('sway', new BufferAttribute(new Float32Array(this.tris.sways), 1));
     g.computeVertexNormals();
     g.computeBoundingSphere();
     return g;

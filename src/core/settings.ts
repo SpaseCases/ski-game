@@ -23,9 +23,9 @@ export function saveQuality(q: Quality): void {
   writeStored('quality', q);
 }
 
-/** How far (m) a preset sees, and where its fog starts. */
-export function viewRange(q: Quality): { far: number; fogStart: number } {
-  return { far: CONFIG.quality.viewDistance[q], fogStart: CONFIG.quality.fogStart[q] };
+/** How far (m) a preset draws the world, where its haze starts, and where the haze is complete. */
+export function viewRange(q: Quality): { far: number; fogStart: number; hazeEnd: number } {
+  return { far: CONFIG.quality.viewDistance[q], fogStart: CONFIG.quality.fogStart[q], hazeEnd: CONFIG.quality.hazeEnd[q] };
 }
 
 /** Share (0..1) of scenery decoration a preset draws. Solid decoration is always drawn. */

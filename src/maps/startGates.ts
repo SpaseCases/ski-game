@@ -1,4 +1,4 @@
-import { makeRamp, ProfileBuilder } from './shapes.ts';
+import { makeRamp, ProfileBuilder, SURFACE } from './shapes.ts';
 import type { Feature, ObstacleDef, RampShape, StartFeature, StartStyle } from './types.ts';
 
 // The four start gates. Each stands around the spot the rider starts from;
@@ -59,14 +59,14 @@ export function startShapes(starts: readonly StartFrame[]): RampShape[] {
   for (const s of starts) {
     if (s.style === 'deck') {
       const p = new ProfileBuilder()
-        .ease(DECK.back, s.height, true)
-        .flat(DECK.behind + DECK.ahead, true)
+        .ease(DECK.back, s.height, SURFACE.wood)
+        .flat(DECK.behind + DECK.ahead, SURFACE.wood)
         .ease(DECK.ramp, 0);
       shapes.push(ramp(s, DECK.back + DECK.behind, DECK.width, p));
     } else if (s.style === 'tower') {
       const p = new ProfileBuilder()
-        .ease(TOWER.back, s.height, true)
-        .flat(TOWER.behind + TOWER.ahead, true)
+        .ease(TOWER.back, s.height, SURFACE.wood)
+        .flat(TOWER.behind + TOWER.ahead, SURFACE.wood)
         .landing(TOWER.angle, TOWER.knuckle, TOWER.transition);
       shapes.push(ramp(s, TOWER.back + TOWER.behind, TOWER.width, p));
     }

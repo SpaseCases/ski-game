@@ -4,6 +4,9 @@ import type { BuiltMap } from '../maps/build.ts';
 import { thinDecor } from '../maps/decor.ts';
 import type { RunState } from '../sim/checkpoints.ts';
 import type { RaceState } from '../sim/race.ts';
+import { ChairliftView } from './chairlifts.ts';
+import { clothTime } from './cloth.ts';
+import { SmokeView } from './smoke.ts';
 import { CheckpointView } from './checkpointMeshes.ts';
 import { DistanceCuller } from './culling.ts';
 import { createDecor } from './decor.ts';
@@ -29,7 +32,13 @@ export class WorldView {
   private readonly startView: StartGateView;
   private readonly slalomView: SlalomView | null;
   private readonly checkpointView: CheckpointView;
+  private readonly lifts: ChairliftView;
+  private readonly smoke: SmokeView;
   private decor: Group;
+  /** Where the camera was last (view()), for placing the moving chairs near it. */
+  private camX = 0;
+  private camZ = 0;
+  private range = 0;
   private culler = new DistanceCuller();
 
   /** `density`: the share of scenery decoration to draw (see decorDensity); `range`: how far the camera sees (m). */
@@ -44,10 +53,14 @@ export class WorldView {
     this.group.add(this.startView.group);
     this.slalomView = race && race.gates.length > 0 ? new SlalomView(race, hf) : null;
     if (this.slalomView) this.group.add(this.slalomView.mesh);
-    this.decor = still(createDecor(thinDecor(built.decor, density), hf, this.culler, range > CONFIG.quality.treeDetail));
+    this.decor = still(createDecor(thinDecor(built.decor, density), map.features, hf, this.culler, range > CONFIG.quality.treeDetail));
     this.group.add(this.decor);
     this.checkpointView = new CheckpointView(map, hf);
     this.group.add(this.checkpointView.group);
+    this.lifts = new ChairliftView(built.decor.lines, hf);
+    this.group.add(this.lifts.group);
+    this.smoke = new SmokeView(map.features, hf);
+    if (this.smoke.mesh) this.group.add(this.smoke.mesh);
   }
 
   /** Redraws the decoration for another quality preset: its density, and far trees if it sees past CONFIG.quality.treeDetail. */
@@ -56,7 +69,7 @@ export class WorldView {
     this.group.remove(this.decor);
     disposeTree(this.decor);
     this.culler = new DistanceCuller();
-    this.decor = still(createDecor(thinDecor(this.built.decor, density), this.built.hf, this.culler, range > CONFIG.quality.treeDetail));
+    this.decor = still(createDecor(thinDecor(this.built.decor, density), this.built.map.features, this.built.hf, this.culler, range > CONFIG.quality.treeDetail));
     this.group.add(this.decor);
   }
 
@@ -66,6 +79,9 @@ export class WorldView {
    * spot), not just a few.
    */
   view(x: number, z: number, range: number, all: boolean): void {
+    this.camX = x;
+    this.camZ = z;
+    this.range = range;
     this.terrain.update(x, z, range, all ? Infinity : CHUNKS_PER_FRAME);
     this.culler.update(x, z, range, CONFIG.quality.treeDetail);
   }
@@ -74,6 +90,9 @@ export class WorldView {
     this.startView.update(race ? race.wandTime : Infinity);
     this.slalomView?.update(race);
     this.checkpointView.update(run, this.built.hf, frameTime);
+    this.lifts.update(frameTime, this.camX, this.camZ, this.range);
+    this.smoke.update(frameTime, this.camX, this.camZ, this.range);
+    clothTime.value += frameTime;
   }
 
   /** Frees every geometry and material. Shared materials just get rebuilt the next time they're drawn. */

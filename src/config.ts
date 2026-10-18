@@ -252,6 +252,12 @@ export const CONFIG = {
      */
     viewDistance: { auto: 450, low: 240, medium: 450, high: 800 },
     fogStart: { auto: 160, low: 70, medium: 160, high: 320 },
+    /**
+     * Where the haze is complete (m). Past the far plane the mountain carries
+     * on as a coarse lit stand-in, fading by the same haze (see
+     * render/backdrop.ts); Low's haze ends at its far plane, a wall of fog.
+     */
+    hazeEnd: { auto: 3200, low: 240, medium: 3200, high: 6000 },
     /** Trees farther than this (m) are drawn as simple stand-ins, when the view reaches that far. */
     treeDetail: 220,
   },
@@ -277,6 +283,14 @@ export const CONFIG = {
     heightSmoothingAir: 3,
     /** Minimum gap (m) between camera and snow. */
     clearance: 0.7,
+    /**
+     * On a slope the snow behind the skier rises toward the camera. This
+     * share of that rise (m, up to slopeLiftMax) lifts the camera, so in the
+     * steeps it still looks down at the skier and the slope below instead of
+     * up at them. Smoothed at heightSmoothingGround.
+     */
+    slopeLift: 0.9,
+    slopeLiftMax: 7,
     /** Mouse-drag orbit: radians turned per pixel dragged. */
     orbitSensitivity: 0.006,
     /** Extra tilt the drag can add (radians, below and above the normal view). */

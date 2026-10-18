@@ -333,7 +333,7 @@ function slideRail(s: SkierState, course: Course, steer: number, dt: number): vo
   railFrame(rail, s.railS, s.position, railDir);
   const g = c.gravity;
   const load = g * Math.sqrt(Math.max(0, 1 - railDir.y * railDir.y));
-  const friction = rail.kind === 'box' ? R.boxFriction : R.railFriction;
+  const friction = rail.kind === 'rail' && rail.metal ? R.railFriction : R.boxFriction;
   let v = s.railSpeed - g * railDir.y * dt;
   v = approach(v, 0, friction * load * dt);
   const drag = c.dragStand + (c.dragCrouch - c.dragStand) * s.crouch;

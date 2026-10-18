@@ -1,6 +1,6 @@
 import { boundsDistance, insideBounds } from '../sim/bounds.ts';
 import { fbm } from './peak.ts';
-import { sampleShape, type ShapeSample } from './shapes.ts';
+import { topShape, type ShapeSample } from './shapes.ts';
 import { startFrames } from './startGates.ts';
 import { hash2, smoothstep } from './terrain.ts';
 import type {
@@ -12,6 +12,7 @@ import type {
   Ramp4,
   ScatterDecor,
   ScatterKind,
+  SignDecor,
   TerrainScatterDecor,
   XZ,
 } from './types.ts';
@@ -38,6 +39,14 @@ export const DECOR_SIZE = {
   groomerWidth: 3.2,
   chairliftSpacing: 55,
   chairliftHeight: 10,
+  /** A chairlift's station at each end of its line: length along the line, width and height. */
+  liftStation: { length: 10, width: 8, height: 5.5 },
+  streetLampHeight: 4.6,
+  hutSize: 3.2,
+  signHeight: 2.4,
+  snowmobileLength: 2.8,
+  snowmobileWidth: 1.1,
+  skiRackLength: 2.6,
 };
 
 /** Per scatter kind: obstacle radius and height at scale 1. */
@@ -47,6 +56,7 @@ const SCATTER_SOLID: Record<ScatterKind, { radius: number; height: number }> = {
   snag: { radius: 0.25, height: 6 },
   rock: { radius: 0.6, height: 0.8 },
   boulder: { radius: 1.3, height: 2 },
+  crag: { radius: 2.2, height: 3 },
 };
 
 const DEG = Math.PI / 180;
@@ -71,6 +81,7 @@ export interface DecorLayout {
   scatter: ScatterItem[];
   lines: LineDecor[];
   props: PropDecor[];
+  signs: SignDecor[];
 }
 
 const sample: ShapeSample = { height: 0, dhdx: 0, dhdz: 0 };
@@ -81,13 +92,15 @@ export function layoutDecor(map: MapDef, hf: Heightfield): DecorLayout {
   const scatter: ScatterItem[] = [];
   const lines: LineDecor[] = [];
   const props: PropDecor[] = [];
+  const signs: SignDecor[] = [];
   map.decor.forEach((d) => {
-    if ('spacing' in d) terrainSet(d, hf, keepOut, scatter);
+    if (d.kind === 'sign') signs.push(d);
+    else if ('spacing' in d) terrainSet(d, hf, keepOut, scatter);
     else if ('area' in d) scatterSet(d, hf, keepOut, scatter);
     else if ('heading' in d) props.push(d);
     else lines.push(d);
   });
-  return { scatter, lines, props };
+  return { scatter, lines, props, signs };
 }
 
 /** The layout with scenery thinned to `density` (0..1); solid things all stay. */
@@ -152,11 +165,67 @@ function keepOutZones(map: MapDef): KeepOut {
   }
   zones.add(map.spawn.x, map.spawn.z, 6);
   for (const s of startFrames(map.features)) zones.add(s.x, s.z, 9);
+  /** A strip `half` m either side of the line from `from` to `to` m along heading `yaw` (degrees) from (x, z). */
+  const runway = (x: number, z: number, yaw: number, from: number, to: number, half: number): void => {
+    const h = (yaw * Math.PI) / 180;
+    const dx = -Math.sin(h);
+    const dz = -Math.cos(h);
+    const rx = Math.cos(h);
+    const rz = -Math.sin(h);
+    // Lines along the strip, spaced so their circles leave no gaps.
+    const r = Math.min(half, 4);
+    const lines = Math.max(1, Math.ceil(half / r));
+    for (let i = 0; i < lines; i++) {
+      const v = lines === 1 ? 0 : -half + r + ((2 * half - 2 * r) * i) / (lines - 1);
+      zones.addLine(
+        [
+          { x: x + dx * from + rx * v, z: z + dz * from + rz * v },
+          { x: x + dx * to + rx * v, z: z + dz * to + rz * v },
+        ],
+        r,
+        r,
+      );
+    }
+  };
   for (const f of map.features) {
-    if (f.type === 'rail' || f.type === 'box') zones.addLine(f.points, 3, 2);
-    else if (f.type === 'slalom') for (const g of f.gates) lineOf(g.x, g.z, g.heading, g.width, 3);
+    if (f.type === 'rail' || f.type === 'box') {
+      // The line itself, and the snow riding onto it and off its end.
+      zones.addLine(f.points, 3, 2);
+      const a = f.points[0]!;
+      const b = f.points[1]!;
+      const y = f.points[f.points.length - 1]!;
+      const z = f.points[f.points.length - 2]!;
+      runway(a.x, a.z, (Math.atan2(-(b.x - a.x), -(b.z - a.z)) * 180) / Math.PI, -10, 0, 3);
+      runway(y.x, y.z, (Math.atan2(-(y.x - z.x), -(y.z - z.z)) * 180) / Math.PI, 0, 18, 4);
+    } else if (f.type === 'slalom') {
+      for (const g of f.gates) lineOf(g.x, g.z, g.heading, g.width, 3);
+    } else if (f.type === 'jump' || f.type === 'kicker' || f.type === 'landing') {
+      // The run-up, the feature, and the landing below it (natural kickers land on the slope).
+      const length = f.type === 'jump' ? f.gap + 2 * f.lipHeight + 20 : f.type === 'kicker' ? (2 * f.lipHeight) / Math.tan((f.lipAngle * Math.PI) / 180) : f.back + f.top + 15;
+      runway(f.x, f.z, f.yaw, -18, length + 55, f.width / 2 + f.sideWidth + 5);
+    } else if (f.type === 'building' || f.type === 'terrace') {
+      // The whole footprint and a few meters round it; for one built to be
+      // ridden, the run-up to its drift and the landing below it too.
+      const ridden = f.type === 'building' ? f.drift > 0 || f.apron > 0 : true;
+      const before = f.type === 'building' ? f.drift + (ridden ? 15 : 0) : 10;
+      const after = f.length + (f.type === 'building' ? f.apron + (ridden ? 25 : 0) : f.stairs > 0 ? f.height * 2 + 12 : 8);
+      runway(f.x, f.z, f.yaw, -before, after, f.width / 2 + 4);
+    }
   }
   for (const run of map.runs) if (run.clear > 0) zones.addLine(run.points, run.clear, Math.max(1, run.clear / 2));
+  for (const d of map.decor) {
+    if (d.kind === 'sign') zones.add(d.x, d.z, 3);
+    else if (d.kind === 'chairlift' && 'points' in d) {
+      // The lift line is cut through the trees, and the stations stand in clearings.
+      zones.addLine(d.points, 7, 3.5);
+      const first = d.points[0]!;
+      const last = d.points[d.points.length - 1]!;
+      zones.add(first.x, first.z, 14);
+      zones.add(last.x, last.z, 14);
+    } else if ((d.kind === 'streetLamp' || d.kind === 'hut' || d.kind === 'snowmobile' || d.kind === 'skier' || d.kind === 'skiRack') && 'points' in d) {
+      for (const p of d.points) zones.add(p.x, p.z, d.kind === 'hut' ? 5 : 2.5);
+    }
+  }
   return zones;
 }
 
@@ -259,10 +328,7 @@ function onMap(hf: Heightfield, x: number, z: number): boolean {
 
 function clear(x: number, z: number, hf: Heightfield, keepOut: KeepOut): boolean {
   if (!keepOut.clear(x, z)) return false;
-  for (const s of hf.shapes ?? []) {
-    if (sampleShape(s, x, z, sample) && sample.height > 0.02) return false;
-  }
-  return true;
+  return !(topShape(hf, x, z, sample) && sample.height > 0.02);
 }
 
 /** Evenly spaced spots along a polyline, `spacing` apart, including both ends. */
@@ -298,15 +364,38 @@ export function decorObstacles(layout: DecorLayout): ObstacleDef[] {
         out.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, radius: 0.08, height });
       }
     } else if (l.kind === 'chairlift') {
-      for (const p of alongLine(l.points, S.chairliftSpacing)) post(p, 0.4, S.chairliftHeight);
+      const towers = alongLine(l.points, S.chairliftSpacing);
+      for (const p of towers.slice(1, -1)) post(p, 0.4, S.chairliftHeight);
+      // A station at each end, a fat capsule along the line.
+      for (const [end, next] of [
+        [l.points[0]!, l.points[1]!],
+        [l.points[l.points.length - 1]!, l.points[l.points.length - 2]!],
+      ] as const) {
+        const len = Math.hypot(next.x - end.x, next.z - end.z);
+        const dx = ((next.x - end.x) / len) * (S.liftStation.length / 2 - S.liftStation.width / 2);
+        const dz = ((next.z - end.z) / len) * (S.liftStation.length / 2 - S.liftStation.width / 2);
+        out.push({ ax: end.x - dx, az: end.z - dz, bx: end.x + dx, bz: end.z + dz, radius: S.liftStation.width / 2, height: S.liftStation.height });
+      }
     }
   }
+  for (const sign of layout.signs) post(sign, 0.1, S.signHeight);
   for (const p of layout.props) {
     const h = (p.heading * Math.PI) / 180;
     const rx = Math.cos(h);
     const rz = -Math.sin(h);
     for (const at of p.points) {
       if (p.kind === 'lightPole') post(at, 0.15, S.lightPoleHeight);
+      else if (p.kind === 'streetLamp') post(at, 0.12, S.streetLampHeight);
+      else if (p.kind === 'hut') post(at, S.hutSize / 2 + 0.2, 3);
+      else if (p.kind === 'skier') post(at, 0.35, 1.8);
+      else if (p.kind === 'snowmobile' || p.kind === 'skiRack') {
+        // Along its length: a snowmobile points along its heading, a rack stands across it.
+        const along = p.kind === 'snowmobile';
+        const len = (along ? S.snowmobileLength - S.snowmobileWidth : S.skiRackLength) / 2;
+        const ux = along ? -Math.sin(h) : rx;
+        const uz = along ? -Math.cos(h) : rz;
+        out.push({ ax: at.x - ux * len, az: at.z - uz * len, bx: at.x + ux * len, bz: at.z + uz * len, radius: along ? S.snowmobileWidth / 2 : 0.35, height: along ? 1.1 : 1.6 });
+      }
       else if (p.kind === 'floodlight') post(at, 0.45, S.floodlightHeight);
       else if (p.kind === 'flag') post(at, 0.06, S.flagHeight);
       else if (p.kind === 'banner') {

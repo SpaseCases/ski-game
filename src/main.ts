@@ -10,7 +10,7 @@ import { parseMap } from './maps/loader.ts';
 import { mapEntry, MAPS, type MapEntry, type MapId } from './maps/registry.ts';
 import { CONFIG } from './config.ts';
 import { ChaseCamera, type OrbitDrag } from './render/chaseCamera.ts';
-import { applyMapColors, createView, setViewRange, type View } from './render/scene.ts';
+import { applyMap, createView, renderFrame, setViewRange, type View } from './render/scene.ts';
 import { createSkierPose, interpolateSkier, SkierView } from './render/skierView.ts';
 import { WorldView } from './render/world.ts';
 import {
@@ -49,7 +49,6 @@ try {
   throw err;
 }
 const { renderer, scene, camera } = view;
-applyView();
 
 const windowBar = mountWindowButtons(hud);
 mountControlsHint(hud);
@@ -93,6 +92,7 @@ interface Level {
   race: RaceState | null;
 }
 let level: Level | null = null;
+applyView();
 
 // Render state. The skier and camera are made with the first map.
 const pose = createSkierPose();
@@ -152,8 +152,9 @@ async function loadMap(entry: MapEntry): Promise<void> {
     const built = buildMap(map);
     const world = new WorldView(built, decorDensity(quality), viewRange(quality).far);
     scene.add(world.group);
-    applyMapColors(view, map);
+    applyMap(view, built);
     level = { id: entry.id, built, world, run: createRun(map), race: built.race ? createRace(built.race) : null };
+    applyView();
     if (skierView && chase) {
       skierView.hf = built.hf;
       chase.hf = built.hf;
@@ -226,7 +227,9 @@ function setQuality(q: Quality): void {
 /** The current preset's view range on the camera and fog. */
 function applyView(): void {
   const range = viewRange(quality);
-  setViewRange(view, range.far, range.fogStart);
+  // Only a map with far ranges has the far stand-in the haze can fade into; elsewhere the fog ends at the far plane.
+  const hazeEnd = level?.built.map.peaks ? range.hazeEnd : range.far;
+  setViewRange(view, range.far, range.fogStart, hazeEnd);
 }
 
 /** Dev testing: puts the skier at (x, z) facing `heading` (radians), moving along the skis at `speed`. */
@@ -255,6 +258,7 @@ if (import.meta.env.DEV) {
       camera,
       scene,
       renderer,
+      backdrop: view.backdrop,
       config: CONFIG,
       respawn,
       backToTop,
@@ -370,7 +374,7 @@ startLoop(
       level.world.update(level.run, level.race, frameTime);
     }
 
-    renderer.render(scene, camera);
+    renderFrame(view);
     fader.update(frameTime);
     crashHint.show(pose.bailed);
     toast.update(frameTime);

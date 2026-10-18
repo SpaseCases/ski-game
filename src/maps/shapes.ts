@@ -1,11 +1,13 @@
 import type {
   Feature,
   HalfpipeFeature,
+  Heightfield,
   JumpFeature,
   KickerFeature,
   LandingFeature,
   PipeShape,
   RampShape,
+  ShapeCells,
   TerrainShape,
 } from './types.ts';
 
@@ -27,6 +29,11 @@ import type {
 const DEG = Math.PI / 180;
 /** Flat top (m) of a gap jump's landing before its knuckle. */
 const LANDING_TOP = 1.5;
+/** Side (m) of the cells shapes are sorted into for sampling. */
+const SHAPE_CELL = 32;
+
+/** What a stretch of a ramp is: snow, wooden boards (a start deck), or drawn by its structure instead (stairs). */
+export const SURFACE = { snow: 0, wood: 1, hidden: 2 } as const;
 
 /** Builds a ramp profile knot by knot. */
 export class ProfileBuilder {
@@ -34,7 +41,7 @@ export class ProfileBuilder {
   readonly h: number[] = [0];
   readonly mIn: number[] = [0];
   readonly mOut: number[] = [0];
-  readonly wood: boolean[] = [false];
+  readonly surface: number[] = [SURFACE.snow];
   readonly lips: number[] = [];
 
   /** Distance along and height of the last knot. */
@@ -47,33 +54,39 @@ export class ProfileBuilder {
   }
 
   /** A knot `length` past the last one: the curve arrives with slope `mIn` and leaves with `mOut`. */
-  to(length: number, h: number, mIn: number, mOut = mIn, wood = false): this {
+  to(length: number, h: number, mIn: number, mOut = mIn, surface: number = SURFACE.snow): this {
     if (!(length > 0)) throw new Error(`Map: a ramp piece has length ${length}; make the feature longer`);
     this.u.push(this.end + length);
     this.h.push(h);
     this.mIn.push(mIn);
     this.mOut.push(mOut);
-    this.wood.push(wood);
+    this.surface.push(surface);
     return this;
   }
 
-  /** Curved takeoff from the slope up to a sharp lip at `angle` degrees. */
-  takeoff(height: number, angle: number): this {
+  /** Curved takeoff from the slope up to a sharp lip at `angle` degrees; a park lip is dyed, a natural booter's isn't. */
+  takeoff(height: number, angle: number, natural = false): this {
     const m = Math.tan(angle * DEG);
     // A parabola reaching height H over length L ends with slope 2H / L.
     this.to((2 * height) / m, height, m, 0);
-    this.lips.push(this.end);
+    if (!natural) this.lips.push(this.end);
     return this;
   }
 
   /** Level at the current height. */
-  flat(length: number, wood = false): this {
-    return length > 0 ? this.to(length, this.height, 0, 0, wood) : this;
+  flat(length: number, surface: number = SURFACE.snow): this {
+    return length > 0 ? this.to(length, this.height, 0, 0, surface) : this;
   }
 
   /** Rounded change of height (zero slope at both ends). */
-  ease(length: number, height: number, wood = false): this {
-    return this.to(length, height, 0, 0, wood);
+  ease(length: number, height: number, surface: number = SURFACE.snow): this {
+    return this.to(length, height, 0, 0, surface);
+  }
+
+  /** A straight stretch to `height`, `length` on: arriving and leaving at its own slope. */
+  line(length: number, height: number, surface: number = SURFACE.snow): this {
+    const m = (height - this.height) / length;
+    return this.to(length, height, m, m, surface);
   }
 
   /** Rounded knuckle, straight face at `angle` degrees, rounded transition back to the slope. */
@@ -121,7 +134,7 @@ export function makeRamp(
     kh: Float32Array.from(p.h),
     kIn: Float32Array.from(p.mIn),
     kOut: Float32Array.from(p.mOut),
-    wood: Uint8Array.from(p.wood, (w) => (w ? 1 : 0)),
+    surface: Uint8Array.from(p.surface),
     lips: p.lips.slice(),
     sides,
     minX: 0,
@@ -164,7 +177,7 @@ export function buildShapes(features: readonly Feature[]): TerrainShape[] {
 }
 
 function jumpShape(j: JumpFeature): RampShape {
-  const p = new ProfileBuilder().takeoff(j.lipHeight, j.lipAngle);
+  const p = new ProfileBuilder().takeoff(j.lipHeight, j.lipAngle, j.natural);
   if (j.deck) {
     p.flat(j.gap);
   } else {
@@ -186,7 +199,7 @@ function jumpShape(j: JumpFeature): RampShape {
 }
 
 function kickerShape(k: KickerFeature): RampShape {
-  const p = new ProfileBuilder().takeoff(k.lipHeight, k.lipAngle).ease(k.back, 0);
+  const p = new ProfileBuilder().takeoff(k.lipHeight, k.lipAngle, k.natural).ease(k.back, 0);
   return makeRamp(k.x, k.z, k.yaw, k.width, k.sideWidth, p);
 }
 
@@ -238,12 +251,75 @@ export function pipeHalfWidth(s: PipeShape): number {
   return s.floorHalf + s.transition + s.deckWidth + s.outerWidth;
 }
 
+/**
+ * Puts the shapes on a heightfield, sorted into square cells by the ground
+ * they cover, so a sample looks at only the few nearby (a town has hundreds).
+ */
+export function setShapes(hf: Heightfield, shapes: TerrainShape[]): void {
+  hf.shapes = shapes;
+  const cols = Math.ceil(((hf.cols - 1) * hf.cellSize) / SHAPE_CELL) + 1;
+  const rows = Math.ceil(((hf.rows - 1) * hf.cellSize) / SHAPE_CELL) + 1;
+  const cell = (v: number, origin: number, n: number): number => Math.min(n - 1, Math.max(0, Math.floor((v - origin) / SHAPE_CELL)));
+  const lists: number[][] = Array.from({ length: cols * rows }, () => []);
+  shapes.forEach((s, i) => {
+    for (let r = cell(s.minZ, hf.originZ, rows); r <= cell(s.maxZ, hf.originZ, rows); r++) {
+      for (let c = cell(s.minX, hf.originX, cols); c <= cell(s.maxX, hf.originX, cols); c++) lists[r * cols + c]!.push(i);
+    }
+  });
+  const start = new Int32Array(cols * rows + 1);
+  for (let k = 0; k < cols * rows; k++) start[k + 1] = start[k]! + lists[k]!.length;
+  const items = new Int32Array(start[cols * rows]!);
+  lists.forEach((list, k) => items.set(list, start[k]!));
+  const index: ShapeCells = { cell: SHAPE_CELL, originX: hf.originX, originZ: hf.originZ, cols, rows, start, items };
+  hf.shapeCells = index;
+}
+
+/**
+ * The highest of the shapes at world (x, z), into `out` (height 0 and a level
+ * gradient where there's none). Returns false where no shape reaches.
+ */
+export function topShape(hf: Heightfield, x: number, z: number, out: ShapeSample): boolean {
+  out.height = 0;
+  out.dhdx = 0;
+  out.dhdz = 0;
+  const shapes = hf.shapes;
+  if (!shapes || shapes.length === 0) return false;
+  let found = false;
+  const g = hf.shapeCells;
+  if (g) {
+    const c = Math.floor((x - g.originX) / g.cell);
+    const r = Math.floor((z - g.originZ) / g.cell);
+    if (c < 0 || r < 0 || c >= g.cols || r >= g.rows) return false;
+    const k = r * g.cols + c;
+    for (let j = g.start[k]!; j < g.start[k + 1]!; j++) {
+      if (sampleShape(shapes[g.items[j]!]!, x, z, scratch) && scratch.height > out.height) {
+        out.height = scratch.height;
+        out.dhdx = scratch.dhdx;
+        out.dhdz = scratch.dhdz;
+        found = true;
+      }
+    }
+    return found;
+  }
+  for (let i = 0; i < shapes.length; i++) {
+    if (sampleShape(shapes[i]!, x, z, scratch) && scratch.height > out.height) {
+      out.height = scratch.height;
+      out.dhdx = scratch.dhdx;
+      out.dhdz = scratch.dhdz;
+      found = true;
+    }
+  }
+  return found;
+}
+
 /** Height a shape adds at a point, and its gradient in world X and Z. */
 export interface ShapeSample {
   height: number;
   dhdx: number;
   dhdz: number;
 }
+
+const scratch: ShapeSample = { height: 0, dhdx: 0, dhdz: 0 };
 
 /** Samples one shape at world (x, z). Returns false (and leaves `out` alone) outside it. */
 export function sampleShape(s: TerrainShape, x: number, z: number, out: ShapeSample): boolean {

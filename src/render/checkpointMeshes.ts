@@ -134,7 +134,11 @@ function gateRight(f: { heading: number }): { rx: number; rz: number } {
   return { rx: Math.cos(h), rz: -Math.sin(h) };
 }
 
-/** The finish: two posts holding a checkered banner over the line, and a checkered line on the snow. */
+/**
+ * The finish: two posts holding a checkered banner, and a checkered line on
+ * the snow under it: across the whole line, or just under the arch on a
+ * wide run-out (the zone itself stays as wide as the basin).
+ */
 function createFinish(f: FinishDef, hf: Heightfield): Mesh {
   const c = CONFIG.checkpoints;
   const b = new TriBuilder();
@@ -142,9 +146,10 @@ function createFinish(f: FinishDef, hf: Heightfield): Mesh {
   const right = new Vector3(rx, 0, rz);
   const fwd = new Vector3(-Math.sin((f.heading * Math.PI) / 180), 0, -Math.cos((f.heading * Math.PI) / 180));
   const back = fwd.clone().negate();
-  const half = f.width / 2;
+  const line = f.arch ?? f;
+  const half = line.width / 2;
   const at = (across: number, along: number, y: number): Vector3 =>
-    new Vector3(f.x + rx * across + fwd.x * along, y, f.z + rz * across + fwd.z * along);
+    new Vector3(line.x + rx * across + fwd.x * along, y, line.z + rz * across + fwd.z * along);
   const snow = (across: number, along: number): number => {
     const p = at(across, along, 0);
     return drawnHeightAt(hf, p.x, p.z);
@@ -154,9 +159,9 @@ function createFinish(f: FinishDef, hf: Heightfield): Mesh {
   let ground = -Infinity;
   for (let s = -half; s <= half; s += 2) ground = Math.max(ground, snow(s, 0));
   const bottom = ground + c.finishHeight;
-  const cols = Math.max(1, Math.round(f.width / CHECK));
+  const cols = Math.max(1, Math.round(line.width / CHECK));
   const rows = Math.max(1, Math.round(c.finishBanner / CHECK));
-  const cw = f.width / cols;
+  const cw = line.width / cols;
   const rh = c.finishBanner / rows;
   for (let i = 0; i < cols; i++) {
     for (let j = 0; j < rows; j++) {

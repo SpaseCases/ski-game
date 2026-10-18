@@ -250,6 +250,8 @@ export function mountDevPanel(actions: DevActions): DevPanel {
   cam.add(c, 'heightSmoothingGround', 0.5, 30, 0.5);
   cam.add(c, 'heightSmoothingAir', 0.5, 30, 0.5);
   cam.add(c, 'clearance', 0, 3, 0.05);
+  cam.add(c, 'slopeLift', 0, 1.5, 0.05);
+  cam.add(c, 'slopeLiftMax', 0, 15, 0.5);
   cam.add(c, 'orbitSensitivity', 0.001, 0.02, 0.0005);
   cam.add(c, 'orbitPitchMin', -1, 0, 0.05);
   cam.add(c, 'orbitPitchMax', 0, 1.2, 0.05);

@@ -1,5 +1,6 @@
 import { BufferAttribute, BufferGeometry, Color, Group, Mesh, MeshLambertMaterial, Vector3 } from 'three';
 import { CONFIG } from '../config.ts';
+import { hash2 } from '../maps/terrain.ts';
 import type { Heightfield, RailShape } from '../maps/types.ts';
 import { railFrame } from '../sim/rails.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
@@ -7,14 +8,33 @@ import { TriBuilder } from './triBuilder.ts';
 
 // Rails and boxes, drawn from the slide lines the physics uses so the skis
 // sit exactly on what you see. They're merged into one vertex-colored mesh
-// per 64 m tile, so a long rail drops out of view past the fog.
+// per 64 m tile, so a long rail drops out of view past the fog. Each has its
+// look: park rails and handrails on posts, fallen logs lying on the snow,
+// park boxes, concrete ledges, benches, flat-topped rocks and stumps.
 
 const BOX_DECK = new Color('#9aa4ad');
 const BOX_SIDE = new Color('#8a5a32');
 const RAIL = new Color('#b4bec8');
 const POST = new Color('#56606b');
+const HANDRAIL = new Color('#2f4a3c');
+const HANDRAIL_POST = new Color('#26372e');
+const BARK = new Color('#5a4232');
+const BARK_DARK = new Color('#47342a');
+const LOG_END = new Color('#c9a273');
+const SNOW = new Color('#f1f5fa');
+const LEDGE_TOP = new Color('#b9bdc1');
+const LEDGE_SIDE = new Color('#8e9398');
+const BENCH = new Color('#a87443');
+const BENCH_DARK = new Color('#7a4f2c');
+const BENCH_LEG = new Color('#2c333b');
+const ROCK = new Color('#7d848c');
+const ROCK_DARK = new Color('#666d75');
+const STUMP_TOP = new Color('#c49a6c');
 /** Sides around a rail tube. With 6, one flat face is on top. */
 const RAIL_SIDES = 6;
+/** Sides around a log, and around a stump. */
+const LOG_SIDES = 8;
+const STUMP_SIDES = 9;
 /** Most distance (m) between posts, and how far in from the ends the first and last stand. */
 const POST_SPACING = 2.5;
 const POST_INSET = 0.4;
@@ -36,10 +56,34 @@ export function createRailMesh(rails: readonly RailShape[], hf: Heightfield): Gr
     }
     return b;
   };
-  for (const r of rails) {
-    if (r.kind === 'box') addBox(near, r, hf);
-    else addRail(near, r, hf);
-  }
+  rails.forEach((r, i) => {
+    switch (r.look) {
+      case 'metal':
+        addRail(near, r, hf, RAIL, POST);
+        break;
+      case 'handrail':
+        addRail(near, r, hf, HANDRAIL, HANDRAIL_POST);
+        break;
+      case 'log':
+        addLog(near, r, i);
+        break;
+      case 'wood':
+        addBox(near, r, hf, BOX_DECK, BOX_SIDE, 0);
+        break;
+      case 'ledge':
+        addBox(near, r, hf, LEDGE_TOP, LEDGE_SIDE, 0);
+        break;
+      case 'rock':
+        addBox(near, r, hf, SNOW, ROCK, 0.35);
+        break;
+      case 'bench':
+        addBench(near, r, hf);
+        break;
+      case 'stump':
+        addStump(near, r, hf);
+        break;
+    }
+  });
   const group = new Group();
   for (const b of tiles.values()) {
     // No normals: flat shading works them out per face on the GPU.
@@ -59,8 +103,11 @@ type Near = (x: number, z: number) => TriBuilder;
 
 const UP = new Vector3(0, 1, 0);
 
-/** A box: wooden sides down into the snow under a sliding deck along its top line. */
-function addBox(near: Near, r: RailShape, hf: Heightfield): void {
+/**
+ * A box: sides down into the snow under a deck along its top line. `flare`
+ * widens the sides toward the bottom (a rock's rough flanks).
+ */
+function addBox(near: Near, r: RailShape, hf: Heightfield, deck: Color, side: Color, flare: number): void {
   const segs = r.dist.length - 1;
   const w = r.halfWidth;
   for (let k = 0; k < segs; k++) {
@@ -73,21 +120,27 @@ function addBox(near: Near, r: RailShape, hf: Heightfield): void {
     const aR = a.clone().addScaledVector(right, w);
     const eL = e.clone().addScaledVector(right, -w);
     const eR = e.clone().addScaledVector(right, w);
-    const below = (v: Vector3): Vector3 => new Vector3(v.x, drawnHeightAt(hf, v.x, v.z) - BURY, v.z);
-    const aLb = below(aL);
-    const aRb = below(aR);
-    const eLb = below(eL);
-    const eRb = below(eR);
-    b.quad(aL, aR, eR, eL, BOX_DECK, UP);
-    b.quad(aR, eR, eRb, aRb, BOX_SIDE, right);
-    b.quad(aL, eL, eLb, aLb, BOX_SIDE, right.clone().negate());
-    if (k === 0) b.quad(aL, aR, aRb, aLb, BOX_SIDE, along.clone().negate());
-    if (k === segs - 1) b.quad(eL, eR, eRb, eLb, BOX_SIDE, along);
+    const below = (v: Vector3, out: number, ahead: number): Vector3 => {
+      const p = v.clone().addScaledVector(right, out).addScaledVector(along, ahead);
+      return new Vector3(p.x, drawnHeightAt(hf, p.x, p.z) - BURY, p.z);
+    };
+    const back = k === 0 ? -flare : 0;
+    const fore = k === segs - 1 ? flare : 0;
+    const aLb = below(aL, -flare, back);
+    const aRb = below(aR, flare, back);
+    const eLb = below(eL, -flare, fore);
+    const eRb = below(eR, flare, fore);
+    b.quad(aL, aR, eR, eL, deck, UP);
+    const rockShade = flare > 0 && hash2(k, 3, 17) > 0 ? ROCK_DARK : side;
+    b.quad(aR, eR, eRb, aRb, side, right);
+    b.quad(aL, eL, eLb, aLb, rockShade, right.clone().negate());
+    if (k === 0) b.quad(aL, aR, aRb, aLb, side, along.clone().negate());
+    if (k === segs - 1) b.quad(eL, eR, eRb, eLb, rockShade, along);
   }
 }
 
 /** A round rail: a tube under its top line, capped at both ends, on posts down to the snow. */
-function addRail(near: Near, r: RailShape, hf: Heightfield): void {
+function addRail(near: Near, r: RailShape, hf: Heightfield, tube: Color, postColor: Color): void {
   const radius = r.halfWidth;
   const segs = r.dist.length - 1;
   const ring = Array.from({ length: RAIL_SIDES }, () => new Vector3());
@@ -111,10 +164,10 @@ function addRail(near: Near, r: RailShape, hf: Heightfield): void {
       const o0 = ring[i]!;
       const o1 = ring[(i + 1) % RAIL_SIDES]!;
       const out = o0.clone().add(o1);
-      b.quad(a.clone().add(o0), a.clone().add(o1), e.clone().add(o1), e.clone().add(o0), RAIL, out);
+      b.quad(a.clone().add(o0), a.clone().add(o1), e.clone().add(o1), e.clone().add(o0), tube, out);
     }
-    if (k === 0) cap(b, a, ring, dir.clone().negate());
-    if (k === segs - 1) cap(b, e, ring, dir);
+    if (k === 0) cap(b, a, ring, dir.clone().negate(), tube);
+    if (k === segs - 1) cap(b, e, ring, dir, tube);
   }
 
   // Posts, evenly spaced, from under the tube down into the snow.
@@ -132,28 +185,177 @@ function addRail(near: Near, r: RailShape, hf: Heightfield): void {
     const b = near(pos.x, pos.z);
     const along = new Vector3(dir.x, 0, dir.z).normalize().multiplyScalar(half);
     const right = new Vector3(-along.z, 0, along.x);
-    const corners = [
-      along.clone().add(right),
-      along.clone().sub(right),
-      along.clone().negate().sub(right),
-      along.clone().negate().add(right),
-    ];
+    const corners = [along.clone().add(right), along.clone().sub(right), along.clone().negate().sub(right), along.clone().negate().add(right)];
     for (let c = 0; c < 4; c++) {
       const c0 = corners[c]!;
       const c1 = corners[(c + 1) % 4]!;
       const at = (o: Vector3, y: number): Vector3 => new Vector3(pos.x + o.x, y, pos.z + o.z);
-      b.quad(at(c0, top), at(c1, top), at(c1, bottom), at(c0, bottom), POST, c0.clone().add(c1));
+      b.quad(at(c0, top), at(c1, top), at(c1, bottom), at(c0, bottom), postColor, c0.clone().add(c1));
     }
   }
 }
 
+/**
+ * A fallen tree: a faceted trunk hanging under its top line (with snow
+ * along the top, where the skis slide), broken branch stubs, a cut end at
+ * the tip and the torn-up root plate at the last point.
+ */
+function addLog(near: Near, r: RailShape, seed: number): void {
+  const radius = r.halfWidth;
+  const segs = r.dist.length - 1;
+  const ring = Array.from({ length: LOG_SIDES }, () => new Vector3());
+  const first = point(r, 0);
+  const last = point(r, segs);
+  const axis = last.clone().sub(first).normalize();
+  const side = new Vector3().crossVectors(axis, UP).normalize();
+  const up = new Vector3().crossVectors(side, axis);
+  // One face straight up, so the snow strip sits where the skis ride.
+  for (let i = 0; i < LOG_SIDES; i++) {
+    const t = Math.PI / 2 + (i / LOG_SIDES) * Math.PI * 2 + Math.PI / LOG_SIDES;
+    ring[i]!.copy(side).multiplyScalar(Math.cos(t) * radius).addScaledVector(up, Math.sin(t) * radius);
+  }
+  for (let k = 0; k < segs; k++) {
+    const a = point(r, k);
+    const e = point(r, k + 1);
+    const b = near(a.x, a.z);
+    a.addScaledVector(up, -radius);
+    e.addScaledVector(up, -radius);
+    for (let i = 0; i < LOG_SIDES; i++) {
+      const o0 = ring[i]!;
+      const o1 = ring[(i + 1) % LOG_SIDES]!;
+      const out = o0.clone().add(o1);
+      const top = out.y > radius * 1.2;
+      const color = top ? SNOW : (i + k) % 3 === 0 ? BARK_DARK : BARK;
+      b.quad(a.clone().add(o0), a.clone().add(o1), e.clone().add(o1), e.clone().add(o0), color, out);
+    }
+    if (k === 0) cap(b, a, ring, axis.clone().negate(), LOG_END);
+  }
+  const end = last.clone().addScaledVector(up, -radius);
+  const b = near(end.x, end.z);
+  // The root plate: a ragged disc of roots and earth standing up at the end.
+  const plate = radius * 2.6;
+  const spokes = 9;
+  const rim: Vector3[] = [];
+  for (let i = 0; i < spokes; i++) {
+    const t = (i / spokes) * Math.PI * 2;
+    const rr = plate * (0.75 + 0.25 * hash2(i, seed, 41));
+    rim.push(end.clone().addScaledVector(side, Math.cos(t) * rr).addScaledVector(up, Math.sin(t) * rr).addScaledVector(axis, 0.15));
+  }
+  for (let i = 0; i < spokes; i++) {
+    const p0 = rim[i]!;
+    const p1 = rim[(i + 1) % spokes]!;
+    const color = p0.y + p1.y > 2 * end.y + plate ? SNOW : i % 2 === 0 ? BARK_DARK : BARK;
+    b.tri(end.clone().addScaledVector(axis, 0.3), p0, p1, color, axis);
+    b.tri(end.clone().addScaledVector(axis, -0.05), p0, p1, BARK_DARK, axis.clone().negate());
+  }
+  // Branch stubs along the sides.
+  const n = Math.max(2, Math.floor(r.length / 2.2));
+  const pos = new Vector3();
+  const dir = new Vector3();
+  for (let i = 1; i < n; i++) {
+    const s = (r.length * i) / n + 0.3 * hash2(i, seed, 7);
+    railFrame(r, s, pos, dir);
+    const out = hash2(i, seed, 3) > 0 ? 1 : -1;
+    const base = pos.clone().addScaledVector(up, -radius * 0.9).addScaledVector(side, out * radius * 0.8);
+    const tip = base.clone().addScaledVector(side, out * (0.5 + 0.4 * (0.5 + 0.5 * hash2(i, seed, 5)))).addScaledVector(up, -0.15).addScaledVector(axis, 0.25);
+    beam(near(pos.x, pos.z), base, tip, 0.09, BARK_DARK);
+  }
+}
+
+/** A bench: a slatted seat along its top line on dark legs. */
+function addBench(near: Near, r: RailShape, hf: Heightfield): void {
+  const segs = r.dist.length - 1;
+  const w = r.halfWidth;
+  const thick = 0.08;
+  for (let k = 0; k < segs; k++) {
+    const a = point(r, k);
+    const e = point(r, k + 1);
+    const b = near(a.x, a.z);
+    const along = new Vector3(e.x - a.x, 0, e.z - a.z).normalize();
+    const right = new Vector3(-along.z, 0, along.x);
+    // Three slats across the seat, with dark gaps between.
+    const slats = 3;
+    for (let i = 0; i < slats; i++) {
+      const v0 = -w + (2 * w * i) / slats + 0.02;
+      const v1 = -w + (2 * w * (i + 1)) / slats - 0.02;
+      const p = (q: Vector3, v: number, y = 0): Vector3 => q.clone().addScaledVector(right, v).setY(q.y + y);
+      const color = i % 2 === 0 ? BENCH : BENCH_DARK;
+      b.quad(p(a, v0), p(a, v1), p(e, v1), p(e, v0), color, UP);
+      b.quad(p(a, v1), p(e, v1), p(e, v1, -thick), p(a, v1, -thick), BENCH_DARK, right);
+      b.quad(p(a, v0), p(e, v0), p(e, v0, -thick), p(a, v0, -thick), BENCH_DARK, right.clone().negate());
+    }
+  }
+  // Legs: a frame at each end and every 1.5 m between.
+  const n = Math.max(1, Math.round(r.length / 1.5));
+  const pos = new Vector3();
+  const dir = new Vector3();
+  for (let i = 0; i <= n; i++) {
+    railFrame(r, Math.min(r.length - 0.1, Math.max(0.1, (r.length * i) / n)), pos, dir);
+    const right = new Vector3(-dir.z, 0, dir.x).normalize();
+    for (const v of [-w + 0.06, w - 0.06]) {
+      const top = pos.clone().addScaledVector(right, v);
+      top.y -= thick;
+      const foot = top.clone();
+      foot.y = drawnHeightAt(hf, foot.x, foot.z) - BURY;
+      beam(near(pos.x, pos.z), foot, top, 0.06, BENCH_LEG);
+    }
+  }
+}
+
+/** A tree stump: a faceted cylinder from the snow up to the top line's middle, cut flat with rings, capped with snow. */
+function addStump(near: Near, r: RailShape, hf: Heightfield): void {
+  const pos = new Vector3();
+  const dir = new Vector3();
+  railFrame(r, r.length / 2, pos, dir);
+  const b = near(pos.x, pos.z);
+  const radius = Math.max(r.halfWidth, r.length / 2);
+  const ground = drawnHeightAt(hf, pos.x, pos.z) - BURY;
+  const ring: Vector3[] = [];
+  for (let i = 0; i < STUMP_SIDES; i++) {
+    const t = (i / STUMP_SIDES) * Math.PI * 2;
+    ring.push(new Vector3(Math.cos(t) * radius, 0, Math.sin(t) * radius));
+  }
+  const center = pos.clone();
+  for (let i = 0; i < STUMP_SIDES; i++) {
+    const o0 = ring[i]!;
+    const o1 = ring[(i + 1) % STUMP_SIDES]!;
+    const flare = 1.18;
+    const top0 = center.clone().add(o0);
+    const top1 = center.clone().add(o1);
+    const bot0 = center.clone().addScaledVector(o0, flare).setY(ground);
+    const bot1 = center.clone().addScaledVector(o1, flare).setY(ground);
+    b.quad(top0, top1, bot1, bot0, i % 2 === 0 ? BARK : BARK_DARK, o0.clone().add(o1));
+    // The cut top: wood with a snow cap in the middle.
+    const mid0 = center.clone().addScaledVector(o0, 0.55);
+    const mid1 = center.clone().addScaledVector(o1, 0.55);
+    b.quad(mid0, mid1, top1, top0, STUMP_TOP, UP);
+    b.tri(center.clone().setY(center.y + 0.04), mid0, mid1, SNOW, UP);
+  }
+}
+
 /** Closes a tube end with a fan of triangles. */
-function cap(b: TriBuilder, center: Vector3, ring: readonly Vector3[], out: Vector3): void {
+function cap(b: TriBuilder, center: Vector3, ring: readonly Vector3[], out: Vector3, color: Color): void {
   for (let i = 0; i < ring.length; i++) {
     const o0 = ring[i]!;
     const o1 = ring[(i + 1) % ring.length]!;
-    b.tri(center, center.clone().add(o0), center.clone().add(o1), RAIL, out);
+    b.tri(center, center.clone().add(o0), center.clone().add(o1), color, out);
   }
+}
+
+/** A square beam `w` thick between two world points. */
+function beam(b: TriBuilder, a: Vector3, e: Vector3, w: number, color: Color): void {
+  const dir = new Vector3().subVectors(e, a);
+  if (dir.lengthSq() < 1e-8) return;
+  dir.normalize();
+  const side = new Vector3().crossVectors(dir, Math.abs(dir.y) > 0.9 ? new Vector3(1, 0, 0) : UP).normalize().multiplyScalar(w / 2);
+  const up = new Vector3().crossVectors(side, dir).normalize().multiplyScalar(w / 2);
+  const offs = [side.clone().add(up), side.clone().sub(up), side.clone().negate().sub(up), side.clone().negate().add(up)];
+  for (let i = 0; i < 4; i++) {
+    const o0 = offs[i]!;
+    const o1 = offs[(i + 1) % 4]!;
+    b.quad(a.clone().add(o0), a.clone().add(o1), e.clone().add(o1), e.clone().add(o0), color, o0.clone().add(o1));
+  }
+  b.quad(e.clone().add(offs[0]!), e.clone().add(offs[1]!), e.clone().add(offs[2]!), e.clone().add(offs[3]!), color, dir);
 }
 
 function point(r: RailShape, k: number): Vector3 {

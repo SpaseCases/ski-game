@@ -66,10 +66,10 @@ export function buildObstacles(defs: readonly ObstacleDef[], hf: Heightfield): O
     o.bx[i] = d.bx;
     o.bz[i] = d.bz;
     o.radius[i] = d.radius;
-    const ha = heightAt(hf, d.ax, d.az);
-    const hb = heightAt(hf, d.bx, d.bz);
-    o.bottom[i] = Math.min(ha, hb) - 0.5;
-    o.top[i] = Math.max(ha, hb) + d.height;
+    const ha = d.y0 !== undefined && d.y1 !== undefined ? 0 : heightAt(hf, d.ax, d.az);
+    const hb = d.y0 !== undefined && d.y1 !== undefined ? 0 : heightAt(hf, d.bx, d.bz);
+    o.bottom[i] = d.y0 ?? Math.min(ha, hb) - 0.5;
+    o.top[i] = d.y1 ?? Math.max(ha, hb) + d.height;
     const r = d.radius + reach;
     span[i * 4] = cellOf(o, Math.min(d.ax, d.bx) - r, o.originX, o.cols);
     span[i * 4 + 1] = cellOf(o, Math.max(d.ax, d.bx) + r, o.originX, o.cols);
