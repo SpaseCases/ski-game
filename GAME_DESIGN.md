@@ -84,6 +84,9 @@ Every map has a start gate themed to its kind of skiing, checkpoint flags, a fin
    - Start gates: a race start house with a timing wand at the top of each course.
    - Decoration: blue course lines dyed in the snow, safety netting along both sides, a finish banner for each course.
 4. **Big air:** several big jumps of different sizes and takeoff steepness, from long and mellow to steep and poppy, side by side at the bottom of the hill. Each has its own lane from a shared start. At least two of them clear a 720 (see Jump sizing).
+   - Each jump looks and rides differently: at least one is massive all round (in-run, lip, kicker width, table and landing), and one has a really steep lip.
+   - A short run-in: lanes start soon after the drop-in, with short, steep in-runs.
+   - Tables are wider than their kickers, with room to ride round the kicker and huck the knuckle.
    - Start gate: a scaffold drop-in tower, like a big air contest.
    - Decoration: spectator fencing beside the landings, flags, floodlights.
    - Flags: one at the top of each lane.
@@ -152,18 +155,19 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 7. **Sound effects.**
 8. **Performance and polish pass** on the Low preset, then a final embed and deploy check. Polish includes a sun in the sky with a soft glow and warmer golden-hour light, and snow spray when carving hard, braking or landing, with ski tracks left behind that fade out.
 
-## Status (2026-10-18)
+## Status (2026-10-19)
 
-**Done:** 0 scaffold and deploy, 1 skiing, 2 air, 3 rails and boxes, 4 checkpoints, 5a map features, 5b map select and the Park, 5c-1 the Freeride mountain, 5c-2 the town and natural features, 5d the Slalom map (two timed courses side by side, each with its own start house, wand, clock and finish; slalom pole gates and giant slalom panel gates; `tools/maps/slalom.ts` writes it, `tools/sim/course.ts` rides each course through its gates). **Next:** 5e, the Big air map.
+**Done:** 0 scaffold and deploy, 1 skiing, 2 air, 3 rails and boxes, 4 checkpoints, 5a map features, 5b map select and the Park, 5c-1 the Freeride mountain, 5c-2 the town and natural features, 5d the Slalom map, 5e the Big air map (a 12 m scaffold tower over four lanes, left to right Mellow, Big, Massive and Steep; `tools/maps/bigair.ts` writes it; `tools/sim/line.ts` now also drops in from a start (`start=<x>`), reports kickers against the knuckle and landing the terrain makes, hucks knuckles from the ride-round, and takes `v0=`, `brake=` and `speed=`). **Next:** 6, menus.
 
 **Known issues**
-- Not yet tested on a real school Chromebook. On a PC with the CPU slowed 4×, Low takes about 1.6 to 2.2 ms of CPU per frame on Freeride and the Slalom (up to ~115 draw calls in Freeride's town); a jump to a new spot spikes one frame to 30 to 50 ms while snow is built. The GPU side is unmeasured.
+- Not yet tested on a real school Chromebook. On a PC with the CPU slowed 4×, Low takes about 1.6 to 2.2 ms of CPU per frame on Freeride, the Slalom and Big air (up to ~115 draw calls in Freeride's town, 50 to 92 in Big air); a jump to a new spot spikes one frame to 30 to 50 ms while snow is built. The GPU side is unmeasured.
 - Auto sees as far as Medium (450 m) until milestone 8's frame-rate scaling. Until the Settings menu (milestone 6), presets are picked with `?quality=low|medium|high`, and Esc opens the map menu as a stand-in pause.
 - Far scenery: past the far plane, stands of trees show as flat dark facets (Freeride, and the Slalom's hillsides down the valley on Medium); far stand-in trees are plain cones.
 - Park: the huge jumps are sized for tucking the in-run from their flag; the long rail has no brake; kicker-fed rails catch at about 6 to 22 m/s.
 - Test slope: invisible walls at the top of the side berms and at the bottom. Riding off a rail sideways crashes unless you turn the skis back first. In the japan grab the ski hangs low.
 - Freeride: straight-lining a couloir reaches ~36 m/s; over a convex rollover the camera can't see the slope below; the pillow line is rounded steps, not domes; gully walls throw wall airs only when ridden up fairly square; trail map labels crowd on the North face and in town. Town: the rooftop gap needs about 7 m/s; full pops off a chalet ridge or the Market at 18 m/s overshoot their drifts; the camera rises over a roof when riding beside a building.
 - Slalom: course times (slalom 57 to 66 s, giant slalom 48 to 51 s) come from a bot that steers more finely than keys; human runs are unmeasured. The giant slalom is only ~20% faster. Hitting the netting above 5 m/s crashes, like any fence.
+- Big air: airtime from the flag (standing to tucked) is Mellow 1.6 to 3.6 s, Big 2.3 to 4.4 s, Massive 2.5 to 5.2 s, Steep 2.9 to 4.8 s; all land clean from the flag, from the tower or at 12 m/s, at most 13.9 m/s into the snow. No speed-check rise below the tower (one that slows a tucked rider stops a standing one), so landings are sized for tucking from the tower. Steep's 44° lip is the most a lip can be (`walls.wallAngle`). Knuckle hucks land at 10 to 14 m/s, but at full tucked speed overshoot Massive's and Steep's landings. Banks between lanes reach 36°; Mellow's runout is ~23°, so tucked riders hit the corral at ~42 m/s. The outer lanes are a 100 m swing out from the tower, and the tower's deck needs a pole push to drop in.
 - Headless bots don't steer around everything (`face.ts --fall` riders sometimes pin against a tree) and only brake on the snow.
 
 **Tuned config values** (`src/config.ts`, start → now)
