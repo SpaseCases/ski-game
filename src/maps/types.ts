@@ -84,6 +84,12 @@ export interface GeneratedTerrainDef {
    * stays inside width × length.
    */
   margin: number;
+  /**
+   * Folds in that scenery (spurs and hollows), growing over the first 60 m
+   * past the play area: half their height (m) and their wavelength (m).
+   * Absent: smooth hillsides.
+   */
+  hills?: { amplitude: number; wavelength: number };
 }
 
 /**
@@ -521,20 +527,34 @@ export interface HalfpipeFeature {
   exit: number;
 }
 
-/** One slalom gate: two poles, and the rider must pass between them. */
+/** One gate: the rider must pass between its two sides. */
 export interface SlalomGateDef {
   /** Middle of the gate. */
   x: number;
   z: number;
   /** Heading in degrees riders pass through it; 0 faces downhill. */
   heading: number;
-  /** Distance between the poles. */
+  /** The opening: distance between the poles (for a giant slalom gate, between the panels' inner poles). */
   width: number;
 }
 
-/** A slalom course: gates in order, poles alternating red and blue. */
+/**
+ * What a course's gates are: slalom gates (a single pole each side, bending
+ * when clipped) or giant slalom gates (each side a plain panel between two
+ * poles, which tips over as one when hit).
+ */
+export type GateKind = 'slalom' | 'giant';
+
+/**
+ * A timed course's gates, in order, alternating red and blue. A race start
+ * and finishes naming the same course time it (see StartFeature.course and
+ * FinishDef.course); several features with one name join into one course.
+ */
 export interface SlalomFeature {
   type: 'slalom';
+  /** The course's name, shown on the race HUD; '' goes with a race start that names no course. */
+  name: string;
+  kind: GateKind;
   gates: SlalomGateDef[];
 }
 
@@ -554,6 +574,8 @@ export interface StartFeature {
   heading: number;
   /** Deck or tower platform height above the snow. */
   height: number;
+  /** A race start: the course (SlalomFeature.name) its timing wand starts; '' for the gates that name none. */
+  course: string;
 }
 
 export type Feature =
@@ -606,6 +628,12 @@ export interface FinishDef {
   length: number;
   /** The arch: its middle and width, facing the zone's heading. Absent: the banner spans the whole line. */
   arch?: { x: number; z: number; width: number };
+  /**
+   * The timed course (SlalomFeature.name) whose clock this finish stops.
+   * Absent: it stops none of the courses that have finishes of their own,
+   * and any course that has none.
+   */
+  course?: string;
 }
 
 /** Things scattered over an area. */

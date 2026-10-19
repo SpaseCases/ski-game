@@ -1,0 +1,2541 @@
+{
+ "name": "Slalom",
+ "terrain": {
+  "type": "generated",
+  "width": 160,
+  "length": 970,
+  "cellSize": 3,
+  "bermWidth": 12,
+  "bermHeight": 5,
+  "noise": 0.08,
+  "seed": 21,
+  "margin": 320,
+  "hills": {
+   "amplitude": 22,
+   "wavelength": 210
+  },
+  "profile": [
+   {
+    "length": 46,
+    "pitch": 4,
+    "ease": 10
+   },
+   {
+    "length": 204,
+    "pitch": 15,
+    "ease": 22
+   },
+   {
+    "length": 60,
+    "pitch": 12,
+    "ease": 30
+   },
+   {
+    "length": 220,
+    "pitch": 16,
+    "ease": 30
+   },
+   {
+    "length": 90,
+    "pitch": 12,
+    "ease": 30
+   },
+   {
+    "length": 180,
+    "pitch": 15,
+    "ease": 26
+   },
+   {
+    "length": 70,
+    "pitch": 3,
+    "ease": 30
+   },
+   {
+    "length": 100,
+    "pitch": -8,
+    "ease": 30
+   }
+  ]
+ },
+ "features": [
+  {
+   "type": "start",
+   "style": "race",
+   "x": -12,
+   "z": -38,
+   "heading": 0,
+   "course": "Slalom"
+  },
+  {
+   "type": "slalom",
+   "name": "Slalom",
+   "kind": "slalom",
+   "gates": [
+    {
+     "x": -16.07,
+     "z": -54,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -10.89,
+     "z": -67.5,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -20.82,
+     "z": -81,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -16.11,
+     "z": -94.5,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -24.57,
+     "z": -108,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -17.34,
+     "z": -121.5,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -24.15,
+     "z": -135,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -16.21,
+     "z": -148.5,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -22.79,
+     "z": -162,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -15.18,
+     "z": -175.5,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -22.02,
+     "z": -189,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -14.52,
+     "z": -202.5,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -21.47,
+     "z": -216,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -14.08,
+     "z": -229.5,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -21.16,
+     "z": -243,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -13.94,
+     "z": -256.5,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -20.9,
+     "z": -270.06,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -14.31,
+     "z": -283.93,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -21.07,
+     "z": -297.93,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -14.7,
+     "z": -311.93,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -21.87,
+     "z": -325.93,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -14.77,
+     "z": -340.16,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -22.98,
+     "z": -354.65,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -15.65,
+     "z": -369.15,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -23.92,
+     "z": -383.65,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -17.06,
+     "z": -398.11,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -24.37,
+     "z": -411.96,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -18.26,
+     "z": -425.46,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -25.35,
+     "z": -438.96,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -19.21,
+     "z": -452.46,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -26.24,
+     "z": -465.96,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -20.03,
+     "z": -479.46,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -26.97,
+     "z": -492.96,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -20.66,
+     "z": -506.46,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -27.5,
+     "z": -519.96,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -21.08,
+     "z": -533.46,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -27.47,
+     "z": -546.88,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -21.7,
+     "z": -559.2,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -27.28,
+     "z": -570.7,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -21.61,
+     "z": -582.2,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -27.08,
+     "z": -593.7,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -21.32,
+     "z": -605.2,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -26.7,
+     "z": -616.7,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -20.68,
+     "z": -628.2,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -26.81,
+     "z": -639.97,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -19.28,
+     "z": -652.58,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -26.27,
+     "z": -665.58,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -18.43,
+     "z": -678.58,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -25.37,
+     "z": -691.58,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -17.5,
+     "z": -704.58,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -24.42,
+     "z": -717.58,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -16.72,
+     "z": -730.58,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -22.97,
+     "z": -743.44,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -16.28,
+     "z": -756,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -22.09,
+     "z": -768.5,
+     "heading": 0,
+     "width": 4.5
+    },
+    {
+     "x": -15.53,
+     "z": -781,
+     "heading": 0,
+     "width": 4.5
+    }
+   ]
+  },
+  {
+   "type": "start",
+   "style": "race",
+   "x": 12,
+   "z": -38,
+   "heading": 0,
+   "course": "Giant slalom"
+  },
+  {
+   "type": "slalom",
+   "name": "Giant slalom",
+   "kind": "giant",
+   "gates": [
+    {
+     "x": 19.03,
+     "z": -64,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 13.45,
+     "z": -92,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 29.04,
+     "z": -120,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 18.64,
+     "z": -148,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 30.85,
+     "z": -176,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 20.91,
+     "z": -204,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 32.61,
+     "z": -232,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 22.25,
+     "z": -260,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 32.93,
+     "z": -288.78,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 22.82,
+     "z": -319.78,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 33.76,
+     "z": -350.11,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 21.33,
+     "z": -377.11,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 32.73,
+     "z": -404.11,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 19.97,
+     "z": -431.11,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 31.28,
+     "z": -458.11,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 17.14,
+     "z": -486.01,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 30.03,
+     "z": -518.01,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 16.48,
+     "z": -550.01,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 26.16,
+     "z": -580.53,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 15.53,
+     "z": -610.53,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 25.74,
+     "z": -640.53,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 14.2,
+     "z": -668.24,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 25.9,
+     "z": -695.24,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 14.61,
+     "z": -722.24,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 26.72,
+     "z": -749.24,
+     "heading": 0,
+     "width": 6
+    },
+    {
+     "x": 15.8,
+     "z": -776.24,
+     "heading": 0,
+     "width": 6
+    }
+   ]
+  }
+ ],
+ "spawn": {
+  "x": 0,
+  "z": -12,
+  "heading": 0
+ },
+ "flags": [],
+ "finishes": [
+  {
+   "x": -40,
+   "z": -800,
+   "heading": 0,
+   "width": 80,
+   "length": 70,
+   "arch": {
+    "x": -18.17,
+    "z": -800,
+    "width": 24
+   },
+   "course": "Slalom"
+  },
+  {
+   "x": 40,
+   "z": -800,
+   "heading": 0,
+   "width": 80,
+   "length": 70,
+   "arch": {
+    "x": 22.31,
+    "z": -800,
+    "width": 28
+   },
+   "course": "Giant slalom"
+  }
+ ],
+ "decor": [
+  {
+   "kind": "netting",
+   "points": [
+    {
+     "x": -40,
+     "z": -34
+    },
+    {
+     "x": -40,
+     "z": -864
+    }
+   ]
+  },
+  {
+   "kind": "netting",
+   "points": [
+    {
+     "x": 0,
+     "z": -50
+    },
+    {
+     "x": 0,
+     "z": -870
+    }
+   ]
+  },
+  {
+   "kind": "netting",
+   "points": [
+    {
+     "x": 48,
+     "z": -34
+    },
+    {
+     "x": 48,
+     "z": -870
+    }
+   ]
+  },
+  {
+   "kind": "dyeLine",
+   "points": [
+    {
+     "x": -37,
+     "z": -46
+    },
+    {
+     "x": -37,
+     "z": -798
+    }
+   ]
+  },
+  {
+   "kind": "dyeLine",
+   "points": [
+    {
+     "x": -3,
+     "z": -46
+    },
+    {
+     "x": -3,
+     "z": -798
+    }
+   ]
+  },
+  {
+   "kind": "dyeLine",
+   "points": [
+    {
+     "x": 3,
+     "z": -46
+    },
+    {
+     "x": 3,
+     "z": -798
+    }
+   ]
+  },
+  {
+   "kind": "dyeLine",
+   "points": [
+    {
+     "x": 45,
+     "z": -46
+    },
+    {
+     "x": 45,
+     "z": -798
+    }
+   ]
+  },
+  {
+   "kind": "sign",
+   "x": 0,
+   "z": -21,
+   "heading": 0,
+   "header": "Race courses",
+   "lines": [
+    {
+     "text": "Slalom",
+     "level": "black",
+     "arrow": -1
+    },
+    {
+     "text": "Giant slalom",
+     "level": "black",
+     "arrow": 1
+    }
+   ]
+  },
+  {
+   "kind": "sign",
+   "x": -16,
+   "z": -34,
+   "heading": 0,
+   "header": "Slalom",
+   "lines": []
+  },
+  {
+   "kind": "sign",
+   "x": 16,
+   "z": -34,
+   "heading": 0,
+   "header": "Giant slalom",
+   "lines": []
+  },
+  {
+   "kind": "bunting",
+   "points": [
+    {
+     "x": -30,
+     "z": -30
+    },
+    {
+     "x": -18,
+     "z": -31
+    },
+    {
+     "x": 18,
+     "z": -31
+    },
+    {
+     "x": 30,
+     "z": -30
+    }
+   ]
+  },
+  {
+   "kind": "flag",
+   "points": [
+    {
+     "x": -8,
+     "z": -6
+    },
+    {
+     "x": 8,
+     "z": -6
+    },
+    {
+     "x": -24,
+     "z": -26
+    },
+    {
+     "x": 24,
+     "z": -26
+    }
+   ],
+   "heading": 0
+  },
+  {
+   "kind": "hut",
+   "points": [
+    {
+     "x": -26,
+     "z": -36
+    }
+   ],
+   "heading": 90
+  },
+  {
+   "kind": "hut",
+   "points": [
+    {
+     "x": 26,
+     "z": -36
+    }
+   ],
+   "heading": -90
+  },
+  {
+   "kind": "skiRack",
+   "points": [
+    {
+     "x": -6,
+     "z": -4
+    }
+   ],
+   "heading": 0
+  },
+  {
+   "kind": "snowmobile",
+   "points": [
+    {
+     "x": 40,
+     "z": -12
+    }
+   ],
+   "heading": 150
+  },
+  {
+   "kind": "banner",
+   "points": [
+    {
+     "x": -38.8,
+     "z": -770
+    },
+    {
+     "x": -38.8,
+     "z": -812
+    }
+   ],
+   "heading": -90,
+   "color": "#d8342c"
+  },
+  {
+   "kind": "hut",
+   "points": [
+    {
+     "x": -46,
+     "z": -806
+    }
+   ],
+   "heading": 90
+  },
+  {
+   "kind": "skier",
+   "points": [
+    {
+     "x": -43,
+     "z": -782
+    },
+    {
+     "x": -43.5,
+     "z": -788
+    },
+    {
+     "x": -42.8,
+     "z": -794
+    },
+    {
+     "x": -43.2,
+     "z": -820
+    }
+   ],
+   "heading": -90
+  },
+  {
+   "kind": "flag",
+   "points": [
+    {
+     "x": -42,
+     "z": -760
+    },
+    {
+     "x": -42,
+     "z": -830
+    }
+   ],
+   "heading": 0
+  },
+  {
+   "kind": "banner",
+   "points": [
+    {
+     "x": 46.8,
+     "z": -770
+    },
+    {
+     "x": 46.8,
+     "z": -812
+    }
+   ],
+   "heading": 90,
+   "color": "#2f62d0"
+  },
+  {
+   "kind": "hut",
+   "points": [
+    {
+     "x": 54,
+     "z": -806
+    }
+   ],
+   "heading": -90
+  },
+  {
+   "kind": "skier",
+   "points": [
+    {
+     "x": 51,
+     "z": -782
+    },
+    {
+     "x": 51.5,
+     "z": -788
+    },
+    {
+     "x": 50.8,
+     "z": -794
+    },
+    {
+     "x": 51.2,
+     "z": -820
+    }
+   ],
+   "heading": 90
+  },
+  {
+   "kind": "flag",
+   "points": [
+    {
+     "x": 50,
+     "z": -760
+    },
+    {
+     "x": 50,
+     "z": -830
+    }
+   ],
+   "heading": 0
+  },
+  {
+   "kind": "snowmobile",
+   "points": [
+    {
+     "x": -60,
+     "z": -830
+    }
+   ],
+   "heading": 30
+  },
+  {
+   "kind": "groomer",
+   "points": [
+    {
+     "x": 66,
+     "z": -850
+    }
+   ],
+   "heading": -50
+  },
+  {
+   "kind": "groomer",
+   "points": [
+    {
+     "x": -66,
+     "z": -420
+    }
+   ],
+   "heading": 20
+  },
+  {
+   "kind": "chairlift",
+   "points": [
+    {
+     "x": -122,
+     "z": -1030
+    },
+    {
+     "x": -122,
+     "z": 70
+    }
+   ]
+  },
+  {
+   "kind": "chairlift",
+   "points": [
+    {
+     "x": 124,
+     "z": -930
+    },
+    {
+     "x": 124,
+     "z": -120
+    }
+   ]
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -214.29,
+    "z": 39.63,
+    "width": 45.64,
+    "length": 66.97
+   },
+   "count": 20,
+   "seed": 129,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -142.52,
+    "z": 3.96,
+    "width": 67.06,
+    "length": 58.01
+   },
+   "count": 62,
+   "seed": 130,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -223.19,
+    "z": -7.52,
+    "width": 55.2,
+    "length": 35.46
+   },
+   "count": 13,
+   "seed": 131,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -142.91,
+    "z": -52.76,
+    "width": 51.5,
+    "length": 90.83
+   },
+   "count": 58,
+   "seed": 132,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -185.62,
+    "z": -57.87,
+    "width": 43.72,
+    "length": 77.07
+   },
+   "count": 51,
+   "seed": 133,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -134.8,
+    "z": -115.96,
+    "width": 39.77,
+    "length": 72.96
+   },
+   "count": 52,
+   "seed": 134,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -231.05,
+    "z": -123.95,
+    "width": 57.52,
+    "length": 80.2
+   },
+   "count": 32,
+   "seed": 135,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -133.8,
+    "z": -167.13,
+    "width": 37.27,
+    "length": 61.18
+   },
+   "count": 27,
+   "seed": 136,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -224.69,
+    "z": -161.82,
+    "width": 32.49,
+    "length": 64.19
+   },
+   "count": 35,
+   "seed": 137,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -127.83,
+    "z": -229.82,
+    "width": 47.7,
+    "length": 65.98
+   },
+   "count": 56,
+   "seed": 138,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -119.76,
+    "z": -297.41,
+    "width": 28.32,
+    "length": 65.04
+   },
+   "count": 17,
+   "seed": 139,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -165.2,
+    "z": -293.11,
+    "width": 45.9,
+    "length": 91.46
+   },
+   "count": 64,
+   "seed": 140,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -218.53,
+    "z": -288.89,
+    "width": 30.64,
+    "length": 35.95
+   },
+   "count": 18,
+   "seed": 141,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -147.04,
+    "z": -334.19,
+    "width": 57.64,
+    "length": 94.97
+   },
+   "count": 48,
+   "seed": 142,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -186.2,
+    "z": -350.25,
+    "width": 48.1,
+    "length": 70.47
+   },
+   "count": 37,
+   "seed": 143,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -127.77,
+    "z": -384.61,
+    "width": 49.18,
+    "length": 63.08
+   },
+   "count": 25,
+   "seed": 144,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -184.92,
+    "z": -408.66,
+    "width": 61.11,
+    "length": 36.98
+   },
+   "count": 27,
+   "seed": 145,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -226.6,
+    "z": -384.79,
+    "width": 49.96,
+    "length": 88.44
+   },
+   "count": 71,
+   "seed": 146,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -163.3,
+    "z": -447.43,
+    "width": 30.87,
+    "length": 40.46
+   },
+   "count": 8,
+   "seed": 147,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -134.13,
+    "z": -516.61,
+    "width": 67.21,
+    "length": 49.39
+   },
+   "count": 33,
+   "seed": 148,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -166.53,
+    "z": -504.99,
+    "width": 31.77,
+    "length": 75.88
+   },
+   "count": 26,
+   "seed": 149,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -151.41,
+    "z": -549.44,
+    "width": 63.05,
+    "length": 70.41
+   },
+   "count": 56,
+   "seed": 150,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -176.82,
+    "z": -559.66,
+    "width": 43.39,
+    "length": 43.51
+   },
+   "count": 17,
+   "seed": 151,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -225.12,
+    "z": -563.88,
+    "width": 68.25,
+    "length": 42.56
+   },
+   "count": 29,
+   "seed": 152,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -173.68,
+    "z": -611.68,
+    "width": 52.97,
+    "length": 83.18
+   },
+   "count": 52,
+   "seed": 153,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -186.78,
+    "z": -658.94,
+    "width": 44.19,
+    "length": 43.52
+   },
+   "count": 21,
+   "seed": 154,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -202.35,
+    "z": -662.59,
+    "width": 29.15,
+    "length": 44.73
+   },
+   "count": 14,
+   "seed": 155,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -175.05,
+    "z": -737.95,
+    "width": 45.49,
+    "length": 55.97
+   },
+   "count": 40,
+   "seed": 156,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -226.07,
+    "z": -735.83,
+    "width": 34.69,
+    "length": 75.78
+   },
+   "count": 24,
+   "seed": 157,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -140.32,
+    "z": -778.87,
+    "width": 47.77,
+    "length": 71.02
+   },
+   "count": 51,
+   "seed": 158,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -188.35,
+    "z": -786.07,
+    "width": 53.47,
+    "length": 61.36
+   },
+   "count": 47,
+   "seed": 159,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -227.21,
+    "z": -780.43,
+    "width": 67.95,
+    "length": 86.08
+   },
+   "count": 73,
+   "seed": 160,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -177.48,
+    "z": -846.08,
+    "width": 50.95,
+    "length": 87.59
+   },
+   "count": 66,
+   "seed": 161,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -235.06,
+    "z": -846.58,
+    "width": 61.03,
+    "length": 77.39
+   },
+   "count": 29,
+   "seed": 162,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -136.76,
+    "z": -895.03,
+    "width": 45.85,
+    "length": 38.91
+   },
+   "count": 21,
+   "seed": 163,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -179.64,
+    "z": -891.32,
+    "width": 33.98,
+    "length": 90
+   },
+   "count": 51,
+   "seed": 164,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -141.91,
+    "z": -945.44,
+    "width": 69.52,
+    "length": 47.93
+   },
+   "count": 33,
+   "seed": 165,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -183.56,
+    "z": -936.35,
+    "width": 44.79,
+    "length": 63.05
+   },
+   "count": 29,
+   "seed": 166,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -217.36,
+    "z": -930.03,
+    "width": 31.91,
+    "length": 72.83
+   },
+   "count": 14,
+   "seed": 167,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -135.31,
+    "z": -1005.42,
+    "width": 57.73,
+    "length": 54.15
+   },
+   "count": 44,
+   "seed": 168,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -216.81,
+    "z": -1007.92,
+    "width": 56.9,
+    "length": 84.72
+   },
+   "count": 34,
+   "seed": 169,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -210,
+    "z": -485,
+    "width": 200,
+    "length": 1470
+   },
+   "count": 450,
+   "seed": 3,
+   "minScale": 0.8,
+   "maxScale": 1.4
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 115.34,
+    "z": 31.44,
+    "width": 34.62,
+    "length": 47.81
+   },
+   "count": 18,
+   "seed": 171,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 179.58,
+    "z": 36.69,
+    "width": 42.54,
+    "length": 51.15
+   },
+   "count": 20,
+   "seed": 172,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 212.85,
+    "z": 54.25,
+    "width": 44.01,
+    "length": 51.93
+   },
+   "count": 14,
+   "seed": 173,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 117.4,
+    "z": -13.03,
+    "width": 35.98,
+    "length": 84.18
+   },
+   "count": 33,
+   "seed": 174,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 208.48,
+    "z": 1.95,
+    "width": 32.1,
+    "length": 94.28
+   },
+   "count": 27,
+   "seed": 175,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 186.57,
+    "z": -70.09,
+    "width": 56.32,
+    "length": 82.69
+   },
+   "count": 70,
+   "seed": 176,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 205.45,
+    "z": -71,
+    "width": 27.54,
+    "length": 70.89
+   },
+   "count": 19,
+   "seed": 177,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 180.04,
+    "z": -126.09,
+    "width": 48.68,
+    "length": 68.23
+   },
+   "count": 33,
+   "seed": 178,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 186.78,
+    "z": -169.48,
+    "width": 63.71,
+    "length": 83.8
+   },
+   "count": 79,
+   "seed": 179,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 128.44,
+    "z": -222.77,
+    "width": 38.98,
+    "length": 70.29
+   },
+   "count": 31,
+   "seed": 180,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 174.24,
+    "z": -223.38,
+    "width": 42.69,
+    "length": 61.81
+   },
+   "count": 28,
+   "seed": 181,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 131.12,
+    "z": -291.86,
+    "width": 36.43,
+    "length": 75.31
+   },
+   "count": 33,
+   "seed": 182,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 198.26,
+    "z": -283.81,
+    "width": 67.51,
+    "length": 62.64
+   },
+   "count": 42,
+   "seed": 183,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 228.52,
+    "z": -274.51,
+    "width": 54.76,
+    "length": 59.11
+   },
+   "count": 58,
+   "seed": 184,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.31,
+    "z": -325.45,
+    "width": 40.47,
+    "length": 67.5
+   },
+   "count": 44,
+   "seed": 185,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 217.45,
+    "z": -332.4,
+    "width": 49.58,
+    "length": 90.07
+   },
+   "count": 79,
+   "seed": 186,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 144.54,
+    "z": -384.82,
+    "width": 56.23,
+    "length": 62.35
+   },
+   "count": 22,
+   "seed": 187,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 183.99,
+    "z": -409.75,
+    "width": 56.85,
+    "length": 61.2
+   },
+   "count": 52,
+   "seed": 188,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 209.07,
+    "z": -394.87,
+    "width": 37.58,
+    "length": 80.23
+   },
+   "count": 18,
+   "seed": 189,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 227.03,
+    "z": -452.54,
+    "width": 60.23,
+    "length": 79.8
+   },
+   "count": 29,
+   "seed": 190,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 119.75,
+    "z": -501.57,
+    "width": 28.01,
+    "length": 67.64
+   },
+   "count": 16,
+   "seed": 191,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 181.8,
+    "z": -514.48,
+    "width": 54.66,
+    "length": 77.56
+   },
+   "count": 40,
+   "seed": 192,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 214.17,
+    "z": -505.63,
+    "width": 55.87,
+    "length": 53.61
+   },
+   "count": 22,
+   "seed": 193,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 115.23,
+    "z": -566.71,
+    "width": 34.93,
+    "length": 38.32
+   },
+   "count": 11,
+   "seed": 194,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.95,
+    "z": -608.58,
+    "width": 45.57,
+    "length": 66.2
+   },
+   "count": 24,
+   "seed": 195,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 186.18,
+    "z": -601.72,
+    "width": 56.3,
+    "length": 69.67
+   },
+   "count": 39,
+   "seed": 196,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 232.11,
+    "z": -611.33,
+    "width": 49.41,
+    "length": 35.1
+   },
+   "count": 11,
+   "seed": 197,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 138.45,
+    "z": -656.07,
+    "width": 50.93,
+    "length": 79.34
+   },
+   "count": 50,
+   "seed": 198,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 218.09,
+    "z": -658.78,
+    "width": 33.47,
+    "length": 56.08
+   },
+   "count": 25,
+   "seed": 199,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 150.92,
+    "z": -717.77,
+    "width": 67.93,
+    "length": 56.42
+   },
+   "count": 68,
+   "seed": 200,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 222.91,
+    "z": -730.85,
+    "width": 61.59,
+    "length": 88.87
+   },
+   "count": 83,
+   "seed": 201,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 117.35,
+    "z": -768.41,
+    "width": 36.86,
+    "length": 74.93
+   },
+   "count": 24,
+   "seed": 202,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 168.62,
+    "z": -767.48,
+    "width": 25.27,
+    "length": 45.56
+   },
+   "count": 13,
+   "seed": 203,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 210.04,
+    "z": -765.89,
+    "width": 41.89,
+    "length": 85.17
+   },
+   "count": 63,
+   "seed": 204,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 177.07,
+    "z": -843.07,
+    "width": 59.62,
+    "length": 91.04
+   },
+   "count": 56,
+   "seed": 205,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 232.4,
+    "z": -821.09,
+    "width": 58.72,
+    "length": 75.31
+   },
+   "count": 67,
+   "seed": 206,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 222.47,
+    "z": -882.01,
+    "width": 54.37,
+    "length": 72
+   },
+   "count": 34,
+   "seed": 207,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 116.23,
+    "z": -949.86,
+    "width": 32.47,
+    "length": 79.65
+   },
+   "count": 17,
+   "seed": 208,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 232.24,
+    "z": -947.81,
+    "width": 46.79,
+    "length": 72.26
+   },
+   "count": 21,
+   "seed": 209,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 130.71,
+    "z": -1008.16,
+    "width": 47.35,
+    "length": 38.22
+   },
+   "count": 22,
+   "seed": 210,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 228.71,
+    "z": -1007.3,
+    "width": 68.97,
+    "length": 63.06
+   },
+   "count": 49,
+   "seed": 211,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 210,
+    "z": -485,
+    "width": 200,
+    "length": 1470
+   },
+   "count": 450,
+   "seed": 5,
+   "minScale": 0.8,
+   "maxScale": 1.4
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -100,
+    "z": -485,
+    "width": 24,
+    "length": 970
+   },
+   "count": 160,
+   "seed": 11,
+   "minScale": 0.8,
+   "maxScale": 1.2
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 104,
+    "z": -485,
+    "width": 24,
+    "length": 970
+   },
+   "count": 160,
+   "seed": 12,
+   "minScale": 0.8,
+   "maxScale": 1.2
+  },
+  {
+   "kind": "snag",
+   "area": {
+    "x": -150,
+    "z": -485,
+    "width": 80,
+    "length": 1470
+   },
+   "count": 60,
+   "seed": 13,
+   "minScale": 0.8,
+   "maxScale": 1.2
+  },
+  {
+   "kind": "boulder",
+   "area": {
+    "x": 150,
+    "z": -485,
+    "width": 90,
+    "length": 1470
+   },
+   "count": 90,
+   "seed": 14,
+   "minScale": 0.8,
+   "maxScale": 1.6
+  },
+  {
+   "kind": "rock",
+   "area": {
+    "x": -150,
+    "z": -485,
+    "width": 90,
+    "length": 1470
+   },
+   "count": 120,
+   "seed": 15,
+   "minScale": 0.6,
+   "maxScale": 1.4
+  }
+ ],
+ "runs": [
+  {
+   "name": "Slalom",
+   "points": [
+    {
+     "x": -12,
+     "z": -38
+    },
+    {
+     "x": -16.07,
+     "z": -54
+    },
+    {
+     "x": -10.89,
+     "z": -67.5
+    },
+    {
+     "x": -20.82,
+     "z": -81
+    },
+    {
+     "x": -16.11,
+     "z": -94.5
+    },
+    {
+     "x": -24.57,
+     "z": -108
+    },
+    {
+     "x": -17.34,
+     "z": -121.5
+    },
+    {
+     "x": -24.15,
+     "z": -135
+    },
+    {
+     "x": -16.21,
+     "z": -148.5
+    },
+    {
+     "x": -22.79,
+     "z": -162
+    },
+    {
+     "x": -15.18,
+     "z": -175.5
+    },
+    {
+     "x": -22.02,
+     "z": -189
+    },
+    {
+     "x": -14.52,
+     "z": -202.5
+    },
+    {
+     "x": -21.47,
+     "z": -216
+    },
+    {
+     "x": -14.08,
+     "z": -229.5
+    },
+    {
+     "x": -21.16,
+     "z": -243
+    },
+    {
+     "x": -13.94,
+     "z": -256.5
+    },
+    {
+     "x": -20.9,
+     "z": -270.06
+    },
+    {
+     "x": -14.31,
+     "z": -283.93
+    },
+    {
+     "x": -21.07,
+     "z": -297.93
+    },
+    {
+     "x": -14.7,
+     "z": -311.93
+    },
+    {
+     "x": -21.87,
+     "z": -325.93
+    },
+    {
+     "x": -14.77,
+     "z": -340.16
+    },
+    {
+     "x": -22.98,
+     "z": -354.65
+    },
+    {
+     "x": -15.65,
+     "z": -369.15
+    },
+    {
+     "x": -23.92,
+     "z": -383.65
+    },
+    {
+     "x": -17.06,
+     "z": -398.11
+    },
+    {
+     "x": -24.37,
+     "z": -411.96
+    },
+    {
+     "x": -18.26,
+     "z": -425.46
+    },
+    {
+     "x": -25.35,
+     "z": -438.96
+    },
+    {
+     "x": -19.21,
+     "z": -452.46
+    },
+    {
+     "x": -26.24,
+     "z": -465.96
+    },
+    {
+     "x": -20.03,
+     "z": -479.46
+    },
+    {
+     "x": -26.97,
+     "z": -492.96
+    },
+    {
+     "x": -20.66,
+     "z": -506.46
+    },
+    {
+     "x": -27.5,
+     "z": -519.96
+    },
+    {
+     "x": -21.08,
+     "z": -533.46
+    },
+    {
+     "x": -27.47,
+     "z": -546.88
+    },
+    {
+     "x": -21.7,
+     "z": -559.2
+    },
+    {
+     "x": -27.28,
+     "z": -570.7
+    },
+    {
+     "x": -21.61,
+     "z": -582.2
+    },
+    {
+     "x": -27.08,
+     "z": -593.7
+    },
+    {
+     "x": -21.32,
+     "z": -605.2
+    },
+    {
+     "x": -26.7,
+     "z": -616.7
+    },
+    {
+     "x": -20.68,
+     "z": -628.2
+    },
+    {
+     "x": -26.81,
+     "z": -639.97
+    },
+    {
+     "x": -19.28,
+     "z": -652.58
+    },
+    {
+     "x": -26.27,
+     "z": -665.58
+    },
+    {
+     "x": -18.43,
+     "z": -678.58
+    },
+    {
+     "x": -25.37,
+     "z": -691.58
+    },
+    {
+     "x": -17.5,
+     "z": -704.58
+    },
+    {
+     "x": -24.42,
+     "z": -717.58
+    },
+    {
+     "x": -16.72,
+     "z": -730.58
+    },
+    {
+     "x": -22.97,
+     "z": -743.44
+    },
+    {
+     "x": -16.28,
+     "z": -756
+    },
+    {
+     "x": -22.09,
+     "z": -768.5
+    },
+    {
+     "x": -15.53,
+     "z": -781
+    },
+    {
+     "x": -18.17,
+     "z": -820
+    }
+   ],
+   "clear": 0
+  },
+  {
+   "name": "Giant slalom",
+   "points": [
+    {
+     "x": 12,
+     "z": -38
+    },
+    {
+     "x": 19.03,
+     "z": -64
+    },
+    {
+     "x": 13.45,
+     "z": -92
+    },
+    {
+     "x": 29.04,
+     "z": -120
+    },
+    {
+     "x": 18.64,
+     "z": -148
+    },
+    {
+     "x": 30.85,
+     "z": -176
+    },
+    {
+     "x": 20.91,
+     "z": -204
+    },
+    {
+     "x": 32.61,
+     "z": -232
+    },
+    {
+     "x": 22.25,
+     "z": -260
+    },
+    {
+     "x": 32.93,
+     "z": -288.78
+    },
+    {
+     "x": 22.82,
+     "z": -319.78
+    },
+    {
+     "x": 33.76,
+     "z": -350.11
+    },
+    {
+     "x": 21.33,
+     "z": -377.11
+    },
+    {
+     "x": 32.73,
+     "z": -404.11
+    },
+    {
+     "x": 19.97,
+     "z": -431.11
+    },
+    {
+     "x": 31.28,
+     "z": -458.11
+    },
+    {
+     "x": 17.14,
+     "z": -486.01
+    },
+    {
+     "x": 30.03,
+     "z": -518.01
+    },
+    {
+     "x": 16.48,
+     "z": -550.01
+    },
+    {
+     "x": 26.16,
+     "z": -580.53
+    },
+    {
+     "x": 15.53,
+     "z": -610.53
+    },
+    {
+     "x": 25.74,
+     "z": -640.53
+    },
+    {
+     "x": 14.2,
+     "z": -668.24
+    },
+    {
+     "x": 25.9,
+     "z": -695.24
+    },
+    {
+     "x": 14.61,
+     "z": -722.24
+    },
+    {
+     "x": 26.72,
+     "z": -749.24
+    },
+    {
+     "x": 15.8,
+     "z": -776.24
+    },
+    {
+     "x": 22.31,
+     "z": -820
+    }
+   ],
+   "clear": 0
+  }
+ ],
+ "colors": {
+  "sky": "#7fb2e6",
+  "fog": "#dce9f5"
+ },
+ "peaks": {
+  "seed": 19,
+  "count": 12,
+  "rings": 3,
+  "distance": [
+   12000,
+   30000
+  ],
+  "base": -900,
+  "height": [
+   1400,
+   3000
+  ],
+  "snowLine": 500
+ }
+}

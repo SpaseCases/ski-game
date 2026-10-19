@@ -1,6 +1,7 @@
 import { Color, Group, MeshLambertMaterial, Vector3 } from 'three';
 import { DECK, HOUSE, RIDGE, startPoint, TOWER, type StartFrame } from '../maps/startGates.ts';
 import type { Heightfield } from '../maps/types.ts';
+import type { RaceDef, RaceState } from '../sim/race.ts';
 import { clothMaterial } from './cloth.ts';
 import { pennantString } from './decor.ts';
 import { MeshKit } from './meshKit.ts';
@@ -18,7 +19,7 @@ const material = new MeshLambertMaterial({ vertexColors: true, flatShading: true
 
 export class StartGateView {
   readonly group = new Group();
-  /** Timing wands: each swings about its hinge post. */
+  /** Timing wands, one per race start in order: each swings about its hinge post. */
   private readonly wands: Group[] = [];
 
   constructor(starts: readonly StartFrame[], hf: Heightfield) {
@@ -34,13 +35,13 @@ export class StartGateView {
     if (!cloth.empty) this.group.add(cloth.mesh(clothMaterial));
   }
 
-  /** `wandTime`: seconds since the wand was pushed through (Infinity if never). */
-  update(wandTime: number): void {
-    // Kicked open quickly, then swinging slowly shut.
-    const open = Math.min(1, wandTime / 0.12);
-    const shut = Math.min(1, Math.max(0, (wandTime - 0.5) / 1.4));
-    const angle = Number.isFinite(wandTime) ? 1.35 * open * (1 - shut * shut * (3 - 2 * shut)) : 0;
-    for (const w of this.wands) w.rotation.y = angle;
+  /** Swings each race start's wand by the time since its course's clock last started there. */
+  update(def: RaceDef | undefined, race: RaceState | null): void {
+    if (!def || !race) return;
+    for (let c = 0; c < def.courses.length; c++) {
+      const wand = this.wands[def.courses[c]!.house];
+      if (wand) wand.rotation.y = wandAngle(race.wandTime[c] ?? Infinity);
+    }
   }
 
   private drawRace(kit: MeshKit, s: StartFrame, hf: Heightfield): void {
@@ -83,6 +84,14 @@ export class StartGateView {
     this.group.add(pivot);
     this.wands.push(pivot);
   }
+}
+
+/** A wand's swing `t` seconds after it was pushed through (Infinity: never): kicked open quickly, then swinging slowly shut. */
+function wandAngle(t: number): number {
+  if (!Number.isFinite(t)) return 0;
+  const open = Math.min(1, t / 0.12);
+  const shut = Math.min(1, Math.max(0, (t - 0.5) / 1.4));
+  return 1.35 * open * (1 - shut * shut * (3 - 2 * shut));
 }
 
 /** Wooden start deck: boards down each side to the snow, and a banner arch over the front. */

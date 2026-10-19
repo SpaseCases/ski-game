@@ -58,7 +58,7 @@ export function testSpots(map: MapDef): Record<string, TestSpot> {
   for (const f of map.features) {
     switch (f.type) {
       case 'start':
-        spots[`start: ${f.style}`] = { x: f.x, z: f.z, heading: f.heading / DEG };
+        spots[f.course === '' ? `start: ${f.style}` : `start: ${f.course}`] = { x: f.x, z: f.z, heading: f.heading / DEG };
         break;
       case 'jump':
       case 'kicker':
@@ -80,7 +80,7 @@ export function testSpots(map: MapDef): Record<string, TestSpot> {
       }
       case 'slalom': {
         const g = f.gates[0];
-        if (g) spots[name('slalom')] = before(g.x, g.z, g.heading, 25);
+        if (g) spots[f.name === '' ? name('slalom') : `gates: ${f.name}`] = before(g.x, g.z, g.heading, 25);
         break;
       }
     }

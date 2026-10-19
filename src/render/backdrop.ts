@@ -408,14 +408,17 @@ function litGroundGeometry(hf: Heightfield, trees: readonly ScatterItem[]): Buff
  * edge down to the ranges' base, so the land carries on into the haze.
  */
 function plainGeometry(hf: Heightfield, def: PeaksDef): BufferGeometry {
-  const inner = ((hf.cols - 1) * hf.cellSize) / 2 - 60;
+  // Round the middle of the heightfield (a mountain's summit, or halfway down a long slope).
+  const cx = hf.originX + ((hf.cols - 1) * hf.cellSize) / 2;
+  const cz = hf.originZ + ((hf.rows - 1) * hf.cellSize) / 2;
+  const inner = ((Math.min(hf.cols, hf.rows) - 1) * hf.cellSize) / 2 - 60;
   const outer = def.distance[0] * 0.92;
   // Start below the lowest ground round the map's edge, so the map's own hills stand over it.
   let low = Infinity;
   for (let k = 0; k < 72; k++) {
     const a = (k / 72) * Math.PI * 2;
-    const x = -Math.sin(a) * inner;
-    const z = -Math.cos(a) * inner;
+    const x = cx - Math.sin(a) * inner;
+    const z = cz - Math.cos(a) * inner;
     const c = Math.round((x - hf.originX) / hf.cellSize);
     const r = Math.round((z - hf.originZ) / hf.cellSize);
     low = Math.min(low, hf.heights[Math.min(hf.rows - 1, Math.max(0, r)) * hf.cols + Math.min(hf.cols - 1, Math.max(0, c))] ?? 0);
@@ -432,8 +435,8 @@ function plainGeometry(hf: Heightfield, def: PeaksDef): BufferGeometry {
     for (let j = 0; j < around; j++) {
       const a = ((j + (i % 2) * 0.5) / around) * Math.PI * 2;
       const rr = radii[i]! * (1 + 0.03 * hash2(i, j, def.seed + 11));
-      const x = -Math.sin(a) * rr;
-      const z = -Math.cos(a) * rr;
+      const x = cx - Math.sin(a) * rr;
+      const z = cz - Math.cos(a) * rr;
       const roll = i === 0 ? 0 : 60 * fbm(x / 1800, z / 1800, def.seed + 13);
       const y = top + (def.base - top) * t + roll;
       const k = i * around + j;

@@ -117,7 +117,8 @@ function crossedGate(f: FlagDef, a: Vector3, b: Vector3): boolean {
   return Math.abs(across) <= f.width / 2;
 }
 
-function inFinish(f: FinishDef, p: { x: number; z: number }): boolean {
+/** True when (x, z) is inside the finish zone. */
+export function inFinish(f: FinishDef, p: { x: number; z: number }): boolean {
   const h = (f.heading * Math.PI) / 180;
   const dx = -Math.sin(h);
   const dz = -Math.cos(h);

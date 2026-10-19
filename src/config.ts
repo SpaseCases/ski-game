@@ -238,6 +238,29 @@ export const CONFIG = {
     maxBend: 1.3,
   },
 
+  /**
+   * Giant slalom gates: each side is a panel strung between two poles (as
+   * tall as a slalom pole). Both poles are hinged at the snow, so the panel
+   * tips over forward or back as one, heavier than a single pole: it springs
+   * back slower, and running into it costs more speed.
+   */
+  giantSlalom: {
+    /** Panel width between its poles, and the heights (m above the snow) of its bottom and top edges. */
+    panelWidth: 0.75,
+    panelBottom: 0.95,
+    panelTop: 1.5,
+    /** A panel closer than this (m) to the skier's feet, below the hips, is knocked over. */
+    clipReach: 0.5,
+    /** Tip speed (rad/s) a knock gives per m/s of the skier's speed. */
+    kick: 0.45,
+    /** Each knock costs the skier this much speed (m/s) and pushes them this fast (m/s) off the panel's end. */
+    clipSlow: 1.6,
+    clipPush: 0.6,
+    stiffness: 40,
+    damping: 6,
+    maxBend: 1.15,
+  },
+
   quality: {
     /**
      * Share of scenery decoration (trees and rocks off the course) drawn by

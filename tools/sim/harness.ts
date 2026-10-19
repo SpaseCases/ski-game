@@ -13,7 +13,7 @@ import { buildMap, type BuiltMap } from '../../src/maps/build.ts';
 import { parseMap } from '../../src/maps/loader.ts';
 import type { JumpFeature } from '../../src/maps/types.ts';
 import { createRun, updateRun, type RunState } from '../../src/sim/checkpoints.ts';
-import { createRace, finishRace, stepRace, type RaceState } from '../../src/sim/race.ts';
+import { createRace, stepRace, type RaceEvent, type RaceState } from '../../src/sim/race.ts';
 import { copySkierState, createSkierState, placeSkierAt, stepSkier } from '../../src/sim/skier.ts';
 
 export const DT = 1 / CONFIG.sim.stepHz;
@@ -51,8 +51,8 @@ export class Rider {
     this.t = 0;
   }
 
-  /** One fixed step with these actions held (presses and releases come from the change since last step). */
-  step(held: readonly Action[] = []): void {
+  /** One fixed step with these actions held (presses and releases come from the change since last step). Returns what the race noticed. */
+  step(held: readonly Action[] = []): RaceEvent {
     const now = new Set(held);
     for (const a of ACTIONS) {
       const b = this.keys[a];
@@ -63,12 +63,10 @@ export class Rider {
     this.held = now;
     copySkierState(this.prev, this.s);
     stepSkier(this.s, this.keys, this.sim.course, DT);
-    const event = updateRun(this.run, this.sim.map, this.prev.position, this.s);
-    if (this.race && this.sim.race) {
-      stepRace(this.race, this.sim.race, this.prev.position, this.s, DT);
-      if (event === 'finish') finishRace(this.race);
-    }
+    updateRun(this.run, this.sim.map, this.prev.position, this.s);
+    const event = this.race && this.sim.race ? stepRace(this.race, this.sim.race, this.prev.position, this.s, DT) : 'none';
     this.t += DT;
+    return event;
   }
 
   get speed(): number {

@@ -52,7 +52,7 @@ export class WorldView {
     this.startView = new StartGateView(starts, hf);
     this.group.add(this.startView.group);
     this.slalomView = race && race.gates.length > 0 ? new SlalomView(race, hf) : null;
-    if (this.slalomView) this.group.add(this.slalomView.mesh);
+    if (this.slalomView) this.group.add(...this.slalomView.meshes);
     this.decor = still(createDecor(thinDecor(built.decor, density), map.features, hf, this.culler, range > CONFIG.quality.treeDetail));
     this.group.add(this.decor);
     this.checkpointView = new CheckpointView(map, hf);
@@ -87,7 +87,7 @@ export class WorldView {
   }
 
   update(run: RunState, race: RaceState | null, frameTime: number): void {
-    this.startView.update(race ? race.wandTime : Infinity);
+    this.startView.update(this.built.race, race);
     this.slalomView?.update(race);
     this.checkpointView.update(run, this.built.hf, frameTime);
     this.lifts.update(frameTime, this.camX, this.camZ, this.range);

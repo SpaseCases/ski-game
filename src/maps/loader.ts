@@ -6,6 +6,7 @@ import type {
   Feature,
   FinishDef,
   FlagDef,
+  GateKind,
   HeightPoint,
   LineKind,
   MapDef,
@@ -38,6 +39,7 @@ const BOX_STYLES: readonly BoxStyle[] = ['wood', 'ledge', 'bench', 'rock', 'stum
 const ROOF_STYLES: readonly RoofStyle[] = ['gable', 'shed', 'flat'];
 const BUILDING_STYLES: readonly BuildingStyle[] = ['chalet', 'shop', 'lodge', 'station'];
 const RUN_LEVELS: readonly RunLevel[] = ['green', 'blue', 'black', 'double'];
+const GATE_KINDS: readonly GateKind[] = ['slalom', 'giant'];
 
 /**
  * Checks raw JSON against the map format and returns a typed MapDef, filling
@@ -108,7 +110,13 @@ function parseTerrain(raw: unknown): TerrainDef {
     seed: n('seed'),
     rollers: t.rollers === undefined ? undefined : parseRollers(t.rollers),
     margin: n('margin', 0),
+    hills: t.hills === undefined ? undefined : parseHills(t.hills),
   };
+}
+
+function parseHills(raw: unknown): { amplitude: number; wavelength: number } {
+  const n = reader(obj(raw, 'terrain.hills'), 'terrain.hills');
+  return { amplitude: n('amplitude'), wavelength: n('wavelength') };
 }
 
 function parsePeak(t: Record<string, unknown>): PeakTerrainDef {
@@ -272,6 +280,7 @@ function parseFinish(raw: unknown, path: string): FinishDef {
     const a = reader(obj(o.arch, `${path}.arch`), `${path}.arch`);
     f.arch = { x: a('x'), z: a('z'), width: a('width') };
   }
+  if (o.course !== undefined) f.course = str(o.course, `${path}.course`);
   return f;
 }
 
@@ -407,6 +416,8 @@ function parseFeature(raw: unknown, path: string): Feature {
     case 'slalom':
       return {
         type: 'slalom',
+        name: f.name === undefined ? '' : str(f.name, `${path}.name`),
+        kind: f.kind === undefined ? 'slalom' : oneOf(f.kind, GATE_KINDS, `${path}.kind`),
         gates: arr(f.gates, `${path}.gates`).map((g, i) => {
           const m = reader(obj(g, `${path}.gates[${i}]`), `${path}.gates[${i}]`);
           return { x: m('x'), z: m('z'), heading: m('heading', 0), width: m('width', 6) };
@@ -421,6 +432,7 @@ function parseFeature(raw: unknown, path: string): Feature {
         z: n('z'),
         heading: n('heading', 0),
         height: n('height', style === 'tower' ? 7 : 0.6),
+        course: f.course === undefined ? '' : str(f.course, `${path}.course`),
       };
     }
     default:

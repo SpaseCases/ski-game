@@ -22,7 +22,7 @@ import {
   updateRun,
   type RunState,
 } from './sim/checkpoints.ts';
-import { createRace, finishRace, resetRace, stepRace, type RaceState } from './sim/race.ts';
+import { createRace, resetRace, stepRace, type CourseDef, type RaceState } from './sim/race.ts';
 import { copySkierState, createSkierState, placeSkierAt, stepSkier } from './sim/skier.ts';
 import { heightAt } from './sim/terrain.ts';
 import type { DevPanel } from './ui/devPanel.ts';
@@ -105,17 +105,23 @@ let snapView = true;
 /** Dev only: a fixed camera spot and aim (parkLaps.lookFrom), instead of the chase camera. */
 let freeCamera: { from: Vector3; at: Vector3 } | null = null;
 
-/** True from the timing wand until back to the start (a timed run, finished or not). */
+/** True from a course's timing wand until back to the start (a timed run, finished or not). */
 function timedRun(): boolean {
   return level?.race != null && (level.race.running || level.race.finished);
 }
 
-/** Back to the latest checkpoint; on a timed run, back to the start house for another go. */
+/** The course of the timed run, if on one. */
+function timedCourse(): CourseDef | undefined {
+  const race = level?.race;
+  return race && timedRun() ? level?.built.race?.courses[race.course] : undefined;
+}
+
+/** Back to the latest checkpoint; on a timed run, back to that course's start house for another go. */
 function respawn(): void {
   if (!level) return;
   const { built, run, race } = level;
-  const start = built.race?.start;
-  if (race && start && timedRun()) {
+  const start = timedCourse()?.start;
+  if (race && start) {
     resetRace(race);
     run.finished = false;
     placeSkierAt(skier, start.x, start.z, start.heading, built.hf);
@@ -347,7 +353,6 @@ startLoop(
     if (race && built.race) {
       const raceEvent = stepRace(race, built.race, skierPrev.position, skier, dt);
       if (raceEvent === 'missed') toast.show('Missed gate');
-      if (event === 'finish') finishRace(race);
     }
     if (event === 'flag' && !timedRun()) toast.show(`Checkpoint: flag ${run.flag + 1} of ${built.map.flags.length}`);
     // After a crash, let the tumble play out, then fade and respawn.
@@ -379,9 +384,11 @@ startLoop(
     crashHint.show(pose.bailed);
     toast.update(frameTime);
     const race = level?.race;
-    raceHud.update(timedRun(), race?.time ?? 0, race?.missed ?? 0);
-    const result = race?.finished ? `${formatTime(race.time)} · ${missedText(race.missed)}` : '';
-    runHud.update(level?.run.finished ?? false, result, heldToTop ? 0 : holdTime);
+    const course = timedCourse();
+    raceHud.update(course !== undefined, course?.name ?? '', race?.time ?? 0, race?.missed ?? 0);
+    const finished = level?.run.finished ?? false;
+    const result = finished && race?.finished ? `${course?.name ?? ''} · ${formatTime(race.time)} · ${missedText(race.missed)}` : '';
+    runHud.update(finished, result, result === '' ? '' : 'R: race it again', heldToTop ? 0 : holdTime);
     fps.frame(frameTime);
     devPanel?.update(pose, skier);
   },

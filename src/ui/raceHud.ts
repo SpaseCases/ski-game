@@ -1,8 +1,10 @@
-/** Run timer and missed-gate count for a timed slalom run, top center. */
+/** The course being ridden, its run timer and missed-gate count on a timed run, top center. */
 export class RaceHud {
   private readonly el: HTMLElement;
+  private readonly course: HTMLElement;
   private readonly time: HTMLElement;
   private readonly missed: HTMLElement;
+  private shownCourse = '';
   private shownTime = '';
   private shownMissed = -1;
 
@@ -10,17 +12,23 @@ export class RaceHud {
     this.el = document.createElement('div');
     this.el.className = 'race-hud';
     this.el.hidden = true;
+    this.course = document.createElement('div');
+    this.course.className = 'race-course';
     this.time = document.createElement('div');
     this.time.className = 'race-time';
     this.missed = document.createElement('div');
     this.missed.className = 'race-missed';
-    this.el.append(this.time, this.missed);
+    this.el.append(this.course, this.time, this.missed);
     hud.appendChild(this.el);
   }
 
-  update(visible: boolean, seconds: number, missed: number): void {
+  update(visible: boolean, course: string, seconds: number, missed: number): void {
     if (this.el.hidden === visible) this.el.hidden = !visible;
     if (!visible) return;
+    if (course !== this.shownCourse) {
+      this.shownCourse = course;
+      this.course.textContent = course;
+    }
     const text = formatTime(seconds);
     if (text !== this.shownTime) {
       this.shownTime = text;

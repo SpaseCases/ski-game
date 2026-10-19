@@ -9,7 +9,7 @@ import { generateSlope } from './terrain.ts';
 import { townObstacles, townRails, townShapes } from './town.ts';
 import type { Heightfield, MapDef, TerrainDef } from './types.ts';
 
-/** A map turned into what the simulation rides: terrain, shapes, rails, obstacles and the race course. */
+/** A map turned into what the simulation rides: terrain, shapes, rails, obstacles and the timed courses. */
 export interface BuiltMap {
   map: MapDef;
   hf: Heightfield;
@@ -33,7 +33,7 @@ export function buildMap(map: MapDef): BuiltMap {
   const rails = buildRailShapes([...map.features, ...townRails(map.features)], hf);
   const decor = layoutDecor(map, hf);
   const obstacles = buildObstacles([...startObstacles(starts), ...townObstacles(map.features, hf), ...decorObstacles(decor)], hf);
-  return { map, hf, starts, course: { hf, rails, obstacles }, race: buildRace(map.features, hf), decor };
+  return { map, hf, starts, course: { hf, rails, obstacles }, race: buildRace(map.features, map.finishes, hf), decor };
 }
 
 /** The heightfield for a map's terrain: a slope, or a mountain. */

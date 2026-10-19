@@ -1,3 +1,4 @@
+import { fbm } from './peak.ts';
 import type { GeneratedTerrainDef, Heightfield, PitchSection, RollersDef, TerrainLane } from './types.ts';
 
 /** How steeply (rise per meter) the scenery hillsides climb past the berms, and the slope above the top. */
@@ -15,8 +16,8 @@ const DEG = Math.PI / 180;
  * or a profile of sections at different pitches. Lanes then carve bands with
  * their own fall line into it, rollers add waves, and raised berms run along
  * both sides. Past the play area, scenery: hillsides climb away beyond the
- * berms and the slope carries on above and below. Random facet jitter goes
- * in `detail` (visual only).
+ * berms and the slope carries on above and below, folded into spurs and
+ * hollows if the map asks. Random facet jitter goes in `detail` (visual only).
  * Row 0 is the lowest z (the bottom); the last row is the highest (the top).
  */
 export function generateSlope(def: GeneratedTerrainDef): Heightfield {
@@ -80,7 +81,12 @@ export function generateSlope(def: GeneratedTerrainDef): Heightfield {
       const ax = Math.abs(x);
       const berm = smoothstep(halfWidth - def.bermWidth, halfWidth, ax);
       const out = Math.max(0, ax - halfWidth);
-      const hill = HILLSIDE_RISE * out * smoothstep(0, 12, out);
+      let hill = HILLSIDE_RISE * out * smoothstep(0, 12, out);
+      if (def.hills) {
+        const z = originZ + row * def.cellSize;
+        const past = Math.max(out, z, -def.length - z);
+        hill += def.hills.amplitude * fbm(x / def.hills.wavelength, z / def.hills.wavelength, def.seed + 3) * smoothstep(0, 60, past);
+      }
       let lane = 0;
       for (let k = 0; k < lanes.length; k++) lane += laneWeight(lanes[k]!, x) * (offsets[k]![row] ?? 0);
       const i = row * cols + col;

@@ -28,7 +28,8 @@ export const MAPS: readonly MapEntry[] = [
   {
     id: 'slalom',
     name: 'Slalom',
-    blurb: 'Two timed courses: a tight slalom and a fast giant slalom.',
+    blurb: 'Two timed courses side by side: a tight slalom and a fast giant slalom. Push through the wand to start the clock.',
+    load: () => import('./slalom.json').then((m) => m.default),
   },
   {
     id: 'bigair',

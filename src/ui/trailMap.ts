@@ -8,8 +8,8 @@ import { insideBounds } from '../sim/bounds.ts';
 // map menu. It shows the ground (shaded, rock in gray, steep slopes tinted
 // blue like a piste map's black runs, forests as dots), the town's
 // buildings, the chairlifts, the faces' names, every named run, jumps and
-// booters, rails and logs, the flags, the finishes, the start, and where
-// you are.
+// booters, rails and logs, race gates, the flags, the finishes, the start,
+// and where you are.
 // Like a piste map it's drawn as if seen from the valley: the start's way
 // down points down the page, with a north arrow in the corner.
 
@@ -350,8 +350,17 @@ function drawOverlay(g: CanvasRenderingContext2D, map: MapDef, f: Frame, at: XZ,
   });
 
   // Jumps and booters: a small chevron pointing the way off them. Rails, boxes and logs: a short bar along them.
+  // Gates: a dot each, red and blue in turn along the course.
   for (const feat of map.features) {
-    if (feat.type === 'jump' || feat.type === 'kicker') {
+    if (feat.type === 'slalom') {
+      feat.gates.forEach((gate, i) => {
+        const [x, y] = px(gate);
+        g.beginPath();
+        g.arc(x, y, feat.kind === 'giant' ? 2.4 : 1.8, 0, Math.PI * 2);
+        g.fillStyle = i % 2 === 0 ? '#d8342c' : '#2f62d0';
+        g.fill();
+      });
+    } else if (feat.type === 'jump' || feat.type === 'kicker') {
       const h = feat.yaw * DEG;
       const fx = -Math.sin(h);
       const fz = -Math.cos(h);

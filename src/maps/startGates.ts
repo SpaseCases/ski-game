@@ -27,6 +27,8 @@ export interface StartFrame {
   rightX: number;
   rightZ: number;
   height: number;
+  /** A race start's course (see StartFeature.course). */
+  course: string;
 }
 
 export function startFrame(f: StartFeature): StartFrame {
@@ -41,6 +43,7 @@ export function startFrame(f: StartFeature): StartFrame {
     rightX: Math.cos(h),
     rightZ: -Math.sin(h),
     height: f.height,
+    course: f.course,
   };
 }
 

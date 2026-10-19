@@ -217,6 +217,11 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.finish-hint {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
 .race-hud {
   position: absolute;
   top: 12px;
@@ -227,6 +232,14 @@ body {
   background: rgb(20 32 48 / 0.72);
   color: #fff;
   text-align: center;
+}
+
+.race-course {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
 }
 
 .race-time {
