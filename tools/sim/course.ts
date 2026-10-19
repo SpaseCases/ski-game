@@ -4,8 +4,8 @@
 // panel) a little inside it, at the speed the slope gives, checking speed
 // only when sliding wide of the line on the outside of a turn, as a player
 // would. Reports each run's time (wand to finish), missed gates, poles and
-// panels clipped, crashes, top and average speed, and how much of the run
-// it braked.
+// panels brushed in passing (free) and knocked (costing speed), crashes,
+// top and average speed, and how much of the run it braked.
 //   node tools/sim/course.ts <map.json> [course names...]
 // Options: --margin <m> how far inside the inner pole the line passes
 // (default 1); --nobrake never checks speed (the gates at the speed the
@@ -148,7 +148,9 @@ interface Result {
   time: number;
   finished: boolean;
   missed: number[];
-  clips: number;
+  /** Poles and panels brushed in passing (no speed lost), and knocked squarely enough to cost speed. */
+  brushed: number;
+  knocked: number;
   crashes: string[];
   top: number;
   distance: number;
@@ -164,7 +166,7 @@ function ride(ci: number): Result {
   const r = new Rider(sim);
   const start = c.start!;
   r.place(start.x, start.z, (start.heading * 180) / Math.PI, 0);
-  const res: Result = { time: 0, finished: false, missed: [], clips: 0, crashes: [], top: 0, distance: 0, braking: 0 };
+  const res: Result = { time: 0, finished: false, missed: [], brushed: 0, knocked: 0, crashes: [], top: 0, distance: 0, braking: 0 };
   let progress = 0;
   let started = -1;
   const touching = new Uint8Array(race!.gates.length * 2);
@@ -204,13 +206,19 @@ function ride(ci: number): Result {
     }
     const prevX = p.x;
     const prevZ = p.z;
+    const before = r.speed;
     const event = r.step(keys);
+    // A knock takes a good part of a m/s off in one step; the slope and the snow never do.
+    const knock = before - r.speed > 0.15;
     if (keys.includes('down')) res.braking += DT;
     res.distance += Math.hypot(p.x - prevX, p.z - prevZ);
     if (started >= 0) res.top = Math.max(res.top, r.speed);
     const state = r.race!;
     for (let i = 0; i < touching.length; i++) {
-      if (state.touching[i] === 1 && touching[i] === 0) res.clips++;
+      if (state.touching[i] === 1 && touching[i] === 0) {
+        if (knock) res.knocked++;
+        else res.brushed++;
+      }
       touching[i] = state.touching[i]!;
     }
     if (event === 'start') started = r.t;
@@ -254,7 +262,7 @@ race.courses.forEach((c, i) => {
   const avg = res.distance / Math.max(1, res.time);
   console.log(
     `${c.name} (${c.count} ${c.kind === 'giant' ? 'giant slalom' : 'slalom'} gates): ${res.finished ? `finished in ${res.time.toFixed(2)} s` : `NO FINISH after ${res.time.toFixed(0)} s`}, ` +
-      `${res.missed.length} missed${res.missed.length > 0 ? ` (gates ${res.missed.join(', ')})` : ''}, ${res.clips} clipped, ` +
+      `${res.missed.length} missed${res.missed.length > 0 ? ` (gates ${res.missed.join(', ')})` : ''}, ${res.brushed} brushed, ${res.knocked} knocked, ` +
       `top ${res.top.toFixed(1)} m/s, avg ${avg.toFixed(1)} m/s, braking ${((100 * res.braking) / Math.max(1, res.time)).toFixed(0)}% of the time`,
   );
   for (const crash of res.crashes) console.log(`    CRASH: ${crash}`);

@@ -225,11 +225,20 @@ export const CONFIG = {
   slalom: {
     /** Pole height (m) above the snow. */
     poleHeight: 1.8,
-    /** A pole closer than this (m) to the skier's feet, below the hips, is knocked aside (the body's half width with arms). */
-    clipReach: 0.55,
-    /** Bend speed (rad/s) a knock gives per m/s of the skier's speed. */
+    /**
+     * A pole closer than this (m) to the skier's knees, hips or chest (leaning
+     * into the turn as drawn) is knocked aside: the body's half width with arms.
+     */
+    clipReach: 0.45,
+    /**
+     * A pole that far off the line the body travels along that it's within
+     * the last grazeWidth (m) of clipReach is only brushed: a small flick, no
+     * speed lost. Squarer hits cost more, up to clipSlow and clipPush.
+     */
+    grazeWidth: 0.2,
+    /** Bend speed (rad/s) a square knock gives per m/s of the skier's speed (a quarter of it for a brush). */
     kick: 0.6,
-    /** Each knock costs the skier this much speed (m/s) and pushes them this fast (m/s) away from the pole. */
+    /** A square knock costs the skier this much speed (m/s) and pushes them this fast (m/s) away from the pole. */
     clipSlow: 1,
     clipPush: 0.8,
     /** How a bent pole springs back (per second², per second), and the most it bends (radians). */
@@ -249,11 +258,13 @@ export const CONFIG = {
     panelWidth: 0.75,
     panelBottom: 0.95,
     panelTop: 1.5,
-    /** A panel closer than this (m) to the skier's feet, below the hips, is knocked over. */
-    clipReach: 0.5,
-    /** Tip speed (rad/s) a knock gives per m/s of the skier's speed. */
+    /** A panel closer than this (m) to the skier's knees, hips or chest is knocked over. */
+    clipReach: 0.42,
+    /** Catching an end pole this close (m) to the edge of the reach only brushes it (see slalom.grazeWidth). */
+    grazeWidth: 0.17,
+    /** Tip speed (rad/s) a square knock gives per m/s of the skier's speed. */
     kick: 0.45,
-    /** Each knock costs the skier this much speed (m/s) and pushes them this fast (m/s) off the panel's end. */
+    /** A square knock costs the skier this much speed (m/s) and pushes them this fast (m/s) off the panel's end. */
     clipSlow: 1.6,
     clipPush: 0.6,
     stiffness: 40,

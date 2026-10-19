@@ -2,6 +2,7 @@ import type { Vector3 } from 'three';
 import { CONFIG } from '../config.ts';
 import { raceWand, startFrames } from '../maps/startGates.ts';
 import type { Feature, FinishDef, GateKind, Heightfield } from '../maps/types.ts';
+import { smoothstep } from '../maps/terrain.ts';
 import { inFinish } from './checkpoints.ts';
 import { heightAt } from './terrain.ts';
 import type { SkierState } from './skier.ts';
@@ -13,8 +14,9 @@ import type { SkierState } from './skier.ts';
 // riding past a gate's line outside them, or skipping it, counts as a
 // missed gate. A slalom gate's sides are single poles, a giant slalom
 // gate's are panels strung between two poles. Both are hinged: the skier's
-// body knocks them out of the way, and they spring back. Each knock costs
-// the skier a little speed and nudges them off the pole or panel.
+// body (leaning into the turn as it's drawn) knocks them out of the way, and
+// they spring back. A square knock costs the skier a little speed and
+// nudges them off; a pole brushed in passing just flicks aside.
 
 /** A gate (or a wand): its middle, the direction riders cross it, its right, and half its width. */
 export interface RaceLine {
@@ -256,8 +258,54 @@ function crossed(g: RaceLine, a: Vector3, b: Vector3): number {
   return Math.abs(across) <= g.half ? 1 : 2;
 }
 
+/** Heights (m up the body from the feet) where it's checked against poles and panels: knees, hips and chest. */
+const BODY = [0.35, 0.8, 1.25] as const;
+/** Where those parts of the body are this step (world x, z and y). */
+const bodyX = new Float64Array(BODY.length);
+const bodyZ = new Float64Array(BODY.length);
+const bodyY = new Float64Array(BODY.length);
+/** Inside this distance (m) of the line the body travels along, a hit is square: it costs the full knock. */
+const SQUARE = 0.03;
+
+/**
+ * Places the body for this step the way render/skierView.ts draws it: part
+ * of the lean into a turn tilts the whole body from the feet and the rest
+ * moves the hips inside (more of it tilts the body in a crouch), and a
+ * hockey stop leans away from the skid with the body swung round. Carving
+ * hard, the chest is well inside the feet.
+ */
+function placeBody(s: SkierState): void {
+  const r = CONFIG.render;
+  const lean = s.lean + s.brake * r.brakeLean * s.brakeSide;
+  const legShare = s.grounded ? (1 - r.leanBodyShare) * (1 - (1 - r.crouchAngulation) * s.crouch) : 0;
+  const bodyLean = lean * (1 - legShare);
+  const yaw = s.yaw + s.brake * r.brakeTwist * s.brakeSide;
+  // The skier's left: the inside of a left turn (lean > 0).
+  const leftX = -Math.cos(yaw);
+  const leftZ = Math.sin(yaw);
+  const tilt = Math.sin(bodyLean);
+  const up = Math.cos(bodyLean);
+  for (let k = 0; k < BODY.length; k++) {
+    const h = BODY[k]!;
+    const inside = tilt * h + r.hipShift * (lean - bodyLean) * Math.min(1, h / BODY[1]);
+    bodyX[k] = s.position.x + leftX * inside;
+    bodyZ[k] = s.position.z + leftZ * inside;
+    bodyY[k] = s.position.y + up * h;
+  }
+}
+
+/**
+ * How square a hit is, 0 to 1, from how far (m) the thing hit stands off the
+ * line the body is travelling along: dead ahead is a full knock; out in the
+ * last `graze` meters of the reach it's only brushed aside.
+ */
+function squareness(offLine: number, reach: number, graze: number): number {
+  return 1 - smoothstep(SQUARE, Math.max(SQUARE + 0.01, reach - graze), offLine);
+}
+
 /** Bends every gate's sides: poles and panels, whichever course they're on and whether or not it's being timed. */
 function bendSides(race: RaceState, def: RaceDef, s: SkierState, dt: number): void {
+  placeBody(s);
   for (let i = 0; i < def.gates.length * 2; i++) {
     if (def.panel[i >> 1] === 1) bendPanel(race, def, i, s, dt);
     else bendPole(race, def, i, s, dt);
@@ -265,15 +313,16 @@ function bendSides(race: RaceState, def: RaceDef, s: SkierState, dt: number): vo
 }
 
 /**
- * A pole is a damped spring hinged at the snow. Where the skier's body (a
- * column clipReach wide around the feet, up to the hips) runs into one,
- * it's pushed out to the edge of the body at once, whipping on at least as
- * fast as the skier is moving. The first moment of each knock slows the
- * skier by clipSlow and pushes them clipPush away from the pole.
+ * A pole is a damped spring hinged at the snow. Where the skier's body (the
+ * knees, hips and chest, clipReach wide, leaning as drawn) runs into one,
+ * it's pushed out to the edge of the body at once, so it never passes
+ * through. How hard it whips on, and what the knock costs the skier (up to
+ * clipSlow of speed, and a clipPush away from the pole), depends on how
+ * square the hit is: a pole brushed with a shoulder or a shin in passing
+ * costs nothing and only flicks aside.
  */
 function bendPole(race: RaceState, def: RaceDef, i: number, s: SkierState, dt: number): void {
   const c = CONFIG.slalom;
-  const p = s.position;
   const v = s.velocity;
   const g = def.gates[i >> 1]!;
   const across = sideOffset(def, i);
@@ -284,25 +333,40 @@ function bendPole(race: RaceState, def: RaceDef, i: number, s: SkierState, dt: n
   let rx = race.rateX[i] ?? 0;
   let rz = race.rateZ[i] ?? 0;
 
-  // Where the pole is at the body's height (it leans by its bend there).
+  // The part of the body nearest the pole, where the pole is at its height (it leans by its bend there).
   const base = def.poleBase[i] ?? 0;
-  const rise = Math.min(c.poleHeight, Math.max(0, s.center.y - base));
-  const dx = px + bx * rise - p.x;
-  const dz = pz + bz * rise - p.z;
-  const d = Math.hypot(dx, dz);
-  const touching = !s.bailed && p.y < base + c.poleHeight && d < c.clipReach && rise > 0.2;
+  let d = Infinity;
+  let k = -1;
+  let rise = 0;
+  let dx = 0;
+  let dz = 0;
+  for (let j = 0; j < BODY.length; j++) {
+    const up = bodyY[j]! - base;
+    if (up < 0.1 || up > c.poleHeight) continue;
+    const ex = px + bx * up - bodyX[j]!;
+    const ez = pz + bz * up - bodyZ[j]!;
+    const e = Math.hypot(ex, ez);
+    if (e >= d) continue;
+    d = e;
+    k = j;
+    rise = up;
+    dx = ex;
+    dz = ez;
+  }
+  const touching = !s.bailed && k >= 0 && d < c.clipReach;
   if (touching) {
     // Away from the body (along the skier's travel when dead center).
     const speed = Math.hypot(v.x, v.z);
     const ux = d > 1e-4 ? dx / d : v.x / Math.max(speed, 1e-4);
     const uz = d > 1e-4 ? dz / d : v.z / Math.max(speed, 1e-4);
     // Lean it out to the edge of the body so it never passes through.
-    bx = (p.x + ux * c.clipReach - px) / rise;
-    bz = (p.z + uz * c.clipReach - pz) / rise;
-    const whip = Math.max(speed * c.kick, rx * ux + rz * uz);
+    bx = (bodyX[k]! + ux * c.clipReach - px) / rise;
+    bz = (bodyZ[k]! + uz * c.clipReach - pz) / rise;
+    const hit = squareness(speed > 0.5 ? Math.abs(dx * v.z - dz * v.x) / speed : d, c.clipReach, c.grazeWidth);
+    const whip = Math.max(speed * c.kick * (0.25 + 0.75 * hit), rx * ux + rz * uz);
     rx = ux * whip;
     rz = uz * whip;
-    if (race.touching[i] === 0) knock(s, c.clipSlow, -ux * c.clipPush, -uz * c.clipPush);
+    if (race.touching[i] === 0) knock(s, c.clipSlow * hit, -ux * c.clipPush * hit, -uz * c.clipPush * hit);
   }
   race.touching[i] = touching ? 1 : 0;
   rx += (-c.stiffness * bx - c.damping * rx) * dt;
@@ -323,15 +387,16 @@ function bendPole(race: RaceState, def: RaceDef, i: number, s: SkierState, dt: n
 /**
  * A panel stands across the gate's line, its two poles hinged at the snow,
  * so it only tips forward or back (along the gate's direction), as one
- * damped spring. Where the skier's body runs into it (anywhere along its
- * width), it's tipped out to the edge of the body at once. The first moment
- * of each knock slows the skier by clipSlow and pushes them clipPush toward
- * the panel's nearer end, so they slide off it.
+ * damped spring. Where the skier's body (as for a pole) runs into it, it's
+ * tipped out to the edge of the body at once. Running into its face is a
+ * full knock: up to clipSlow of speed, and a clipPush toward its nearer end
+ * so the skier slides off it. Catching an end pole costs less the more
+ * glancing it is, and brushing one in passing costs nothing.
  */
 function bendPanel(race: RaceState, def: RaceDef, i: number, s: SkierState, dt: number): void {
   const c = CONFIG.giantSlalom;
   const pole = CONFIG.slalom.poleHeight;
-  const p = s.position;
+  const half = c.panelWidth / 2;
   const v = s.velocity;
   const g = def.gates[i >> 1]!;
   const side = (i & 1) === 0 ? -1 : 1;
@@ -342,23 +407,47 @@ function bendPanel(race: RaceState, def: RaceDef, i: number, s: SkierState, dt: 
   let b = (race.bendX[i] ?? 0) * g.dirX + (race.bendZ[i] ?? 0) * g.dirZ;
   let r = (race.rateX[i] ?? 0) * g.dirX + (race.rateZ[i] ?? 0) * g.dirZ;
 
+  // The part of the body nearest the panel: how far ahead of it (at that height), and how far out past its ends.
   const base = def.poleBase[i] ?? 0;
-  const rise = Math.min(pole, Math.max(0, s.center.y - base));
-  // The body against the panel at its height: how far ahead of it, and how far out past its ends.
-  const along = (p.x - px) * g.dirX + (p.z - pz) * g.dirZ;
-  const across = ((p.x - px) * g.rightX + (p.z - pz) * g.rightZ) * side;
-  const ahead = along - b * rise;
-  const past = Math.max(0, Math.abs(across) - c.panelWidth / 2);
-  const touching = !s.bailed && p.y < base + pole && rise > 0.2 && Math.hypot(ahead, past) < c.clipReach;
+  let d = Infinity;
+  let k = -1;
+  let rise = 0;
+  let along = 0;
+  let across = 0;
+  let past = 0;
+  for (let j = 0; j < BODY.length; j++) {
+    const up = bodyY[j]! - base;
+    if (up < 0.1 || up > pole) continue;
+    const a = (bodyX[j]! - px) * g.dirX + (bodyZ[j]! - pz) * g.dirZ;
+    const w = ((bodyX[j]! - px) * g.rightX + (bodyZ[j]! - pz) * g.rightZ) * side;
+    const out = Math.max(0, Math.abs(w) - half);
+    const e = Math.hypot(a - b * up, out);
+    if (e >= d) continue;
+    d = e;
+    k = j;
+    rise = up;
+    along = a;
+    across = w;
+    past = out;
+  }
+  const touching = !s.bailed && k >= 0 && d < c.clipReach;
   if (touching) {
     // Tipped away from the body (downhill when it comes from above), out to the edge of it.
-    const away = ahead < 0 ? 1 : -1;
+    const away = along - b * rise < 0 ? 1 : -1;
     b = (along + away * Math.sqrt(c.clipReach * c.clipReach - past * past)) / rise;
-    const speed = Math.abs(v.x * g.dirX + v.z * g.dirZ);
-    r = away * Math.max(speed * c.kick, away * r);
+    const speed = Math.hypot(v.x, v.z);
+    // Square into its face, or as glancing as the line of travel past the end pole it caught.
+    let hit = 1;
+    if (past > 0 && speed > 0.5) {
+      const end = (across >= 0 ? half : -half) * side;
+      const ex = px + g.rightX * end - bodyX[k]!;
+      const ez = pz + g.rightZ * end - bodyZ[k]!;
+      hit = squareness(Math.abs(ex * v.z - ez * v.x) / speed, c.clipReach, c.grazeWidth);
+    }
+    r = away * Math.max(Math.abs(v.x * g.dirX + v.z * g.dirZ) * c.kick * (0.25 + 0.75 * hit), away * r);
     if (race.touching[i] === 0) {
-      const end = (across >= 0 ? 1 : -1) * side * c.clipPush;
-      knock(s, c.clipSlow, g.rightX * end, g.rightZ * end);
+      const push = (across >= 0 ? 1 : -1) * side * c.clipPush * hit;
+      knock(s, c.clipSlow * hit, g.rightX * push, g.rightZ * push);
     }
   }
   race.touching[i] = touching ? 1 : 0;
