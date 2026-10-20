@@ -58,7 +58,7 @@ Grabs (hold in the air, release to let go):
 - Holding R for 1s sends you back to the top.
 - Every map has a finish zone at the bottom. Entering it shows an on-screen **Back to top** button (Enter also works). Back to top is also in the pause menu.
 
-## Maps (v1: four maps plus the Test slope, all unlocked from the start)
+## Maps (v1: four maps plus the Test slope, all unlocked from the start; Brundage Mountain after v1)
 Every map has a start gate themed to its kind of skiing, checkpoint flags, a finish zone, and enough decoration to feel like a real place. Decoration stays inside the performance budget: instanced and merged meshes, and the Low preset thins it out. No real brand names or logos anywhere. Every map is picked from the map-select menu.
 
 1. **Park:** a big, dense terrain park, about 2 to 3 minutes top to bottom, with several lines side by side so you can pick a route, features packed close together, and flatter stretches between sections so speed stays under control. Steep enough everywhere that speed comes easily.
@@ -90,7 +90,13 @@ Every map has a start gate themed to its kind of skiing, checkpoint flags, a fin
    - Start gate: a scaffold drop-in tower, like a big air contest.
    - Decoration: spectator fencing beside the landings, flags, floodlights.
    - Flags: one at the top of each lane.
-5. **Test slope:** the development map, kept as a playable map: every feature side by side in four lanes (halfpipe, jumps, rails and boxes, slalom) under all four start gates, for trying things out.
+5. **Brundage Mountain (milestone 9, after v1):** a recreation of the real ski area near McCall, Idaho, built from public data: the terrain from USGS elevation data, the runs and lifts from OpenStreetMap, checked against the owner's own GPS tracks. It should feel like riding the real mountain: the real runs where they really are, under their real names.
+   - Start gate: a ridgetop start on the summit. Finish: the base lodge area, with an arch over the main run-out.
+   - Chairlifts along the real lift lines, moving like Freeride's (scenery; riding them stays a later idea).
+   - Groomed runs cut into the terrain, forest between them, trees spaced out in the gladed areas, rocks where it's steep.
+   - Trail signs with the real run names at forks; checkpoint flags at the main junctions (lift tops and major splits).
+   - Its own art throughout: no Brundage logo, no copy of their trail map art, nothing suggesting the resort made or endorses the game. Credit for the data ("© OpenStreetMap contributors", USGS) and a "not affiliated" line in the game and the README.
+6. **Test slope:** the development map, kept as a playable map: every feature side by side in four lanes (halfpipe, jumps, rails and boxes, slalom) under all four start gates, for trying things out.
 
 ### Jump sizing
 - Size the 720 jumps from the config: measure the airtime a clean 720 takes at the current spin rate, including winding up and slowing down, then give those jumps at least 20% more airtime than that at the speed the in-run naturally reaches.
@@ -155,28 +161,49 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 6b. **Weather.** Clear (bluebird) or overcast and blizzard, changing the fog distance, sky and light, with falling snow in a blizzard. Low keeps its fog inside the Chromebook budget; clear weather on a fast computer shows the far scenery.
 7. **Sound effects.**
 8. **Performance and polish pass** on the Low preset, then a final embed and deploy check. Polish includes a sun in the sky with a soft glow and warmer golden-hour light, and snow spray when carving hard, braking or landing, with ski tracks left behind that fade out.
+9. **Brundage Mountain** (the Maps section). Research and plan before any code, and stop for the user's go-ahead at the two checkpoints marked **Stop**. Every step is a script in `tools/maps/brundage/` that can be rerun, like the other maps; nothing is edited by hand.
+   - **Privacy first.** The user's Strava archive goes in `reference/brundage/`, which is gitignored: never commit, copy into `src/` or `public/`, or deploy raw tracks. Read `activities.csv` (and `activities/*.gpx`, `.fit.gz`, `.tcx.gz`) and keep only activities whose GPS points fall inside the ski area's boundary (OpenStreetMap's `landuse=winter_sports` polygon, buffered ~200 m); skip everything else without looking further. Clip kept tracks to the boundary and keep only relative times. Only derived results (run lines, lift lines, speed figures) go into the repo. Parsing `.fit` needs a library: ask before adding a dev dependency, or convert outside the repo.
+   - **Research and plan (no code).**
+     - Elevation: USGS 3DEP from The National Map. Prefer the 1 m lidar DEM where it covers the ski area, else the 1/3 arc-second (~10 m) DEM, plus 1 arc-second for scenery around it. Bare earth, public domain. Ask before downloading, stating the products, tiles and sizes.
+     - OpenStreetMap (Overpass): the ski-area boundary, `piste:type=downhill` ways and areas (`name`, `piste:difficulty`, `piste:grooming`, glades), `aerialway=*` lines and stations (`name`, `aerialway:occupancy`), and the base lodge. Note what's missing or wrong. The data is ODbL: credit it in the game and README, and treat the map file built from it as a derived database under ODbL.
+     - Tree cover: OSM woods if they're mapped well, else the NLCD Tree Canopy Cover raster (public domain, 30 m) for where forest grows; glades from OSM tags and the Strava lines.
+     - Strava: split each kept track into lift rides (a steady climb of ~2 to 6 m/s along a near-straight line) and descents. Fit a line through each cluster of lift rides for the lift's path and terminals, and check it against OSM. Overlay the descents on the OSM runs (a heat map) to find the user's real lines and favorite runs, and note runs OSM lacks.
+     - Write the plan in `tools/maps/brundage/PLAN.md`: extent and bounds, projection, resolution and file size, every lift and run (OSM name, difficulty, ridden in Strava or not), which runs are "main", where the start, finish, flags and signs go, and open questions. **Stop** for approval.
+   - **Heightfield.**
+     - Project to UTM zone 11N (meters) with north = -Z and east = +X, origin at the summit start. Keep the transform in one module the tools share, so the DEM, OSM and GPS line up exactly.
+     - Resample the play area (the boundary plus ~100 m) to 3 m cells, like the other maps: physics samples it directly and the chunked renderer already coarsens it with distance. Fill a scenery ring out to 2 to 3 km at 10 to 20 m from the coarser DEM, blended at the seam, with the existing `peaks` backdrop beyond it.
+     - Add a terrain type that loads a heightfield file (a 16-bit PNG, or a small binary with origin, cell size, base height and a 2 to 5 cm step), fetched lazily like the other maps. Aim for 3 MB or less. The bounds polygon comes from the boundary, with a rim that turns riders back like Freeride's.
+     - Clean up without flattening the mountain: lidar has road cuts, ditches, building pads and noise. Use a small median then a light blur, clip one-cell spikes, and fill pits until `tools/maps/sinks.ts` reports no holes. Keep real rollers, benches and cat tracks.
+     - Check the scale: overlay the Strava descents on the DEM; elevations along the tracks should match within a few meters.
+   - **Runs and lifts.**
+     - Groom each OSM run into the snow: along its line (with its width, or its area), smooth the cross-slope and small bumps but keep the fall line. Widen cat tracks and traverses to at least 8 m and give them ~3° or more downhill so riders don't stall (pole pushing tops out at 8.5 m/s).
+     - Each run becomes a map `run` under its real name, giving the trail map, test spots and tree-free corridors.
+     - Chairlifts from the OSM lines, adjusted by the Strava lift rides, as moving `chairlift` decor with stations at the real terminals.
+     - **Stop:** show an overhead view (`tools/maps/overview.ts`, with the OSM runs, lifts and the user's Strava descents drawn over the shaded terrain) and in-game screenshots down the main runs (High, and Low with its 240 m view), then wait for corrections before decorating.
+   - **Speeds.** On the main runs, compare the user's real speeds (moving segments only, smoothed; median and 90th percentile per run) with headless riders on the same lines (`tools/sim/face.ts`-style, standing and tucked). The game's gravity is 12, not 9.81, and its drag is tuned for feel, so expect it to run faster. Report the ratio and recommend leaving `config.ts` alone unless the user agrees otherwise: the other maps are tuned to it.
+   - **Decorate.** The summit ridge start, a generic base lodge (no real signage) with the finish zone and arch, trail signs with real run names and difficulty at forks, flags at the main junctions, forest outside the runs with spaced trees in the glades, runs and lift lines kept clear, rocks on steep ground. Keep thick forest near the runs and fold distant hillsides so far forests don't read as slabs. Add the map card (named "Brundage Mountain", with credits) and a credits line in the game for OSM and USGS.
+   - **Check.** Zero build errors; `sinks.ts` finds no holes; a headless rider finishes every named run; the Low preset holds the budget with the CPU slowed 4× (draw calls about 120 or fewer, like Freeride's town); it looks right on High; the embed test passes; the other maps' tools are unchanged. Commit, and ask before pushing.
 
 ## Status (2026-10-20)
 
-**Done:** 0 scaffold and deploy, 1 skiing, 2 air, 3 rails and boxes, 4 checkpoints, 5a map features, 5b map select and the Park, 5c-1 the Freeride mountain, 5c-2 the town and natural features, 5d the Slalom map, 5e the Big air map (a 12 m scaffold tower over six lanes, left to right Ski jump, Mellow, Big, Massive, Steep (58° lip) and Aerials (66°); `tools/maps/bigair.ts` writes it; `tools/sim/line.ts` now also drops in from a start (`start=<x>`), reports kickers against the knuckle and landing the terrain makes, hucks knuckles from the ride-round, and takes `v0=`, `brake=`, `speed=` and `lip=<d>` for a takeoff with no kicker). **Next:** 6, menus.
+**Done:** milestones 0 to 5e: scaffold and deploy, skiing, air, rails and boxes, checkpoints, map features, map select, and the Park, Freeride, Slalom and Big air maps. 5d, 5e and the Big air update are committed but not pushed. **Next:** 6, menus. Milestone 9 (Brundage Mountain) is planned, not started.
 
 **Known issues**
-- Not yet tested on a real school Chromebook. On a PC with the CPU slowed 4×, Low takes about 1.6 to 2.2 ms of CPU per frame on Freeride, the Slalom and Big air (up to ~115 draw calls in Freeride's town, 50 to 92 in Big air); a jump to a new spot spikes one frame to 30 to 50 ms while snow is built. The GPU side is unmeasured.
-- Auto sees as far as Medium (450 m) until milestone 8's frame-rate scaling. Until the Settings menu (milestone 6), presets are picked with `?quality=low|medium|high`, and Esc opens the map menu as a stand-in pause.
-- Far scenery: past the far plane, stands of trees show as flat dark facets (Freeride, and the Slalom's hillsides down the valley on Medium); far stand-in trees are plain cones.
-- Park: the huge jumps are sized for tucking the in-run from their flag; the long rail has no brake; kicker-fed rails catch at about 6 to 22 m/s.
-- Test slope: invisible walls at the top of the side berms and at the bottom. Riding off a rail sideways crashes unless you turn the skis back first. In the japan grab the ski hangs low.
-- Freeride: straight-lining a couloir reaches ~36 m/s; over a convex rollover the camera can't see the slope below; the pillow line is rounded steps, not domes; gully walls throw wall airs only when ridden up fairly square; trail map labels crowd on the North face and in town. Town: the rooftop gap needs about 7 m/s; full pops off a chalet ridge or the Market at 18 m/s overshoot their drifts; the camera rises over a roof when riding beside a building.
-- Slalom: course times (slalom 57 to 66 s, giant slalom 48 to 51 s) come from a bot that steers more finely than keys; human runs are unmeasured. The giant slalom is only ~20% faster. Hitting the netting above 5 m/s crashes, like any fence.
-- Big air: airtime from the flag (standing to tucked, popped) is Mellow 1.5 to 2.9 s, Big 2.4 to 3.7 s, Massive 2.3 to 4.2 s, Steep 2.8 to 5.4 s, Aerials 2.3 to 4.1 s; the ski jump flies 58 to 77 m when popped at the edge (rolled off, it just rides down the knoll). All land clean from the flag, from the tower or at 12 m/s, at most 14.3 m/s into the snow. No speed-check rise below the tower (one that slows a tucked rider stops a standing one), so landings are sized for tucking from the tower. A 720 off the aerials kicker corks into a flip, and riding into it crooked lands on an edge. Knuckle hucks land at 10 to 14 m/s, but at full tucked speed overshoot Massive's, Steep's and Aerials' landings. Banks between lanes reach 44°; runouts reach ~22°, so tucked riders hit the corral at ~42 m/s. The run-in from the foot of the tower to a lip is 106 to 125 m; the outer lanes are a ~160 m swing out, and the tower's deck needs a pole push to drop in.
-- Headless bots don't steer around everything (`face.ts --fall` riders sometimes pin against a tree) and only brake on the snow.
+- Not tested on a real school Chromebook. With the CPU slowed 4×, Low takes ~1.6 to 3 ms of CPU per frame (42 to ~115 draw calls); a jump to a new spot spikes one frame to 30 to 50 ms. GPU cost unmeasured.
+- Until milestone 6, quality comes from `?quality=low|medium|high` and Esc opens the map menu. Auto sees as far as Medium.
+- Far forests show as flat dark facets past the far plane (Freeride; the Slalom on Medium); far stand-in trees are plain cones.
+- Park: huge jumps sized for tucking from their flag; the long rail has no brake.
+- Freeride: couloirs reach ~36 m/s; the camera can't see past a convex rollover; trail map labels crowd.
+- Slalom: course times come from a bot that steers more finely than keys.
+- Big air: no speed-check rise below the tower, so landings are sized for tucking from it; full-speed knuckle hucks overshoot Massive, Steep and Aerials; a 720 off the aerials kicker corks into a flip; the outer lanes are a ~160 m swing out; the tower's deck needs a pole push.
+- Test slope: invisible walls at the berm tops; riding off a rail sideways crashes; the japan grab's ski hangs low.
 
 **Tuned config values** (`src/config.ts`, start → now)
-- Riding: `gravity` 11 → 12, `skiFriction` 0.05 → 0.035, `dragStand` 0.0055 → 0.0066 → 0.0055, `dragCrouch` 0.003 → 0.002, `brakeDecel` 6 → 9.5, `brakeRampTime` 0.15 → 0.12.
+- Riding: `gravity` 11 → 12, `skiFriction` 0.05 → 0.035, `dragCrouch` 0.003 → 0.002, `brakeDecel` 6 → 9.5, `brakeRampTime` 0.15 → 0.12.
 - Turning: `grip` 1.8 → 2.0, `turnRateSlow` 2.8 → 2.3, `turnRateFast` 1.5 → 1.25, `turnResponse` 14 → 10.
 - Pole push: `polePushSpeed` 1.8 → 3.1, `poleMaxSpeed` 7 → 8.5, `polePushInterval` 0.55 → 0.73. Pop: `popMin` 3 → 3.2, `popMax` 5.2 → 5.5.
-- Camera: `heightNear` 2.1 → 2.35, `heightFar` 2.6 → 4.85. New: `slopeLift` 0.9, `slopeLiftMax` 7.
-- Slalom poles: `kick` 0.25 → 0.6, `clipReach` 0.45 → 0.55 → 0.45 (now round the leaning body), new `grazeWidth` 0.2. New `giantSlalom`: `clipReach` 0.42, `grazeWidth` 0.17, `kick` 0.45, `clipSlow` 1.6, `clipPush` 0.6, `stiffness` 40, `damping` 6, `maxBend` 1.15.
-- Halfpipe: `wallPop` 0.4, `wallLaunchMax` 9 m/s. Walls: `wallAngle` 50 → 44.
-- Quality: `viewDistance` 240 / 450 / 800 m, `fogStart`, `treeDetail` 220 m, `hazeEnd` 240 / 3200 / 6000 m.
-- Landing tolerances loosened so edge landings stick. Still untuned: rail values, checkpoint timings, curve load, rough landings, decoration density.
+- Camera: `heightNear` 2.1 → 2.35, `heightFar` 2.6 → 4.85; new `slopeLift` 0.9, `slopeLiftMax` 7.
+- Air: `wallAngle` 50 → 44 (takeoff faces never count as walls); new `wallPop` 0.4, `wallLaunchMax` 9 m/s.
+- Slalom gates: `kick` 0.25 → 0.6, new `grazeWidth` 0.2; new `giantSlalom` block (`clipReach` 0.42, `kick` 0.45, `stiffness` 40, `damping` 6, `maxBend` 1.15).
+- Quality: `viewDistance` 240 / 450 / 800 m, `treeDetail` 220 m, `hazeEnd` 240 / 3200 / 6000 m.
+- Still untuned: rail values, checkpoint timings, curve load, rough landings, decoration density.
