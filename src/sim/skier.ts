@@ -1,7 +1,7 @@
 import { Quaternion, Vector3 } from 'three';
 import { CONFIG } from '../config.ts';
 import { GRAB_ACTIONS, type InputState } from '../core/input.ts';
-import { onPipeWall, pipeInward } from '../maps/shapes.ts';
+import { onPipeWall, onTakeoff, pipeInward } from '../maps/shapes.ts';
 import type { Heightfield, RailShape, SpawnDef } from '../maps/types.ts';
 import { keepInside } from './bounds.ts';
 import { collideObstacles, type Course } from './obstacles.ts';
@@ -288,10 +288,13 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
 
   // Pop: release the crouch on the snow or a rail (or just after leaving it).
   // Up a wall it drives up the wall, a little; pushing off along the snow's
-  // normal there would throw the skier out across the pipe.
+  // normal there would throw the skier out across the pipe. Off a takeoff
+  // steeper than a wall (an aerials kicker) it pushes straight up: the
+  // normal there points back down the in-run.
   if (input.up.released && s.canPop && (s.grounded || s.airTime <= c.popCoyoteTime)) {
     const pop = c.popMin + (c.popMax - c.popMin) * s.crouch;
     if (onWall(s, course.hf)) s.velocity.y += pop * CONFIG.air.wallPop;
+    else if (s.normal.y < Math.cos(CONFIG.air.wallAngle * DEG)) s.velocity.y += pop;
     else s.velocity.addScaledVector(s.normal, pop);
     if (s.grounded) takeOff(s, steer, course.hf);
     s.canPop = false;
@@ -545,10 +548,14 @@ function airOrient(s: SkierState): void {
   s.orient.copy(s.airFrame).multiply(qTurn).multiply(qPitch).multiply(s.trick);
 }
 
-/** On a wall: steeper than CONFIG.air.wallAngle, or up a halfpipe's transition, and not on a rail. */
+/**
+ * On a wall: steeper than CONFIG.air.wallAngle (but not a jump's takeoff,
+ * however steep), or up a halfpipe's transition, and not on a rail.
+ */
 function onWall(s: SkierState, hf: Heightfield): boolean {
   if (s.rail >= 0) return false;
-  return s.normal.y < Math.cos(CONFIG.air.wallAngle * DEG) || onPipeWall(hf.shapes, s.position.x, s.position.z);
+  const p = s.position;
+  return (s.normal.y < Math.cos(CONFIG.air.wallAngle * DEG) && !onTakeoff(hf, p.x, p.z)) || onPipeWall(hf.shapes, p.x, p.z);
 }
 
 /** Leaves the snow, setting up the air orientation to carry on exactly from the snow. */

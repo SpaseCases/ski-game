@@ -863,6 +863,12 @@ export interface RampShape {
   surface: Uint8Array;
   /** Distances along where a lip is dyed blue. */
   lips: number[];
+  /**
+   * Each takeoff's stretch (distance along where it starts curving up, and
+   * its lip), as pairs. However steep, a takeoff face isn't a wall (see
+   * CONFIG.air.wallAngle): it launches the rider the way it points.
+   */
+  takeoffs: number[];
   /** Draw the side slopes as snow. Structures (towers, decks, roofs) draw their own sides. */
   sides: boolean;
   /** Bounding box in world XZ. */

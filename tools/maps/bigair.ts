@@ -3,30 +3,36 @@
 // Edit here and rerun, from the repo root:
 //   node tools/maps/bigair.ts
 // Then ride every lane with tools/sim/line.ts (see GAME_DESIGN.md, Jump
-// sizing; "start=0" drops in from the tower, and a line beside a kicker
-// rides round it and hucks the knuckle) and check for holes with tools/maps/sinks.ts.
+// sizing; "start=0" drops in from the tower, a line beside a kicker rides
+// round it and hucks the knuckle, and "lip=<d>" marks the ski jump's edge)
+// and check for holes with tools/maps/sinks.ts.
 //
 // Layout: the fall line runs down -Z, d below is the distance down from the
 // top (z = -d), x across (+X to the right facing down). A scaffold drop-in
 // tower stands in the middle of a plateau at the top; just below it a short
-// apron, where riders pick a lane, then four jumps side by side, each in a
+// apron, where riders pick a lane, then six jumps side by side, each in a
 // lane of its own (a band of terrain with its own fall line), each its own
-// size and shape:
-//   Mellow   small, low and long: a floaty 360
-//   Big      the Park's pro jump: a clean 720
-//   Massive  huge all round: a 6 m lip on an 18 m wide kicker, the longest table and landing
-//   Steep    narrow, with a very steep lip that throws riders high: a 720 with time to spare
-// Each lane is built like the Park's pro jump (tools/maps/park.ts, PRO): a
-// level spot with the lane's flag, a short steep in-run, the kicker at the
-// start of a long table, the knuckle, a steep landing that eases off below,
-// and a runout. Lanes nearer the tower start higher, so every in-run starts
-// soon after the drop-in. The table is as wide as the lane, so there's room
-// to ride round the kicker and huck the knuckle. Unlike the Park there's no
-// rise above the level spot to check the speed riders bring from the tower:
-// one tall enough to slow a tucked rider stops a standing one. Instead every
-// landing is long and steep enough for a rider who tucked all the way from
-// the tower (about 12 m/s at the flag). All four come out into one finish
-// corral, which climbs to stop riders.
+// size and shape, left to right:
+//   Ski jump  a steep in-run, a takeoff table tipped down to its edge and a long landing hill: pop at the edge to fly 60 to 80 m
+//   Mellow    small, low and long: a floaty 360
+//   Big       the Park's pro jump: a clean 720
+//   Massive   huge all round: a 6 m lip on an 18 m wide kicker, the longest table and landing
+//   Steep     narrow, with a 58° lip that throws riders high: a 720 with time to spare
+//   Aerials   a 66° kicker on a little knoll: nearly straight up, for flips
+// Each kicker lane is built like the Park's pro jump (tools/maps/park.ts,
+// PRO): a level spot with the lane's flag, a short steep in-run, the kicker
+// at the start of a table, the knuckle, a steep landing that eases off
+// below, and a runout. The steeper the lip, the shorter the table and the
+// steeper the landing: riders thrown high come down close and steep. The
+// knuckles sit near one line across the hill, so lanes side by side stay
+// near each other's height, and every lane starts as soon after the tower
+// as a rider can swing out to it. The table is as wide as the lane, so
+// there's room to ride round the kicker and huck the knuckle. Unlike the
+// Park there's no rise above the level spot to check the speed riders bring
+// from the tower: one tall enough to slow a tucked rider stops a standing
+// one. Instead every landing is long and steep enough for a rider who tucked
+// all the way from the tower (about 12 m/s at the flag). All six come out
+// into one finish corral, which climbs to stop riders.
 
 import { writeFileSync } from 'node:fs';
 import { parseMap } from '../../src/maps/loader.ts';
@@ -50,13 +56,16 @@ interface JumpSpec {
   /** The level spot at the top (the flag), and the in-run: length and pitch. */
   level0: [number, number];
   inrun: [number, number];
-  /** Table: from the in-run to the knuckle. The kicker starts KICKER_IN into it. */
+  /** Table: from the in-run to the knuckle, and its pitch (a ski jump's tips down to the edge). */
   table: number;
-  lip: number;
-  lipAngle: number;
-  /** Width of the kicker's full-height part, and of the slopes down each side of it. */
+  tablePitch: number;
+  /** The kicker, starting `at` m into the table; absent for a ski jump, which takes off from the table's edge. */
+  kicker?: { at: number; lip: number; angle: number; back: number };
+  /** Width of the kicker's full-height part (or the ski jump's track), and of the slopes down each side of it. */
   width: number;
   sideWidth: number;
+  /** Distance (m) the knuckle rounds over in: long for a kicker's table (casing it rolls over), short for a ski jump's edge. */
+  knuckleEase: number;
   /**
    * The landing, from the knuckle to where it eases off into the runout;
    * its steep part as stretches (length and pitch; a face that steepens
@@ -70,74 +79,113 @@ interface JumpSpec {
   faces: [number, number][];
   lower: number;
 }
-/** How far the kicker sits into the table. */
-const KICKER_IN = 6;
 /** Room beside the kicker (m) to ride round it along the table to the knuckle. */
-const RIDE_ROUND = 5;
+const RIDE_ROUND = 4;
 
-// Left to right across the hill, from the one that drops least to the ones that drop most, so
-// lanes side by side are never far apart in height; Massive, the longest, nearest the tower.
+// Left to right across the hill, from the ones that drop least to the ones
+// that drop most, so lanes side by side are never far apart in height. In-runs
+// are short and steep: a level spot, then straight down to the table.
 const JUMPS: JumpSpec[] = [
   {
+    // A ski jump: a steep in-run onto a takeoff table that tips down to its
+    // edge, no kicker, then a long landing hill that steepens the way the
+    // flight curves down, so riders skim it all the way and land soft.
+    name: 'Ski jump',
+    level: 'double',
+    stagger: -2,
+    level0: [8, 4],
+    inrun: [46, 35],
+    table: 8,
+    tablePitch: 11,
+    width: 8,
+    sideWidth: 0,
+    knuckleEase: 6,
+    landing: 150,
+    faces: [[8, 18], [8, 28], [8, 36], [100, 42]],
+    lower: 32,
+  },
+  {
     name: 'Mellow',
-    stagger: -10,
     level: 'blue',
-    level0: [12, 4],
-    inrun: [42, 24],
+    stagger: -8,
+    level0: [8, 4],
+    inrun: [32, 28],
     table: 30,
-    lip: 2.2,
-    lipAngle: 22,
+    tablePitch: 2,
+    kicker: { at: 6, lip: 2.2, angle: 22, back: 3 },
     width: 9,
     sideWidth: 3,
-    landing: 96,
+    knuckleEase: 16,
+    landing: 110,
     faces: [[34, 38], [36, 44]],
-    lower: 40,
+    lower: 44,
   },
   {
     name: 'Big',
-    stagger: 0,
     level: 'black',
-    level0: [12, 4],
-    inrun: [48, 27],
+    stagger: 0,
+    level0: [8, 4],
+    inrun: [38, 32],
     table: 34,
-    lip: 3.5,
-    lipAngle: 32,
+    tablePitch: 2,
+    kicker: { at: 6, lip: 3.5, angle: 32, back: 3 },
     width: 12,
     sideWidth: 4,
+    knuckleEase: 16,
     landing: 100,
-    faces: [[40, 45], [36, 49]],
-    lower: 40,
+    faces: [[40, 46], [36, 51]],
+    lower: 42,
   },
   {
     name: 'Massive',
-    stagger: 2,
     level: 'double',
-    level0: [12, 4],
-    inrun: [64, 30],
+    stagger: 2,
+    level0: [8, 4],
+    inrun: [50, 34],
     table: 46,
-    lip: 6,
-    lipAngle: 34,
+    tablePitch: 2,
+    kicker: { at: 6, lip: 6, angle: 34, back: 3 },
     width: 18,
     sideWidth: 5,
+    knuckleEase: 16,
     landing: 96,
     faces: [[30, 48], [48, 53]],
     lower: 40,
   },
   {
+    // A really steep lip (a takeoff isn't a wall however steep: CONFIG.air.wallAngle).
     name: 'Steep',
-    stagger: 8,
     level: 'double',
-    level0: [12, 4],
-    inrun: [46, 28],
-    table: 30,
-    // As steep as a lip can be: past CONFIG.walls.wallAngle (44° from level, the table falls 2°) the snow is a wall.
-    lip: 4.4,
-    lipAngle: 44,
+    stagger: 2,
+    level0: [8, 4],
+    inrun: [40, 30],
+    table: 16,
+    tablePitch: 2,
+    kicker: { at: 5, lip: 4.6, angle: 58, back: 3 },
     width: 8,
     sideWidth: 3,
-    landing: 86,
-    faces: [[26, 53], [40, 57]],
-    lower: 40,
+    knuckleEase: 8,
+    landing: 90,
+    faces: [[30, 58], [40, 61]],
+    lower: 42,
+  },
+  {
+    // Freestyle aerials: a short in-run onto a little knoll, and a kicker so
+    // steep it throws riders nearly straight up, with time for flips.
+    name: 'Aerials',
+    level: 'double',
+    stagger: 4,
+    level0: [8, 4],
+    inrun: [30, 28],
+    table: 14,
+    tablePitch: 2,
+    kicker: { at: 4, lip: 4, angle: 66, back: 2.5 },
+    width: 7,
+    sideWidth: 2.5,
+    knuckleEase: 8,
+    landing: 90,
+    faces: [[26, 60], [30, 63]],
+    lower: 44,
   },
 ];
 
@@ -148,8 +196,8 @@ const JUMPS: JumpSpec[] = [
 // however far apart the lanes' heights are. The outer lanes reach out
 // under the berms.
 /** Width of the bank between each lane and the next: widest where their heights differ most. */
-const BANKS = [36, 40, 44];
-const halfOf = (j: JumpSpec): number => j.width / 2 + j.sideWidth + RIDE_ROUND;
+const BANKS = [38, 38, 38, 38, 38];
+const halfOf = (j: JumpSpec): number => j.width / 2 + j.sideWidth + (j.kicker ? RIDE_ROUND : 4);
 /** Each lane's middle (x), centered across the hill. */
 const LANE_X: number[] = (() => {
   const xs: number[] = [];
@@ -202,7 +250,7 @@ const TOWER_D = 14;
  * The soonest a lane can start (d): after the foot of the tower, and
  * further down the farther out it is, so a rider has room to swing out to it.
  */
-const soonest = (x: number): number => 58 + 0.7 * Math.abs(x);
+const soonest = (x: number): number => 42 + 0.4 * Math.abs(x);
 /** From a lane's start to its knuckle. */
 const toKnuckle = (j: JumpSpec): number => j.level0[0] + j.inrun[0] + j.table;
 /**
@@ -242,13 +290,14 @@ JUMPS.forEach((j, i) => {
   const flagD = start + j.level0[0] / 2;
   const inrun = start + j.level0[0];
   const table = inrun + j.inrun[0];
-  const kickerAt = table + KICKER_IN;
-  const lip = kickerAt + (2 * j.lip) / Math.tan((j.lipAngle * Math.PI) / 180);
+  const k = j.kicker;
+  const kickerAt = table + (k?.at ?? 0);
   const knuckle = table + j.table;
+  const lip = k ? kickerAt + (2 * k.lip) / Math.tan((k.angle * Math.PI) / 180) : knuckle;
   const landingEnd = knuckle + j.landing;
   at.push({ x, half, flag: flagD, inrun, table, lip, knuckle, landingEnd });
 
-  features.push({ type: 'kicker', x, z: -kickerAt, width: j.width, sideWidth: j.sideWidth, lipHeight: j.lip, lipAngle: j.lipAngle, back: 3 });
+  if (k) features.push({ type: 'kicker', x, z: -kickerAt, width: j.width, sideWidth: j.sideWidth, lipHeight: k.lip, lipAngle: k.angle, back: k.back });
   flags.push({ ...xz(x, flagD), heading: 0, width: 2 * half - 2 });
   lanes.push({
     ...band(i),
@@ -258,9 +307,9 @@ JUMPS.forEach((j, i) => {
     sections: [
       sec(j.level0[0], j.level0[1], 8),
       sec(j.inrun[0], j.inrun[1], 16),
-      sec(j.table, 2, 20),
+      sec(j.table, j.tablePitch, j.kicker ? 20 : 12),
       // A well-rounded knuckle: casing it, or riding round the kicker to huck it, rolls over rather than trips.
-      ...j.faces.map(([length, pitch], k) => sec(length, pitch, k === 0 ? 16 : 14)),
+      ...j.faces.map(([length, pitch], n) => sec(length, pitch, n === 0 ? j.knuckleEase : 14)),
       sec(j.landing - j.faces.reduce((a, [length]) => a + length, 0), j.lower, 16),
       sec(FINISH - landingEnd, undefined, 30),
     ],
@@ -288,6 +337,18 @@ for (const a of at) {
     decor.push({ kind: 'fence', points: [xz(a.x + side * fenceOff(a), a.table + 4), xz(a.x + side * fenceOff(a), FINISH - 6)] });
   }
 }
+// The ski jump: two tracks dyed down its in-run to the edge, a line across
+// the landing hill every 10 m out from the edge (from 30 m), and a board
+// beside the hill every 20 m saying how far.
+JUMPS.forEach((j, i) => {
+  if (j.kicker) return;
+  const a = at[i]!;
+  for (const side of [-1, 1]) decor.push({ kind: 'dyeLine', points: [xz(a.x + side * 0.7, a.inrun + 2), xz(a.x + side * 0.7, a.knuckle - 0.5)] });
+  for (let m = 30; m <= 110; m += 10) {
+    decor.push({ kind: 'dyeLine', points: [xz(a.x - a.half + 1, a.knuckle + m), xz(a.x + a.half - 1, a.knuckle + m)] });
+    if (m % 20 === 0) decor.push({ kind: 'sign', ...xz(a.x + (a.x < 0 ? 1 : -1) * (fenceOff(a) + 3), a.knuckle + m), heading: 0, header: `${m} m`, lines: [] });
+  }
+});
 // Spectators behind the fences: along the tables (the best seats), and at the foot of the landings.
 let seed = 7;
 const rand = (): number => {
@@ -427,6 +488,7 @@ for (let d = Math.min(...at.map((a) => a.flag)); d < FINISH + 20; d += 2) {
     }
   }
 }
+console.log(`run-in from the foot of the tower to the lip: mean ${(at.reduce((a, l) => a + l.lip, 0) / at.length - 42).toFixed(0)} m, ${at.map((l) => (l.lip - 42).toFixed(0)).join(' / ')}`);
 console.log(`steepest bank across the slope: ${((bank * 180) / Math.PI).toFixed(0)}° at ${bankAt}`);
 console.log(`${features.length} features, ${flags.length} flags, ${decor.length} decoration sets; ${(heightAt(hf, 0, -TOWER_D) - heightAt(hf, 0, -FINISH)).toFixed(0)} m drop from the tower to the finish`);
 writeFileSync('src/maps/bigair.json', JSON.stringify(map, null, 1) + '\n');

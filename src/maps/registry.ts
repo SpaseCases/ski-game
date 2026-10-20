@@ -34,7 +34,7 @@ export const MAPS: readonly MapEntry[] = [
   {
     id: 'bigair',
     name: 'Big air',
-    blurb: 'Drop in off the scaffold tower and pick a jump: long and mellow, a big 720 table, a very steep lip, or the massive one.',
+    blurb: 'Drop in off the scaffold tower and pick a jump: a ski jump, a mellow table, a big 720 table, the massive one, a very steep lip, or an aerials kicker.',
     load: () => import('./bigair.json').then((m) => m.default),
   },
   {

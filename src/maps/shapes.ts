@@ -43,6 +43,8 @@ export class ProfileBuilder {
   readonly mOut: number[] = [0];
   readonly surface: number[] = [SURFACE.snow];
   readonly lips: number[] = [];
+  /** Each takeoff's start and lip, as pairs. */
+  readonly takeoffs: number[] = [];
 
   /** Distance along and height of the last knot. */
   get end(): number {
@@ -67,8 +69,10 @@ export class ProfileBuilder {
   /** Curved takeoff from the slope up to a sharp lip at `angle` degrees; a park lip is dyed, a natural booter's isn't. */
   takeoff(height: number, angle: number, natural = false): this {
     const m = Math.tan(angle * DEG);
+    const start = this.end;
     // A parabola reaching height H over length L ends with slope 2H / L.
     this.to((2 * height) / m, height, m, 0);
+    this.takeoffs.push(start, this.end);
     if (!natural) this.lips.push(this.end);
     return this;
   }
@@ -136,6 +140,7 @@ export function makeRamp(
     kOut: Float32Array.from(p.mOut),
     surface: Uint8Array.from(p.surface),
     lips: p.lips.slice(),
+    takeoffs: p.takeoffs.slice(),
     sides,
     minX: 0,
     maxX: 0,
@@ -463,6 +468,30 @@ function samplePipe(s: PipeShape, x: number, z: number, out: ShapeSample): boole
   out.dhdx = dpdu * s.dirX + dpdv * s.rightX;
   out.dhdz = dpdu * s.dirZ + dpdv * s.rightZ;
   return true;
+}
+
+/** True on the face of a ramp's takeoff, from where it starts curving up to its lip (and a little past). */
+export function onTakeoff(hf: Heightfield, x: number, z: number): boolean {
+  const shapes = hf.shapes;
+  const g = hf.shapeCells;
+  if (!shapes || !g) return false;
+  const c = Math.floor((x - g.originX) / g.cell);
+  const r = Math.floor((z - g.originZ) / g.cell);
+  if (c < 0 || r < 0 || c >= g.cols || r >= g.rows) return false;
+  const k = r * g.cols + c;
+  for (let j = g.start[k]!; j < g.start[k + 1]!; j++) {
+    const s = shapes[g.items[j]!]!;
+    if (s.kind !== 'ramp' || s.takeoffs.length === 0 || x < s.minX || x > s.maxX || z < s.minZ || z > s.maxZ) continue;
+    const dx = x - s.x;
+    const dz = z - s.z;
+    const v = dx * s.rightX + dz * s.rightZ;
+    if (Math.abs(v) > s.halfWidth + s.sideWidth) continue;
+    const u = dx * s.dirX + dz * s.dirZ;
+    for (let t = 0; t < s.takeoffs.length; t += 2) {
+      if (u >= s.takeoffs[t]! && u <= s.takeoffs[t + 1]! + 0.5) return true;
+    }
+  }
+  return false;
 }
 
 /** How far (m) past the edge of a pipe's floor the wall counts as a wall, not floor. */

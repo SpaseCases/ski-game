@@ -14,7 +14,8 @@
 // huck, popped with "pop". "speed=<d>[,<d>...]"
 // reports the speed passing each of those d; "v0=<m/s>" starts moving at that
 // speed instead of standing; "brake=<m/s>" brakes down to that speed before
-// each takeoff (a controlled huck). After a crash the rider
+// each takeoff (a controlled huck). "lip=<d>" adds a takeoff with no kicker
+// (a ski jump's edge), reported against the landing hill below it. After a crash the rider
 // starts again from a standstill 15 m further down.
 
 import { CONFIG } from '../../src/config.ts';
@@ -65,17 +66,14 @@ const pitchAt = (d: number): number => Math.atan(heightAt(hf, x, -d + 0.5) - hei
  * its steepest), and the end where it eases back under 12°. Absent when the
  * snow past the kicker never steepens (a kicker on an ordinary slope).
  */
-function terrainLanding(back: number): Pick<Lip, 'knuckle' | 'faceStart' | 'faceEnd' | 'end'> {
-  // Past the foot of the kicker's back, onto the table.
+function terrainLanding(back: number, edge?: number): Pick<Lip, 'knuckle' | 'faceStart' | 'faceEnd' | 'end'> {
+  // Past the foot of the kicker's back, onto the table (or, given an edge, that is the knuckle).
   let from = back;
-  while (pitchAt(from) > 8 && from < back + 10) from += 0.25;
+  while (edge === undefined && pitchAt(from) > 8 && from < back + 10) from += 0.25;
   const table = pitchAt(from + 1);
-  let knuckle = -1;
-  for (let d = from; d < from + 80; d += 0.25) {
-    if (pitchAt(d) > Math.max(12, table + 8)) {
-      knuckle = d;
-      break;
-    }
+  let knuckle = edge ?? -1;
+  for (let d = from; knuckle < 0 && d < from + 80; d += 0.25) {
+    if (pitchAt(d) > Math.max(12, table + 8)) knuckle = d;
   }
   if (knuckle < 0) return {};
   let steepest = 0;
@@ -120,6 +118,10 @@ sim.map.features.forEach((f, i) => {
     });
   }
 });
+for (const f of flagsArg.filter((a) => a.startsWith('lip='))) {
+  const d = Number(f.slice(4));
+  lips.push({ d, name: `takeoff at d=${d}`, height: 0, ...terrainLanding(d, d) });
+}
 lips.sort((a, b) => a.d - b.d);
 
 const r = new Rider(sim);
