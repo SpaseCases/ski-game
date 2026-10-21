@@ -15,8 +15,21 @@ import type { JumpFeature } from '../../src/maps/types.ts';
 import { createRun, updateRun, type RunState } from '../../src/sim/checkpoints.ts';
 import { createRace, stepRace, type RaceEvent, type RaceState } from '../../src/sim/race.ts';
 import { copySkierState, createSkierState, placeSkierAt, stepSkier } from '../../src/sim/skier.ts';
+import { setSkiScale, type Scale } from '../../src/sim/tuning.ts';
 
 export const DT = 1 / CONFIG.sim.stepHz;
+
+// Every tool takes "--ski <park|big|carving>" to ride on that ski (its
+// multipliers in config.ts's skis block); without it, the park ski, whose
+// multipliers are all 1. It's taken out of the arguments before the tool reads them.
+const skiAt = process.argv.indexOf('--ski');
+if (skiAt >= 0) {
+  const ski = process.argv[skiAt + 1] ?? '';
+  if (!(ski in CONFIG.skis)) throw new Error(`--ski takes one of: ${Object.keys(CONFIG.skis).join(', ')}`);
+  setSkiScale(CONFIG.skis[ski as keyof typeof CONFIG.skis] as Scale);
+  process.argv.splice(skiAt, 2);
+  console.log(`(on the ${ski} ski)`);
+}
 
 /** A map built exactly as the game builds it. */
 export type Sim = BuiltMap;

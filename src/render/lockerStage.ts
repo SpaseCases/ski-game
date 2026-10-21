@@ -27,7 +27,8 @@ import { SkierRig } from './skierRig.ts';
 // canvas (a scissored viewport on the one WebGLRenderer, never a second
 // context): from the title, a small stage of its own (the skier on a snow
 // plinth against a winter sky, turning slowly); from pause, the paused world
-// itself, with the camera circling the real skier.
+// itself, with the camera circling the real skier. On the Skis tab the
+// camera looks down at the skis instead of the whole skier.
 
 
 export interface Rect {
@@ -43,6 +44,7 @@ export class LockerStage {
   private rig: SkierRig | null = null;
   private outfit: Outfit;
   private angle = 0.6;
+  private skis = false;
   private readonly aim = new Vector3();
 
   constructor(outfit: Outfit) {
@@ -53,6 +55,11 @@ export class LockerStage {
   setOutfit(outfit: Outfit): void {
     this.outfit = outfit;
     this.rig?.setOutfit(outfit);
+  }
+
+  /** Frames the skis (true) or the whole skier. */
+  showSkis(on: boolean): void {
+    this.skis = on;
   }
 
   /** Turns the preview on by `frameTime` seconds (real time; it turns even while the game is paused). */
@@ -66,7 +73,7 @@ export class LockerStage {
     this.rig!.root.rotation.y = -this.angle;
     this.rig!.root.updateMatrix();
     this.rig!.root.updateMatrixWorld(true);
-    this.aim.set(0, 0.85, 0);
+    this.aim.set(0, this.skis ? CONFIG.locker.skiAim : 0.85, 0);
     // A turntable: the skier turns under a still camera and sun.
     this.place(rect, CONFIG.locker.stageAngle);
     beginScissor(renderer, rect);
@@ -81,7 +88,7 @@ export class LockerStage {
    */
   renderWorld(view: View, rect: Rect, center: Vector3, hf: Heightfield): void {
     this.aim.copy(center);
-    this.aim.y += 0.1;
+    this.aim.y += this.skis ? CONFIG.locker.skiAim - CONFIG.air.comHeight : 0.1;
     this.place(rect, this.angle);
     const c = this.camera;
     const ground = heightAt(hf, c.position.x, c.position.z) + 0.5;
@@ -104,9 +111,16 @@ export class LockerStage {
     c.aspect = rect.width / Math.max(1, rect.height);
     // Far enough back for the whole skier, and the skis when turned side on.
     const t = Math.tan((c.fov * Math.PI) / 360);
-    const { halfHeight, halfWidth, rise } = CONFIG.locker;
-    const d = Math.max(halfHeight / t, halfWidth / (t * c.aspect));
-    c.position.set(this.aim.x + Math.sin(angle) * d, this.aim.y + rise, this.aim.z - Math.cos(angle) * d);
+    const { halfHeight, halfWidth, rise, skiHalfLength, skiPitch } = CONFIG.locker;
+    if (this.skis) {
+      // Looking down at the skis from all round, the whole length in view.
+      const d = skiHalfLength / (t * Math.min(1, c.aspect));
+      const flat = Math.cos(skiPitch) * d;
+      c.position.set(this.aim.x + Math.sin(angle) * flat, this.aim.y + Math.sin(skiPitch) * d, this.aim.z - Math.cos(angle) * flat);
+    } else {
+      const d = Math.max(halfHeight / t, halfWidth / (t * c.aspect));
+      c.position.set(this.aim.x + Math.sin(angle) * d, this.aim.y + rise, this.aim.z - Math.cos(angle) * d);
+    }
     c.lookAt(this.aim);
     c.near = 0.1;
     c.updateProjectionMatrix();

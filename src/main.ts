@@ -28,7 +28,7 @@ import {
 import { createRace, resetRace, stepRace, type CourseDef, type RaceState } from './sim/race.ts';
 import { copySkierState, createSkierState, placeSkierAt, stepSkier } from './sim/skier.ts';
 import { heightAt } from './sim/terrain.ts';
-import { anyCheat, CHEATS, configChanged, rebuildTuning, setCheat, TUNING } from './sim/tuning.ts';
+import { anyCheat, CHEATS, configChanged, rebuildTuning, setCheat, setSkiScale, TUNING } from './sim/tuning.ts';
 import { CheatsScreen } from './ui/cheatsMenu.ts';
 import type { TuningPanel } from './ui/tuningPanel.ts';
 import { mountWindowButtons } from './ui/embed.ts';
@@ -53,6 +53,7 @@ const hud = byId('hud');
 const settings = loadSettings();
 /** The skier's look from the Locker. */
 let outfit: Outfit = loadOutfit();
+setSkiScale(CONFIG.skis[outfit.ski]);
 /** The preset in use: the saved one, unless the URL names one for this visit. */
 let quality: Quality = urlQuality() ?? settings.quality;
 
@@ -139,6 +140,7 @@ const lockerScreen = new LockerScreen(
   {
     get: () => outfit,
     set: setOutfit,
+    skisShown: (on) => lockerStage.showSkis(on),
     shown: (open) => {
       lockerOpen = open;
       // The painted mountain fills round the window, from the title and from pause.
@@ -305,6 +307,7 @@ function openLocker(): void {
 function setOutfit(next: Outfit): void {
   outfit = next;
   saveOutfit(outfit);
+  setSkiScale(CONFIG.skis[outfit.ski]);
   skierView?.rig.setOutfit(outfit);
   lockerStage.setOutfit(outfit);
 }

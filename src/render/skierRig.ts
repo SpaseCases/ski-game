@@ -7,7 +7,6 @@ import {
   CylinderGeometry,
   DoubleSide,
   Euler,
-  ExtrudeGeometry,
   Float32BufferAttribute,
   Group,
   IcosahedronGeometry,
@@ -17,7 +16,6 @@ import {
   MeshBasicMaterial,
   MeshLambertMaterial,
   Quaternion,
-  Shape,
   Sphere,
   SphereGeometry,
   Vector2,
@@ -25,7 +23,9 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DEFAULT_OUTFIT, type Outfit } from '../core/outfit.ts';
+import { skiGraphic, skiType } from '../core/skis.ts';
 import { clothMaterial } from './cloth.ts';
+import { buildSkiGeometry } from './skiModel.ts';
 import type { PoseDef, Vec3 } from './skierPoses.ts';
 
 // Low-poly freeskier: a straight hip-length shell jacket, wide pants over
@@ -35,7 +35,7 @@ import type { PoseDef, Vec3 } from './skierPoses.ts';
 // by a small solver: hips, chest and head are rigid; knees and elbows come
 // from two-bone IK so hands and feet land where the pose says. The jacket's
 // hem is the one part rebuilt every pose, so it rides up over the thighs.
-// Colors and headwear come from the Locker's outfit; changing it rebuilds
+// Colors, headwear and skis come from the Locker's outfit; changing it rebuilds
 // only the parts it touches (setOutfit), never per frame.
 
 const FIXED = {
@@ -48,10 +48,6 @@ const FIXED = {
   bootSole: '#202328',
   buckle: '#c9ced6',
   binding: '#1c1f25',
-  skiTop: '#21252c',
-  skiTip: '#b8e330',
-  skiStripe: '#e2497b',
-  skiBase: '#2f7fe0',
   poleShaft: '#b8c0c9',
   poleDark: '#1c1f25',
   hatRed: '#c3262e',
@@ -82,8 +78,6 @@ export const BODY = {
   forearm: 0.25,
   /** Wrist to the middle of the glove. */
   hand: 0.05,
-  skiLength: 1.76,
-  skiWidth: 0.1,
 };
 
 /** Goggle height above the base of the neck; also roughly the middle of the head. */
@@ -177,14 +171,16 @@ export class SkierRig {
     const thigh = buildThigh(c.pants);
     const shin = buildShin(c.pants, c.boots);
     const pole = buildPole();
+    const ski = buildSki(outfit);
     for (const side of [-1, 1]) {
       this.upperArms.push(add(upperArm));
       this.forearms.push(add(forearm));
       this.thighs.push(add(thigh));
       this.shins.push(add(shin));
-      this.feet.push(add(buildFoot(side, c.boots)));
+      this.feet.push(add(buildFoot(side, c.boots, ski)));
       this.poles.push(add(pole));
     }
+    ski.dispose();
   }
 
   /** Changes colors or headwear, rebuilding only the parts that change (the old geometry is freed). */
@@ -204,7 +200,11 @@ export class SkierRig {
     }
     if (changed('jacket', 'mittens')) swap(this.forearms, buildForearm(c.jacket, c.mittens));
     if (changed('pants', 'boots')) swap(this.shins, buildShin(c.pants, c.boots));
-    if (changed('boots')) this.feet.forEach((m, i) => swap([m], buildFoot(i === 0 ? -1 : 1, c.boots)));
+    if (changed('boots', 'ski', 'skiGraphic')) {
+      const ski = buildSki(next);
+      this.feet.forEach((m, i) => swap([m], buildFoot(i === 0 ? -1 : 1, c.boots, ski)));
+      ski.dispose();
+    }
     if (changed('helmet', 'goggleFrame', 'goggleLens', 'goggleStrap', 'headwear')) {
       swap([this.head], buildHead(next));
       this.setHeadwear();
@@ -1142,13 +1142,13 @@ function buildShin(pants: Color, boot: Color): BufferGeometry {
   ]);
 }
 
-/** Boot (shell, sole, buckles), binding and ski, in the foot frame (origin at the ankle). */
-function buildFoot(side: number, boot: Color): BufferGeometry {
+/** Boot (shell, sole, buckles), binding and `ski` (from buildSki), in the foot frame (origin at the ankle). */
+function buildFoot(side: number, boot: Color, ski: BufferGeometry): BufferGeometry {
   const parts = [
     paint(bootShell(), boot),
     paint(new BoxGeometry(0.118, 0.022, 0.33).translate(0, -0.104, -0.015), FIXED.bootSole),
     paint(new BoxGeometry(0.09, 0.025, 0.4).translate(0, -0.1275, 0), FIXED.binding),
-    buildSki().translate(0, -BODY.ankleHeight, -BODY.ankleBack),
+    ski,
   ];
   // Buckles on the outside of the instep and cuff.
   for (const [y, z] of [
@@ -1179,52 +1179,9 @@ function bootShell(): BufferGeometry {
   return g.translate(0, -0.046, -0.015);
 }
 
-/**
- * Twin-tip ski: a side profile extruded across the ski's width, colored per
- * face (dark topsheet, bright tips, a stripe, colored base).
- */
-function buildSki(): BufferGeometry {
-  const half = BODY.skiLength / 2;
-  const thick = 0.022;
-  const flat = 0.66;
-  const tipStations = [0.69, 0.72, 0.76, 0.8, 0.83, 0.86];
-  const stations = [
-    -half,
-    ...tipStations.map((x) => -x).reverse(),
-    -flat,
-    -0.25,
-    -0.15,
-    0.15,
-    0.25,
-    flat,
-    ...tipStations,
-    half,
-  ];
-  const rise = (x: number): number => {
-    const t = Math.max(0, (Math.abs(x) - flat) / (half - flat));
-    return 0.12 * t ** 1.6;
-  };
-  const shape = new Shape();
-  stations.forEach((x, i) => (i === 0 ? shape.moveTo(x, rise(x)) : shape.lineTo(x, rise(x))));
-  for (let i = stations.length - 1; i >= 0; i--) {
-    const x = stations[i] ?? 0;
-    shape.lineTo(x, rise(x) + thick);
-  }
-  // Profile x runs along the ski, y up; extrusion depth is the width.
-  const g = new ExtrudeGeometry(shape, { depth: BODY.skiWidth, bevelEnabled: false })
-    .rotateY(Math.PI / 2)
-    .translate(-BODY.skiWidth / 2, 0, 0);
-
-  const top = new Color(FIXED.skiTop);
-  const tip = new Color(FIXED.skiTip);
-  const stripe = new Color(FIXED.skiStripe);
-  const base = new Color(FIXED.skiBase);
-  return paint(g, (c, n) => {
-    const along = Math.abs(c.z);
-    if (n.y < -0.5) return base;
-    if (along > flat) return tip;
-    return along > 0.15 && along < 0.25 ? stripe : top;
-  });
+/** The outfit's ski, in the foot frame (see render/skiModel.ts). */
+function buildSki(o: Outfit): BufferGeometry {
+  return buildSkiGeometry(skiType(o.ski).model, skiGraphic(o.ski, o.skiGraphic)).translate(0, -BODY.ankleHeight, -BODY.ankleBack);
 }
 
 /** Pole hanging down -Y from the grip at the origin. */

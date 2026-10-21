@@ -18,9 +18,9 @@
 // (a ski jump's edge), reported against the landing hill below it. After a crash the rider
 // starts again from a standstill 15 m further down.
 
-import { CONFIG } from '../../src/config.ts';
 import type { Action } from '../../src/core/input.ts';
 import { heightAt } from '../../src/sim/terrain.ts';
+import { TUNING } from '../../src/sim/tuning.ts';
 import { DT, jumpLayout, loadMap, Rider } from './harness.ts';
 
 const [file, xArg, fromArg, toArg] = process.argv.slice(2);
@@ -157,7 +157,7 @@ while (r.t < 600) {
     }
   } else if (spinning) {
     const rate = Math.abs(r.s.spin.y);
-    if (turned + (rate * rate) / (2 * CONFIG.air.rotateStop) >= 4 * Math.PI) spinning = false;
+    if (turned + (rate * rate) / (2 * TUNING.air.rotateStop) >= 4 * Math.PI) spinning = false;
     else keys.push('left');
   }
   r.step(keys);

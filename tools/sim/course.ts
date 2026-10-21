@@ -15,11 +15,11 @@
 // straight stretches; --trace prints each gate as it's passed. After a crash
 // the rider starts again from a standstill 15 m further on the line.
 
-import { CONFIG } from '../../src/config.ts';
 import type { Action } from '../../src/core/input.ts';
 import type { XZ } from '../../src/maps/types.ts';
 import type { CourseDef, RaceLine } from '../../src/sim/race.ts';
 import { wrapAngle } from '../../src/sim/skier.ts';
+import { TUNING } from '../../src/sim/tuning.ts';
 import { DT, loadMap, Rider } from './harness.ts';
 
 const args = process.argv.slice(2);
@@ -130,7 +130,7 @@ function smooth(pts: readonly XZ[]): { x: Float64Array; z: Float64Array; h: Floa
 
 /** Fastest speed (m/s) the skis can carve a turn of curvature k at, with a little to spare. */
 function carveSpeed(k: number): number {
-  const c = CONFIG.skier;
+  const c = TUNING.skier;
   if (k < 1e-4) return Infinity;
   let lo = 0;
   let hi = 60;
@@ -244,7 +244,7 @@ function ride(ci: number): Result {
       const t = r.t;
       const heading = Math.atan2(-(line.x[Math.min(n - 1, k + 2)]! - line.x[k]!), -(line.z[Math.min(n - 1, k + 2)]! - line.z[k]!));
       r.place(line.x[k]!, line.z[k]!, (heading * 180) / Math.PI, 0);
-      r.t = t + CONFIG.bail.respawnDelay;
+      r.t = t + TUNING.bail.respawnDelay;
       progress = k;
     }
   }

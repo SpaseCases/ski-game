@@ -9,12 +9,12 @@
 // where each rider is every 20 s. After a crash the rider starts again from
 // a standstill 20 m further on.
 
-import { CONFIG } from '../../src/config.ts';
 import type { Action } from '../../src/core/input.ts';
 import type { Bounds, RunDef, XZ } from '../../src/maps/types.ts';
 import { finishAt } from '../../src/sim/checkpoints.ts';
 import { wrapAngle } from '../../src/sim/skier.ts';
 import { heightAt } from '../../src/sim/terrain.ts';
+import { TUNING } from '../../src/sim/tuning.ts';
 import { DT, loadMap, Rider } from './harness.ts';
 
 const args = process.argv.slice(2);
@@ -222,7 +222,7 @@ function ride(def: Ride): Result {
       const again = def.restart(r);
       const t = r.t;
       r.place(again.at.x, again.at.z, again.heading, 0);
-      r.t = t + CONFIG.bail.respawnDelay;
+      r.t = t + TUNING.bail.respawnDelay;
       takeoff = null;
       continue;
     }

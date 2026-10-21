@@ -1,13 +1,13 @@
-// Measures how long a clean 720 takes at the current CONFIG.air spin values:
+// Measures how long a clean 720 takes at the current spin values (the ski's, with --ski):
 // hold a spin key from takeoff, let go when the remaining turn equals the
 // distance it takes to slow to a stop, and time until the spin has stopped.
 // 720 jumps need at least 20% more airtime than this (GAME_DESIGN.md, Jump sizing).
-//   node tools/sim/spin720.ts
+//   node tools/sim/spin720.ts [--ski big]
 
-import { CONFIG } from '../../src/config.ts';
+import { TUNING } from '../../src/sim/tuning.ts';
 import { DT } from './harness.ts';
 
-const a = CONFIG.air;
+const a = TUNING.air;
 const target = 4 * Math.PI;
 
 function time720(startRate: number): number {

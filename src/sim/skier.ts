@@ -382,6 +382,12 @@ function rideSnow(s: SkierState, input: InputState, dt: number): void {
   // What the edges grip with and friction works against: gravity's push plus
   // the snow's when it curves up under the skis.
   const load = press + s.press * c.curveLoad;
+  // Riding switch, some skis grip and hold their edges less (switchGrip,
+  // switchEdgeHold), fading in with the speed backwards along the skis.
+  const backwards = s.velocity.x * Math.sin(s.yaw) + s.velocity.z * Math.cos(s.yaw);
+  const sw = clamp(backwards / c.switchSpeed, 0, 1);
+  const grip = c.grip * (1 + (c.switchGrip - 1) * sw);
+  const edgeHold = c.edgeHold * (1 + (c.switchEdgeHold - 1) * sw);
 
   // Steering: the skis turn at a rate that drops with speed, and never faster
   // than the edges can carve (a held turn is a clean arc, not a skid).
@@ -389,7 +395,7 @@ function rideSnow(s: SkierState, input: InputState, dt: number): void {
   const speed = s.velocity.length();
   const t = Math.min(1, speed / c.turnSpeedRef);
   const baseRate = c.turnRateSlow + (c.turnRateFast - c.turnRateSlow) * t;
-  const maxRate = Math.min(baseRate, (c.grip * load) / Math.max(speed, 0.1));
+  const maxRate = Math.min(baseRate, (grip * load) / Math.max(speed, 0.1));
   s.yawRate = approach(s.yawRate, steer * maxRate, c.turnResponse * dt);
   s.yaw = wrapAngle(s.yaw + s.yawRate * dt);
 
@@ -413,7 +419,7 @@ function rideSnow(s: SkierState, input: InputState, dt: number): void {
 
   u += slopeGravity.dot(forward) * dt;
   const sidePull = slopeGravity.dot(left);
-  const overHold = Math.abs(sidePull) - c.edgeHold * load;
+  const overHold = Math.abs(sidePull) - edgeHold * load;
   if (overHold > 0) w += Math.sign(sidePull) * overHold * dt;
 
   // Pole push: each push is a stroke whose force swells and fades over
@@ -438,7 +444,7 @@ function rideSnow(s: SkierState, input: InputState, dt: number): void {
     // Full grip up to half of carveSlipMax, fading to none at carveSlipMax.
     const slipAngle = Math.atan2(Math.abs(w), Math.abs(u));
     const carve = clamp((c.carveSlipMax - slipAngle) / (0.5 * c.carveSlipMax), 0, 1);
-    const redirect = c.grip * load * carve * dt;
+    const redirect = grip * load * carve * dt;
     if (redirect > 0) {
       const wNext = Math.abs(w) <= redirect ? 0 : w - Math.sign(w) * redirect;
       u = Math.sign(u) * Math.sqrt(Math.max(0, total * total - wNext * wNext));

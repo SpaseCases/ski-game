@@ -2,7 +2,7 @@ import { CONFIG } from '../config.ts';
 
 // The numbers the simulation actually runs on. CONFIG (config.ts, edited
 // live by the tuning panel) is the base; TUNING is that base times the ski's
-// multipliers (milestone 6d) times every cheat that's on. It's rebuilt only
+// multipliers (CONFIG.skis) times every cheat that's on. It's rebuilt only
 // when one of those changes, never per frame. With no ski multipliers and
 // every cheat off it equals CONFIG exactly (a number times 1 is itself), so
 // the headless sim tools, which read CONFIG, get the same results.
@@ -38,9 +38,10 @@ const ORIGINAL = structuredClone(CONFIG);
 export const TUNING = {} as Tuning;
 for (const b of BLOCKS) (TUNING as Record<Block, Numbers>)[b] = { ...(CONFIG[b] as Numbers) };
 
-/** The ski's multipliers. Milestone 6d sets them; until then every one is 1. */
+/** The ski's multipliers (the park ski's are all 1). */
 let skiScale: Scale = {};
 
+/** Rides on a ski: pass its block from CONFIG.skis (the same object, so the tuning panel's edits to it apply). */
 export function setSkiScale(scale: Scale): void {
   skiScale = scale;
   rebuildTuning();

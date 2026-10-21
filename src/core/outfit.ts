@@ -1,9 +1,11 @@
+import { SKI_TYPES, skiGraphic, type SkiId } from './skis.ts';
 import { readStored, writeStored } from './storage.ts';
 
 // The skier's look, picked in the Locker: a color for each part from one
-// shared palette, and the headwear. Saved locally as one versioned JSON
-// entry; anything missing, unknown or unreadable falls back to the default,
-// so a wiped or blocked storage just means today's look.
+// shared palette, the headwear, and the skis (type and graphic, see
+// core/skis.ts). Saved locally as one versioned JSON entry; anything
+// missing, unknown or unreadable falls back to the default, so a wiped or
+// blocked storage just means today's look.
 
 /** One shared palette for every part, ordered for the swatch strip: neutrals, then round the color wheel. */
 export const PALETTE: readonly { readonly name: string; readonly hex: string }[] = [
@@ -49,9 +51,9 @@ export const COLOR_PARTS: readonly { readonly id: ColorPart; readonly name: stri
   { id: 'mittens', name: 'Mittens' },
 ];
 
-export type Outfit = Record<ColorPart, string> & { headwear: Headwear };
+export type Outfit = Record<ColorPart, string> & { headwear: Headwear; ski: SkiId; skiGraphic: string };
 
-/** Today's look: matte black helmet and goggles with a smoke lens, a charcoal shell, olive pants, gray boots and mittens. */
+/** Today's look: matte black helmet and goggles with a smoke lens, a charcoal shell, olive pants, gray boots and mittens, on park skis with lime tips. */
 export const DEFAULT_OUTFIT: Readonly<Outfit> = {
   helmet: '#2c3037',
   goggleFrame: '#2c3037',
@@ -62,6 +64,8 @@ export const DEFAULT_OUTFIT: Readonly<Outfit> = {
   boots: '#4d525b',
   mittens: '#3a3f47',
   headwear: 'helmet',
+  ski: 'park',
+  skiGraphic: 'park-lime',
 };
 
 const KEY = 'outfit.v1';
@@ -87,6 +91,11 @@ export function loadOutfit(): Outfit {
   }
   const hw = saved.headwear;
   if (HEADWEAR.some((h) => h.id === hw)) out.headwear = hw as Headwear;
+  const ski = SKI_TYPES.find((s) => s.id === saved.ski);
+  if (ski) {
+    out.ski = ski.id;
+    out.skiGraphic = skiGraphic(ski.id, typeof saved.skiGraphic === 'string' ? saved.skiGraphic : '').id;
+  }
   return out;
 }
 

@@ -176,6 +176,9 @@ export function mountTuningPanel(actions: PanelActions): TuningPanel {
   carve.add(s, 'carveSlipMax', 0.1, 1.5, 0.01);
   carve.add(s, 'skidFriction', 0, 2, 0.01);
   carve.add(s, 'edgeHold', 0, 2, 0.01);
+  carve.add(s, 'switchGrip', 0, 2, 0.01);
+  carve.add(s, 'switchEdgeHold', 0, 2, 0.01);
+  carve.add(s, 'switchSpeed', 0.1, 10, 0.1);
   carve.add(s, 'turnRateSlow', 0.2, 6, 0.05);
   carve.add(s, 'turnRateFast', 0.2, 6, 0.05);
   carve.add(s, 'turnSpeedRef', 1, 40, 0.5);
@@ -250,6 +253,16 @@ export function mountTuningPanel(actions: PanelActions): TuningPanel {
   bail.add(b, 'respawnDelay', 0, 5, 0.1);
   bail.add(b, 'fadeTime', 0.05, 2, 0.05);
   bail.close();
+
+  // Each ski's multipliers (config.ts's skis block); the ski in use rides on them at once.
+  const skis = gui.addFolder('Skis (multipliers)');
+  for (const [id, scale] of Object.entries(CONFIG.skis)) {
+    const blocks = Object.entries(scale as Record<string, Record<string, number>>);
+    if (blocks.length === 0) continue;
+    const f = skis.addFolder(id);
+    for (const [block, keys] of blocks) for (const key of Object.keys(keys)) f.add(keys, key, 0, 3, 0.01).name(`${block}.${key}`);
+  }
+  skis.close();
 
   const look = gui.addFolder('Skier look');
   const r = CONFIG.render;

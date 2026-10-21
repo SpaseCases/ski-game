@@ -38,6 +38,15 @@ export const CONFIG = {
     skidFriction: 0.75,
     /** How much sideways pull from the slope the edges hold before slipping, as a multiple of normal load. */
     edgeHold: 0.9,
+    /**
+     * Riding switch (backwards), grip and edgeHold are multiplied by these:
+     * 1 here, so switch rides like forwards; a ski can lower them (see
+     * `skis`). They take full effect once the skis slide backwards at
+     * switchSpeed m/s, fading in from 0, so a hockey stop isn't switch.
+     */
+    switchGrip: 1,
+    switchEdgeHold: 1,
+    switchSpeed: 3,
 
     /** Ski turn rate (rad/s) when stopped and at turnSpeedRef or faster. */
     turnRateSlow: 2.3,
@@ -441,6 +450,42 @@ export const CONFIG = {
     turboSpins: { air: { spinRate: 2, flipRate: 2, lincolnRate: 2, rotateAccel: 2 } },
   },
 
+  /**
+   * Skis (the Locker): the ski in use multiplies these numbers in their
+   * blocks above, before any cheat (see sim/tuning.ts). The park ski's are
+   * all 1, so it rides exactly as the maps were tuned for. Every ski is the
+   * same length to the physics; only the model's looks differ.
+   */
+  skis: {
+    park: {},
+    /** Bigger drops and forgiving landings; slower spins, flips and Lincoln loops (a 720 still fits the 720 jumps). */
+    big: {
+      landing: { impactMax: 1.3, pitchMax: 1.35 },
+      air: { spinRate: 0.85, flipRate: 0.85, lincolnRate: 0.85 },
+    },
+    /**
+     * Holds an edge at speed, keeps speed through turns, turns sharper when
+     * fast, and a higher top speed (less friction and drag); stiff landings,
+     * slower spins, and twitchy riding switch: less grip and edge hold going
+     * backwards, so it skids out and slips down the hill more easily.
+     */
+    carving: {
+      skier: {
+        grip: 1.3,
+        carveFriction: 0.5,
+        turnRateFast: 1.3,
+        skiFriction: 0.8,
+        dragStand: 0.9,
+        dragCrouch: 0.9,
+        dragAir: 0.9,
+        switchGrip: 0.6,
+        switchEdgeHold: 0.6,
+      },
+      landing: { impactMax: 0.85, pitchMax: 0.75 },
+      air: { spinRate: 0.8, flipRate: 0.8, lincolnRate: 0.8 },
+    },
+  },
+
   /** The Locker's live preview of the skier. */
   locker: {
     /** How fast it turns (rad/s). */
@@ -452,6 +497,16 @@ export const CONFIG = {
     rise: 0.55,
     /** Where the title's stage camera stands (rad from straight in front; < 0 is the skier's right). */
     stageAngle: -0.35,
+    /**
+     * On the Skis tab the camera looks down at the skis: the aim's height
+     * above the feet, half the length (m) kept in view, and how steeply it
+     * looks down (radians).
+     */
+    skiAim: 0.1,
+    skiHalfLength: 1.15,
+    skiPitch: 0.9,
+    /** Stat bars: the park ski fills half; each 0.1 a ski's stat is over or under 1 moves the bar this share of 0.1. */
+    statGain: 1.4,
   },
 
   debug: {
