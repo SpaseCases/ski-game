@@ -39,8 +39,6 @@ import type { PoseDef, Vec3 } from './skierPoses.ts';
 // only the parts it touches (setOutfit), never per frame.
 
 const FIXED = {
-  gaiter: '#1b1d21',
-  gaiterSeam: '#2a2d33',
   vent: '#0e0f12',
   /** What a mirrored lens reflects: its top half takes a little of the sky's blue. */
   lensSky: '#9fc3e6',
@@ -205,7 +203,7 @@ export class SkierRig {
       this.feet.forEach((m, i) => swap([m], buildFoot(i === 0 ? -1 : 1, c.boots, ski)));
       ski.dispose();
     }
-    if (changed('helmet', 'goggleFrame', 'goggleLens', 'goggleStrap', 'headwear')) {
+    if (changed('helmet', 'goggleFrame', 'goggleLens', 'goggleStrap', 'gaiter', 'headwear')) {
       swap([this.head], buildHead(next));
       this.setHeadwear();
     }
@@ -805,18 +803,19 @@ function smooth01(t: number): number {
  * jack-o'-lantern replaces the helmet and goggles with a whole pumpkin.
  */
 function buildHead(o: Outfit): BufferGeometry {
-  if (o.headwear === 'pumpkin') return merge([...buildGaiter(), ...buildPumpkin(), buildCarvedFace(true)]);
+  const gaiter = new Color(o.gaiter);
+  if (o.headwear === 'pumpkin') return merge([...buildGaiter(gaiter), ...buildPumpkin(), buildCarvedFace(true)]);
   return merge([
     // Head under everything, in case any gap shows.
-    paint(new SphereGeometry(0.105, 16, 12).scale(1, 1.08, 1.1).translate(0, 0.2, 0), FIXED.gaiter),
-    ...buildGaiter(),
+    paint(new SphereGeometry(0.105, 16, 12).scale(1, 1.08, 1.1).translate(0, 0.2, 0), gaiter),
+    ...buildGaiter(gaiter),
     ...buildHelmet(new Color(o.helmet), o.goggleStrap),
     ...buildGoggles(o.goggleFrame, new Color(o.goggleLens)),
   ]);
 }
 
 /** Neck gaiter pulled up over the chin and nose, following the jaw, tucked under the goggles and helmet. */
-function buildGaiter(): BufferGeometry[] {
+function buildGaiter(color: Color): BufferGeometry[] {
   const profile = [
     [0.074, -0.02],
     [0.078, 0.02],
@@ -828,11 +827,13 @@ function buildGaiter(): BufferGeometry[] {
     [0.097, 0.205],
   ].map(([r, y]) => new Vector2(r, y));
   const face = (g: BufferGeometry): BufferGeometry => g.scale(1, 1, 1.13).translate(0, 0, -0.006);
+  // The hemmed seam round the neck: a little lighter on a dark gaiter, a little darker on a light one.
+  const seam = color.getHSL({ h: 0, s: 0, l: 0 }).l < 0.25 ? color.clone().lerp(new Color('#ffffff'), 0.08) : shade(color, 0.82);
   return [
-    paint(face(new LatheGeometry(profile, 18)), FIXED.gaiter),
-    paint(face(prism(0.0835, 0.0875, 0.012, 18).translate(0, 0.048, 0)), FIXED.gaiterSeam),
+    paint(face(new LatheGeometry(profile, 18)), color),
+    paint(face(prism(0.0835, 0.0875, 0.012, 18).translate(0, 0.048, 0)), seam),
     // Nose under the fabric, just below the goggles.
-    paint(new IcosahedronGeometry(0.028, 0).scale(0.7, 0.9, 0.85).translate(0, 0.166, -0.118), FIXED.gaiter),
+    paint(new IcosahedronGeometry(0.028, 0).scale(0.7, 0.9, 0.85).translate(0, 0.166, -0.118), color),
   ];
 }
 
