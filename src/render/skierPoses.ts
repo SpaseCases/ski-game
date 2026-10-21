@@ -94,12 +94,6 @@ export const CROUCH: PoseDef = {
   ],
 };
 
-/**
- * Speed tuck: low, chest down, hands together out in front. The poles sweep
- * back past the outside of the body, under the arms and clear of the hips,
- * their baskets a little higher than the grips (tools/model/clearance.ts
- * checks that they don't pass through the body).
- */
 export const TUCK: PoseDef = {
   pelvis: [0, 0.64, 0.25],
   pelvisPitch: 0.62,
@@ -107,8 +101,8 @@ export const TUCK: PoseDef = {
   headPitch: -1.05,
   feet: SNOW_FEET,
   hands: [
-    { at: [-0.18, 0.76, -0.44], pole: [-0.37, 0.14, 0.92], elbow: [-0.3, -1, 0.1] },
-    { at: [0.18, 0.76, -0.44], pole: [0.37, 0.14, 0.92], elbow: [0.3, -1, 0.1] },
+    { at: [-0.1, 0.76, -0.44], pole: [-0.08, -0.05, 1], elbow: [-0.3, -1, 0.1] },
+    { at: [0.1, 0.76, -0.44], pole: [0.08, -0.05, 1], elbow: [0.3, -1, 0.1] },
   ],
 };
 
