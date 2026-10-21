@@ -415,10 +415,24 @@ export const CONFIG = {
     lowGravity: { skier: { gravity: 0.4 } },
     /**
      * A much higher top speed: less ski friction and air drag (riding and
-     * flying), and a stronger, faster-reaching pole push. Gravity stays, so
-     * it still works with Low gravity.
+     * flying), and a much stronger pole push: each push adds more speed, it
+     * keeps helping up to a higher speed, and the pushes come quicker (plant,
+     * stroke and the whole cycle all shorter). Gravity stays, so it still
+     * works with Low gravity.
      */
-    superFast: { skier: { skiFriction: 0.3, dragStand: 0.4, dragCrouch: 0.4, dragAir: 0.4, poleMaxSpeed: 2, polePushSpeed: 1.5 } },
+    superFast: {
+      skier: {
+        skiFriction: 0.3,
+        dragStand: 0.4,
+        dragCrouch: 0.4,
+        dragAir: 0.4,
+        polePushSpeed: 2,
+        poleMaxSpeed: 2.5,
+        polePlantTime: 0.6,
+        polePushTime: 0.6,
+        polePushInterval: 0.6,
+      },
+    },
     /** Pops launch far higher. */
     moonJump: { skier: { popMin: 2.5, popMax: 2.5 } },
     /** The whole game runs slower, so tricks are easier to time. */

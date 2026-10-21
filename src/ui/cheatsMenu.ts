@@ -7,7 +7,7 @@ import { addBackButton, board, setHints, type Screen } from './menus.ts';
 
 const CHEAT_TEXT: readonly (readonly [CheatId, string, string])[] = [
   ['lowGravity', 'Low gravity', 'Long, floaty airs.'],
-  ['superFast', 'Super fast', 'A much higher top speed: less friction and drag, a stronger pole push.'],
+  ['superFast', 'Super fast', 'A much higher top speed: less friction and drag, and quicker, stronger pole pushes.'],
   ['moonJump', 'Moon jump', 'Pops launch far higher.'],
   ['slowMotion', 'Slow motion', 'The whole game runs at half speed, so tricks are easier to time.'],
   ['noCrashes', 'No crashes', 'Every landing rides away. Trees and rails only stop you.'],

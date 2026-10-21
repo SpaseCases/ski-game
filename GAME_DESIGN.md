@@ -144,7 +144,7 @@ Three ski types, each with its own model, 3 to 4 top sheet graphics to pick from
 ## Cheats
 - A Cheats screen, reached from the title and pause menus, with toggles that combine freely:
   - **Low gravity:** gravity scaled down, for long floaty airs.
-  - **Super fast:** a much higher top speed (less friction and drag, a stronger pole push). Everything else runs at normal speed.
+  - **Super fast:** a much higher top speed (less friction and drag), and quicker, stronger pole pushes that keep helping up to a higher speed. Everything else runs at normal speed.
   - **Moon jump:** pops launch far higher.
   - **Slow motion:** the whole game runs slower (the time fed to the fixed-step loop is scaled), so tricks are easier to time.
   - **No crashes:** every landing rides away, however bad: the skier is set upright on the snow instead of bailing. Hitting an obstacle stops you without a crash.
@@ -272,5 +272,5 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - Air: `wallAngle` 50 → 44 (takeoff faces never count as walls); new `wallPop` 0.4, `wallLaunchMax` 9 m/s.
 - Slalom gates: `kick` 0.25 → 0.6, new `grazeWidth` 0.2; new `giantSlalom` block (`clipReach` 0.42, `kick` 0.45, `stiffness` 40, `damping` 6, `maxBend` 1.15).
 - Quality: `viewDistance` 240 / 450 / 800 m, `treeDetail` 220 m, `hazeEnd` 240 / 3200 / 6000 m.
-- New in 6b: `sim.timeScale` 1, and the `cheats` block (Low gravity × 0.4 gravity; Super fast × 0.3 ski friction, × 0.4 all three drags, × 2 pole max speed, × 1.5 pole push; Moon jump × 2.5 pop; Slow motion × 0.5 time; Turbo spins × 2 spin, flip and Lincoln rates and rotateAccel), still to tune by feel.
+- New in 6b: `sim.timeScale` 1, and the `cheats` block (Low gravity × 0.4 gravity; Super fast × 0.3 ski friction, × 0.4 all three drags, × 2 pole push, × 2.5 pole max speed, × 0.6 pole plant, stroke and interval; Moon jump × 2.5 pop; Slow motion × 0.5 time; Turbo spins × 2 spin, flip and Lincoln rates and rotateAccel), still to tune by feel.
 - Still untuned: rail values, checkpoint timings, curve load, rough landings, decoration density.
