@@ -5,10 +5,10 @@ import type { MeshKit } from './meshKit.ts';
 // glyph is a few polylines on a 4 × 6 grid, capitals and digits only.
 // Lower case is drawn as capitals.
 
-type Stroke = readonly (readonly [number, number])[];
+export type Stroke = readonly (readonly [number, number])[];
 const O: Stroke = [[1, 0], [0, 1], [0, 5], [1, 6], [3, 6], [4, 5], [4, 1], [3, 0], [1, 0]];
 const P: Stroke = [[0, 0], [0, 6], [3, 6], [4, 5], [4, 4], [3, 3], [0, 3]];
-const GLYPHS: Record<string, readonly Stroke[]> = {
+export const GLYPHS: Record<string, readonly Stroke[]> = {
   A: [[[0, 0], [0, 4], [2, 6], [4, 4], [4, 0]], [[0, 3], [4, 3]]],
   B: [[[0, 0], [0, 6], [3, 6], [4, 5], [4, 4], [3, 3], [0, 3]], [[3, 3], [4, 2], [4, 1], [3, 0], [0, 0]]],
   C: [[[4, 5], [3, 6], [1, 6], [0, 5], [0, 1], [1, 0], [3, 0], [4, 1]]],
@@ -53,8 +53,8 @@ const GLYPHS: Record<string, readonly Stroke[]> = {
   '&': [[[4, 0], [1, 5], [2, 6], [3, 5], [0, 2], [0, 1], [1, 0], [3, 0], [4, 2]]],
 };
 /** Grid units per character (4 wide plus a gap), and per line of capitals. */
-const ADVANCE = 5.6;
-const CAP = 6;
+export const ADVANCE = 5.6;
+export const CAP = 6;
 
 /** Width (m) of `text` drawn with capitals `size` m tall. */
 export function textWidth(text: string, size: number): number {

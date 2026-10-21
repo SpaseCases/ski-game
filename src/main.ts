@@ -1,9 +1,9 @@
 import './style.css';
 import { Vector3 } from 'three';
-import { createInputState, DEFAULT_BINDINGS, Keyboard } from './core/input.ts';
+import { createInputState, Keyboard, type Bindings } from './core/input.ts';
 import { startLoop } from './core/loop.ts';
 import { PointerOrbit } from './core/pointerOrbit.ts';
-import { decorDensity, loadQuality, saveQuality, viewRange, type Quality } from './core/settings.ts';
+import { decorDensity, loadSettings, saveSettings, urlQuality, viewRange, type Quality } from './core/settings.ts';
 import { readStored, writeStored } from './core/storage.ts';
 import { buildMap, type BuiltMap } from './maps/build.ts';
 import { parseMap } from './maps/loader.ts';
@@ -29,8 +29,14 @@ import type { DevPanel } from './ui/devPanel.ts';
 import { mountWindowButtons } from './ui/embed.ts';
 import { Fader } from './ui/fade.ts';
 import { mountFpsMeter } from './ui/fps.ts';
-import { mountControlsHint, mountCrashHint, mountFocusHint } from './ui/hints.ts';
+import { mountCrashHint, mountFocusHint } from './ui/hints.ts';
+import { ControlsScreen } from './ui/controlsMenu.ts';
+import { mainKey } from './ui/keyNames.ts';
+import { PauseScreen, TitleScreen } from './ui/mainMenus.ts';
 import { MapSelect } from './ui/mapSelect.ts';
+import { Menus, type Screen } from './ui/menus.ts';
+import { SettingsScreen } from './ui/settingsMenu.ts';
+import { titleArt } from './ui/titleArt.ts';
 import { formatTime, missedText, RaceHud } from './ui/raceHud.ts';
 import { RunHud } from './ui/runHud.ts';
 import { Toast } from './ui/toast.ts';
@@ -38,7 +44,9 @@ import { TrailMap } from './ui/trailMap.ts';
 
 const app = byId('app');
 const hud = byId('hud');
-let quality: Quality = loadQuality();
+const settings = loadSettings();
+/** The preset in use: the saved one, unless the URL names one for this visit. */
+let quality: Quality = urlQuality() ?? settings.quality;
 
 let view: View;
 try {
@@ -51,7 +59,6 @@ try {
 const { renderer, scene, camera } = view;
 
 const windowBar = mountWindowButtons(hud);
-mountControlsHint(hud);
 mountFocusHint(hud);
 const fps = mountFpsMeter(hud);
 const crashHint = mountCrashHint(hud);
@@ -59,23 +66,57 @@ const fader = new Fader(hud);
 const toast = new Toast(hud);
 const raceHud = new RaceHud(hud);
 const runHud = new RunHud(hud, backToTop);
-const menu = new MapSelect(hud, (entry) => void loadMap(entry), closeMenu);
 const trailMap = new TrailMap(hud, closeTrailMap);
-const mapsButton = document.createElement('button');
-mapsButton.type = 'button';
-mapsButton.className = 'hud-button';
-mapsButton.innerHTML = 'Maps <kbd>Esc</kbd>';
-mapsButton.addEventListener('click', openMenu);
-const trailButton = document.createElement('button');
-trailButton.type = 'button';
-trailButton.className = 'hud-button';
-trailButton.innerHTML = 'Trail map <kbd>M</kbd>';
-trailButton.addEventListener('click', openTrailMap);
-windowBar.prepend(trailButton, mapsButton);
+const keyboard = new Keyboard(settings.bindings);
+keyboard.attach(window);
+
+// The menus: the title before any map is loaded, the pause menu while riding,
+// and the screens they open. The game waits while any is open.
+const menus = new Menus(hud, onRootBack, onGameKey, () => [...windowBar.querySelectorAll<HTMLElement>('a, button')]);
+menus.scenery.innerHTML = titleArt();
+const titleScreen = new TitleScreen({ play: openMapSelect, settings: openSettings, controls: openControls });
+const pauseScreen = new PauseScreen({
+  resume: closeMenus,
+  respawn: () => {
+    closeMenus();
+    respawn();
+  },
+  backToTop: () => {
+    closeMenus();
+    backToTop();
+  },
+  maps: openMapSelect,
+  settings: openSettings,
+  controls: openControls,
+});
+const mapSelect = new MapSelect((entry) => void loadMap(entry), () => menus.back());
+const settingsScreen = new SettingsScreen(
+  {
+    get: () => ({ ...settings, quality }),
+    setQuality,
+    setSound: (master, sfx, muted) => {
+      settings.masterVolume = master;
+      settings.sfxVolume = sfx;
+      settings.muted = muted;
+      saveSettings(settings);
+    },
+    setBindings,
+    trapNextKey: (fn) => menus.trapNextKey(fn),
+  },
+  () => menus.back(),
+);
+const controlsScreen = new ControlsScreen(() => settings.bindings, () => menus.back());
+for (const screen of [titleScreen, pauseScreen, mapSelect, settingsScreen, controlsScreen]) menus.add(screen);
+
+// HUD buttons for the mouse, beside the window buttons; hidden while a menu is open.
+/** Under a finished timed run's result: the respawn key races the course again. */
+let raceAgainHint = '';
+const pauseButton = hudButton('Pause', openPause);
+const trailButton = hudButton('Trail map', openTrailMap);
+windowBar.prepend(trailButton, pauseButton);
+syncKeyLabels();
 
 // Simulation state: the current step and the one before it, for interpolation.
-const keyboard = new Keyboard(DEFAULT_BINDINGS);
-keyboard.attach(window);
 const keys = createInputState();
 const skier = createSkierState();
 const skierPrev = createSkierState();
@@ -145,10 +186,10 @@ function backToTop(): void {
 async function loadMap(entry: MapEntry): Promise<void> {
   if (!entry.load) return;
   if (level?.id === entry.id) {
-    closeMenu();
+    closeMenus();
     return;
   }
-  menu.setLoading(entry.id);
+  mapSelect.setLoading(entry.id);
   try {
     const map = parseMap(await entry.load());
     await nextPaint();
@@ -171,24 +212,54 @@ async function loadMap(entry: MapEntry): Promise<void> {
     writeStored('map', entry.id);
     devPanel?.setMap(map);
     backToTop();
-    menu.setLoading(null);
-    closeMenu();
+    mapSelect.setLoading(null);
+    closeMenus();
   } catch (err) {
     console.error(err);
-    menu.setError(`Couldn't load ${entry.name}. Try again, or pick another map.`);
+    mapSelect.setError(`Couldn't load ${entry.name}. Try again, or pick another map.`);
   }
 }
 
-/** Opens the map-select menu; the game waits behind it. */
-function openMenu(): void {
-  trailMap.close();
+/** The title, over the painted mountain: where the game starts. */
+function openTitle(): void {
   keyboard.setEnabled(false);
-  menu.open(level?.id ?? null, (mapEntry(readStored('map'))?.id ?? MAPS[0]!.id) as MapId);
+  menus.setScenery(true);
+  menus.open(titleScreen);
 }
 
-function closeMenu(): void {
+/** The pause menu (Esc, the pause key, or the HUD button); the game waits behind it. */
+function openPause(): void {
   if (!level) return;
-  menu.close();
+  trailMap.close();
+  keyboard.setEnabled(false);
+  const b = settings.bindings;
+  pauseScreen.setInfo(mapEntry(level.id)?.name ?? '', mainKey(b, 'pause'), mainKey(b, 'respawn'), (code) => keyboard.isBound('pause', code));
+  menus.setScenery(false);
+  menus.open(pauseScreen);
+}
+
+function openMapSelect(): void {
+  mapSelect.prepare(level?.id ?? null, (mapEntry(readStored('map'))?.id ?? MAPS[0]!.id) as MapId);
+  menus.push(mapSelect);
+}
+
+function openSettings(): void {
+  menus.push(settingsScreen);
+}
+
+function openControls(): void {
+  menus.push(controlsScreen);
+}
+
+/** Esc on the bottom screen: the pause menu resumes; the title stays (there's nothing to go back to). */
+function onRootBack(screen: Screen): void {
+  if (screen === pauseScreen) closeMenus();
+}
+
+/** Back to riding. */
+function closeMenus(): void {
+  if (!level) return;
+  menus.close();
   keyboard.setEnabled(true);
   keyboard.sample(keys);
   holdTime = 0;
@@ -196,7 +267,7 @@ function closeMenu(): void {
 
 /** Opens the trail map of the map being ridden; the game waits behind it. */
 function openTrailMap(): void {
-  if (!level || menu.isOpen) return;
+  if (!level || menus.isOpen) return;
   keyboard.setEnabled(false);
   trailMap.open(level.built, skier.position, skier.yaw, level.run.passed);
 }
@@ -209,23 +280,47 @@ function closeTrailMap(): void {
   holdTime = 0;
 }
 
-window.addEventListener('keydown', (e) => {
+/** A key pressed while no menu is open (the menus see it first, in Menus). */
+function onGameKey(e: KeyboardEvent): void {
+  // Riding, Tab never moves focus: it's the checkpoint key (or was, before rebinding).
+  if (e.key === 'Tab') e.preventDefault();
   if (e.repeat) return;
-  // While the trail map is open, its key or Esc closes it (game keys are off then).
+  const pauseKey = e.key === 'Escape' || keyboard.isBound('pause', e.code);
+  // While the trail map is open, its key or Esc closes it (game keys are off then); the pause key pauses.
   if (trailMap.isOpen && (e.key === 'Escape' || keyboard.isBound('trailMap', e.code))) {
     e.preventDefault();
     closeTrailMap();
     return;
   }
-  if (e.key !== 'Escape') return;
-  if (!menu.isOpen) openMenu();
-  else if (menu.canGoBack) closeMenu();
-});
+  if (pauseKey) {
+    e.preventDefault();
+    openPause();
+  }
+}
+
+/** New key bindings from Settings: used at once, saved, and shown on the HUD. */
+function setBindings(b: Bindings): void {
+  settings.bindings = b;
+  keyboard.setBindings(b);
+  saveSettings(settings);
+  syncKeyLabels();
+}
+
+/** HUD labels that name a key, as bound now. */
+function syncKeyLabels(): void {
+  const b = settings.bindings;
+  setButtonKey(pauseButton, mainKey(b, 'pause'));
+  setButtonKey(trailButton, mainKey(b, 'trailMap'));
+  crashHint.setKey(mainKey(b, 'respawn'));
+  runHud.setKeys(mainKey(b, 'confirm'), mainKey(b, 'respawn'));
+  raceAgainHint = `${mainKey(b, 'respawn')}: race it again`;
+}
 
 /** Switches to a quality preset (and remembers it): view range and decoration. */
 function setQuality(q: Quality): void {
   quality = q;
-  saveQuality(q);
+  settings.quality = q;
+  saveSettings(settings);
   applyView();
   level?.world.setQuality(decorDensity(q), viewRange(q).far);
 }
@@ -300,14 +395,19 @@ if (import.meta.env.DEV) {
   });
 }
 
-// Start on the map menu, or straight on a map named in the URL (?map=park).
+// Start on the title, or straight on a map named in the URL (?map=park).
 const fromUrl = mapEntry(new URLSearchParams(window.location.search).get('map'));
-openMenu();
+openTitle();
 if (fromUrl?.load) void loadMap(fromUrl);
+
+/** True while the game waits: no map yet, or a menu or the trail map is open. Nothing moves then. */
+function gameWaits(): boolean {
+  return !level || menus.isOpen || trailMap.isOpen;
+}
 
 startLoop(
   (dt) => {
-    if (!level || menu.isOpen || trailMap.isOpen) return;
+    if (!level) return;
     const { built, run, race } = level;
     keyboard.sample(keys);
     if (keys.trailMap.pressed) {
@@ -358,7 +458,9 @@ startLoop(
     // After a crash, let the tumble play out, then fade and respawn.
     if (skier.bailed && skier.bailTime >= CONFIG.bail.respawnDelay && !fader.busy) fader.fadeOut(respawn);
   },
-  (alpha, frameTime) => {
+  (alpha, realFrameTime) => {
+    // While the game waits, everything that moves by time holds still too.
+    const frameTime = gameWaits() ? 0 : realFrameTime;
     if (level && skierView && chase) {
       interpolateSkier(pose, skierPrev, skier, alpha);
       const snapped = snapView;
@@ -388,11 +490,31 @@ startLoop(
     raceHud.update(course !== undefined, course?.name ?? '', race?.time ?? 0, race?.missed ?? 0);
     const finished = level?.run.finished ?? false;
     const result = finished && race?.finished ? `${course?.name ?? ''} · ${formatTime(race.time)} · ${missedText(race.missed)}` : '';
-    runHud.update(finished, result, result === '' ? '' : 'R: race it again', heldToTop ? 0 : holdTime);
-    fps.frame(frameTime);
+    runHud.update(finished, result, result === '' ? '' : raceAgainHint, heldToTop ? 0 : holdTime);
+    fps.frame(realFrameTime);
     devPanel?.update(pose, skier);
   },
+  gameWaits,
 );
+
+function hudButton(label: string, onClick: () => void): HTMLButtonElement {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'hud-button ride-only';
+  b.dataset.label = label;
+  b.addEventListener('click', () => {
+    b.blur();
+    onClick();
+  });
+  return b;
+}
+
+/** A HUD button's label with its key after it. */
+function setButtonKey(b: HTMLButtonElement, key: string): void {
+  const kbd = document.createElement('kbd');
+  kbd.textContent = key;
+  b.replaceChildren(document.createTextNode(b.dataset.label ?? ''), kbd);
+}
 
 /** Resolves after the browser has painted, so a status shown just before is on screen during long work. */
 function nextPaint(): Promise<void> {

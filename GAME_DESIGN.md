@@ -248,11 +248,14 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 
 ## Status (2026-10-20)
 
-**Done:** milestones 0 to 5e: scaffold and deploy, skiing, air, rails and boxes, checkpoints, map features, map select, and the Park, Freeride, Slalom and Big air maps, all pushed and live. **Next:** 6a, menus. Milestone 6 is split into 6a to 6f (menus, cheats, Locker, skis, snow effects, weather). Milestone 9 (Brundage Mountain) is planned, not started.
+**Done:** milestones 0 to 5e (scaffold and deploy, skiing, air, rails and boxes, checkpoints, map features, map select, and the Park, Freeride, Slalom and Big air maps), pushed and live; 6a, menus, committed. 6a added the title (a trail sign over a painted mountain), the finished map select (each card has an empty options row for 6f's weather), Settings (quality applied live, volume and mute saved for milestone 7, every key rebindable with two slots per action, swaps on a taken key, reset), Controls built from the bindings, and the pause menu (Esc or P, both rebindable apart from Esc), which freezes the sim and every time-based animation. Settings save under `parkLaps.settings.v1` (the old `quality` key is read once). Menus live in `src/ui/menus.ts` (screen stack and all keyboard routing); later screens add planks with `addItem`. **Next:** 6b, cheats. Milestone 9 (Brundage Mountain) is planned, not started.
 
 **Known issues**
 - Not tested on a real school Chromebook. With the CPU slowed 4×, Low takes ~1.6 to 3 ms of CPU per frame (42 to ~115 draw calls); a jump to a new spot spikes one frame to 30 to 50 ms. GPU cost unmeasured.
-- Until milestone 6a, quality comes from `?quality=low|medium|high` and Esc opens the map menu. Auto sees as far as Medium.
+- Auto is the same as Medium until milestone 8's frame-rate scaling. `?quality=` still overrides the saved preset for a visit.
+- With the CPU slowed 4×, the first time Settings or Controls opens costs one ~60 / ~30 ms frame (layout), while the game is already paused; later opens and pausing or resuming cost 6 to 18 ms. Riding on Low is unchanged (~1.6 ms per frame).
+- Key names follow key positions on a US keyboard (bindings use `KeyboardEvent.code`).
+- Volume and mute are saved but nothing plays until milestone 7.
 - Far forests show as flat dark facets past the far plane (Freeride; the Slalom on Medium); far stand-in trees are plain cones.
 - Park: huge jumps sized for tucking from their flag; the long rail has no brake.
 - Freeride: couloirs reach ~36 m/s; the camera can't see past a convex rollover; trail map labels crowd.

@@ -1,25 +1,15 @@
-/** Key reminder until the Controls menu exists. */
-export function mountControlsHint(hud: HTMLElement): void {
-  const el = document.createElement('div');
-  el.className = 'controls-hint';
-  el.innerText =
-    '← → turn · hold ↑ crouch, release to pop · ↓ brake · Shift pole push · drag to look around\n' +
-    'Tab set checkpoint · R back to checkpoint (hold 1 s: back to top) · M trail map\n' +
-    'In the air: ← → spin · ↑ ↓ flip · Q E Lincoln loop · grabs A S D F (left hand) Z X C V (right hand)\n' +
-    'On a rail or box (land on it): ← → turn the skis · hold and release ↑ to pop off';
-  hud.appendChild(el);
-}
-
-/** "Crashed" notice shown while the skier tumbles. */
-export function mountCrashHint(hud: HTMLElement): { show(visible: boolean): void } {
+/** "Crashed" notice shown while the skier tumbles, naming the respawn key. */
+export function mountCrashHint(hud: HTMLElement): { show(visible: boolean): void; setKey(key: string): void } {
   const el = document.createElement('div');
   el.className = 'crash-hint';
-  el.textContent = 'Crashed! Press R to skip';
   el.hidden = true;
   hud.appendChild(el);
   return {
     show(visible: boolean): void {
       if (el.hidden === visible) el.hidden = !visible;
+    },
+    setKey(key: string): void {
+      el.textContent = `Crashed! Press ${key} to skip`;
     },
   };
 }

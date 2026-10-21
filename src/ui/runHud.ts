@@ -10,6 +10,8 @@ export class RunHud {
   private readonly hint: HTMLElement;
   private readonly hold: HTMLElement;
   private readonly holdFill: HTMLElement;
+  private readonly holdLabel: HTMLElement;
+  private readonly button: HTMLButtonElement;
   private holdShown = -1;
 
   constructor(hud: HTMLElement, onBackToTop: () => void) {
@@ -23,9 +25,9 @@ export class RunHud {
     this.detail.className = 'finish-detail';
     this.detail.hidden = true;
     const button = document.createElement('button');
+    this.button = button;
     button.type = 'button';
     button.className = 'hud-button finish-button';
-    button.innerHTML = 'Back to top <kbd>Enter</kbd>';
     button.addEventListener('click', () => {
       button.blur();
       onBackToTop();
@@ -40,7 +42,7 @@ export class RunHud {
     this.hold.className = 'hold-top';
     this.hold.hidden = true;
     const label = document.createElement('div');
-    label.textContent = 'Keep holding R: back to top';
+    this.holdLabel = label;
     const track = document.createElement('div');
     track.className = 'hold-track';
     this.holdFill = document.createElement('div');
@@ -48,6 +50,16 @@ export class RunHud {
     track.appendChild(this.holdFill);
     this.hold.append(label, track);
     hud.appendChild(this.hold);
+    this.setKeys('Enter', 'R');
+  }
+
+  /** The keys as bound now: Back to top at the finish (`confirm`) and respawn. */
+  setKeys(confirm: string, respawn: string): void {
+    this.button.replaceChildren(document.createTextNode('Back to top'));
+    const kbd = document.createElement('kbd');
+    kbd.textContent = confirm;
+    this.button.appendChild(kbd);
+    this.holdLabel.textContent = `Keep holding ${respawn}: back to top`;
   }
 
   /**

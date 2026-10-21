@@ -11,9 +11,11 @@ export type RenderFn = (alpha: number, frameTime: number) => void;
 
 /**
  * Fixed-timestep loop: the simulation runs at CONFIG.sim.stepHz no matter the
- * display rate, and rendering happens once per animation frame.
+ * display rate, and rendering happens once per animation frame. While
+ * `paused()` is true no step runs and no time builds up: the accumulator
+ * holds still, so the drawn frame (and its interpolation) stays put.
  */
-export function startLoop(step: StepFn, render: RenderFn): void {
+export function startLoop(step: StepFn, render: RenderFn, paused: () => boolean): void {
   const dt = 1 / CONFIG.sim.stepHz;
   let accumulator = 0;
   let last = -1;
@@ -26,7 +28,7 @@ export function startLoop(step: StepFn, render: RenderFn): void {
     last = now;
     if (frameTime > CONFIG.sim.maxFrameTime) frameTime = CONFIG.sim.maxFrameTime;
 
-    accumulator += frameTime;
+    if (!paused()) accumulator += frameTime;
     while (accumulator >= dt) {
       step(dt);
       accumulator -= dt;

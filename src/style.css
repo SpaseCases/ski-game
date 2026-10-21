@@ -58,15 +58,6 @@ body {
   font: 12px/1 ui-monospace, Consolas, monospace;
 }
 
-.controls-hint {
-  position: absolute;
-  right: 10px;
-  bottom: 6px;
-  color: rgb(20 32 48 / 0.75);
-  font-size: 12px;
-  text-align: right;
-}
-
 .focus-hint {
   position: absolute;
   top: 50%;
@@ -255,7 +246,26 @@ body {
   opacity: 0.85;
 }
 
-/* Map select (milestone 6 adds the other menus in the same style). */
+/*
+ * Menus (milestone 6a): trail-sign boards. Each screen is an enamel sign
+ * with a white keyline, its heading lettered in the trail signs' stroke
+ * font; choices are planks, and the focused plank turns into a white
+ * direction arrow with an orange edge. No backdrop blur or animated shadows
+ * (Chromebook GPUs).
+ */
+:root {
+  --enamel: #173352;
+  --enamel-deep: #0f243c;
+  --plank: #21466f;
+  --plank-hover: #2b5582;
+  --snow: #f4f8fc;
+  --frost: #a9c1dc;
+  --flag: #ff7a1a;
+  --ink: #142030;
+  --wood: #8a6440;
+  --wood-dark: #6c4c2f;
+}
+
 .menu {
   position: absolute;
   inset: 0;
@@ -264,12 +274,34 @@ body {
   /* Clear of the window buttons along the top. */
   padding: 58px 16px 16px;
   overflow-y: auto;
-  background: rgb(14 24 36 / 0.62);
+  background: rgb(10 20 33 / 0.55);
   pointer-events: auto;
 }
 
-.menu[hidden] {
+.menu[hidden],
+.menu-screen[hidden],
+.board-sub[hidden] {
   display: none;
+}
+
+.menu.is-painted {
+  background: #dce8f3;
+}
+
+.menu-scenery {
+  display: none;
+  position: fixed;
+  inset: 0;
+}
+
+.menu.is-painted .menu-scenery {
+  display: block;
+}
+
+.menu-scenery svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .window-buttons {
@@ -277,23 +309,629 @@ body {
 }
 
 .menu-open .focus-hint,
-.menu-open .controls-hint,
-/* The Trail map and Maps buttons; the open menu has its own way back. */
-.menu-open .window-buttons > :nth-child(-n + 2),
+.menu-open .ride-only,
 .menu-open .lil-gui.autoPlace {
   display: none;
 }
 
+.menu-screen {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  width: min(1080px, 100%);
+  /* Centered when it fits; when it doesn't, it starts at the top and scrolls. */
+  margin: auto;
+}
+
+.board {
+  position: relative;
+  padding: 22px 24px 18px;
+  border-radius: 6px;
+  background: var(--enamel);
+  color: var(--snow);
+  outline: 3px solid var(--snow);
+  outline-offset: -9px;
+}
+
+.board-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.board-title {
+  margin: 0;
+  line-height: 0;
+}
+
+.sign-text {
+  display: block;
+  height: 30px;
+  width: auto;
+  max-width: 100%;
+  color: var(--snow);
+}
+
+.board-sub {
+  margin: 12px 0 0;
+  max-width: 44ch;
+  color: var(--frost);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.board-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 18px;
+  color: var(--frost);
+  font-size: 13px;
+}
+
+.board-foot:empty {
+  display: none;
+}
+
+.hint .key {
+  margin-right: 3px;
+}
+
+.hint .key:last-of-type {
+  margin-right: 7px;
+}
+
+.board-status {
+  min-height: 1.4em;
+  margin: 12px 0 0;
+  color: var(--frost);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.board-status:empty {
+  display: none;
+}
+
+/* Keycaps: a key as it looks on the keyboard. */
+.key {
+  display: inline-block;
+  box-sizing: border-box;
+  min-width: 1.9em;
+  padding: 2px 6px 1px;
+  border-radius: 4px;
+  border-bottom: 3px solid #93a8c1;
+  background: #e8eef5;
+  color: var(--ink);
+  font: 700 12px/1.35 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Planks: the sign's choices. */
+.plank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plank,
+.board-back,
+.segment,
+.toggle,
+.key-slot {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.plank {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 50px;
+  padding: 10px 40px 10px 18px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--plank);
+  color: var(--snow);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.plank:hover {
+  background: var(--plank-hover);
+}
+
+.plank:focus {
+  outline: none;
+  background: var(--snow);
+  color: var(--ink);
+  box-shadow: inset 7px 0 0 var(--flag);
+  clip-path: polygon(0 0, calc(100% - 24px) 0, 100% 50%, calc(100% - 24px) 100%, 0 100%);
+}
+
+.plank-keys {
+  display: flex;
+  gap: 4px;
+}
+
+.plank:focus .key {
+  background: #dce5ef;
+}
+
+.plank-small {
+  width: auto;
+  min-height: 40px;
+  font-size: 15px;
+}
+
+.board-back {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px 7px 14px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--plank);
+  color: var(--snow);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.board-back:hover {
+  background: var(--plank-hover);
+}
+
+.board-back:focus,
+.segment:focus,
+.toggle:focus,
+.key-slot:focus,
+.slider:focus,
+.map-pick:focus {
+  outline: 3px solid var(--flag);
+  outline-offset: 2px;
+}
+
+/* Title and pause: a narrow signpost on the left, the mountain or the game beside it. */
+.title-screen,
+.pause-screen {
+  width: min(430px, 100%);
+  margin: auto auto auto max(0px, calc(7vw - 16px));
+}
+
+.title-screen {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  min-height: 100%;
+  /* The posts run down into the snow, to the bottom edge. */
+  margin-bottom: -16px;
+}
+
+.title-screen .board {
+  margin-top: auto;
+}
+
+/* Two wooden posts under the title board. */
+.title-screen::after {
+  content: '';
+  flex: 1 0 9vh;
+  margin: 0 56px;
+  background:
+    linear-gradient(90deg, var(--wood) 0 16px, var(--wood-dark) 16px 22px, transparent 22px) left / 22px 100% no-repeat,
+    linear-gradient(90deg, var(--wood) 0 16px, var(--wood-dark) 16px 22px, transparent 22px) right / 22px 100% no-repeat;
+}
+
+.title-screen .sign-text {
+  height: clamp(48px, 9vw, 76px);
+}
+
+/* Map select. */
+.map-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.map-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 5px;
+  background: var(--enamel-deep);
+}
+
+.map-pick {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--snow);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.map-pick:hover .map-name {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.map-pick:focus {
+  outline-width: 4px;
+  outline-offset: 0;
+}
+
+.map-pick[aria-disabled='true'] {
+  cursor: default;
+}
+
+.map-pick[aria-disabled='true'] .map-art,
+.map-pick[aria-disabled='true'] .map-text {
+  opacity: 0.45;
+}
+
+.map-art {
+  display: block;
+  aspect-ratio: 16 / 9;
+}
+
+.map-art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.map-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px 12px;
+}
+
+.map-name {
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.map-blurb {
+  color: var(--frost);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.map-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 9px;
+  border-radius: 3px;
+  background: var(--enamel-deep);
+  color: var(--snow);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.map-badge:empty {
+  display: none;
+}
+
+.map-pick.is-current .map-badge {
+  background: var(--snow);
+  color: var(--ink);
+}
+
+.map-pick.is-loading .map-badge::after {
+  content: 'Loading…';
+}
+
+.map-pick.is-loading .map-badge {
+  display: block;
+  background: var(--flag);
+  color: var(--ink);
+}
+
+/* Room for each card's options (6f: weather). */
+.map-options:empty {
+  display: none;
+}
+
+.map-options {
+  padding: 0 12px 12px;
+}
+
+/* Settings. */
+.settings-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.settings-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.settings-section h2 {
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--plank);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.setting-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.setting-label {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.setting-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.setting-note {
+  margin: 6px 0 0;
+  color: var(--frost);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.segmented {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+}
+
+.segment,
+.toggle {
+  flex: 1;
+  min-height: 38px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--plank);
+  color: var(--snow);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.toggle {
+  flex: none;
+  min-width: 72px;
+}
+
+.segment:hover,
+.toggle:hover {
+  background: var(--plank-hover);
+}
+
+.segment[aria-pressed='true'] {
+  background: var(--snow);
+  color: var(--ink);
+}
+
+.toggle[aria-pressed='true'] {
+  background: var(--flag);
+  color: var(--ink);
+}
+
+.slider {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--flag);
+}
+
+.slider-value {
+  min-width: 3.2em;
+  color: var(--frost);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.keys-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.keys-table thead th {
+  padding: 0 4px 6px;
+  color: var(--frost);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.keys-table tbody th {
+  padding: 3px 8px 3px 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.keys-table td {
+  padding: 3px 4px;
+}
+
+.keys-table .keys-group th {
+  padding: 12px 0 4px;
+  color: var(--frost);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.key-slot {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 92px;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 3px;
+  border-bottom: 3px solid var(--enamel-deep);
+  background: var(--plank);
+  color: var(--snow);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.key-slot:hover {
+  background: var(--plank-hover);
+}
+
+.key-slot.is-empty {
+  color: var(--frost);
+  font-weight: 600;
+}
+
+.key-slot.is-listening {
+  background: var(--flag);
+  color: var(--ink);
+}
+
+.keys-section .plank-small {
+  margin-top: 14px;
+}
+
+/* Controls. */
+.controls-table {
+  width: 100%;
+  min-width: 620px;
+  margin-bottom: 22px;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.grabs-table {
+  min-width: 420px;
+}
+
+.controls-table caption {
+  margin-bottom: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.controls-table th,
+.controls-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid rgb(244 248 252 / 0.12);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.controls-table thead th {
+  color: var(--frost);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.controls-table .keys-cell {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.controls-table td.none {
+  color: rgb(169 193 220 / 0.5);
+}
+
+.controls-tips {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--frost);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.controls-tips li + li {
+  margin-top: 4px;
+}
+
+@media (max-width: 820px) {
+  .settings-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .menu {
+    padding: 52px 10px 10px;
+  }
+
+  .board {
+    padding: 18px 16px 14px;
+    outline-offset: -7px;
+  }
+
+  .sign-text {
+    height: 24px;
+  }
+
+  .title-screen {
+    margin-bottom: -10px;
+  }
+
+  .title-screen .sign-text {
+    height: 44px;
+  }
+
+  .plank {
+    min-height: 46px;
+    font-size: 17px;
+  }
+
+  .setting-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .board-foot {
+    display: none;
+  }
+}
+
+/* Trail map: its own panel, sized to the drawn map. */
 .menu-panel {
   box-sizing: border-box;
   width: min(1120px, 100%);
-  /* Centered when it fits; when it doesn't, it starts at the top and scrolls. */
   margin: auto;
   padding: 20px 22px 16px;
-  border-radius: 14px;
-  background: rgb(20 32 48 / 0.9);
-  color: #fff;
-  box-shadow: 0 18px 48px rgb(0 0 0 / 0.35);
+  border-radius: 6px;
+  background: var(--enamel);
+  color: var(--snow);
+  outline: 3px solid var(--snow);
+  outline-offset: -9px;
 }
 
 .menu-head {
@@ -305,11 +943,9 @@ body {
 }
 
 .menu-kicker {
-  color: #8fc0f4;
-  font-size: 13px;
+  color: var(--frost);
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .menu-title {
@@ -333,111 +969,13 @@ body {
   vertical-align: 1px;
 }
 
-.map-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 12px;
-}
-
-.map-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  overflow: hidden;
-  border: 2px solid transparent;
-  border-radius: 10px;
-  background: #24384f;
-  color: #fff;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.map-card:hover {
-  background: #2d4561;
-}
-
-.map-card:focus-visible,
-.map-card:focus {
-  border-color: #fff;
-  outline: none;
-}
-
-.map-card[aria-disabled='true'] {
-  cursor: default;
-}
-
-.map-card[aria-disabled='true'] .map-art,
-.map-card[aria-disabled='true'] .map-text {
-  opacity: 0.45;
-}
-
-.map-art {
-  display: block;
-  aspect-ratio: 16 / 9;
-}
-
-.map-art svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.map-text {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px 12px;
-}
-
-.map-name {
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.map-blurb {
-  color: rgb(255 255 255 / 0.78);
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.map-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgb(14 24 36 / 0.78);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.map-badge:empty {
-  display: none;
-}
-
-.map-card.is-current .map-badge {
-  background: #2f7de1;
-}
-
-.map-card.is-loading .map-badge::after {
-  content: 'Loading…';
-}
-
-.map-card.is-loading .map-badge {
-  display: block;
-  background: #2f7de1;
-}
-
 .menu-foot {
   margin-top: 14px;
-  color: rgb(255 255 255 / 0.7);
+  color: var(--frost);
   font-size: 13px;
   text-align: center;
 }
 
-/* Trail map: the menu panel, sized to the drawn map. */
 .trail-map-panel {
   width: auto;
   max-width: 100%;

@@ -13,6 +13,7 @@ export type Action =
   | 'checkpoint'
   | 'confirm'
   | 'trailMap'
+  | 'pause'
   | GrabAction;
 
 /** Grab keys, in the order of the GRABS list (render/skierPoses.ts): left hand first. */
@@ -41,6 +42,7 @@ export const ACTIONS: readonly Action[] = [
   'checkpoint',
   'confirm',
   'trailMap',
+  'pause',
   ...GRAB_ACTIONS,
 ];
 
@@ -58,6 +60,8 @@ export const DEFAULT_BINDINGS: Bindings = {
   checkpoint: ['Tab'],
   confirm: ['Enter', 'NumpadEnter'],
   trailMap: ['KeyM'],
+  // Esc opens the pause menu too, but it isn't a binding: in fullscreen the browser takes it.
+  pause: ['KeyP'],
   grabLeftMute: ['KeyA'],
   grabLeftSafety: ['KeyS'],
   grabLeftJapan: ['KeyD'],
