@@ -970,7 +970,24 @@ body {
 }
 
 .ski-rack-head {
+  align-items: center;
   margin-top: 12px;
+}
+
+.ski-rack-head .paint-name {
+  margin-left: auto;
+}
+
+/* Top sheets or bases: a small switch beside the graphic's name. */
+.segmented.ski-faces {
+  flex: none;
+  gap: 2px;
+}
+
+.ski-faces .segment {
+  min-height: 0;
+  padding: 3px 10px;
+  font-size: 13px;
 }
 
 .ski-rack {
@@ -1006,6 +1023,10 @@ body {
 .ski-graphic[aria-pressed='true'] {
   background: var(--plank);
   box-shadow: inset 6px 0 0 var(--flag);
+}
+
+.ski-thumb[hidden] {
+  display: none;
 }
 
 .ski-thumb {

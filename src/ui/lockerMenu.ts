@@ -1,9 +1,7 @@
 import { CONFIG } from '../config.ts';
 import { COLOR_PARTS, colorName, HEADWEAR, PALETTE, type ColorPart, type Headwear, type Outfit } from '../core/outfit.ts';
 import {
-  aspectOf,
-  graphicColor,
-  halfWidthAt,
+  drawSki,
   riseAt,
   SKI_STATS,
   SKI_TYPES,
@@ -23,8 +21,9 @@ import { addBackButton, board, setHints, type Screen } from './menus.ts';
 // on the right. Outfit: three headwear tiles, then a strip of paint chips
 // per part, all from one palette, so arrows move across a row and up and
 // down a column. Skis: a tile per ski type (its side profile), a rack of
-// its graphics (each drawn from the same data the 3D ski is painted from),
-// and stat bars against the park ski, marked at the middle.
+// its graphics (each pair of skis drawn from the same data the 3D skis are
+// painted from, top sheets or bases), and stat bars against the park ski,
+// marked at the middle.
 
 export interface LockerHooks {
   get: () => Outfit;
@@ -79,6 +78,10 @@ export class LockerScreen implements Screen {
   private readonly lastGraphic = new Map<SkiId, string>();
   private skiBlurb!: HTMLElement;
   private skiGraphicName!: HTMLElement;
+  /** The rack shows the bases (true) or the top sheets. */
+  private showBases = false;
+  private readonly faceButtons: HTMLButtonElement[] = [];
+  private readonly thumbs: { canvas: HTMLCanvasElement; base: boolean }[] = [];
   private readonly foot: HTMLElement;
   private readonly rect: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
@@ -240,7 +243,27 @@ export class LockerScreen implements Screen {
     part.textContent = 'Graphic';
     this.skiGraphicName = document.createElement('span');
     this.skiGraphicName.className = 'paint-name';
-    head.append(part, this.skiGraphicName);
+    // Top sheets or bases in the rack.
+    const faces = document.createElement('div');
+    faces.className = 'segmented ski-faces';
+    faces.setAttribute('role', 'group');
+    faces.setAttribute('aria-label', 'Show');
+    for (const [base, label] of [
+      [false, 'Top'],
+      [true, 'Base'],
+    ] as const) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'segment';
+      b.textContent = label;
+      b.addEventListener('click', () => {
+        this.showBases = base;
+        this.sync();
+      });
+      faces.appendChild(b);
+      this.faceButtons.push(b);
+    }
+    head.append(part, this.skiGraphicName, faces);
 
     // The rack: every graphic of every ski, only the chosen ski's showing.
     const rack = document.createElement('div');
@@ -253,7 +276,11 @@ export class LockerScreen implements Screen {
         button.type = 'button';
         button.className = 'ski-graphic';
         button.setAttribute('aria-label', `${type.name}: ${g.name}`);
-        button.appendChild(skiThumb(type, g));
+        for (const base of [false, true]) {
+          const canvas = skiThumb(type, g, base);
+          button.appendChild(canvas);
+          this.thumbs.push({ canvas, base });
+        }
         const label = document.createElement('span');
         label.textContent = g.name;
         button.appendChild(label);
@@ -324,6 +351,8 @@ export class LockerScreen implements Screen {
     }
     this.skiBlurb.textContent = type.blurb;
     this.skiGraphicName.textContent = graphic.name;
+    this.faceButtons.forEach((b, i) => b.setAttribute('aria-pressed', String((i === 1) === this.showBases)));
+    for (const { canvas, base } of this.thumbs) canvas.hidden = base !== this.showBases;
     const stats = skiStats(o.ski);
     for (const [id, bar] of this.statBars) {
       const steps = statSteps(stats[id]);
@@ -359,14 +388,13 @@ function profilePath(type: SkiType): string {
   return `M${bottom.join('L')}L${top.reverse().join('L')}Z`;
 }
 
-/** A canvas of the graphic on the ski's outline seen from above, tip to the right, painted cell by cell like the 3D ski. */
-function skiThumb(type: SkiType, g: SkiGraphic): HTMLCanvasElement {
-  const m = type.model;
-  const half = m.length / 2;
-  const aspect = aspectOf(m);
-  const w = Math.round(m.length * RACK_PX_PER_M);
+/** A canvas of the pair of skis seen from above (or their bases), tip to the right, the left ski on top, painted cell by cell like the 3D skis. */
+function skiThumb(type: SkiType, g: SkiGraphic, base: boolean): HTMLCanvasElement {
+  const w = Math.round(type.model.length * RACK_PX_PER_M);
   const maxHalf = Math.max(...SKI_TYPES.flatMap((t) => t.model.width.map(([, hw]) => hw)));
-  const h = Math.ceil(2 * maxHalf * RACK_PX_PER_M) + 2;
+  const skiH = Math.ceil(2 * maxHalf * RACK_PX_PER_M) + 1;
+  const gap = 3;
+  const h = skiH * 2 + gap;
   const canvas = document.createElement('canvas');
   canvas.className = 'ski-thumb';
   canvas.width = w;
@@ -374,22 +402,18 @@ function skiThumb(type: SkiType, g: SkiGraphic): HTMLCanvasElement {
   const ctx = canvas.getContext('2d');
   if (!ctx) return canvas;
   const img = ctx.createImageData(w, h);
-  const mid = h / 2;
-  for (let px = 0; px < w; px++) {
-    const along = -half + ((px + 0.5) / w) * m.length;
-    const row = Math.min(m.rows - 1, Math.floor(((along + half) / m.length) * m.rows));
-    const u = ((row + 0.5) / m.rows) * 2 - 1;
-    const hw = halfWidthAt(m, along) * RACK_PX_PER_M;
-    for (let py = Math.max(0, Math.ceil(mid - hw - 0.5)); py < Math.min(h, mid + hw); py++) {
-      // Tip to the right, so the ski's left edge (v = -1) is at the top.
-      const col = Math.min(m.cols - 1, Math.max(0, Math.floor(((py + 0.5 - (mid - hw)) / (2 * hw)) * m.cols)));
-      const hex = graphicColor(g, u, -1 + (2 * col + 1) / m.cols, aspect);
-      const i = (py * w + px) * 4;
+  for (const [row, side] of [
+    [0, -1],
+    [1, 1],
+  ] as const) {
+    drawSki(type, g, side, base, RACK_PX_PER_M, row * (skiH + gap) + skiH / 2, (x, y, hex) => {
+      if (x >= w || y < 0 || y >= h) return;
+      const i = (y * w + x) * 4;
       img.data[i] = parseInt(hex.slice(1, 3), 16);
       img.data[i + 1] = parseInt(hex.slice(3, 5), 16);
       img.data[i + 2] = parseInt(hex.slice(5, 7), 16);
       img.data[i + 3] = 255;
-    }
+    });
   }
   ctx.putImageData(img, 0, 0);
   return canvas;

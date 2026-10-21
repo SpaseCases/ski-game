@@ -1,57 +1,60 @@
-// Every ski and graphic: triangles per ski (the 3D model the game builds),
-// and optionally a PNG of each top sheet seen from above, tip to the right,
-// painted cell by cell as the model paints its faces. From the repo root:
+// Every ski and graphic: triangles per ski (the 3D model the game builds;
+// with a pair graphic, left / right), and optionally a PNG of each graphic
+// seen from above, tip to the right, painted cell by cell as the model
+// paints its faces: the pair's top sheets (left ski on top), then their
+// bases. From the repo root:
 //   node tools/model/skis.ts [out.png]
 
 import { writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
-import { Color } from 'three';
-import { aspectOf, graphicColor, halfWidthAt, SKI_TYPES } from '../../src/core/skis.ts';
+import { drawSki, SKI_TYPES } from '../../src/core/skis.ts';
 import { buildSkiGeometry } from '../../src/render/skiModel.ts';
 
 const out = process.argv[2];
 
 for (const type of SKI_TYPES) {
   const counts = type.graphics.map((g) => {
-    const geo = buildSkiGeometry(type.model, g);
-    const tris = geo.getAttribute('position').count / 3;
-    geo.dispose();
-    return `${g.name} ${tris}`;
+    const tris = ([-1, 1] as const).map((side) => {
+      const geo = buildSkiGeometry(type.model, g, side);
+      const n = geo.getAttribute('position').count / 3;
+      geo.dispose();
+      return n;
+    });
+    return `${g.name} ${g.pair ? tris.join(' / ') : tris[0]}`;
   });
   const { rows, cols } = type.model;
   console.log(`${type.name} (${rows} x ${cols} grid): triangles per ski: ${counts.join(', ')}`);
 }
 
 if (out) {
-  const PX = 420; // pixels per meter
-  const pad = 16;
+  const PX = 300; // pixels per meter
+  const pad = 14;
   const longest = Math.max(...SKI_TYPES.map((t) => t.model.length));
-  const W = Math.ceil(longest * PX) + pad * 2;
-  const laneH = 70;
+  const widest = Math.max(...SKI_TYPES.flatMap((t) => t.model.width.map(([, hw]) => hw)));
+  const skiH = Math.ceil(2 * widest * PX) + 2;
+  const laneH = skiH * 2 + 4 + 12;
+  const colW = Math.ceil(longest * PX) + pad;
+  const W = pad + colW * 2;
   const H = pad + SKI_TYPES.reduce((n, t) => n + t.graphics.length, 0) * laneH + pad;
   const rgb = new Uint8Array(W * H * 3).fill(232);
-  const c = new Color();
   let y0 = pad;
   for (const type of SKI_TYPES) {
-    const m = type.model;
-    const half = m.length / 2;
-    const aspect = aspectOf(m);
     for (const g of type.graphics) {
-      const mid = y0 + laneH / 2;
-      for (let px = 0; px < Math.round(m.length * PX); px++) {
-        const along = -half + (px + 0.5) / PX;
-        const row = Math.min(m.rows - 1, Math.floor(((along + half) / m.length) * m.rows));
-        const u = ((row + 0.5) / m.rows) * 2 - 1;
-        const hw = halfWidthAt(m, along) * PX;
-        for (let py = Math.ceil(mid - hw); py < mid + hw; py++) {
-          // Seen from above with the tip to the right, the ski's left edge is at the top.
-          const col = Math.min(m.cols - 1, Math.floor(((py + 0.5 - (mid - hw)) / (2 * hw)) * m.cols));
-          const v = -1 + (2 * col + 1) / m.cols;
-          c.set(graphicColor(g, u, v, aspect)).convertLinearToSRGB();
-          const i = (py * W + pad + px) * 3;
-          rgb[i] = c.r * 255;
-          rgb[i + 1] = c.g * 255;
-          rgb[i + 2] = c.b * 255;
+      for (const [k, base] of [
+        [0, false],
+        [1, true],
+      ] as const) {
+        for (const [r, side] of [
+          [0, -1],
+          [1, 1],
+        ] as const) {
+          const mid = y0 + r * (skiH + 4) + skiH / 2;
+          drawSki(type, g, side, base, PX, mid, (x, y, hex) => {
+            const i = (y * W + pad + k * colW + x) * 3;
+            rgb[i] = parseInt(hex.slice(1, 3), 16);
+            rgb[i + 1] = parseInt(hex.slice(3, 5), 16);
+            rgb[i + 2] = parseInt(hex.slice(5, 7), 16);
+          });
         }
       }
       y0 += laneH;

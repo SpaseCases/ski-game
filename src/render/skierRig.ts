@@ -23,7 +23,7 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DEFAULT_OUTFIT, type Outfit } from '../core/outfit.ts';
-import { skiGraphic, skiType } from '../core/skis.ts';
+import { skiGraphic, skiType, type Side } from '../core/skis.ts';
 import { clothMaterial } from './cloth.ts';
 import { buildSkiGeometry } from './skiModel.ts';
 import type { PoseDef, Vec3 } from './skierPoses.ts';
@@ -169,16 +169,14 @@ export class SkierRig {
     const thigh = buildThigh(c.pants);
     const shin = buildShin(c.pants, c.boots);
     const pole = buildPole();
-    const ski = buildSki(outfit);
-    for (const side of [-1, 1]) {
+    for (const side of [-1, 1] as const) {
       this.upperArms.push(add(upperArm));
       this.forearms.push(add(forearm));
       this.thighs.push(add(thigh));
       this.shins.push(add(shin));
-      this.feet.push(add(buildFoot(side, c.boots, ski)));
+      this.feet.push(add(buildFoot(side, c.boots, buildSki(outfit, side))));
       this.poles.push(add(pole));
     }
-    ski.dispose();
   }
 
   /** Changes colors or headwear, rebuilding only the parts that change (the old geometry is freed). */
@@ -199,9 +197,10 @@ export class SkierRig {
     if (changed('jacket', 'mittens')) swap(this.forearms, buildForearm(c.jacket, c.mittens));
     if (changed('pants', 'boots')) swap(this.shins, buildShin(c.pants, c.boots));
     if (changed('boots', 'ski', 'skiGraphic')) {
-      const ski = buildSki(next);
-      this.feet.forEach((m, i) => swap([m], buildFoot(i === 0 ? -1 : 1, c.boots, ski)));
-      ski.dispose();
+      this.feet.forEach((m, i) => {
+        const side = i === 0 ? -1 : 1;
+        swap([m], buildFoot(side, c.boots, buildSki(next, side)));
+      });
     }
     if (changed('helmet', 'goggleFrame', 'goggleLens', 'goggleStrap', 'gaiter', 'headwear')) {
       swap([this.head], buildHead(next));
@@ -1180,9 +1179,9 @@ function bootShell(): BufferGeometry {
   return g.translate(0, -0.046, -0.015);
 }
 
-/** The outfit's ski, in the foot frame (see render/skiModel.ts). */
-function buildSki(o: Outfit): BufferGeometry {
-  return buildSkiGeometry(skiType(o.ski).model, skiGraphic(o.ski, o.skiGraphic)).translate(0, -BODY.ankleHeight, -BODY.ankleBack);
+/** The outfit's ski for the left (-1) or right (1) foot, in the foot frame (see render/skiModel.ts). */
+function buildSki(o: Outfit, side: Side): BufferGeometry {
+  return buildSkiGeometry(skiType(o.ski).model, skiGraphic(o.ski, o.skiGraphic), side).translate(0, -BODY.ankleHeight, -BODY.ankleBack);
 }
 
 /** Pole hanging down -Y from the grip at the origin. */

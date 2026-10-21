@@ -1,15 +1,21 @@
 import { CONFIG } from '../config.ts';
 
 // The three ski types, as data: each one's model (its shape, for the eye
-// only: the physics treats every ski as the same length) and its top sheet
-// graphics. A graphic is a list of layers painted in order onto the top
-// sheet's grid of faces, so it shows as vertex colors on Low with no
-// textures. The same painter draws the Locker's thumbnails. How each ski
-// rides is CONFIG.skis (multipliers on config.ts's numbers).
+// only: the physics treats every ski as the same length) and its graphics.
+// A graphic is a list of layers painted in order onto the top sheet's grid
+// of faces (and, if it has them, base layers onto the base's), so it shows
+// as vertex colors on Low with no textures. A pair graphic is one picture
+// across both skis. The same painter draws the Locker's thumbnails. How
+// each ski rides is CONFIG.skis (multipliers on config.ts's numbers).
 
 export type SkiId = keyof typeof CONFIG.skis;
 
-/** A spot on the top sheet: u along the ski (-1 tail end, 1 tip end), v across it (-1 left edge, 1 right edge, seen from above). */
+/**
+ * A spot on the ski: u along it (-1 tail end, 1 tip end), v across it (-1
+ * left edge, 1 right edge, seen from above, on the base too). In a pair
+ * graphic v spans both skis: -2 the left ski's left edge, 0 where the two
+ * skis meet, 2 the right ski's right edge.
+ */
 export type UV = readonly [number, number];
 
 /**
@@ -52,11 +58,17 @@ export type Layer = (
 export interface SkiGraphic {
   id: string;
   name: string;
-  /** The base (the underside) and, if not the top sheet's edge color, the sidewalls. */
+  /** The base's color (the underside; under baseLayers if it has them) and, if not the top sheet's edge color, the sidewalls. */
   base: string;
   sidewall?: string;
+  /** One picture across both skis (v from -2 to 2) instead of the same on each. */
+  pair?: boolean;
   layers: readonly Layer[];
+  baseLayers?: readonly Layer[];
 }
+
+/** Which ski of the pair: -1 left, 1 right. */
+export type Side = -1 | 1;
 
 /** Where the ski turns up at one end: from `start` m from the middle to the end, rising `height` m on a curve of this power. */
 export interface Rise {
@@ -151,92 +163,78 @@ const PARK: SkiType = {
         { checks: [0.42, 1], size: 0.5, colors: [C.ink, C.chalk], mirror: true },
         { rect: [0.36, 0.42], color: C.chalk, mirror: true },
       ],
+      baseLayers: [{ fill: C.ink }, { checks: [-0.3, 0.3], size: 0.5, colors: [C.cherry, C.chalk] }],
     },
     {
       id: 'park-blocks',
       name: 'Color blocks',
       base: C.navy,
       sidewall: C.ink,
+      pair: true,
       layers: [
         { fill: C.lemon },
         { stripes: [-1, 1], period: 0.24, duty: 0.5, slant: 0.09, colors: [C.tangerine, C.bubblegum, C.cobalt, C.teal] },
         { rect: [0.9, 1], color: C.ink, mirror: true },
       ],
+      baseLayers: [{ fill: C.navy }, { stripes: [-0.9, 0.9], period: 0.24, duty: 0.5, slant: -0.09, colors: [C.lemon, C.tangerine] }],
     },
     {
       id: 'park-chevrons',
       name: 'Chevrons',
       base: C.lemon,
+      pair: true,
       layers: [
         { fill: C.navy },
-        { stripes: [0.28, 0.95], period: 0.13, duty: 0.5, slant: 0.1, chevron: true, colors: [C.lemon, C.glacier], mirror: true },
+        { stripes: [0.28, 0.95], period: 0.13, duty: 0.5, slant: 0.07, chevron: true, colors: [C.lemon, C.glacier], mirror: true },
         { rect: [0.95, 1], color: C.tangerine, mirror: true },
       ],
+      baseLayers: [{ fill: C.lemon }, { stripes: [-0.6, 0.6], period: 0.2, duty: 0.4, slant: 0.07, chevron: true, colors: [C.navy] }],
     },
   ],
 };
 
-// Big mountain graphics are long panoramas: the horizon runs along the ski,
-// the sky toward its left edge (v = -1), seen from above with the tip ahead
-// (in the Locker's thumbnails, the tip to the right and the sky on top).
-// The boots stand on the middle, so the art leans to the ends.
+// Big mountain graphics are pairs: each is one picture across both skis
+// (v from -2 at the left ski's left edge to 2 at the right ski's right
+// edge), upright with its top toward the tips, so the two skis go together.
+// The boots stand on the middle, so faces and heads sit toward the tips.
 const SUNSET = ['#3b2a5c', C.plum, '#a3477a', C.bubblegum, '#f0784a', '#f6a640', C.lemon];
-const RANGE: readonly UV[] = [
-  [-1, 0],
-  [-0.9, -0.25],
-  [-0.82, -0.05],
-  [-0.68, -0.85],
-  [-0.55, -0.15],
-  [-0.45, -0.3],
-  [-0.32, 0.05],
-  [-0.15, -0.35],
-  [0, 0],
-  [0.12, -0.25],
-  [0.28, 0.1],
-  [0.42, -0.2],
-  [0.55, 0.05],
-  [0.72, -0.9],
-  [0.86, -0.2],
-  [0.94, -0.35],
-  [1, -0.1],
-  [1, 1],
-  [-1, 1],
-];
+const NIGHT = '#14203a';
 
-/** A row of pine tops along the ski, from v = `base` up by about `height`, closed down to the right edge. */
-function treeline(base: number, height: number, period: number): UV[] {
+/** A row of pine tops across both skis, from u = `base` up by about `height`, closed down to u = `bottom`. */
+function forest(base: number, height: number, bottom: number): UV[] {
   const tall = [0.75, 1, 0.6, 0.9, 1.1, 0.8, 0.95, 0.65];
-  const pts: UV[] = [[-1, 1]];
-  for (let i = 0, u = -1; u < 1; i++, u += period) {
-    pts.push([u, base], [u + period / 2, base - height * tall[i % tall.length]!]);
-  }
-  pts.push([1, base], [1, 1]);
+  const pts: UV[] = [[bottom, -2]];
+  for (let i = 0, v = -2; v < 2; i++, v += 0.5) pts.push([base, v], [base + height * tall[i % tall.length]!, v + 0.25]);
+  pts.push([base, 2], [bottom, 2]);
   return pts;
 }
 
-/** An owl perched on a branch at u = `at`, facing out of the ski. */
-function owl(at: number): Layer[] {
+/** An owl across both skis, an eye on each, perched on a branch. */
+function owl(): Layer[] {
   const brown = '#8a5a3a';
   const wing = '#6e4429';
   return [
-    { rect: [at - 0.22, at + 0.25], v: [0.72, 0.86], color: '#5a3a22' },
-    { circle: [at, 0.12], r: [0.8, 0.62], color: brown },
-    { circle: [at - 0.045, 0.15], r: [0.32, 0.48], color: wing },
-    { circle: [at + 0.045, 0.15], r: [0.32, 0.48], color: wing },
-    { circle: [at, 0.24], r: [0.45, 0.4], color: '#d9b98a' },
-    { circle: [at, -0.45], r: [0.72, 0.44], color: brown },
-    { poly: [[at - 0.05, -0.72], [at - 0.045, -1], [at - 0.02, -0.8]], color: brown },
-    { poly: [[at + 0.05, -0.72], [at + 0.045, -1], [at + 0.02, -0.8]], color: brown },
-    { circle: [at - 0.024, -0.47], r: 0.3, color: C.lemon },
-    { circle: [at + 0.024, -0.47], r: 0.3, color: C.lemon },
-    { circle: [at - 0.024, -0.47], r: 0.14, color: C.ink },
-    { circle: [at + 0.024, -0.47], r: 0.14, color: C.ink },
-    { poly: [[at - 0.012, -0.32], [at + 0.012, -0.32], [at, -0.1]], color: C.tangerine },
-    { dots: [[at - 0.016, 0.72], [at + 0.016, 0.72]], r: 0.16, color: C.tangerine },
+    { rect: [-0.36, -0.31], color: '#5a3a22' },
+    { circle: [0.12, 0], r: [4.6, 1.75], color: brown },
+    { circle: [0.08, -1.55], r: [3.8, 0.45], color: wing },
+    { circle: [0.08, 1.55], r: [3.8, 0.45], color: wing },
+    { circle: [0.05, 0], r: [3.4, 1.1], color: '#d9b98a' },
+    { dots: [[0.2, -0.5], [0.2, 0.5], [0.08, 0], [-0.04, -0.55], [-0.04, 0.55], [-0.14, 0]], r: 0.2, color: '#b8946a' },
+    { circle: [0.56, 0], r: [2.6, 1.75], color: brown },
+    { poly: [[0.68, -1.55], [0.8, -1.9], [0.72, -1.0]], color: brown },
+    { poly: [[0.68, 1.55], [0.8, 1.9], [0.72, 1.0]], color: brown },
+    { circle: [0.57, -0.8], r: [1.15, 0.85], color: '#c49a6c' },
+    { circle: [0.57, 0.8], r: [1.15, 0.85], color: '#c49a6c' },
+    { circle: [0.58, -0.8], r: 0.62, color: C.lemon },
+    { circle: [0.58, 0.8], r: 0.62, color: C.lemon },
+    { circle: [0.58, -0.8], r: 0.3, color: C.ink },
+    { circle: [0.58, 0.8], r: 0.3, color: C.ink },
+    { poly: [[0.5, -0.3], [0.5, 0.3], [0.42, 0]], color: C.tangerine },
+    { dots: [[-0.3, -0.4], [-0.3, 0.4], [-0.3, -0.75], [-0.3, 0.75]], r: 0.2, color: C.tangerine },
   ];
 }
 
-/** A koi at (`at`, `v`) swimming toward the tip (dir 1) or the tail (-1): tail fin, side fins, body, patches, eyes. */
+/** A koi centered at (`at`, `v`) swimming toward the tip (dir 1) or the tail (-1): tail fin, side fins, body, patches, eyes. */
 function koi(at: number, v: number, dir: number, body: string, patch: string): Layer[] {
   const back = at - dir * 0.15;
   return [
@@ -248,6 +246,42 @@ function koi(at: number, v: number, dir: number, body: string, patch: string): L
     { circle: [at - dir * 0.05, v + 0.12], r: 0.28, color: patch },
     { dots: [[at + dir * 0.125, v - 0.25], [at + dir * 0.125, v + 0.25]], r: 0.13, color: C.ink },
   ];
+}
+
+/** A yeti across both skis, waving with both arms, an eye on each ski. */
+function yeti(): Layer[] {
+  const fur = '#eef3f7';
+  const shade = '#cfe0ec';
+  const skin = '#7db8dc';
+  return [
+    { rect: [-0.62, -0.25], v: [-1.45, -0.3], color: fur },
+    { rect: [-0.62, -0.25], v: [0.3, 1.45], color: fur },
+    { circle: [-0.62, -0.9], r: [0.9, 0.75], color: shade },
+    { circle: [-0.62, 0.9], r: [0.9, 0.75], color: shade },
+    { poly: [[0.3, -1.5], [0.64, -1.95], [0.72, -1.7], [0.38, -1.05]], color: fur },
+    { poly: [[0.3, 1.5], [0.64, 1.95], [0.72, 1.7], [0.38, 1.05]], color: fur },
+    { circle: [0.71, -1.82], r: 0.32, color: skin },
+    { circle: [0.71, 1.82], r: 0.32, color: skin },
+    { circle: [0.1, 0], r: [4.8, 1.8], color: fur },
+    { circle: [0.05, 0], r: [3.0, 1.1], color: '#dde8f0' },
+    { dots: [[0.32, -1.3], [0.2, 1.4], [-0.05, -1.5], [-0.12, 1.2], [0.36, 1.0], [0.12, -1.0]], r: 0.24, color: shade },
+    { poly: [[0.68, -1.2], [0.82, -1.85], [0.71, -0.95]], color: C.sand },
+    { poly: [[0.68, 1.2], [0.82, 1.85], [0.71, 0.95]], color: C.sand },
+    { circle: [0.56, 0], r: [2.4, 1.6], color: fur },
+    { circle: [0.55, 0], r: [1.5, 1.05], color: skin },
+    { dots: [[0.6, -0.42], [0.6, 0.42]], r: 0.2, color: C.ink },
+    { circle: [0.5, 0], r: [0.4, 0.6], color: C.navy },
+  ];
+}
+
+/** Yeti footprints walking down the bases: left feet on the left ski, right feet on the right. */
+function footprints(): Layer[] {
+  const out: Layer[] = [];
+  for (let i = 0, u = 0.8; u > -0.95; i++, u -= 0.22) {
+    const v = i % 2 === 0 ? -1 : 1;
+    out.push({ circle: [u, v], r: [1.2, 0.55], color: '#8fb4cc' }, { dots: [[u + 0.105, v - 0.35], [u + 0.115, v], [u + 0.105, v + 0.35]], r: 0.2, color: '#8fb4cc' });
+  }
+  return out;
 }
 
 const BIG: SkiType = {
@@ -277,66 +311,77 @@ const BIG: SkiType = {
       id: 'big-alpenglow',
       name: 'Alpenglow',
       base: '#3b2a5c',
+      pair: true,
       layers: [
-        { grad: [-1, 0.2], across: true, colors: SUNSET },
-        { circle: [0.42, -0.1], r: 0.8, color: '#ffe9a8' },
-        { poly: RANGE, color: '#7a5f9c' },
-        { poly: [[-0.68, -0.85], [-0.615, -0.5], [-0.64, -0.58], [-0.67, -0.48], [-0.7, -0.6], [-0.741, -0.5]], color: C.chalk },
-        { poly: [[0.72, -0.9], [0.79, -0.55], [0.76, -0.63], [0.73, -0.52], [0.69, -0.64], [0.657, -0.55]], color: C.chalk },
-        { poly: treeline(0.6, 0.45, 0.06), color: C.pine },
-        { waves: [0.84, 1], across: true, colors: ['#f3d6c6'], amp: 0.06, freq: 3 },
+        { grad: [1, -0.1], colors: SUNSET },
+        { circle: [0.3, 1.1], r: 1, color: '#ffe9a8' },
+        { poly: [[-0.3, -2], [0, -2], [0.12, -1.4], [0.22, -1.15], [0.36, -0.6], [0.6, 0.1], [0.48, 0.6], [0.36, 0.95], [0.22, 1.5], [0.08, 2], [-0.3, 2]], color: '#7a5f9c' },
+        { poly: [[0.6, 0.1], [0.48, 0.6], [0.36, 0.95], [0.22, 1.5], [0.08, 2], [-0.3, 2], [-0.3, 0.4], [0.15, 0.35], [0.35, 0.3]], color: '#5a4678' },
+        { poly: [[0.6, 0.1], [0.48, 0.6], [0.455, 0.42], [0.47, 0.2], [0.43, -0.05], [0.46, -0.3], [0.42, -0.42], [0.36, -0.6]], color: C.chalk },
+        { poly: forest(-0.4, 0.13, -0.64), color: C.pine },
+        { grad: [-0.64, -1], colors: ['#f6a640', '#f0784a', '#a3477a', C.plum, '#3b2a5c'] },
+        { stripes: [-0.95, -0.68], period: 0.06, duty: 0.25, colors: ['#ffd9a0'] },
       ],
+      baseLayers: [{ fill: '#3b2a5c' }, { stripes: [-0.9, 0.9], period: 0.16, duty: 0.4, slant: 0.05, chevron: true, colors: [C.bubblegum, C.tangerine, C.lemon] }],
     },
     {
       id: 'big-owl',
       name: 'Night owl',
       base: C.navy,
+      pair: true,
       layers: [
-        { fill: '#14203a' },
-        { waves: [-0.95, -0.1], across: true, colors: ['#1d4a55', C.teal, C.lime, C.teal, '#1d4a55'], amp: 0.22, freq: 1.6 },
+        { fill: NIGHT },
+        { waves: [0.74, 1], colors: ['#1d4a55', C.teal, C.lime, C.teal, '#1d4a55'], amp: 0.04, freq: 0.6 },
         {
-          dots: [[-0.95, -0.7], [-0.82, 0.05], [-0.3, -0.75], [-0.2, 0.15], [0.05, -0.8], [0.3, -0.2], [0.45, -0.85], [0.82, 0], [0.93, -0.75], [0.6, 0.25]],
+          dots: [[0.95, 0.6], [0.86, 1.6], [0.78, -0.4], [0.7, 1.2], [0.4, -1.8], [0.3, 1.85], [-0.45, -1.4], [-0.5, 0.9], [0.88, -1.7], [0.66, 0.2]],
           r: 0.2,
           color: C.chalk,
         },
-        { circle: [0.68, -0.42], r: 0.5, color: '#f3e6a8' },
-        { circle: [0.7, -0.58], r: 0.45, color: '#14203a' },
-        { poly: treeline(0.62, 0.55, 0.07), color: '#0b1424' },
-        ...owl(-0.6),
+        { circle: [0.9, -1.2], r: 0.55, color: '#f3e6a8' },
+        { circle: [0.915, -0.95], r: 0.5, color: NIGHT },
+        { poly: forest(-0.66, 0.16, -1), color: '#0b1424' },
+        ...owl(),
+      ],
+      baseLayers: [
+        { fill: NIGHT },
+        { dots: [[0.85, -1.5], [0.7, 1.4], [0.45, -0.6], [0.2, 1.6], [-0.1, -1.3], [-0.4, 0.5], [-0.7, -1.6], [-0.85, 1.2]], r: 0.22, color: C.chalk },
+        { circle: [0.55, 0], r: 1.3, color: '#f3e6a8' },
       ],
     },
     {
       id: 'big-koi',
       name: 'Koi pond',
       base: C.teal,
+      pair: true,
       layers: [
         { fill: '#1f6f73' },
-        { circle: [0.2, 0.3], r: 0.95, ring: 0.16, color: '#3fa3a0' },
-        { circle: [-0.3, -0.4], r: 0.8, ring: 0.16, color: '#3fa3a0' },
-        { circle: [-0.9, 0.2], r: 0.7, ring: 0.16, color: '#3fa3a0' },
-        { circle: [0.9, 0.4], r: 0.62, color: C.olive },
-        { poly: [[0.9, 0.4], [0.935, 1], [0.9, 1]], color: '#1f6f73' },
-        { circle: [-0.86, -0.5], r: 0.55, color: C.olive },
-        { circle: [0.93, -0.55], r: 0.3, color: C.bubblegum },
-        ...koi(0.55, -0.05, 1, C.tangerine, C.chalk),
-        ...koi(-0.52, 0.2, -1, C.chalk, C.cherry),
+        { circle: [0.72, 0.6], r: 1.9, ring: 0.2, color: '#3fa3a0' },
+        { circle: [0.72, 0.6], r: 1.1, ring: 0.2, color: '#3fa3a0' },
+        { circle: [-0.7, -0.7], r: 1.7, ring: 0.2, color: '#3fa3a0' },
+        { circle: [0.92, 1.2], r: 0.6, color: C.olive },
+        { poly: [[0.92, 1.2], [0.96, 2], [0.91, 2]], color: '#1f6f73' },
+        { circle: [-0.92, -1.3], r: 0.55, color: C.olive },
+        { circle: [-0.85, 1.3], r: 0.5, color: C.olive },
+        { circle: [0.9, -1.4], r: 0.35, color: C.bubblegum },
+        ...koi(0.5, -1, 1, C.tangerine, C.chalk),
+        ...koi(-0.5, 1, -1, C.chalk, C.cherry),
       ],
+      baseLayers: [{ fill: '#174f54' }, { circle: [0, 0], r: 2.6, ring: 0.3, color: '#e8a33c' }, { circle: [0, 0], r: 1.6, ring: 0.3, color: '#e8a33c' }],
     },
     {
-      id: 'big-swirls',
-      name: 'Wind and sun',
-      base: C.tangerine,
+      id: 'big-yeti',
+      name: 'Yeti',
+      base: '#bcd6e6',
+      pair: true,
       layers: [
-        { grad: [-1, 0.5], across: true, colors: [C.cobalt, '#4f94dc', '#6fabe0', '#8cc0e2', C.glacier] },
-        { circle: [0.74, -0.2], r: 0.8, color: C.lemon },
-        { circle: [0.74, -0.2], r: 0.55, color: C.tangerine },
-        { spiral: [0.4, -0.3], r: 0.68, turns: 1.3, width: 0.5, color: C.chalk },
-        { spiral: [-0.42, -0.3], r: 0.68, turns: 1.3, width: 0.5, color: '#d8ecf6' },
-        { spiral: [-0.8, -0.3], r: 0.68, turns: 1.3, width: 0.5, color: C.chalk },
-        { waves: [0.35, 1], across: true, colors: [C.lime, '#7fae3a', C.olive, C.pine], amp: 0.14, freq: 2.5, phase: 1 },
-        { dots: [[-0.9, 0.55], [-0.62, 0.75], [-0.35, 0.6], [0.5, 0.7], [0.66, 0.55], [0.9, 0.75]], r: 0.2, color: C.bubblegum },
-        { dots: [[-0.78, 0.85], [-0.5, 0.5], [0.58, 0.85], [0.8, 0.5]], r: 0.2, color: C.lemon },
+        { grad: [1, -0.6], colors: [C.cobalt, '#4f94dc', '#6fabe0', '#8cc0e2', C.glacier] },
+        { spiral: [0.88, -1.05], r: 0.8, turns: 1.4, width: 0.5, color: C.chalk },
+        { spiral: [0.88, 1.05], r: 0.8, turns: 1.4, width: 0.5, color: '#d8ecf6' },
+        { dots: [[0.95, 0], [0.78, -0.3], [0.62, 1.35], [0.45, -1.8], [0.2, 1.85], [-0.1, -1.85], [-0.4, 1.8], [0.75, 0.6]], r: 0.22, color: C.chalk },
+        { waves: [-0.62, -1], colors: ['#e6eff6', '#cfdeea'], amp: 0.03, freq: 1.5 },
+        ...yeti(),
       ],
+      baseLayers: [{ fill: '#bcd6e6' }, ...footprints()],
     },
   ],
 };
@@ -376,6 +421,7 @@ const CARVING: SkiType = {
         { rect: [-1, 1], v: [-0.2, 0.2], color: C.ink },
         { rect: [-1, -0.82], color: C.ink },
       ],
+      baseLayers: [{ fill: C.cherry }, { stripes: [-0.85, 0.85], period: 0.25, duty: 0.18, slant: 0.15, colors: [C.chalk] }],
     },
     {
       id: 'carving-cobalt',
@@ -399,6 +445,24 @@ const CARVING: SkiType = {
         { stripes: [-0.95, -0.35], period: 0.09, duty: 0.4, slant: 0.07, chevron: true, colors: [C.sand] },
         { rect: [-1, -0.95], color: C.lemon },
       ],
+      baseLayers: [{ fill: C.ink }, { stripes: [-0.9, 0.9], period: 0.12, duty: 0.35, slant: 0.07, chevron: true, colors: [C.lemon] }],
+    },
+    {
+      // A pair: the speed stripes run on from one ski to the other, and each ski's outside edge is lined.
+      id: 'carving-carbon',
+      name: 'Carbon',
+      base: C.cherry,
+      sidewall: C.ink,
+      pair: true,
+      layers: [
+        { fill: '#202328' },
+        { stripes: [-1, 1], period: 0.125, duty: 0.5, slant: 0.06, colors: ['#2c3138'] },
+        { stripes: [0.4, 0.9], period: 0.25, duty: 0.3, slant: 0.12, colors: [C.cherry] },
+        { rect: [-1, 1], v: [-2, -1.72], color: C.chalk },
+        { rect: [-1, 1], v: [1.72, 2], color: C.chalk },
+        { rect: [0.9, 1], color: C.cherry },
+      ],
+      baseLayers: [{ fill: C.cherry }, { rect: [0.75, 1], color: C.chalk }, { rect: [-1, -0.9], color: C.ink }],
     },
   ],
 };
@@ -454,10 +518,35 @@ export function aspectOf(m: SkiModel): number {
 
 // ----------------------------------------------------------- the painter
 
-/** The graphic's color at (u, v); `aspect` from aspectOf. */
-export function graphicColor(g: SkiGraphic, u: number, v: number, aspect: number): string {
+/**
+ * Draws one ski of a pair seen from above (or its base, seen from above
+ * through the ski), tip to the right and its left edge on top, painted
+ * cell by cell like the 3D ski: `put(x, y, hex)` for each pixel inside its
+ * outline, at `pxPerM` pixels per meter, from x = 0, its middle on y = `mid`.
+ */
+export function drawSki(type: SkiType, g: SkiGraphic, side: Side, base: boolean, pxPerM: number, mid: number, put: (x: number, y: number, hex: string) => void): void {
+  const m = type.model;
+  const half = m.length / 2;
+  const aspect = aspectOf(m);
+  const w = Math.round(m.length * pxPerM);
+  for (let px = 0; px < w; px++) {
+    const along = -half + ((px + 0.5) / w) * m.length;
+    const row = Math.min(m.rows - 1, Math.floor(((along + half) / m.length) * m.rows));
+    const u = ((row + 0.5) / m.rows) * 2 - 1;
+    const hw = halfWidthAt(m, along) * pxPerM;
+    for (let py = Math.ceil(mid - hw - 0.5); py < mid + hw; py++) {
+      const col = Math.min(m.cols - 1, Math.max(0, Math.floor(((py + 0.5 - (mid - hw)) / (2 * hw)) * m.cols)));
+      put(px, py, graphicColor(g, u, -1 + (2 * col + 1) / m.cols, aspect, side, base));
+    }
+  }
+}
+
+/** The graphic's color at (u, v) on the `side` ski's top sheet, or its base; `aspect` from aspectOf. */
+export function graphicColor(g: SkiGraphic, u: number, v: number, aspect: number, side: Side = 1, base = false): string {
   let color = g.base;
-  for (const layer of g.layers) {
+  const layers = base ? (g.baseLayers ?? []) : g.layers;
+  if (g.pair) v += side;
+  for (const layer of layers) {
     const c = layerColor(layer, u, v, aspect) ?? (layer.mirror ? layerColor(layer, -u, v, aspect) : null);
     if (c) color = c;
   }
@@ -467,7 +556,7 @@ export function graphicColor(g: SkiGraphic, u: number, v: number, aspect: number
 function layerColor(L: Layer, u: number, v: number, k: number): string | null {
   if ('fill' in L) return L.fill;
   if ('rect' in L) {
-    const [v0, v1] = L.v ?? [-1, 1];
+    const [v0, v1] = L.v ?? [-Infinity, Infinity];
     return within(u, L.rect) && v >= v0 && v <= v1 ? L.color : null;
   }
   if ('grad' in L) {
