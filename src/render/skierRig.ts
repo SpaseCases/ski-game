@@ -216,6 +216,12 @@ export class SkierRig {
     this.glowMaterial.color.set(FIXED.carvedDark).lerp(glowColor, Math.min(1, Math.max(0, amount)));
   }
 
+  /** The part meshes by name (index 0 left, 1 right), for checks such as tools/model/clearance.ts. */
+  parts(): Record<'pelvis' | 'torso' | 'hem' | 'head', Mesh> & Record<'upperArms' | 'forearms' | 'thighs' | 'shins' | 'feet' | 'poles', readonly Mesh[]> {
+    const { pelvis, torso, head, upperArms, forearms, thighs, shins, feet, poles } = this;
+    return { pelvis, torso, hem: this.hem.mesh, head, upperArms, forearms, thighs, shins, feet, poles };
+  }
+
   /** Frees every geometry and material (the rig is not used again). */
   dispose(): void {
     const seen = new Set<BufferGeometry>();
@@ -516,7 +522,8 @@ function buildPelvis(pants: Color): BufferGeometry {
 function buildTorso(jacket: Color): BufferGeometry {
   const dark = shade(jacket, 0.78);
   const parts = [
-    paint(prism(0.205, 0.222, BODY.spine - TORSO_BOTTOM, 12).translate(0, TORSO_BOTTOM, 0).scale(1, 1, 0.66), jacket),
+    // As many sides as the lower jacket, corner for corner, so the two meet flush.
+    paint(prism(0.205, 0.222, BODY.spine - TORSO_BOTTOM, LOWER_SEGMENTS).translate(0, TORSO_BOTTOM, 0).scale(1, 1, 0.66), jacket),
     paint(prism(0.112, 0.102, 0.09, 12).translate(0, 0.49, 0.008).scale(1, 1, 0.95), jacket),
     paint(new SphereGeometry(0.12, 12, 8).scale(1.2, 0.55, 0.7).translate(0, 0.53, 0.12), dark),
     paint(new BoxGeometry(0.014, 0.21, 0.012).translate(0, 0.405, -0.144), FIXED.zip),
@@ -538,30 +545,58 @@ const TORSO_BOTTOM = 0.3;
 const LOWER_SEGMENTS = 18;
 const hemLow = (a: number): number => -0.16 - 0.07 * ((1 - Math.cos(a)) / 2) ** 1.5;
 interface LowerRing {
-  /** Built in the chest's frame (else the hips'). */
-  chest: boolean;
+  /**
+   * How much of the chest's bend (relative to the hips) the ring follows:
+   * 1 moves with the chest, 0 with the hips. Easing from one to the other
+   * down the waist bends the jacket there, so a deep bend doesn't fold the
+   * back of it in and let the hips show through.
+   */
+  bend: number;
   /** Kept out of the thighs. */
   push: boolean;
   /** Height, radius and front-to-back depth at angle a. */
   at: (a: number) => [number, number, number];
 }
+/** Height `f` of the way from the waist ring down to the band above the hem, where the thighs leave the jacket. */
+const waist = (a: number, f: number): number => -0.01 + (hemLow(a) + 0.042) * f;
 const LOWER_RINGS: readonly LowerRing[] = [
-  { chest: true, push: false, at: () => [0.35, 0.2, 0.64] },
-  { chest: true, push: true, at: () => [0.25, 0.205, 0.66] },
-  { chest: true, push: true, at: () => [0.12, 0.202, 0.67] },
-  { chest: false, push: true, at: () => [-0.01, 0.198, 0.7] },
-  { chest: false, push: true, at: (a) => [hemLow(a) + 0.032, 0.2, 0.72] },
-  { chest: false, push: true, at: (a) => [hemLow(a), 0.201, 0.72] },
-  { chest: false, push: true, at: (a) => [hemLow(a) + 0.008, 0.184, 0.7] },
+  // Tucked inside the upper jacket, then flush with its bottom edge
+  // (TORSO_BOTTOM), so the seam neither shows a step nor flickers.
+  { bend: 1, push: false, at: () => [0.33, 0.19, 0.62] },
+  { bend: 1, push: true, at: () => [TORSO_BOTTOM - 0.004, 0.205, 0.66] },
+  { bend: 1, push: true, at: () => [0.25, 0.205, 0.66] },
+  { bend: 0.7, push: true, at: () => [0.12, 0.202, 0.67] },
+  { bend: 0.3, push: true, at: () => [-0.01, 0.198, 0.7] },
+  // Close together here, so the jacket can follow a thigh swinging out under it.
+  { bend: 0.1, push: true, at: (a) => [waist(a, 1 / 3), 0.199, 0.707] },
+  { bend: 0, push: true, at: (a) => [waist(a, 2 / 3), 0.2, 0.713] },
+  { bend: 0, push: true, at: (a) => [hemLow(a) + 0.032, 0.2, 0.72] },
+  { bend: 0, push: true, at: (a) => [hemLow(a), 0.201, 0.72] },
+  { bend: 0, push: true, at: (a) => [hemLow(a) + 0.008, 0.184, 0.7] },
 ];
 /** Rings the zip runs between (it carries on up the upper jacket), and its half-width. */
 const ZIP_FIRST = 1;
-const ZIP_LAST = 5;
+const ZIP_LAST = 8;
 const ZIP_HALF = 0.007;
+/**
+ * How the lower jacket's mesh is laid out, for checks (tools/model): its faces
+ * run band by band between the rings, `segments` quads a band; the last two
+ * bands are the hem's edge and its turned-under lip, the rest the jacket's body.
+ */
+export const JACKET_LAYOUT = { segments: LOWER_SEGMENTS, bodyBands: LOWER_RINGS.length - 3 };
+
 /** Thigh radius plus a little room, for keeping the jacket outside the legs. */
-const THIGH_ROOM = 0.11;
+const THIGH_ROOM = 0.12;
 /** Furthest (m) a raised thigh lifts any point of the jacket. */
 const MAX_RIDE_UP = 0.12;
+/**
+ * How far a thigh must swing up before it lifts the jacket rather than the
+ * jacket lying over it: the sine of its angle from hanging straight down,
+ * where riding up starts, and over how much more it takes over completely.
+ * A riding stance's thighs (~40°) drape; a crouch's or a grab's lift.
+ */
+const RIDE_UP_FROM = 0.7;
+const RIDE_UP_SPAN = 0.22;
 
 /**
  * The jacket from the belly down, rebuilt every pose. A straight jacket on
@@ -632,6 +667,7 @@ class JacketLower {
   fit(pelvisPos: Vector3, pelvisQ: Quaternion, chestQ: Quaternion, hips: Vector3[], knees: Vector3[]): void {
     lowerInv.copy(pelvisQ).invert();
     lowerChest.copy(lowerInv).multiply(chestQ);
+    for (let ring = 0; ring < LOWER_RINGS.length; ring++) lowerBend[ring]!.slerpQuaternions(IDENTITY_Q, lowerChest, LOWER_RINGS[ring]!.bend);
     for (let i = 0; i < 2; i++) {
       lowerHips[i]!.copy(hips[i]!).sub(pelvisPos).applyQuaternion(lowerInv);
       lowerKnees[i]!.copy(knees[i]!).sub(pelvisPos).applyQuaternion(lowerInv);
@@ -665,7 +701,7 @@ class JacketLower {
     const def = LOWER_RINGS[ring]!;
     const [y, r, depth] = def.at(a);
     lowerP.set(r * grow * Math.sin(a), y, -r * grow * Math.cos(a) * depth);
-    if (def.chest) lowerP.applyQuaternion(lowerChest);
+    if (def.bend > 0) lowerP.applyQuaternion(lowerBend[ring]!);
     if (!def.push) return;
     // Twice, so a point pushed out of one thigh into the other ends up clear of both.
     for (let pass = 0; pass < 2; pass++) {
@@ -677,6 +713,9 @@ class JacketLower {
 const lowerMaterial = new MeshLambertMaterial({ vertexColors: true, flatShading: true, side: DoubleSide });
 const lowerInv = new Quaternion();
 const lowerChest = new Quaternion();
+/** Each ring's share of the chest's bend, for the pose being fitted. */
+const lowerBend = LOWER_RINGS.map(() => new Quaternion());
+const IDENTITY_Q = new Quaternion();
 const lowerHips = [new Vector3(), new Vector3()];
 const lowerKnees = [new Vector3(), new Vector3()];
 const lowerP = new Vector3();
@@ -711,21 +750,29 @@ function pushOutOfThigh(p: Vector3, hip: Vector3, knee: Vector3): void {
   hemAxis.normalize();
   hemUp.set(0, 1, 0).addScaledVector(hemAxis, -hemAxis.y); // up, across the thigh
   const a = hemUp.lengthSq();
-  const raised = smooth01((Math.sqrt(a) - 0.25) / 0.35);
+  const raised = smooth01((Math.sqrt(a) - RIDE_UP_FROM) / RIDE_UP_SPAN);
   if (raised > 0) {
     hemOff.addScaledVector(hemAxis, -hemOff.dot(hemAxis)); // offset across the thigh
     const b = hemOff.dot(hemUp);
     const c = hemOff.lengthSq() - room * room;
-    // Fabric only rides up so far; past that it stays bunched against the leg.
+    // Fabric only rides up so far; past that it lies over the leg (below).
     const lift = Math.min(MAX_RIDE_UP, (-b + Math.sqrt(Math.max(0, b * b - a * c))) / a);
     hemRadial.lerp(hemUp.set(0, lift, 0), raised);
   }
   p.add(hemRadial);
+
+  // Where riding up stopped short (or the blend of the two pushes fell
+  // inside), drape it over the leg: straight out from the thigh's axis.
+  const along = Math.min(Math.sqrt(len2), Math.max(0, hemOff.subVectors(p, hip).dot(hemAxis)));
+  hemOff.subVectors(p, hemNear.copy(hip).addScaledVector(hemAxis, along));
+  const left = hemOff.length();
+  if (left < room && left > 1e-6) p.addScaledVector(hemOff, room / left - 1);
 }
 
 // Goggles: a compact frame, tallest in front and tapering toward the
-// temples, where it draws in and slips under the helmet (the strap runs
-// inside the helmet, out of sight). Angles are radians from straight ahead.
+// temples, where it draws in and slips under the helmet's edge (the strap
+// comes back out round the back of the helmet). Angles are radians from
+// straight ahead.
 const GOGGLE_SPAN = 1.62;
 const LENS_SPAN = 1.28;
 const GOGGLE_DEPTH = 1.12;

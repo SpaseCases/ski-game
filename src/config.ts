@@ -363,6 +363,8 @@ export const CONFIG = {
     /** Speeds (m/s) where holding ↑ shifts from the pop crouch into a speed tuck. */
     tuckSpeedMin: 7,
     tuckSpeedFull: 12,
+    /** Seconds to rise out of a tuck into the crouch for a pole push, and to settle back after it. */
+    poleTuckBlendTime: 0.15,
     /** How fast (per second) the skier tilts to match the snow, and eases out of a jump in orientation (takeoff, landing, crash). */
     tiltSmoothing: 10,
     /**

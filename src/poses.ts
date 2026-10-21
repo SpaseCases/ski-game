@@ -21,7 +21,7 @@ import { CONFIG } from './config.ts';
 import type { Heightfield } from './maps/types.ts';
 import { createSkierPose, SkierView, type SkierPose } from './render/skierView.ts';
 import { SkierRig } from './render/skierRig.ts';
-import { DEFAULT_OUTFIT, HEADWEAR, type Outfit } from './core/outfit.ts';
+import { COLOR_PARTS, DEFAULT_OUTFIT, HEADWEAR, type Outfit } from './core/outfit.ts';
 import {
   CROUCH,
   LEFT_JAPAN,
@@ -56,12 +56,14 @@ interface RideState {
   brakeSide: number;
   onRail: boolean;
   railYaw: number;
+  /** How far through a pole push (0..1); 1 is not pushing. */
+  polePhase: number;
 }
 
 const RAIL_HEIGHT = 0.45;
 
 // Grid order, left to right and top to bottom; null is the info card.
-const ENTRIES: (Entry | null)[] = [
+const POSES: (Entry | null)[] = [
   { name: 'Stance', note: 'Riding on the snow', pose: STANCE, airborne: false },
   { name: 'Crouch', note: 'Loading a pop (hold ↑)', pose: CROUCH, airborne: false },
   { name: 'Tuck', note: 'Low and fast', pose: TUCK, airborne: false },
@@ -82,6 +84,26 @@ const ENTRIES: (Entry | null)[] = [
   { name: 'Hockey stop', note: 'In game: full brake', ride: { speed: 8, brake: 1, brakeSide: 1 }, airborne: false },
   { name: 'Rail', note: 'In game: sliding a rail sideways', ride: { speed: 6, onRail: true, railYaw: Math.PI / 2 }, airborne: false },
 ];
+
+/** ?set=poling: a pole push from the stance, a crouch and a tuck, at five points through the stroke. */
+const STROKE_POINTS: readonly [number, string][] = [
+  [0.07, 'reaching'],
+  [0.15, 'planted'],
+  [0.4, 'pushing'],
+  [0.65, 'pushed through'],
+  [0.85, 'swinging back'],
+];
+const POLING: (Entry | null)[] = [
+  ...([
+    ['Stance', { speed: 4 }],
+    ['Crouch', { speed: 4, crouch: 1 }],
+    ['Tuck', { speed: 15, crouch: 1 }],
+  ] as const).flatMap(([name, ride]) =>
+    STROKE_POINTS.map(([phase, what]) => ({ name: `${name} pole push`, note: `${what} (${phase})`, ride: { ...ride, polePhase: phase }, airborne: false })),
+  ),
+  null,
+];
+const ENTRIES = new URLSearchParams(window.location.search).get('set') === 'poling' ? POLING : POSES;
 
 const COLS = 5;
 const ROWS = 4;
@@ -137,7 +159,7 @@ const flat: Heightfield = {
   bounds: { minX: -4, maxX: 4, minZ: -4, maxZ: 4, polygon: new Float32Array(0) },
 };
 
-const RIDE_DEFAULTS: RideState = { speed: 0, crouch: 0, lean: 0, brake: 0, brakeSide: 1, onRail: false, railYaw: 0 };
+const RIDE_DEFAULTS: RideState = { speed: 0, crouch: 0, lean: 0, brake: 0, brakeSide: 1, onRail: false, railYaw: 0, polePhase: 1 };
 
 /** The interpolated state the game would hand SkierView while riding like this. */
 function ridePose(r: RideState): SkierPose {
@@ -151,16 +173,22 @@ function ridePose(r: RideState): SkierPose {
   pose.brakeSide = r.brakeSide;
   pose.onRail = r.onRail;
   pose.yaw = r.railYaw;
+  pose.polePhase = r.polePhase;
   return pose;
 }
 
 const camera = new PerspectiveCamera(30, 1, 0.1, 50);
 
-// ?headwear=santa (or pumpkin) dresses every pose in it; ?glow=1 lights the pumpkin's face.
+// ?headwear=santa (or pumpkin) dresses every pose in it, ?jacket=23898a (any color part, hex
+// without the #) recolors that part, and ?glow=1 lights the pumpkin's face.
 const params = new URLSearchParams(window.location.search);
 const outfit: Outfit = { ...DEFAULT_OUTFIT };
 const headwear = HEADWEAR.find((h) => h.id === params.get('headwear'));
 if (headwear) outfit.headwear = headwear.id;
+for (const { id } of COLOR_PARTS) {
+  const hex = params.get(id);
+  if (hex && /^[0-9a-f]{6}$/i.test(hex)) outfit[id] = `#${hex}`;
+}
 const glow = Number(params.get('glow') ?? 0);
 
 interface View {

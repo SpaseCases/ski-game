@@ -130,6 +130,8 @@ export class SkierView {
   private readonly grabWeights = new Float32Array(GRABS.length);
   private bailWeight = 0;
   private railWeight = 0;
+  /** 1 while a pole push is under way: a tucked skier comes up into the crouch to push. */
+  private poleWeight = 0;
   /** The snow the skier is on; swapped when another map loads. */
   hf: Heightfield;
 
@@ -172,6 +174,7 @@ export class SkierView {
     this.grabWeights.fill(0);
     this.bailWeight = pose.bailed ? 1 : 0;
     this.railWeight = pose.onRail ? 1 : 0;
+    this.poleWeight = pose.polePhase < 1 && !pose.bailed ? 1 : 0;
   }
 
   update(state: SkierPose, frameTime: number): void {
@@ -201,6 +204,7 @@ export class SkierView {
     this.airWeight = approach(this.airWeight, state.grounded ? 0 : 1, frameTime / r.grabBlendTime);
     this.bailWeight = approach(this.bailWeight, state.bailed ? 1 : 0, frameTime / r.bailBlendTime);
     this.railWeight = approach(this.railWeight, state.onRail ? 1 : 0, frameTime / r.railBlendTime);
+    this.poleWeight = approach(this.poleWeight, state.polePhase < 1 && !state.bailed ? 1 : 0, frameTime / r.poleTuckBlendTime);
     let grabTotal = 0;
     for (let i = 0; i < GRABS.length; i++) {
       const w = approach(this.grabWeights[i] ?? 0, state.grab === i ? 1 : 0, frameTime / r.grabBlendTime);
@@ -220,9 +224,11 @@ export class SkierView {
     // Body on the snow: stance, sinking into a crouch while ↑ is held, which
     // becomes a speed tuck when going fast. Braking sinks a little, and a
     // landing absorbs into a quick crouch. On a rail the knees stay soft. In
-    // the air: knees up a little, tucking tighter the faster it rotates.
+    // the air: knees up a little, tucking tighter the faster it rotates. A
+    // pole push comes up out of the tuck into the crouch, the stroke's own
+    // starting point, so the hands swing past the body rather than through it.
     const speed = Math.hypot(state.velocity.x, state.velocity.z);
-    const tuck = smoothstep(r.tuckSpeedMin, r.tuckSpeedFull, speed);
+    const tuck = smoothstep(r.tuckSpeedMin, r.tuckSpeedFull, speed) * (1 - this.poleWeight);
     const squash = state.landDepth * landCurve(state.landTime);
     const groundCrouch =
       state.crouch * (1 - tuck) +
