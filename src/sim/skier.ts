@@ -1,5 +1,5 @@
 import { Quaternion, Vector3 } from 'three';
-import { CONFIG } from '../config.ts';
+import { CHEATS, TUNING } from './tuning.ts';
 import { GRAB_ACTIONS, type InputState } from '../core/input.ts';
 import { onPipeWall, onTakeoff, pipeInward } from '../maps/shapes.ts';
 import type { Heightfield, RailShape, SpawnDef } from '../maps/types.ts';
@@ -30,7 +30,9 @@ import { groundAt, heightAt } from './terrain.ts';
 // is what makes corks and misty flips.
 //
 // Landing checks the body against the snow; too far off and the skier
-// crashes: a cheap tumble that rolls and slides to a stop.
+// crashes: a cheap tumble that rolls and slides to a stop. With the No
+// crashes cheat on, nothing crashes: a bad landing is set upright on the
+// snow and rides on, and a hard hit only stops the skier.
 //
 // Rails and boxes: skis coming down onto one, close enough to its line and
 // lined up straight or sideways, lock on and slide along it. Otherwise they
@@ -239,7 +241,7 @@ export function placeSkierAt(s: SkierState, x: number, z: number, yaw: number, h
   s.position.y = groundAt(hf, x, z, s.normal);
   s.yaw = wrapAngle(yaw);
   groundOrient(s);
-  s.center.copy(s.position).addScaledVector(s.normal, CONFIG.air.comHeight);
+  s.center.copy(s.position).addScaledVector(s.normal, TUNING.air.comHeight);
 }
 
 // Scratch vectors so stepping never allocates.
@@ -279,7 +281,7 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
     stepBail(s, course, dt);
     return;
   }
-  const c = CONFIG.skier;
+  const c = TUNING.skier;
   s.poleCooldown = Math.max(0, s.poleCooldown - dt);
   s.poleTime += dt;
   s.polePhase = Math.min(1, s.poleTime / c.polePushInterval);
@@ -293,8 +295,8 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
   // normal there points back down the in-run.
   if (input.up.released && s.canPop && (s.grounded || s.airTime <= c.popCoyoteTime)) {
     const pop = c.popMin + (c.popMax - c.popMin) * s.crouch;
-    if (onWall(s, course.hf)) s.velocity.y += pop * CONFIG.air.wallPop;
-    else if (s.normal.y < Math.cos(CONFIG.air.wallAngle * DEG)) s.velocity.y += pop;
+    if (onWall(s, course.hf)) s.velocity.y += pop * TUNING.air.wallPop;
+    else if (s.normal.y < Math.cos(TUNING.air.wallAngle * DEG)) s.velocity.y += pop;
     else s.velocity.addScaledVector(s.normal, pop);
     if (s.grounded) takeOff(s, steer, course.hf);
     s.canPop = false;
@@ -322,8 +324,8 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
  * stepSkier).
  */
 function slideRail(s: SkierState, course: Course, steer: number, dt: number): void {
-  const c = CONFIG.skier;
-  const R = CONFIG.rails;
+  const c = TUNING.skier;
+  const R = TUNING.rails;
   const rail = course.rails[s.rail]!;
   s.brake = approach(s.brake, 0, dt / c.brakeRampTime);
   s.lean += (0 - s.lean) * (1 - Math.exp(-c.leanResponse * dt));
@@ -369,11 +371,11 @@ function slideRail(s: SkierState, course: Course, steer: number, dt: number): vo
     s.yawRate = 0;
   }
   groundOrient(s);
-  s.center.copy(s.position).addScaledVector(s.normal, CONFIG.air.comHeight);
+  s.center.copy(s.position).addScaledVector(s.normal, TUNING.air.comHeight);
 }
 
 function rideSnow(s: SkierState, input: InputState, dt: number): void {
-  const c = CONFIG.skier;
+  const c = TUNING.skier;
   const n = s.normal;
   const g = c.gravity;
   const press = g * n.y; // how hard gravity presses the skis into the snow
@@ -463,8 +465,8 @@ function rideSnow(s: SkierState, input: InputState, dt: number): void {
 }
 
 function fly(s: SkierState, input: InputState, steer: number, dt: number): void {
-  const c = CONFIG.skier;
-  const a = CONFIG.air;
+  const c = TUNING.skier;
+  const a = TUNING.air;
   s.airTime += dt;
   s.brake = approach(s.brake, 0, dt / c.brakeRampTime);
   s.lean += (0 - s.lean) * (1 - Math.exp(-c.leanResponse * dt));
@@ -513,7 +515,7 @@ function fly(s: SkierState, input: InputState, steer: number, dt: number): void 
  * snow (a carve into the lip) keeps going until a key takes over.
  */
 function rotateAxis(s: SkierState, bit: number, w: number, input: number, rate: number, dt: number): number {
-  const a = CONFIG.air;
+  const a = TUNING.air;
   if (input !== 0) {
     s.spinDriven |= bit;
     return approach(w, input * rate, a.rotateAccel * dt);
@@ -555,12 +557,12 @@ function airOrient(s: SkierState): void {
 function onWall(s: SkierState, hf: Heightfield): boolean {
   if (s.rail >= 0) return false;
   const p = s.position;
-  return (s.normal.y < Math.cos(CONFIG.air.wallAngle * DEG) && !onTakeoff(hf, p.x, p.z)) || onPipeWall(hf.shapes, p.x, p.z);
+  return (s.normal.y < Math.cos(TUNING.air.wallAngle * DEG) && !onTakeoff(hf, p.x, p.z)) || onPipeWall(hf.shapes, p.x, p.z);
 }
 
 /** Leaves the snow, setting up the air orientation to carry on exactly from the snow. */
 function takeOff(s: SkierState, steer: number, hf: Heightfield): void {
-  const a = CONFIG.air;
+  const a = TUNING.air;
   const wall = onWall(s, hf);
   s.grounded = false;
   s.airTime = 0;
@@ -580,7 +582,7 @@ function takeOff(s: SkierState, steer: number, hf: Heightfield): void {
     if (pipeInward(hf.shapes, s.position.x, s.position.z, frameUp)) frameUp.y = 0;
     else frameUp.set(n.x / flat, 0, n.z / flat);
     s.velocity.y = Math.min(s.velocity.y, a.wallLaunchMax);
-    const inward = clamp((a.wallDrift * CONFIG.skier.gravity) / (2 * Math.max(s.velocity.y, 0.5)), 0.2, 3);
+    const inward = clamp((a.wallDrift * TUNING.skier.gravity) / (2 * Math.max(s.velocity.y, 0.5)), 0.2, 3);
     s.velocity.addScaledVector(frameUp, inward - s.velocity.dot(frameUp));
     s.airFrame.setFromUnitVectors(UP, n);
   } else {
@@ -596,7 +598,7 @@ function takeOff(s: SkierState, steer: number, hf: Heightfield): void {
   qTurn.setFromAxisAngle(UP, s.airHeading);
   qPitch.setFromAxisAngle(SIDE, s.airPitch);
   s.trick.copy(s.airFrame).multiply(qTurn).multiply(qPitch).invert().multiply(s.orient);
-  const carry = s.railExit ? CONFIG.rails.spinCarry : a.spinCarry;
+  const carry = s.railExit ? TUNING.rails.spinCarry : a.spinCarry;
   s.spin.set(0, s.yawRate * carry + steer * a.spinPreload, 0);
   s.spinDriven = 0;
   s.grab = -1;
@@ -605,7 +607,7 @@ function takeOff(s: SkierState, steer: number, hf: Heightfield): void {
 
 /** Moves the skier along the snow, or lets it fly where the snow falls away. */
 function moveOnSnow(s: SkierState, course: Course, steer: number, dt: number): void {
-  const c = CONFIG.skier;
+  const c = TUNING.skier;
   const hf = course.hf;
   const p = s.position;
   p.addScaledVector(s.velocity, dt);
@@ -648,12 +650,12 @@ function moveOnSnow(s: SkierState, course: Course, steer: number, dt: number): v
     return;
   }
   groundOrient(s);
-  s.center.copy(p).addScaledVector(s.normal, CONFIG.air.comHeight);
+  s.center.copy(p).addScaledVector(s.normal, TUNING.air.comHeight);
 }
 
 /** Flies the center of mass with the feet hanging below it along the body. Lands or crashes on contact. */
 function moveInAir(s: SkierState, course: Course, dt: number): void {
-  const a = CONFIG.air;
+  const a = TUNING.air;
   const hf = course.hf;
   const p = s.position;
   s.center.addScaledVector(s.velocity, dt);
@@ -672,10 +674,15 @@ function moveInAir(s: SkierState, course: Course, dt: number): void {
   }
   head.copy(p).addScaledVector(bodyUp, a.headHeight);
   if (head.y <= heightAt(hf, head.x, head.z)) {
-    // Head first into the snow: crash where the body is.
+    // Head first into the snow: crash where the body is (or, with no
+    // crashes, land there).
     p.x = s.center.x;
     p.z = s.center.z;
     p.y = groundAt(hf, p.x, p.z, contactNormal);
+    if (CHEATS.noCrashes) {
+      land(s);
+      return;
+    }
     s.landPitch = Math.acos(clamp(bodyUp.dot(contactNormal), -1, 1));
     s.landRoll = 0;
     s.landSide = 0;
@@ -690,7 +697,7 @@ function moveInAir(s: SkierState, course: Course, dt: number): void {
  * slip off to the side. Returns true when locked on (or crashed onto it).
  */
 function catchRail(s: SkierState, rails: readonly RailShape[]): boolean {
-  const R = CONFIG.rails;
+  const R = TUNING.rails;
   const p = s.position;
   if (!railUnder(rails, p.x, p.z, R.snapDistance, spot)) return false;
   if (p.y > spot.top || p.y < spot.top - R.catchDepth) return false;
@@ -713,7 +720,7 @@ function catchRail(s: SkierState, rails: readonly RailShape[]): boolean {
 
   p.copy(head);
   s.normal.copy(n);
-  if (into > CONFIG.landing.impactMax) {
+  if (into > TUNING.landing.impactMax && !CHEATS.noCrashes) {
     crash(s, 'impact');
     return true;
   }
@@ -727,7 +734,7 @@ function catchRail(s: SkierState, rails: readonly RailShape[]): boolean {
  * straight or sideways, as when landing on one.
  */
 function mountRail(s: SkierState, rails: readonly RailShape[]): boolean {
-  const R = CONFIG.rails;
+  const R = TUNING.rails;
   const p = s.position;
   if (!railUnder(rails, p.x, p.z, R.snapDistance, spot)) return false;
   if (spot.top > p.y + R.stepTolerance || spot.top < p.y - R.sinkDepth) return false;
@@ -783,15 +790,15 @@ function lockOn(s: SkierState, railYaw: number, into: number): void {
   s.press = 0;
   if (into > 0) {
     s.landTime = 0;
-    s.landDepth = clamp((into - 1) / (CONFIG.landing.squashImpact - 1), 0, 1);
+    s.landDepth = clamp((into - 1) / (TUNING.landing.squashImpact - 1), 0, 1);
   }
   groundOrient(s);
-  s.center.copy(s.position).addScaledVector(s.normal, CONFIG.air.comHeight);
+  s.center.copy(s.position).addScaledVector(s.normal, TUNING.air.comHeight);
 }
 
 /** Misses the rail: moves clear of it to the side the skier came down on, drifting away. */
 function slipOff(s: SkierState, halfWidth: number, railYaw: number): void {
-  const R = CONFIG.rails;
+  const R = TUNING.rails;
   const sign = spot.side < 0 ? -1 : 1;
   // Right of the rail's direction, seen from above.
   const rx = Math.cos(railYaw) * sign;
@@ -812,7 +819,7 @@ function bump(s: SkierState, course: Course): boolean {
     collideRails(course.rails, s.position, s.velocity),
     collideObstacles(course.obstacles, s.position, s.velocity),
   );
-  if (hit < CONFIG.rails.crashSpeed) return false;
+  if (hit < TUNING.rails.crashSpeed || CHEATS.noCrashes) return false;
   const p = s.position;
   const h = groundAt(course.hf, p.x, p.z, contactNormal);
   if (s.grounded) p.y = h;
@@ -826,7 +833,7 @@ function bump(s: SkierState, course: Course): boolean {
 
 /** The skis touch down: ride away if the body is close to the snow's angle, otherwise crash. */
 function land(s: SkierState): void {
-  const L = CONFIG.landing;
+  const L = TUNING.landing;
   const n = contactNormal;
   bodyUp.set(0, 1, 0).applyQuaternion(s.orient);
   bodyForward.set(0, 0, -1).applyQuaternion(s.orient);
@@ -835,7 +842,7 @@ function land(s: SkierState): void {
   const impact = Math.max(0, -vn);
   // The skis' direction along the snow, and across it.
   bodyForward.addScaledVector(n, -bodyForward.dot(n));
-  const skiLen = bodyForward.length();
+  let skiLen = bodyForward.length();
   if (skiLen > 1e-3) bodyForward.divideScalar(skiLen);
   skiSide.crossVectors(n, bodyForward);
   // Body up against the snow normal: tipped nose up or down, and rolled onto
@@ -871,8 +878,18 @@ function land(s: SkierState): void {
             ? 'impact'
             : '';
   if (reason !== '') {
-    crash(s, reason);
-    return;
+    if (!CHEATS.noCrashes) {
+      crash(s, reason);
+      return;
+    }
+    // No crashes: upright on the snow with the skis along the travel (or
+    // switch, if they were closer to that), and ride on without the spin.
+    if (speed > 0.5) {
+      const dir = skiLen > 1e-3 && bodyForward.dot(tangent) < 0 ? -1 : 1;
+      bodyForward.copy(tangent).multiplyScalar(dir / speed);
+      skiLen = 1;
+    }
+    s.spin.set(0, 0, 0);
   }
 
   // Clean: the snow takes the speed into it, the skis take the heading, and
@@ -888,7 +905,7 @@ function land(s: SkierState): void {
     s.yaw = Math.atan2(-local.x, -local.z);
   }
   axis.copy(s.spin).applyQuaternion(s.orient);
-  const maxRate = CONFIG.skier.turnRateSlow;
+  const maxRate = TUNING.skier.turnRateSlow;
   s.yawRate = clamp(axis.dot(n), -maxRate, maxRate);
   s.grounded = true;
   s.airTime = 0;
@@ -900,12 +917,12 @@ function land(s: SkierState): void {
   s.landTime = 0;
   s.landDepth = clamp((impact - 1) / (L.squashImpact - 1), 0, 1);
   groundOrient(s);
-  s.center.copy(s.position).addScaledVector(n, CONFIG.air.comHeight);
+  s.center.copy(s.position).addScaledVector(n, TUNING.air.comHeight);
 }
 
 /** Starts the crash tumble from wherever the body is, on the snow at contactNormal. */
 function crash(s: SkierState, reason: BailReason): void {
-  const b = CONFIG.bail;
+  const b = TUNING.bail;
   const n = contactNormal;
   s.bailed = true;
   s.bailTime = 0;
@@ -931,8 +948,8 @@ function crash(s: SkierState, reason: BailReason): void {
 
 /** Crash: the body rolls and slides to a stop. The game decides when to respawn. */
 function stepBail(s: SkierState, course: Course, dt: number): void {
-  const b = CONFIG.bail;
-  const g = CONFIG.skier.gravity;
+  const b = TUNING.bail;
+  const g = TUNING.skier.gravity;
   const hf = course.hf;
   const v = s.velocity;
   s.bailTime += dt;
@@ -946,7 +963,7 @@ function stepBail(s: SkierState, course: Course, dt: number): void {
     tangent.copy(v).addScaledVector(n, -vn);
     const speed = tangent.length();
     let slowed = Math.max(0, speed - b.friction * load * dt);
-    slowed /= 1 + CONFIG.skier.dragStand * slowed * dt;
+    slowed /= 1 + TUNING.skier.dragStand * slowed * dt;
     tangent.multiplyScalar(speed > 1e-6 ? slowed / speed : 0);
     v.copy(tangent).addScaledVector(n, Math.min(vn, 0) - load * dt);
     // Roll along the snow like a ball: ω = n × v / r.

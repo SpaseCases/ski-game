@@ -43,13 +43,14 @@ class PlankScreen implements Screen {
 }
 
 export class TitleScreen extends PlankScreen {
-  constructor(actions: { play: () => void; settings: () => void; controls: () => void }) {
+  constructor(actions: { play: () => void; settings: () => void; controls: () => void; cheats: () => void }) {
     super('Park Laps', 'title-screen');
     this.sub.textContent = 'Freeskiing in a terrain park, on a big mountain, through race gates and off a big air tower.';
     this.sub.hidden = false;
     this.addItem('Play', actions.play);
     this.addItem('Settings', actions.settings);
     this.addItem('Controls', actions.controls);
+    this.addItem('Cheats', actions.cheats);
   }
 }
 
@@ -60,6 +61,7 @@ export interface PauseActions {
   maps: () => void;
   settings: () => void;
   controls: () => void;
+  cheats: () => void;
 }
 
 export class PauseScreen extends PlankScreen {
@@ -77,6 +79,7 @@ export class PauseScreen extends PlankScreen {
     this.addItem('Map select', actions.maps);
     this.addItem('Settings', actions.settings);
     this.addItem('Controls', actions.controls);
+    this.addItem('Cheats', actions.cheats);
     setHints(this.foot, [
       [['↑', '↓'], 'Choose'],
       [['Enter'], 'Pick'],

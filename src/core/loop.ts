@@ -1,4 +1,5 @@
 import { CONFIG } from '../config.ts';
+import { TUNING } from '../sim/tuning.ts';
 
 /** Advances the simulation by exactly `dt` seconds. */
 export type StepFn = (dt: number) => void;
@@ -11,7 +12,9 @@ export type RenderFn = (alpha: number, frameTime: number) => void;
 
 /**
  * Fixed-timestep loop: the simulation runs at CONFIG.sim.stepHz no matter the
- * display rate, and rendering happens once per animation frame. While
+ * display rate, and rendering happens once per animation frame. Real time
+ * is scaled by TUNING.sim.timeScale on its way into the accumulator (Slow
+ * motion), so the sim still steps at stepHz, just fewer times. While
  * `paused()` is true no step runs and no time builds up: the accumulator
  * holds still, so the drawn frame (and its interpolation) stays put.
  */
@@ -28,7 +31,7 @@ export function startLoop(step: StepFn, render: RenderFn, paused: () => boolean)
     last = now;
     if (frameTime > CONFIG.sim.maxFrameTime) frameTime = CONFIG.sim.maxFrameTime;
 
-    if (!paused()) accumulator += frameTime;
+    if (!paused()) accumulator += frameTime * TUNING.sim.timeScale;
     while (accumulator >= dt) {
       step(dt);
       accumulator -= dt;

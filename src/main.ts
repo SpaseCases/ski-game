@@ -25,7 +25,9 @@ import {
 import { createRace, resetRace, stepRace, type CourseDef, type RaceState } from './sim/race.ts';
 import { copySkierState, createSkierState, placeSkierAt, stepSkier } from './sim/skier.ts';
 import { heightAt } from './sim/terrain.ts';
-import type { DevPanel } from './ui/devPanel.ts';
+import { anyCheat, CHEATS, configChanged, rebuildTuning, setCheat, TUNING } from './sim/tuning.ts';
+import { CheatsScreen } from './ui/cheatsMenu.ts';
+import type { TuningPanel } from './ui/tuningPanel.ts';
 import { mountWindowButtons } from './ui/embed.ts';
 import { Fader } from './ui/fade.ts';
 import { mountFpsMeter } from './ui/fps.ts';
@@ -64,6 +66,7 @@ const fps = mountFpsMeter(hud);
 const crashHint = mountCrashHint(hud);
 const fader = new Fader(hud);
 const toast = new Toast(hud);
+const cheatsTag = mountCheatsTag(hud);
 const raceHud = new RaceHud(hud);
 const runHud = new RunHud(hud, backToTop);
 const trailMap = new TrailMap(hud, closeTrailMap);
@@ -74,7 +77,7 @@ keyboard.attach(window);
 // and the screens they open. The game waits while any is open.
 const menus = new Menus(hud, onRootBack, onGameKey, () => [...windowBar.querySelectorAll<HTMLElement>('a, button')]);
 menus.scenery.innerHTML = titleArt();
-const titleScreen = new TitleScreen({ play: openMapSelect, settings: openSettings, controls: openControls });
+const titleScreen = new TitleScreen({ play: openMapSelect, settings: openSettings, controls: openControls, cheats: openCheats });
 const pauseScreen = new PauseScreen({
   resume: closeMenus,
   respawn: () => {
@@ -88,6 +91,7 @@ const pauseScreen = new PauseScreen({
   maps: openMapSelect,
   settings: openSettings,
   controls: openControls,
+  cheats: openCheats,
 });
 const mapSelect = new MapSelect((entry) => void loadMap(entry), () => menus.back());
 const settingsScreen = new SettingsScreen(
@@ -106,7 +110,22 @@ const settingsScreen = new SettingsScreen(
   () => menus.back(),
 );
 const controlsScreen = new ControlsScreen(() => settings.bindings, () => menus.back());
-for (const screen of [titleScreen, pauseScreen, mapSelect, settingsScreen, controlsScreen]) menus.add(screen);
+const cheatsScreen = new CheatsScreen(
+  {
+    isOn: (id) => CHEATS[id],
+    set: (id, on) => {
+      setCheat(id, on);
+      syncCheatsTag();
+    },
+    panelOpen: () => tuningPanel?.isOpen ?? false,
+    togglePanel: async () => {
+      if (tuningPanel?.isOpen) tuningPanel.close();
+      else (await loadTuningPanel()).open();
+    },
+  },
+  () => menus.back(),
+);
+for (const screen of [titleScreen, pauseScreen, mapSelect, settingsScreen, controlsScreen, cheatsScreen]) menus.add(screen);
 
 // HUD buttons for the mouse, beside the window buttons; hidden while a menu is open.
 /** Under a finished timed run's result: the respawn key races the course again. */
@@ -210,7 +229,7 @@ async function loadMap(entry: MapEntry): Promise<void> {
       chase = new ChaseCamera(camera, built.hf);
     }
     writeStored('map', entry.id);
-    devPanel?.setMap(map);
+    tuningPanel?.setMap(map);
     backToTop();
     mapSelect.setLoading(null);
     closeMenus();
@@ -249,6 +268,15 @@ function openSettings(): void {
 
 function openControls(): void {
   menus.push(controlsScreen);
+}
+
+function openCheats(): void {
+  menus.push(cheatsScreen);
+}
+
+/** "Cheats on" in a corner while any cheat is on or the tuning panel has changed a number. */
+function syncCheatsTag(): void {
+  cheatsTag.hidden = !(anyCheat() || configChanged());
 }
 
 /** Esc on the bottom screen: the pause menu resumes; the title stays (there's nothing to go back to). */
@@ -345,12 +373,32 @@ function teleport(x: number, z: number, heading: number, speed: number): void {
   snapView = true;
 }
 
-let devPanel: DevPanel | null = null;
-if (import.meta.env.DEV) {
-  void import('./ui/devPanel.ts').then(({ mountDevPanel }) => {
-    devPanel = mountDevPanel({ respawn, backToTop, teleport, setQuality, quality });
-    if (level) devPanel.setMap(level.built.map);
+/** The live tuning panel: loaded (its own chunk, with lil-gui) the first time it's opened. */
+let tuningPanel: TuningPanel | null = null;
+let panelLoading: Promise<TuningPanel> | null = null;
+function loadTuningPanel(): Promise<TuningPanel> {
+  panelLoading ??= import('./ui/tuningPanel.ts').then(({ mountTuningPanel }) => {
+    const panel = mountTuningPanel({
+      changed: syncCheatsTag,
+      shown: () => cheatsScreen.sync(),
+      respawn,
+      backToTop,
+      teleport,
+      setQuality,
+      quality,
+    });
+    tuningPanel = panel;
+    if (level) panel.setMap(level.built.map);
+    return panel;
   });
+  // A failed load can be tried again.
+  panelLoading.catch(() => (panelLoading = null));
+  return panelLoading;
+}
+
+if (import.meta.env.DEV) {
+  // Dev builds open it at startup, folded up.
+  void loadTuningPanel().then((p) => p.open(true));
   // Handle for inspecting the sim from the browser console while testing.
   Object.assign(window, {
     parkLaps: {
@@ -361,6 +409,18 @@ if (import.meta.env.DEV) {
       renderer,
       backdrop: view.backdrop,
       config: CONFIG,
+      /** The numbers the sim runs on (CONFIG with the cheats); call rebuildTuning() after editing config. */
+      tuning: TUNING,
+      cheats: CHEATS,
+      setCheat: (id: keyof typeof CHEATS, on: boolean) => {
+        setCheat(id, on);
+        syncCheatsTag();
+        cheatsScreen.sync();
+      },
+      rebuildTuning: () => {
+        rebuildTuning();
+        syncCheatsTag();
+      },
       respawn,
       backToTop,
       teleport,
@@ -422,7 +482,8 @@ startLoop(
       heldToTop = false;
     }
     if (keys.respawn.held) {
-      holdTime += dt;
+      // Real seconds, whatever the game speed.
+      holdTime += dt / TUNING.sim.timeScale;
       if (!heldToTop && holdTime >= CONFIG.checkpoints.holdToTop) {
         heldToTop = true;
         backToTop();
@@ -460,7 +521,9 @@ startLoop(
   },
   (alpha, realFrameTime) => {
     // While the game waits, everything that moves by time holds still too.
-    const frameTime = gameWaits() ? 0 : realFrameTime;
+    // In slow motion it all slows with the sim; the HUD keeps real time.
+    const hudTime = gameWaits() ? 0 : realFrameTime;
+    const frameTime = hudTime * TUNING.sim.timeScale;
     if (level && skierView && chase) {
       interpolateSkier(pose, skierPrev, skier, alpha);
       const snapped = snapView;
@@ -482,9 +545,9 @@ startLoop(
     }
 
     renderFrame(view);
-    fader.update(frameTime);
+    fader.update(hudTime);
     crashHint.show(pose.bailed);
-    toast.update(frameTime);
+    toast.update(hudTime);
     const race = level?.race;
     const course = timedCourse();
     raceHud.update(course !== undefined, course?.name ?? '', race?.time ?? 0, race?.missed ?? 0);
@@ -492,10 +555,19 @@ startLoop(
     const result = finished && race?.finished ? `${course?.name ?? ''} · ${formatTime(race.time)} · ${missedText(race.missed)}` : '';
     runHud.update(finished, result, result === '' ? '' : raceAgainHint, heldToTop ? 0 : holdTime);
     fps.frame(realFrameTime);
-    devPanel?.update(pose, skier);
+    tuningPanel?.update(pose, skier);
   },
   gameWaits,
 );
+
+function mountCheatsTag(parent: HTMLElement): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'cheats-tag ride-only';
+  el.textContent = 'Cheats on';
+  el.hidden = true;
+  parent.appendChild(el);
+  return el;
+}
 
 function hudButton(label: string, onClick: () => void): HTMLButtonElement {
   const b = document.createElement('button');

@@ -309,8 +309,7 @@ body {
 }
 
 .menu-open .focus-hint,
-.menu-open .ride-only,
-.menu-open .lil-gui.autoPlace {
+.menu-open .ride-only {
   display: none;
 }
 
@@ -652,6 +651,116 @@ body {
   padding: 0 12px 12px;
 }
 
+/* Cheats: a lift status board, each row's tag On or Off. */
+.cheats-screen {
+  width: min(780px, 100%);
+}
+
+.cheat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cheat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px 14px;
+  min-height: 76px;
+  padding: 11px 40px 11px 18px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--plank);
+  color: var(--snow);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cheat:hover {
+  background: var(--plank-hover);
+}
+
+.cheat:focus {
+  outline: none;
+  background: var(--snow);
+  color: var(--ink);
+  box-shadow: inset 7px 0 0 var(--flag);
+  clip-path: polygon(0 0, calc(100% - 24px) 0, 100% 50%, calc(100% - 24px) 100%, 0 100%);
+}
+
+.cheat-name {
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.cheat-what {
+  grid-column: 1;
+  color: var(--frost);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.cheat:focus .cheat-what {
+  color: #3d5370;
+}
+
+.cheat-tag {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-width: 3.3em;
+  padding: 5px 0 4px;
+  border-radius: 3px;
+  background: var(--enamel-deep);
+  color: var(--frost);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.cheat:focus .cheat-tag {
+  background: #dce5ef;
+  color: var(--ink);
+}
+
+.cheat[aria-pressed='true'] .cheat-tag {
+  background: var(--flag);
+  color: var(--ink);
+}
+
+.cheat-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.cheats-screen .setting-note {
+  max-width: 62ch;
+  margin-top: 10px;
+}
+
+/* The HUD's reminder that the physics aren't the usual ones. */
+.cheats-tag {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 6px 11px 5px;
+  border-radius: 3px;
+  background: var(--flag);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.cheats-tag[hidden] {
+  display: none;
+}
+
 /* Settings. */
 .settings-columns {
   display: grid;
@@ -914,6 +1023,14 @@ body {
   .setting-row {
     grid-template-columns: minmax(0, 1fr);
     gap: 6px;
+  }
+
+  .cheat-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cheat {
+    min-height: 0;
   }
 
   .board-foot {

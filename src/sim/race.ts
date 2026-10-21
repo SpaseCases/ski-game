@@ -6,6 +6,7 @@ import { smoothstep } from '../maps/terrain.ts';
 import { inFinish } from './checkpoints.ts';
 import { heightAt } from './terrain.ts';
 import type { SkierState } from './skier.ts';
+import { TUNING } from './tuning.ts';
 
 // Timed runs. A map can have several courses side by side, each with its
 // own race start house and timing wand, its own gates and its own finish.
@@ -141,7 +142,7 @@ export function buildRace(features: readonly Feature[], finishes: readonly Finis
 /** How far (m) to the gate's right side `i` stands (negative: left): its pole, or its panel's middle. */
 export function sideOffset(def: RaceDef, i: number): number {
   const g = def.gates[i >> 1]!;
-  const out = def.panel[i >> 1] === 1 ? g.half + CONFIG.giantSlalom.panelWidth / 2 : g.half;
+  const out = def.panel[i >> 1] === 1 ? g.half + TUNING.giantSlalom.panelWidth / 2 : g.half;
   return (i & 1) === 0 ? -out : out;
 }
 
@@ -322,7 +323,7 @@ function bendSides(race: RaceState, def: RaceDef, s: SkierState, dt: number): vo
  * costs nothing and only flicks aside.
  */
 function bendPole(race: RaceState, def: RaceDef, i: number, s: SkierState, dt: number): void {
-  const c = CONFIG.slalom;
+  const c = TUNING.slalom;
   const v = s.velocity;
   const g = def.gates[i >> 1]!;
   const across = sideOffset(def, i);
@@ -394,8 +395,8 @@ function bendPole(race: RaceState, def: RaceDef, i: number, s: SkierState, dt: n
  * glancing it is, and brushing one in passing costs nothing.
  */
 function bendPanel(race: RaceState, def: RaceDef, i: number, s: SkierState, dt: number): void {
-  const c = CONFIG.giantSlalom;
-  const pole = CONFIG.slalom.poleHeight;
+  const c = TUNING.giantSlalom;
+  const pole = TUNING.slalom.poleHeight;
   const half = c.panelWidth / 2;
   const v = s.velocity;
   const g = def.gates[i >> 1]!;

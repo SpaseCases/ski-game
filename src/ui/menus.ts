@@ -1,3 +1,4 @@
+import { inTuningPanel } from '../core/input.ts';
 import { keycap } from './keyNames.ts';
 import { signText } from './signText.ts';
 
@@ -8,7 +9,8 @@ import { signText } from './signText.ts';
 // - with a menu open, arrows move focus spatially, Tab cycles inside the
 //   menu, Enter and Space press the focused button (as buttons do), and Esc
 //   goes back a screen;
-// - with no menu open, keys go to the game's handler.
+// - with no menu open, keys go to the game's handler;
+// - keys pressed in the tuning panel are left to it (Esc lets go of it).
 // Game keys never reach the skier while a menu is open: the game turns its
 // Keyboard off whenever a menu opens.
 
@@ -163,6 +165,10 @@ export class Menus {
       const fn = this.trap;
       this.trap = null;
       fn(e);
+      return;
+    }
+    if (inTuningPanel(e.target)) {
+      if (e.key === 'Escape' && e.target instanceof HTMLElement) e.target.blur();
       return;
     }
     if (!this.isOpen) {

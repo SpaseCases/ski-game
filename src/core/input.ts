@@ -148,7 +148,7 @@ export class Keyboard {
   }
 
   private onKeyDown(e: KeyboardEvent): void {
-    if (!this.enabled || isTypingTarget(e.target)) return;
+    if (!this.enabled || isTypingTarget(e.target) || inTuningPanel(e.target)) return;
     // Enter and Space on a focused HUD button or link work it, not the game.
     if (isPressable(e.target) && (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space')) return;
     const actions = this.actionsByCode.get(e.code);
@@ -179,6 +179,11 @@ export class Keyboard {
     this.pressedLatch.clear();
     this.releasedLatch.clear();
   }
+}
+
+/** True for a key pressed in the tuning panel (lil-gui): it's typing or using the panel, never riding. */
+export function inTuningPanel(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest('.lil-gui') !== null;
 }
 
 function isPressable(target: EventTarget | null): boolean {

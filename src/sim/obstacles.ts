@@ -1,4 +1,4 @@
-import { CONFIG } from '../config.ts';
+import { TUNING } from './tuning.ts';
 import type { Heightfield, ObstacleDef, RailShape } from '../maps/types.ts';
 import { heightAt, type Vec3Like } from './terrain.ts';
 
@@ -57,7 +57,7 @@ export function buildObstacles(defs: readonly ObstacleDef[], hf: Heightfield): O
   // Every cell an obstacle could touch a body in: count them per cell, then
   // fill each cell's slice of one array (big maps have too many cells for a
   // list each).
-  const reach = CONFIG.rails.bodyRadius;
+  const reach = TUNING.rails.bodyRadius;
   const span = new Int32Array(n * 4);
   const counts = new Int32Array(o.cols * o.rows + 1);
   defs.forEach((d, i) => {
@@ -107,7 +107,7 @@ export function collideObstacles(o: Obstacles, p: Vec3Like, v: Vec3Like): number
   const row = Math.floor((p.z - o.originZ) / o.cell);
   if (col < 0 || row < 0 || col >= o.cols || row >= o.rows) return -1;
   const k = row * o.cols + col;
-  const head = CONFIG.air.headHeight;
+  const head = TUNING.air.headHeight;
   let hit = -1;
   for (let j = o.start[k] ?? 0; j < (o.start[k + 1] ?? 0); j++) {
     const i = o.items[j] ?? 0;
@@ -121,7 +121,7 @@ export function collideObstacles(o: Obstacles, p: Vec3Like, v: Vec3Like): number
     const t = len2 > 1e-9 ? Math.min(1, Math.max(0, ((p.x - ax) * sx + (p.z - az) * sz) / len2)) : 0;
     let nx = p.x - (ax + sx * t);
     let nz = p.z - (az + sz * t);
-    const reach = (o.radius[i] ?? 0) + CONFIG.rails.bodyRadius;
+    const reach = (o.radius[i] ?? 0) + TUNING.rails.bodyRadius;
     const d = Math.hypot(nx, nz);
     if (d >= reach) continue;
     if (d > 1e-6) {

@@ -1,5 +1,7 @@
 // Every tunable number lives here. Adjust values before rewriting logic.
-// The object is mutable on purpose: the dev tuning panel edits it live.
+// The object is mutable on purpose: the tuning panel edits it live. The sim
+// doesn't read it directly: it reads sim/tuning.ts's TUNING, these numbers
+// times the ski's and the cheats' multipliers (the `cheats` block below).
 
 export const CONFIG = {
   sim: {
@@ -7,6 +9,8 @@ export const CONFIG = {
     stepHz: 120,
     /** Longest frame (seconds) fed to the accumulator; stops a spiral after a stall or tab switch. */
     maxFrameTime: 0.25,
+    /** Game speed: the share of real time fed to the simulation (and everything else that moves by time). */
+    timeScale: 1,
   },
 
   skier: {
@@ -399,6 +403,28 @@ export const CONFIG = {
      * the left and a little behind, so the chase camera sees the skier lit.
      */
     sunFrom: { x: -0.4, y: 1.2, z: 0.3 },
+  },
+
+  /**
+   * Cheats (the Cheats screen): each one multiplies these numbers in their
+   * blocks above while it's on. They combine freely, and No crashes (no
+   * numbers) is a switch the sim reads. See sim/tuning.ts.
+   */
+  cheats: {
+    /** Long floaty airs. */
+    lowGravity: { skier: { gravity: 0.4 } },
+    /**
+     * A much higher top speed: less ski friction and air drag (riding and
+     * flying), and a stronger, faster-reaching pole push. Gravity stays, so
+     * it still works with Low gravity.
+     */
+    superFast: { skier: { skiFriction: 0.3, dragStand: 0.4, dragCrouch: 0.4, dragAir: 0.4, poleMaxSpeed: 2, polePushSpeed: 1.5 } },
+    /** Pops launch far higher. */
+    moonJump: { skier: { popMin: 2.5, popMax: 2.5 } },
+    /** The whole game runs slower, so tricks are easier to time. */
+    slowMotion: { sim: { timeScale: 0.5 } },
+    /** Spins, flips and Lincoln loops rotate faster, and reach their speed as quickly. */
+    turboSpins: { air: { spinRate: 2, flipRate: 2, lincolnRate: 2, rotateAccel: 2 } },
   },
 
   debug: {

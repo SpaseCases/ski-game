@@ -1,4 +1,4 @@
-import { CONFIG } from '../config.ts';
+import { TUNING } from './tuning.ts';
 import type { Feature, Heightfield, RailShape } from '../maps/types.ts';
 import { heightAt, type Vec3Like } from './terrain.ts';
 
@@ -15,7 +15,7 @@ export function buildRailShapes(features: readonly Feature[], hf: Heightfield): 
   const shapes: RailShape[] = [];
   for (const f of features) {
     if (f.type !== 'box' && f.type !== 'rail') continue;
-    const halfWidth = f.type === 'box' ? f.width / 2 : f.radius > 0 ? f.radius : f.style === 'log' ? LOG_RADIUS : CONFIG.rails.radius;
+    const halfWidth = f.type === 'box' ? f.width / 2 : f.radius > 0 ? f.radius : f.style === 'log' ? LOG_RADIUS : TUNING.rails.radius;
     // Logs, benches and stumps are wood, ledges and rocks stone; park box decks and rails are metal.
     const metal = f.type === 'rail' ? f.style !== 'log' : f.style === 'wood';
     const points = f.points.map((p) => [p.x, p.z, p.height] as const);
@@ -173,7 +173,7 @@ export function railFrame(r: RailShape, s: number, pos: Vec3Like, dir: Vec3Like)
  * moving into a face (0 for a touch), or -1 if it touched nothing.
  */
 export function collideRails(rails: readonly RailShape[], p: Vec3Like, v: Vec3Like): number {
-  const R = CONFIG.rails;
+  const R = TUNING.rails;
   const radius = R.bodyRadius;
   let hit = -1;
   for (let i = 0; i < rails.length; i++) {

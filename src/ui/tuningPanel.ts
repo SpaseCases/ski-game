@@ -1,19 +1,33 @@
-// Dev-only live tuning panel. main.ts loads this with a dynamic import behind
-// import.meta.env.DEV, so neither this file nor lil-gui reaches production.
+// The live tuning panel (lil-gui), in every build. main.ts loads this with a
+// dynamic import only when the Cheats screen opens it (dev builds open it at
+// startup, folded up), so neither this file nor lil-gui is in the first
+// load. It edits CONFIG, the base numbers; every change rebuilds the sim's
+// TUNING. Changes last until reload; Reset puts back config.ts's values.
+// Keys pressed while the panel has focus never reach the skier or the menus
+// (see core/input.ts inTuningPanel).
 import GUI from 'lil-gui';
 import { CONFIG } from '../config.ts';
 import { QUALITIES, type Quality } from '../core/settings.ts';
 import type { MapDef } from '../maps/types.ts';
 import type { SkierPose } from '../render/skierView.ts';
 import type { SkierState } from '../sim/skier.ts';
+import { rebuildTuning, resetConfig } from '../sim/tuning.ts';
 
-export interface DevPanel {
+export interface TuningPanel {
   update(pose: SkierPose, skier: SkierState): void;
   /** Lists the test spots of a newly loaded map. */
   setMap(map: MapDef): void;
+  readonly isOpen: boolean;
+  /** Shows the panel, unfolded unless `folded`. */
+  open(folded?: boolean): void;
+  close(): void;
 }
 
-export interface DevActions {
+export interface PanelActions {
+  /** A number changed (or was reset): the sim's numbers were rebuilt. */
+  changed: () => void;
+  /** The panel was shown or hidden. */
+  shown: (open: boolean) => void;
   respawn: () => void;
   backToTop: () => void;
   /** Puts the skier at (x, z) facing `heading` (radians), moving at `speed` m/s. */
@@ -88,11 +102,32 @@ export function testSpots(map: MapDef): Record<string, TestSpot> {
   return spots;
 }
 
-export function mountDevPanel(actions: DevActions): DevPanel {
-  const gui = new GUI({ title: 'Tuning (dev only)', width: 290 });
-  // Keep the top-right corner free for the window buttons.
-  gui.domElement.style.left = '0';
-  gui.domElement.style.right = 'auto';
+export function mountTuningPanel(actions: PanelActions): TuningPanel {
+  const gui = new GUI({ title: 'Tuning (until reload)', width: 290 });
+  // Down the right, under the window buttons.
+  const el = gui.domElement;
+  el.classList.add('tuning-panel');
+  el.style.top = '52px';
+  el.style.right = '8px';
+  el.style.maxHeight = 'calc(100% - 60px)';
+  // Pressed buttons and picked options let go of focus, so riding keys work again at once.
+  el.addEventListener('click', (e) => {
+    if (e.target instanceof Element && e.target.closest('button')) blurActive(el);
+  });
+  el.addEventListener('change', (e) => {
+    if (e.target instanceof HTMLSelectElement) e.target.blur();
+  });
+
+  const panel = {
+    reset: (): void => {
+      resetConfig();
+      for (const c of gui.controllersRecursive()) c.updateDisplay();
+      actions.changed();
+    },
+    close: (): void => hide(),
+  };
+  gui.add(panel, 'close').name('Close panel');
+  gui.add(panel, 'reset').name('Reset to config.ts values');
 
   const readout = { speed: '0 km/h', state: 'riding', landing: '–' };
   gui.add(readout, 'speed').name('Speed').listen().disable();
@@ -260,7 +295,31 @@ export function mountDevPanel(actions: DevActions): DevPanel {
   cam.add(c, 'orbitReturnRate', 0.1, 10, 0.1);
   cam.close();
 
+  // Every number edited here changes the sim's numbers at once.
+  gui.onChange(() => {
+    rebuildTuning();
+    actions.changed();
+  });
+
+  let shown = true;
+  const hide = (): void => {
+    gui.hide();
+    shown = false;
+    actions.shown(false);
+  };
+
   return {
+    get isOpen(): boolean {
+      return shown;
+    },
+    open(folded = false): void {
+      gui.show();
+      if (folded) gui.close();
+      else gui.open();
+      shown = true;
+      actions.shown(true);
+    },
+    close: hide,
     setMap(map: MapDef): void {
       spots = testSpots(map);
       fillSpots();
@@ -279,6 +338,11 @@ export function mountDevPanel(actions: DevActions): DevPanel {
         `side ${Math.round(skier.landSide * DEG)}° ${skier.landImpact.toFixed(1)} m/s`;
     },
   };
+}
+
+function blurActive(within: HTMLElement): void {
+  const a = document.activeElement;
+  if (a instanceof HTMLElement && within.contains(a)) a.blur();
 }
 
 function copyConfig(): void {

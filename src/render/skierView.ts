@@ -12,6 +12,7 @@ import { CONFIG } from '../config.ts';
 import type { Heightfield } from '../maps/types.ts';
 import { wrapAngle, type SkierState } from '../sim/skier.ts';
 import { groundAt } from '../sim/terrain.ts';
+import { TUNING } from '../sim/tuning.ts';
 import { addPoseDelta, createPoseBuffer, setPose, type PoseBuffer } from './poseBlend.ts';
 import { CROUCH, GRABS, STANCE, STANCE_HALF_WIDTH, TUCK, TUMBLE, TUMBLE_CENTER } from './skierPoses.ts';
 import { SkierRig } from './skierRig.ts';
@@ -240,7 +241,7 @@ export class SkierView {
     this.swing.rotation.y = swing;
     this.lean.rotation.z = bodyLean;
 
-    const airCrouch = r.airCrouch + r.spinTuck * Math.min(1, state.spinRate / CONFIG.air.flipRate);
+    const airCrouch = r.airCrouch + r.spinTuck * Math.min(1, state.spinRate / TUNING.air.flipRate);
     const air = this.airWeight;
     const p = this.pose;
     setPose(p, STANCE);
@@ -367,7 +368,7 @@ function turnY(v: [number, number, number], c: number, s: number, cx: number, cz
  */
 function poleStroke(p: PoseBuffer, phase: number): void {
   if (phase >= 1) return;
-  const s = CONFIG.skier;
+  const s = TUNING.skier;
   const plant = s.polePlantTime / s.polePushInterval;
   const done = Math.min(0.95, (s.polePlantTime + s.polePushTime) / s.polePushInterval);
 
@@ -432,7 +433,7 @@ function ease(t: number): number {
 function landCurve(t: number): number {
   const down = 0.07;
   if (t < down) return t / down;
-  return Math.max(0, 1 - (t - down) / (CONFIG.landing.squashTime - down));
+  return Math.max(0, 1 - (t - down) / (TUNING.landing.squashTime - down));
 }
 
 function approach(value: number, target: number, maxDelta: number): number {
