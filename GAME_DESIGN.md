@@ -22,7 +22,7 @@ The right hand works the arrow keys. The left hand handles grabs, pole push, and
 | Tab | Set personal checkpoint | — | — |
 | R | Respawn at last checkpoint (hold 1s: back to top) | same | same |
 | M | Trail map (the game waits; M or Esc closes it) | same | same |
-| Esc | Pause menu | same | same |
+| Esc or P | Pause menu (P also works in fullscreen, where the browser takes Esc) | same | same |
 
 Grabs (hold in the air, release to let go):
 
@@ -75,7 +75,7 @@ Every map has a start gate themed to its kind of skiing, checkpoint flags, a fin
    - Natural features to ride: fallen trees as rails (slides that look like logs), rock and stump jibs, and booters (snow kickers with landings) dug into ridges, gully walls and banks. Some built jumps and rails too, but mostly natural ones.
    - A ski town at the base of one face, fully rideable: chalet roofs as drops and kickers, handrails down stairs, ledges and benches as rails and boxes, a main street, lamp posts and banners. Building walls are solid.
    - Runs end in the town or at a run-out at the base of each other face; each has a finish zone with Back to top, which returns to the summit (no lift ride: chairlifts climb the faces as scenery).
-   - Scenery: rock outcrops and boulders, stands of trees (solid in the tree runs) thinning to a treeline, dead snags, wind-scoured ridges, trail signs at forks, and distant peaks around the map. Detailed enough to look good on a fast computer in clear weather (milestone 6b), while Low thins it out.
+   - Scenery: rock outcrops and boulders, stands of trees (solid in the tree runs) thinning to a treeline, dead snags, wind-scoured ridges, trail signs at forks, and distant peaks around the map. Detailed enough to look good on a fast computer in clear weather (milestone 6f), while Low thins it out.
    - Start gate: a ridgetop start on the summit with a line of flags and a small start hut, like a freeride contest.
    - Flags: on ledges and shoulders across the mountain, at the top of each face's main lines, so a respawn puts you back on the line you were riding.
    - Built by a script like the Park (`tools/maps/`): the mountain's overall shape around the peak, terrain features placed on it (ridges, bowls, gullies, cliffs, chutes, pillows), then fine rocky detail.
@@ -117,8 +117,60 @@ Each map defines: name, heightfield (generated from parameters or loaded from a 
 - Low-poly and flat-shaded, close to Shredsauce's style but entirely original.
 - Snow uses white and blue-gray vertex-colored faces. Features use wood and metal colors. Trees are instanced low-poly cones.
 - The skier is a low-poly segmented body (helmet, torso, arms, legs) on a simple skeleton. Poses are procedural: stance, crouch, tuck, the 8 grabs, and the bail tumble. Skis and poles are separate meshes.
-- **Outfit colors:** jacket, pants, and helmet, chosen from a palette in the menu and saved locally.
-- Sky is a gradient, with matching fog per map.
+- **Outfit:** colors, headwear and skis, chosen in the Locker and saved locally (below).
+- Sky is a gradient, with matching fog per map and weather.
+
+## Locker: outfit, headwear and skis
+- Opened from the title and pause menus. A live preview of the skier turns slowly beside the choices. It reuses the one WebGLRenderer (a scissored viewport, or the paused world when opened from pause), never a second WebGL context.
+- **Colors** for the helmet, goggles (frame and strap; the lens stays a dark mirror), jacket, pants, boots and mittens, each picked from one shared palette of about 16 to 20 swatches that look good together. Arrow keys move across the swatches.
+- **Headwear:** a helmet; a helmet with a Santa hat over it (red, a white band, and a pom-pom that sways like the banners' cloth); or a jack-o'-lantern: a full carved pumpkin head with a carved face instead of goggles, whose eyes and mouth glow at night. The Santa hat and the pumpkin keep their own colors.
+- **Skis:** the ski type and one of its 3 to 4 graphics (see Skis), with stat bars.
+- The defaults are today's look: the current outfit colors (the palette includes them), the helmet, and the park ski with lime tips as its first graphic.
+- Everything is saved locally; the defaults work without storage. The rig rebuilds its geometry only when the outfit changes, never per frame.
+
+## Skis
+Three ski types, each with its own model, 3 to 4 top sheet graphics to pick from, and its own stats. Stats are multipliers on the base numbers in `config.ts` (a `skis` block there). The park ski's multipliers are all 1, so it rides exactly like today's skiing and every map stays tuned for it. The physics treats all three skis as the same length, so rails and landings don't shift between them.
+
+| Ski | Model | Better at | Worse at |
+|---|---|---|---|
+| Park | Today's twin tip: both ends turned up | Spins (the baseline) | Nothing; it's the baseline |
+| Big mountain | Longer looking and much wider, a long early-rise nose, a small tail rise | Bigger drops (higher `impactMax`), landing with the nose further up or down (higher `pitchMax`) | Slower spins and flips, but still able to clear a 720 on the 720 jumps (they have 20% spare airtime) |
+| Carving | A narrow waist with a clear sidecut, a flat race tail, a low tip | Holds an edge at speed (`grip`), keeps speed through turns (`carveFriction`), sharper turns when fast (`turnRateFast`), higher top speed (less friction and drag) | Stiff landings (lower `pitchMax` and `impactMax`), slower spins, twitchy riding switch (catches an edge more easily going backwards) |
+
+- The Locker shows stat bars for each ski: Spins, Landings, Top speed, Grip. They come from the multipliers.
+- **Graphics:** original art painted as vertex colors on a grid of small faces across the top sheet, so it shows on Low without textures. Park graphics are bold and graphic (stripes, blocks, checks). Big mountain graphics are colorful hand-drawn art in the spirit of artist-series skis (painted mountains, sunsets, swirls, critters). Carving graphics are race style (speed stripes, gradients). No real brands, logos, text or copied artwork.
+- Poles are the same for every ski.
+
+## Cheats
+- A Cheats screen, reached from the title and pause menus, with toggles that combine freely:
+  - **Low gravity:** gravity scaled down, for long floaty airs.
+  - **Super fast:** a much higher top speed (less friction and drag, a stronger pole push). Everything else runs at normal speed.
+  - **Moon jump:** pops launch far higher.
+  - **Slow motion:** the whole game runs slower (the time fed to the fixed-step loop is scaled), so tricks are easier to time.
+  - **No crashes:** every landing rides away, however bad: the skier is set upright on the snow instead of bailing. Hitting an obstacle stops you without a crash.
+  - **Turbo spins:** spins, flips and Lincoln loops rotate much faster.
+- Every cheat's numbers live in `config.ts` (a `cheats` block) and layer on top of the base numbers and the ski's multipliers, so turning a cheat off restores exactly what was there.
+- **Tuning panel:** the Cheats screen has a button that opens the live tuning panel (lil-gui) in any build. It loads only when opened (its own chunk), so the first load is unchanged. Its changes last until reload, and it has a reset button. Typing into it never steers the skier.
+- Cheats start off on every visit (never saved). While any cheat is on, or the tuning panel has changed a value, a small "Cheats on" tag shows in a corner.
+
+## Weather
+- **Bluebird:** clear, today's look, with the far scenery on Medium and High.
+- **Overcast:** flat gray light, low contrast, closer haze.
+- **Blizzard:** moody but playable, with about 100 to 120 m of view on every preset. Falling snow blows sideways in gusts under a gray-white sky, and more snow blows off the ridges.
+- **Night:** a dark blue sky with a moon and stars, blue moonlight on the snow, and a headlamp glow ahead of the skier. Floodlights switch on at the Park, Big air and Slalom with pools of light on their runs, the windows and street lamps glow in Freeride's town, and the jack-o'-lantern's face glows.
+- Picked on each map card before riding, or from the pause menu mid-run (it changes live). The last pick is remembered for every map. Default: bluebird.
+- Lighting stays within CLAUDE.md's rule (one directional plus one hemisphere light). Weather changes their colors and strength, the sky and the fog. The headlamp and floodlight pools are faked (for example, additive light decals on the snow), not real lights.
+- Each map's sky and fog colors are its bluebird look. The other weathers derive from them unless a map overrides them.
+- Low keeps its fog within its 240 m budget; the blizzard brings it closer.
+
+## Snow effects
+- One pooled effects system with a fixed budget and no per-frame allocations. The render layer reads sim state and events. Low gets fewer particles and shorter tracks.
+- Spray when carving hard (scaled by edge angle and speed), and a sheet of spray when braking or hockey stopping.
+- Ski tracks: a ribbon behind each ski that fades out, broken in the air and on rails, wider and deeper in powder.
+- A puff of snow on hard landings and a burst on a crash.
+- Sparks off metal rails (none off boxes, logs or other wood).
+- Powder clouds: bigger, fluffier spray off-piste on Freeride. Groomed snow is the Park, Slalom, Big air, the Test slope, and Freeride's named runs and town. The rest of Freeride is powder.
+- Wind blowing snow off ridges, wind lips and cornices, more in a blizzard. The blizzard's falling snow uses the same system.
 
 ## Camera
 - Third-person chase from behind and above, smoothed. It pulls back as speed rises and swings around when you ride switch.
@@ -127,19 +179,25 @@ Each map defines: name, heightfield (generated from parameters or loaded from a 
 - Click-and-drag with the mouse (or a finger) orbits the camera around the skier. Standing still, the view stays where you leave it; once riding, it eases back behind the skier a moment after you let go.
 
 ## Audio (sound effects only)
-- Built with Web Audio, either procedurally (filtered noise) or from CC0 sound files.
+- Built with Web Audio, either procedurally (filtered noise) or from CC0 sound files (credited).
 - Snow carve hiss scaled by speed and edge angle; wind in the air scaled by speed.
 - Pop, soft and hard landing thuds, rail scrape (separate sounds for metal rails and wood boxes), bail tumble, and UI clicks.
+- Weather ambience: howling wind and gusts in a blizzard, a quiet hush at night.
+- A Big air crowd by the landings that cheers when you land clean.
+- Chairlift hum near the lifts and chatter in Freeride's town, fading with distance.
+- Slow motion (a cheat) lowers the sounds' pitch with the game's speed.
 - Master and SFX volume sliders plus a mute toggle in Settings.
 
 ## Menus (HTML/CSS overlay, usable with keyboard or mouse)
-- **Title:** Play, Outfit, Settings, Controls
-- **Map select:** a card per map: Park, Freeride, Slalom, Big air, and the Test slope
-- **Outfit:** color pickers with a live preview of the skier
-- **Settings:** quality (Auto / Low / Medium / High), volume, key rebinding, reset to defaults
-- **Controls:** the tables above
-- **Pause (Esc):** Resume, Respawn, Back to top, Map select, Settings, Controls
-- **HUD:** minimal and with no score. A brief "Checkpoint set" toast, the Back to top button at the finish, and "Open in new tab" when the game is embedded.
+- **Title:** Play, Locker, Settings, Controls, Cheats
+- **Map select:** a card per map: Park, Freeride, Slalom, Big air, and the Test slope, each with a weather picker (milestone 6f)
+- **Locker:** outfit colors, headwear and skis with a live preview of the skier (see Locker)
+- **Settings:** quality (Auto / Low / Medium / High, applied live); master and SFX volume plus mute; key rebinding for every action (it listens for the next key, refuses Esc, and swaps or warns on a key that's already taken), with reset to defaults. Saved locally.
+- **Controls:** the tables above, built from the current bindings so they show rebound keys
+- **Cheats:** see Cheats
+- **Pause (Esc or P):** Resume, Respawn, Back to top, Weather, Map select, Locker, Settings, Controls, Cheats. The simulation stops while paused (the fixed-step accumulator doesn't build up).
+- Every menu works with the keyboard alone (arrows or Tab move focus, Enter picks, Esc goes back, focus is always visible) and with the mouse. While a menu is open, no game key reaches the skier; while riding, Tab sets the checkpoint and never moves browser focus.
+- **HUD:** minimal and with no score. A brief "Checkpoint set" toast, the Back to top button at the finish, the trail map button, "Open in new tab" when the game is embedded, and a small "Cheats on" tag while cheats are on.
 - **Trail map (M, or its HUD button):** a drawn map of the whole map, oriented like a piste map (the start's way down points down the page): shaded ground with rock, steep slopes and forests, the faces' names, every named run, flags (green once passed), finishes, the start, and you with your heading.
 
 ## Not in v1 (later ideas)
@@ -157,10 +215,14 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 5c-2. **Freeride, part 2: the town and natural features.** The rideable ski town, fallen-log rails, rock and stump jibs, booters, some built jumps and rails, trail signs, chairlifts and distant peaks as scenery. Check its frame rate on the Low preset, fully decorated, and that it looks good on High.
 5d. **Slalom map.** Its two timed courses (more than one timed course on a map) and giant slalom gates.
 5e. **Big air map.** Verify its 720 jumps by measuring airtime.
-6. **Menus.** Outfit colors, settings, key rebinding, and pause.
-6b. **Weather.** Clear (bluebird) or overcast and blizzard, changing the fog distance, sky and light, with falling snow in a blizzard. Low keeps its fog inside the Chromebook budget; clear weather on a fast computer shows the far scenery.
-7. **Sound effects.**
-8. **Performance and polish pass** on the Low preset, then a final embed and deploy check. Polish includes a sun in the sky with a soft glow and warmer golden-hour light, and snow spray when carving hard, braking or landing, with ski tracks left behind that fade out.
+6a. **Menus.** The title (Play, Settings, Controls; Cheats joins in 6b and the Locker in 6c), the finished map select, Settings (quality applied live, key rebinding, volume and mute saved for milestone 7), Controls built from the bindings, and the pause menu (Esc or P) that freezes the simulation. Keyboard only, embedded, and without storage all work.
+6b. **Cheats.** The Cheats screen with its six toggles, the tuning panel reachable in every build, and the "Cheats on" tag. Turning every cheat off leaves the sim tools' results unchanged.
+6c. **Locker: outfit and headwear.** Palette colors for helmet, goggles, jacket, pants, boots and mittens; the helmet, Santa hat and jack-o'-lantern; the live preview; saved locally.
+6d. **Skis.** The three ski types with their own models, 3 to 4 graphics each, stats and stat bars. The park ski's sim tool results are unchanged; measure that the big mountain ski still clears a 720 on the Park's and Big air's 720 jumps.
+6e. **Snow effects.** Spray, tracks, landing puffs and crash bursts, rail sparks, powder clouds and ridge snow, within the Low budget.
+6f. **Weather.** Bluebird, overcast, blizzard and night, picked on the map card or from pause. Low keeps its fog inside the Chromebook budget; clear weather on a fast computer shows the far scenery.
+7. **Sound effects** (the Audio section).
+8. **Performance and polish pass** on the Low preset, then a final embed and deploy check. Polish includes a sun in the sky with a soft glow and warmer golden-hour light.
 9. **Brundage Mountain** (the Maps section). Research and plan before any code, and stop for the user's go-ahead at the two checkpoints marked **Stop**. Every step is a script in `tools/maps/brundage/` that can be rerun, like the other maps; nothing is edited by hand.
    - **Privacy first.** The user's Strava archive goes in `reference/brundage/`, which is gitignored: never commit, copy into `src/` or `public/`, or deploy raw tracks. Read `activities.csv` (and `activities/*.gpx`, `.fit.gz`, `.tcx.gz`) and keep only activities whose GPS points fall inside the ski area's boundary (OpenStreetMap's `landuse=winter_sports` polygon, buffered ~200 m); skip everything else without looking further. Clip kept tracks to the boundary and keep only relative times. Only derived results (run lines, lift lines, speed figures) go into the repo. Parsing `.fit` needs a library: ask before adding a dev dependency, or convert outside the repo.
    - **Research and plan (no code).**
@@ -186,11 +248,11 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 
 ## Status (2026-10-20)
 
-**Done:** milestones 0 to 5e: scaffold and deploy, skiing, air, rails and boxes, checkpoints, map features, map select, and the Park, Freeride, Slalom and Big air maps. 5d, 5e and the Big air update are committed but not pushed. **Next:** 6, menus. Milestone 9 (Brundage Mountain) is planned, not started.
+**Done:** milestones 0 to 5e: scaffold and deploy, skiing, air, rails and boxes, checkpoints, map features, map select, and the Park, Freeride, Slalom and Big air maps, all pushed and live. **Next:** 6a, menus. Milestone 6 is split into 6a to 6f (menus, cheats, Locker, skis, snow effects, weather). Milestone 9 (Brundage Mountain) is planned, not started.
 
 **Known issues**
 - Not tested on a real school Chromebook. With the CPU slowed 4×, Low takes ~1.6 to 3 ms of CPU per frame (42 to ~115 draw calls); a jump to a new spot spikes one frame to 30 to 50 ms. GPU cost unmeasured.
-- Until milestone 6, quality comes from `?quality=low|medium|high` and Esc opens the map menu. Auto sees as far as Medium.
+- Until milestone 6a, quality comes from `?quality=low|medium|high` and Esc opens the map menu. Auto sees as far as Medium.
 - Far forests show as flat dark facets past the far plane (Freeride; the Slalom on Medium); far stand-in trees are plain cones.
 - Park: huge jumps sized for tucking from their flag; the long rail has no brake.
 - Freeride: couloirs reach ~36 m/s; the camera can't see past a convex rollover; trail map labels crowd.

@@ -6,7 +6,7 @@ Browser-based 3D freeski game for Chromebooks. Read `GAME_DESIGN.md` before star
 - Three.js (pin the exact version), `WebGLRenderer` only (no WebGPU)
 - TypeScript (strict), Vite
 - No backend, no accounts. Static build output in `/dist`
-- Dev only: lil-gui panel for live-tuning physics values (excluded from production builds)
+- lil-gui panel for live-tuning physics values, lazy-loaded in its own chunk: in production it loads only when opened from the Cheats screen (milestone 6b), so it never adds to the first load
 - No physics engine in v1. Rapier comes in only if ragdoll crashes are added later
 
 ## Hard constraints
@@ -48,7 +48,7 @@ src/
 - **Context7 MCP:** look up current Three.js and Vite docs before using an API you're unsure of, especially anything that changed after r160.
 - **Playwright MCP:** play-test every milestone (see Workflow).
 - **Chrome DevTools MCP:** record a performance trace whenever frame time is over budget, and in milestone 8. Fix what the trace shows rather than guessing.
-- **frontend-design plugin:** use it for the menus and HUD in milestone 6.
+- **frontend-design plugin:** use it for the menus, Locker and HUD in milestones 6a to 6d.
 
 ## Workflow
 - Build in the milestone order in `GAME_DESIGN.md`. Finish and verify each milestone before starting the next.
