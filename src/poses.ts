@@ -21,6 +21,7 @@ import { CONFIG } from './config.ts';
 import type { Heightfield } from './maps/types.ts';
 import { createSkierPose, SkierView, type SkierPose } from './render/skierView.ts';
 import { SkierRig } from './render/skierRig.ts';
+import { DEFAULT_OUTFIT, HEADWEAR, type Outfit } from './core/outfit.ts';
 import {
   CROUCH,
   LEFT_JAPAN,
@@ -155,6 +156,13 @@ function ridePose(r: RideState): SkierPose {
 
 const camera = new PerspectiveCamera(30, 1, 0.1, 50);
 
+// ?headwear=santa (or pumpkin) dresses every pose in it; ?glow=1 lights the pumpkin's face.
+const params = new URLSearchParams(window.location.search);
+const outfit: Outfit = { ...DEFAULT_OUTFIT };
+const headwear = HEADWEAR.find((h) => h.id === params.get('headwear'));
+if (headwear) outfit.headwear = headwear.id;
+const glow = Number(params.get('glow') ?? 0);
+
 interface View {
   scene: Scene;
   rig: SkierRig;
@@ -166,7 +174,8 @@ const views: (View | null)[] = ENTRIES.map((entry) => {
   if (!entry) return null;
   const scene = makeScene();
   if (entry.pose) {
-    const rig = new SkierRig();
+    const rig = new SkierRig(outfit);
+    rig.setGlow(glow);
     rig.apply(entry.pose);
     const lift = entry.airborne ? AIR_HEIGHT : 0;
     rig.root.position.y = lift;
@@ -177,7 +186,8 @@ const views: (View | null)[] = ENTRIES.map((entry) => {
     return { scene, rig, lift };
   }
   // Riding states go through SkierView, which adds its own shadow.
-  const view = new SkierView(scene, flat);
+  const view = new SkierView(scene, flat, outfit);
+  view.rig.setGlow(glow);
   const pose = ridePose({ ...RIDE_DEFAULTS, ...entry.ride });
   view.snap(pose);
   view.update(pose, 1);

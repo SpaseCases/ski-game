@@ -14,6 +14,7 @@ import {
   LatheGeometry,
   Matrix4,
   Mesh,
+  MeshBasicMaterial,
   MeshLambertMaterial,
   Quaternion,
   Shape,
@@ -23,6 +24,8 @@ import {
   Vector3,
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { DEFAULT_OUTFIT, type Outfit } from '../core/outfit.ts';
+import { clothMaterial } from './cloth.ts';
 import type { PoseDef, Vec3 } from './skierPoses.ts';
 
 // Low-poly freeskier: a straight hip-length shell jacket, wide pants over
@@ -32,27 +35,17 @@ import type { PoseDef, Vec3 } from './skierPoses.ts';
 // by a small solver: hips, chest and head are rigid; knees and elbows come
 // from two-bone IK so hands and feet land where the pose says. The jacket's
 // hem is the one part rebuilt every pose, so it rides up over the thighs.
-
-export interface Outfit {
-  jacket: string;
-  pants: string;
-  helmet: string;
-}
-
-export const DEFAULT_OUTFIT: Outfit = { jacket: '#2c3037', pants: '#677a52', helmet: '#2a2d32' };
+// Colors and headwear come from the Locker's outfit; changing it rebuilds
+// only the parts it touches (setOutfit), never per frame.
 
 const FIXED = {
   gaiter: '#1b1d21',
   gaiterSeam: '#2a2d33',
   vent: '#0e0f12',
-  goggleFrame: '#30343a',
   /** Dark smoke lens, a shade lighter at the top. */
   lensTop: '#5a6676',
   lensBottom: '#45505e',
-  glove: '#3a3f47',
-  gloveCuff: '#2a2e35',
   zip: '#16181c',
-  boot: '#4d525b',
   bootSole: '#202328',
   buckle: '#c9ced6',
   binding: '#1c1f25',
@@ -62,6 +55,15 @@ const FIXED = {
   skiBase: '#2f7fe0',
   poleShaft: '#b8c0c9',
   poleDark: '#1c1f25',
+  hatRed: '#c3262e',
+  hatFur: '#f3f1ec',
+  pumpkin: '#e8761e',
+  pumpkinGroove: '#c95f14',
+  pumpkinFlesh: '#f6c05a',
+  stem: '#6e6a2c',
+  /** The carved face: a dark hollow by day; glowing at night (setGlow). */
+  carvedDark: '#2a1206',
+  carvedGlow: '#ffb43a',
 };
 
 /** Body proportions in meters. */
@@ -144,31 +146,95 @@ export class SkierRig {
   /** Largest amount (degrees) a foot was bent past what a boot allows in the last pose. */
   ankleError = 0;
 
+  /** Santa hat (cloth, so it sways) and the pumpkin's carved face (unlit, for its glow); children of the head. */
+  private readonly hat: Mesh;
+  private readonly face: Mesh;
+  private readonly material = new MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  private readonly glowMaterial = new MeshBasicMaterial({ color: FIXED.carvedDark });
+  private outfit: Outfit;
+
   constructor(outfit: Outfit = DEFAULT_OUTFIT) {
-    const material = new MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    this.outfit = { ...outfit };
     const add = (geometry: BufferGeometry): Mesh => {
-      const mesh = new Mesh(geometry, material);
+      const mesh = new Mesh(geometry, this.material);
       this.root.add(mesh);
       return mesh;
     };
-    const jacket = new Color(outfit.jacket);
-    const pants = new Color(outfit.pants);
-    const helmet = new Color(outfit.helmet);
+    const c = colors(outfit);
 
     // The seat of the pants, under the jacket's hem.
-    this.pelvis = add(buildPelvis(pants));
-    this.torso = add(buildTorso(jacket));
-    this.hem = new JacketLower(jacket);
+    this.pelvis = add(buildPelvis(c.pants));
+    this.torso = add(buildTorso(c.jacket));
+    this.hem = new JacketLower(c.jacket);
     this.root.add(this.hem.mesh);
-    this.head = add(buildHead(helmet));
+    this.head = add(buildHead(outfit));
+    this.hat = new Mesh(new BufferGeometry(), clothMaterial);
+    this.face = new Mesh(new BufferGeometry(), this.glowMaterial);
+    this.head.add(this.hat, this.face);
+    this.setHeadwear();
+    // Both sides share one geometry, apart from the feet (buckles on the outside).
+    const upperArm = buildUpperArm(c.jacket);
+    const forearm = buildForearm(c.jacket, c.mittens);
+    const thigh = buildThigh(c.pants);
+    const shin = buildShin(c.pants, c.boots);
+    const pole = buildPole();
     for (const side of [-1, 1]) {
-      this.upperArms.push(add(buildUpperArm(jacket)));
-      this.forearms.push(add(buildForearm(jacket)));
-      this.thighs.push(add(buildThigh(pants)));
-      this.shins.push(add(buildShin(pants)));
-      this.feet.push(add(buildFoot(side)));
-      this.poles.push(add(buildPole()));
+      this.upperArms.push(add(upperArm));
+      this.forearms.push(add(forearm));
+      this.thighs.push(add(thigh));
+      this.shins.push(add(shin));
+      this.feet.push(add(buildFoot(side, c.boots)));
+      this.poles.push(add(pole));
     }
+  }
+
+  /** Changes colors or headwear, rebuilding only the parts that change (the old geometry is freed). */
+  setOutfit(next: Outfit): void {
+    const prev = this.outfit;
+    this.outfit = { ...next };
+    const changed = (...keys: (keyof Outfit)[]): boolean => keys.some((k) => prev[k] !== next[k]);
+    const c = colors(next);
+    if (changed('pants')) {
+      swap([this.pelvis], buildPelvis(c.pants));
+      swap(this.thighs, buildThigh(c.pants));
+    }
+    if (changed('jacket')) {
+      swap([this.torso], buildTorso(c.jacket));
+      this.hem.recolor(c.jacket);
+      swap(this.upperArms, buildUpperArm(c.jacket));
+    }
+    if (changed('jacket', 'mittens')) swap(this.forearms, buildForearm(c.jacket, c.mittens));
+    if (changed('pants', 'boots')) swap(this.shins, buildShin(c.pants, c.boots));
+    if (changed('boots')) this.feet.forEach((m, i) => swap([m], buildFoot(i === 0 ? -1 : 1, c.boots)));
+    if (changed('helmet', 'goggleFrame', 'goggleStrap', 'headwear')) {
+      swap([this.head], buildHead(next));
+      this.setHeadwear();
+    }
+  }
+
+  /** How brightly the pumpkin's carved face glows: 0 by day (a dark hollow), 1 at night. */
+  setGlow(amount: number): void {
+    this.glowMaterial.color.set(FIXED.carvedDark).lerp(glowColor, Math.min(1, Math.max(0, amount)));
+  }
+
+  /** Frees every geometry and material (the rig is not used again). */
+  dispose(): void {
+    const seen = new Set<BufferGeometry>();
+    this.root.traverse((o) => {
+      if (o instanceof Mesh) seen.add(o.geometry as BufferGeometry);
+    });
+    for (const g of seen) g.dispose();
+    this.material.dispose();
+    this.glowMaterial.dispose();
+  }
+
+  /** Builds the Santa hat or the carved face for the current headwear (or neither). */
+  private setHeadwear(): void {
+    const hw = this.outfit.headwear;
+    swap([this.hat], hw === 'santa' ? buildSantaHat() : new BufferGeometry());
+    swap([this.face], hw === 'pumpkin' ? buildCarvedFace(false) : new BufferGeometry());
+    this.hat.visible = hw === 'santa';
+    this.face.visible = hw === 'pumpkin';
   }
 
   /** Solves the pose and moves every part into place. */
@@ -293,6 +359,19 @@ const xAxis = new Vector3();
 const yAxis = new Vector3();
 const zAxis = new Vector3();
 const skiOffset = new Vector3();
+
+const glowColor = new Color(FIXED.carvedGlow);
+
+/** The outfit's colors as Colors. */
+function colors(o: Outfit): Record<'jacket' | 'pants' | 'boots' | 'mittens', Color> {
+  return { jacket: new Color(o.jacket), pants: new Color(o.pants), boots: new Color(o.boots), mittens: new Color(o.mittens) };
+}
+
+/** Gives `meshes` (which share one geometry) a new geometry, freeing the old one. */
+function swap(meshes: readonly Mesh[], geometry: BufferGeometry): void {
+  meshes[0]?.geometry.dispose();
+  for (const m of meshes) m.geometry = geometry;
+}
 
 function place(mesh: Mesh, position: Vector3, quaternion: Quaternion): void {
   mesh.position.copy(position);
@@ -501,11 +580,34 @@ class JacketLower {
   private readonly ringPoints = LOWER_RINGS.length * LOWER_SEGMENTS;
 
   constructor(jacket: Color) {
+    const colors: number[] = [];
+    const index = this.build(jacket, colors);
+    this.points = new Float32Array((this.ringPoints + (ZIP_LAST - ZIP_FIRST + 1) * 2) * 3);
+    this.vertexPoint = new Uint16Array(index);
+    this.position = new BufferAttribute(new Float32Array(index.length * 3), 3);
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', this.position);
+    geometry.setAttribute('color', new Float32BufferAttribute(colors, 3));
+    // It moves every pose; a fixed sphere around the hips covers it.
+    geometry.boundingSphere = new Sphere(new Vector3(0, 0, 0), 0.6);
+    this.mesh = new Mesh(geometry, lowerMaterial);
+  }
+
+  /** New jacket color: rewrites the vertex colors in place (the shape is untouched). */
+  recolor(jacket: Color): void {
+    const colors: number[] = [];
+    this.build(jacket, colors);
+    const attr = this.mesh.geometry.getAttribute('color') as BufferAttribute;
+    (attr.array as Float32Array).set(colors);
+    attr.needsUpdate = true;
+  }
+
+  /** The mesh's faces: fills `colors` per vertex and returns which point each vertex is. */
+  private build(jacket: Color, colors: number[]): number[] {
     const band = shade(jacket, 0.78);
     const under = shade(jacket, 0.6);
     const zip = new Color(FIXED.zip);
     const index: number[] = [];
-    const colors: number[] = [];
     const quad = (a: number, b: number, c: number, d: number, color: Color): void => {
       index.push(a, b, c, a, c, d);
       for (let k = 0; k < 6; k++) colors.push(color.r, color.g, color.b);
@@ -524,15 +626,7 @@ class JacketLower {
     for (let ring = ZIP_FIRST; ring < ZIP_LAST; ring++) {
       quad(zipPoint(ring, 0), zipPoint(ring, 1), zipPoint(ring + 1, 1), zipPoint(ring + 1, 0), zip);
     }
-    this.points = new Float32Array((this.ringPoints + (ZIP_LAST - ZIP_FIRST + 1) * 2) * 3);
-    this.vertexPoint = new Uint16Array(index);
-    this.position = new BufferAttribute(new Float32Array(index.length * 3), 3);
-    const geometry = new BufferGeometry();
-    geometry.setAttribute('position', this.position);
-    geometry.setAttribute('color', new Float32BufferAttribute(colors, 3));
-    // It moves every pose; a fixed sphere around the hips covers it.
-    geometry.boundingSphere = new Sphere(new Vector3(0, 0, 0), 0.6);
-    this.mesh = new Mesh(geometry, lowerMaterial);
+    return index;
   }
 
   /** Rebuilds the lower jacket for a solved pose (all inputs in skier space). */
@@ -659,16 +753,20 @@ function smooth01(t: number): number {
   return c * c * (3 - 2 * c);
 }
 
-/** Head, built up from the base of the neck: gaiter, goggles, helmet. Nothing of the face shows. */
-function buildHead(helmet: Color): BufferGeometry {
-  const parts = [
+/**
+ * Head, built up from the base of the neck: gaiter, goggles, helmet (the
+ * Santa hat goes over it as its own mesh). Nothing of the face shows. The
+ * jack-o'-lantern replaces the helmet and goggles with a whole pumpkin.
+ */
+function buildHead(o: Outfit): BufferGeometry {
+  if (o.headwear === 'pumpkin') return merge([...buildGaiter(), ...buildPumpkin(), buildCarvedFace(true)]);
+  return merge([
     // Head under everything, in case any gap shows.
     paint(new SphereGeometry(0.105, 16, 12).scale(1, 1.08, 1.1).translate(0, 0.2, 0), FIXED.gaiter),
     ...buildGaiter(),
-    ...buildHelmet(helmet),
-    ...buildGoggles(),
-  ];
-  return merge(parts);
+    ...buildHelmet(new Color(o.helmet), o.goggleStrap),
+    ...buildGoggles(o.goggleFrame),
+  ]);
 }
 
 /** Neck gaiter pulled up over the chin and nose, following the jaw, tucked under the goggles and helmet. */
@@ -692,7 +790,7 @@ function buildGaiter(): BufferGeometry[] {
   ];
 }
 
-function buildHelmet(helmet: Color): BufferGeometry[] {
+function buildHelmet(helmet: Color, strap: string): BufferGeometry[] {
   const fit = (g: BufferGeometry): BufferGeometry => g.scale(1, 1, HELMET.long).translate(0, 0, HELMET.back);
 
   // Dome, with every vertex below the edge line lifted onto it.
@@ -737,14 +835,29 @@ function buildHelmet(helmet: Color): BufferGeometry[] {
     slot.translate(x * sink, HELMET.y + y * sink, z * sink);
     parts.push(paint(fit(slot), FIXED.vent));
   }
+  // Goggle strap round the back of the shell, from where the frame slips under the helmet's edge.
+  const strapY: AngleFn = (a) => GOGGLE_Y + 0.012 * smooth01((Math.abs(wrapAngle(a)) - STRAP_FROM) / 1.2);
+  parts.push(
+    paint(
+      fit(curvedPanel(constant(0.127), constant(0.1335), (a) => strapY(a) + 0.014, (a) => strapY(a) - 0.014, STRAP_FROM, Math.PI * 2 - STRAP_FROM, 20)),
+      strap,
+    ),
+  );
   return parts;
+}
+
+/** Angle (from straight ahead) where the strap comes out from under the helmet's edge. */
+const STRAP_FROM = 1.56;
+
+function wrapAngle(a: number): number {
+  return Math.atan2(Math.sin(a), Math.cos(a));
 }
 
 /**
  * Goggles under the helmet's front edge: a matte frame with a notch for the
  * nose, and a dark tinted lens set just proud of it.
  */
-function buildGoggles(): BufferGeometry[] {
+function buildGoggles(frame: string): BufferGeometry[] {
   const half = goggleHalf;
   const nose = goggleNose;
   const onFace = (g: BufferGeometry): BufferGeometry => g.scale(1, 1, GOGGLE_DEPTH).translate(0, GOGGLE_Y, 0);
@@ -753,7 +866,7 @@ function buildGoggles(): BufferGeometry[] {
   return [
     paint(
       onFace(curvedPanel((a) => goggleOuter(a) - 0.012, goggleOuter, half, (a) => -half(a) + nose(a), -GOGGLE_SPAN, GOGGLE_SPAN, 26)),
-      FIXED.goggleFrame,
+      frame,
     ),
     paint(onFace(curvedPanel(lensIn, lensOut, (a) => half(a) - 0.006, constant(-0.002), -LENS_SPAN, LENS_SPAN, 22)), FIXED.lensTop),
     paint(
@@ -761,6 +874,181 @@ function buildGoggles(): BufferGeometry[] {
       FIXED.lensBottom,
     ),
   ];
+}
+
+/**
+ * Santa hat over the helmet: a white fur band resting on the helmet's edge
+ * just above the goggles (a touch lower at the back), a red cone that flops
+ * back and to one side, and a pom-pom at its tip. Drawn with the cloth
+ * material: its `sway` weight is 0 on the band and grows toward the tip, so
+ * the tip and pom-pom sway like the banners.
+ */
+function buildSantaHat(): BufferGeometry {
+  const fit = (g: BufferGeometry): BufferGeometry => g.scale(1, 1, HELMET.long).translate(0, 0, HELMET.back);
+  const bandY: AngleFn = (a) => 0.262 - 0.022 * (1 - Math.cos(a)) * 0.5;
+  const bandIn = helmetRadiusAt(0.255) - 0.004;
+  const band = curvedPanel(constant(bandIn), constant(bandIn + 0.026), (a) => bandY(a) + 0.024, (a) => bandY(a) - 0.01, -Math.PI, Math.PI, 24);
+
+  // Cone: rings along a path from the band's top to the tip.
+  const RINGS = 7;
+  const SIDES = 12;
+  const path = (t: number, out: Vector3): Vector3 => out.set(0.035 * t * t, 0.27 + 0.13 * t - 0.035 * t * t * t, 0.006 + 0.012 * t + 0.1 * t * t);
+  const radius = (t: number): number => (bandIn + 0.02) * (1 - t) ** 1.1 + 0.008;
+  const rings: Vector3[][] = [];
+  const c = new Vector3();
+  const ahead = new Vector3();
+  const tangent = new Vector3();
+  const across = new Vector3();
+  const fore = new Vector3();
+  for (let k = 0; k <= RINGS; k++) {
+    const t = k / RINGS;
+    path(t, c);
+    tangent.subVectors(path(Math.min(1, t + 0.01), ahead), path(Math.max(0, t - 0.01), fore)).normalize();
+    path(t, c);
+    across.set(1, 0, 0).addScaledVector(tangent, -tangent.x).normalize();
+    fore.crossVectors(across, tangent).normalize(); // -Z-ish: the hat's front
+    const r = radius(t);
+    const ring: Vector3[] = [];
+    for (let j = 0; j < SIDES; j++) {
+      const a = (j / SIDES) * Math.PI * 2;
+      ring.push(c.clone().addScaledVector(across, r * Math.sin(a)).addScaledVector(fore, r * Math.cos(a)));
+    }
+    rings.push(ring);
+  }
+  const tip = new Vector3();
+  path(1, tip);
+  const cone: number[] = [];
+  for (let k = 0; k < RINGS; k++) {
+    for (let j = 0; j < SIDES; j++) {
+      const a0 = rings[k]![j]!;
+      const a1 = rings[k]![(j + 1) % SIDES]!;
+      const b0 = rings[k + 1]![j]!;
+      const b1 = rings[k + 1]![(j + 1) % SIDES]!;
+      cone.push(...outward(a0, a1, b1, c.copy(a0).sub(path(k / RINGS, tip))), ...outward(a0, b1, b0, c.copy(a0).sub(path(k / RINGS, tip))));
+    }
+  }
+  const coneGeometry = new BufferGeometry();
+  coneGeometry.setAttribute('position', new Float32BufferAttribute(cone, 3));
+  coneGeometry.computeVertexNormals();
+  path(1, tip);
+  const pom = new IcosahedronGeometry(0.03, 1).translate(tip.x, tip.y, tip.z);
+
+  const g = fit(merge([paint(band, FIXED.hatFur), paint(coneGeometry, FIXED.hatRed), paint(pom, FIXED.hatFur)]));
+  // Sway grows with height above the band; the pom-pom moves as one with the tip.
+  const pos = g.getAttribute('position');
+  const sway = new Float32Array(pos.count);
+  const tipY = tip.y;
+  for (let i = 0; i < pos.count; i++) {
+    const t = Math.min(1, Math.max(0, (pos.getY(i) - 0.29) / (tipY - 0.29)));
+    sway[i] = 0.24 * t * t;
+  }
+  g.setAttribute('sway', new BufferAttribute(sway, 1));
+  return g;
+}
+
+/** Triangle a, b, c as a flat list, wound so its face points along `out`. */
+function outward(a: Vector3, b: Vector3, c: Vector3, out: Vector3): number[] {
+  fa.subVectors(b, a);
+  fb.subVectors(c, a);
+  const flip = fc.crossVectors(fa, fb).dot(out) < 0;
+  return flip ? [a.x, a.y, a.z, c.x, c.y, c.z, b.x, b.y, b.z] : [a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z];
+}
+
+// Jack-o'-lantern: a whole ribbed pumpkin for a head, well bigger than the
+// helmet and sitting low, so it swallows the head and most of the neck
+// (its bottom meets the collar), with a stem in the top's dimple.
+const PUMPKIN = { r: 0.185, h: 0.16, y: 0.165, ribs: 8, ribDepth: 0.05 };
+/** The carved face was drawn for a 0.152 m pumpkin; its heights scale with it (angles don't need to). */
+const FACE_SCALE = PUMPKIN.r / 0.152;
+/** Rib bulge at angle a from straight ahead: a rib's middle faces forward. */
+const pumpkinRib = (a: number): number => 1 - PUMPKIN.ribDepth * (0.5 - 0.5 * Math.cos(PUMPKIN.ribs * a));
+/** Distance from the pumpkin's axis to its skin at angle a and height y (from the pumpkin's middle). */
+const pumpkinSkin = (a: number, y: number): number => PUMPKIN.r * pumpkinRib(a) * Math.sqrt(Math.max(0, 1 - (y / PUMPKIN.h) ** 2));
+
+function buildPumpkin(): BufferGeometry[] {
+  const profile: Vector2[] = [new Vector2(0.001, -PUMPKIN.h * 0.97)];
+  for (let i = 1; i < 8; i++) {
+    const phi = -Math.PI / 2 + (i / 8) * Math.PI;
+    profile.push(new Vector2(PUMPKIN.r * Math.cos(phi), PUMPKIN.h * Math.sin(phi)));
+  }
+  profile.push(new Vector2(0.03, PUMPKIN.h * 0.9), new Vector2(0.001, PUMPKIN.h * 0.82));
+  const shell = new LatheGeometry(profile, PUMPKIN.ribs * 3);
+  const p = shell.getAttribute('position');
+  for (let i = 0; i < p.count; i++) {
+    const k = pumpkinRib(Math.atan2(p.getX(i), -p.getZ(i)));
+    p.setXYZ(i, p.getX(i) * k, p.getY(i) + PUMPKIN.y, p.getZ(i) * k);
+  }
+  const skin = new Color(FIXED.pumpkin);
+  const groove = new Color(FIXED.pumpkinGroove);
+  const mix = new Color();
+  const top = PUMPKIN.y + PUMPKIN.h * 0.82;
+  return [
+    paint(shell, (c) => mix.copy(skin).lerp(groove, 0.5 - 0.5 * Math.cos(PUMPKIN.ribs * Math.atan2(c.x, -c.z)))),
+    paint(prism(0.023, 0.014, 0.075, 6).rotateZ(0.25).rotateX(0.15).translate(0, top - 0.012, 0), FIXED.stem),
+  ];
+}
+
+/**
+ * The carved face: triangle eyes and nose and a toothy grin, laid on the
+ * pumpkin's skin. `rim` gives the pale cut flesh round each hole (part of
+ * the head); otherwise the holes themselves, a touch further out, drawn
+ * unlit so they can glow at night without a light (see setGlow).
+ */
+function buildCarvedFace(rim: boolean): BufferGeometry {
+  const k = FACE_SCALE;
+  const grow = rim ? 0.007 * k : 0;
+  const lift = rim ? 0.0015 : 0.003;
+  const tri = (ac: number, yc: number, w: number, h: number): BufferGeometry =>
+    carvedPanel(
+      (a) => yc - h / 2 + (h + grow) * Math.max(0, 1 - Math.abs(a - ac) / (w + grow)) + grow * 0.4,
+      () => yc - h / 2 - grow,
+      ac - w - grow,
+      ac + w + grow,
+      6,
+      lift,
+    );
+  const MOUTH = 0.56;
+  const mid = (a: number): number => (-0.054 + 0.026 * (a / MOUTH) ** 2) * k;
+  const half = (a: number): number => (0.023 * Math.sqrt(Math.max(0, 1 - (a / (MOUTH + grow)) ** 2)) + 0.002) * k;
+  const notch = (a: number, at: number, w: number): number => (Math.abs(a - at) < w ? 0.017 * k : 0);
+  const mouth = carvedPanel(
+    (a) => mid(a) + half(a) + grow - (rim ? 0 : notch(a, -0.22, 0.055) + notch(a, 0.22, 0.055)),
+    (a) => mid(a) - half(a) - grow + (rim ? 0 : notch(a, 0, 0.06)),
+    -MOUTH - grow,
+    MOUTH + grow,
+    28,
+    lift,
+  );
+  const parts = [tri(-0.3, 0.037 * k, 0.14, 0.058 * k), tri(0.3, 0.037 * k, 0.14, 0.058 * k), tri(0, -0.008 * k, 0.065, 0.032 * k), mouth];
+  return rim ? merge(parts.map((g) => paint(g, FIXED.pumpkinFlesh))) : merge(parts.map((g) => paint(g, FIXED.carvedDark)));
+}
+
+/** A patch of the pumpkin's skin between bottom(a) and top(a) (heights from its middle), raised by `lift`. */
+function carvedPanel(top: AngleFn, bottom: AngleFn, a0: number, a1: number, segments: number, lift: number): BufferGeometry {
+  const ROWS = 3;
+  const at = (a: number, v: number): Vector3 => {
+    const y = bottom(a) + (top(a) - bottom(a)) * v;
+    const r = pumpkinSkin(a, y) + lift;
+    return new Vector3(r * Math.sin(a), PUMPKIN.y + y, -r * Math.cos(a));
+  };
+  const pos: number[] = [];
+  const out = new Vector3();
+  for (let i = 0; i < segments; i++) {
+    const a = a0 + ((a1 - a0) * i) / segments;
+    const b = a0 + ((a1 - a0) * (i + 1)) / segments;
+    for (let j = 0; j < ROWS; j++) {
+      const p00 = at(a, j / ROWS);
+      const p10 = at(b, j / ROWS);
+      const p01 = at(a, (j + 1) / ROWS);
+      const p11 = at(b, (j + 1) / ROWS);
+      out.set(Math.sin((a + b) / 2), 0, -Math.cos((a + b) / 2));
+      pos.push(...outward(p00, p10, p11, out), ...outward(p00, p11, p01, out));
+    }
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
 }
 
 function buildUpperArm(jacket: Color): BufferGeometry {
@@ -771,14 +1059,14 @@ function buildUpperArm(jacket: Color): BufferGeometry {
 }
 
 /** Sleeve flaring toward the wrist, then a glove with a thumb. */
-function buildForearm(jacket: Color): BufferGeometry {
+function buildForearm(jacket: Color, mitten: Color): BufferGeometry {
   const f = BODY.forearm;
   return merge([
     paint(prism(0.066, 0.072, f, 9), jacket),
     paint(prism(0.074, 0.074, 0.025, 9).translate(0, f - 0.03, 0), shade(jacket, 0.78)),
-    paint(prism(0.058, 0.056, 0.05, 10).translate(0, f - 0.01, 0), FIXED.gloveCuff),
-    paint(new CapsuleGeometry(0.04, 0.05, 3, 10).scale(1.05, 1, 0.82).translate(0, f + BODY.hand, 0), FIXED.glove),
-    paint(new CapsuleGeometry(0.016, 0.03, 2, 6).rotateX(-0.5).translate(0, f + BODY.hand - 0.012, 0.035), FIXED.glove),
+    paint(prism(0.058, 0.056, 0.05, 10).translate(0, f - 0.01, 0), shade(mitten, 0.74)),
+    paint(new CapsuleGeometry(0.04, 0.05, 3, 10).scale(1.05, 1, 0.82).translate(0, f + BODY.hand, 0), mitten),
+    paint(new CapsuleGeometry(0.016, 0.03, 2, 6).rotateX(-0.5).translate(0, f + BODY.hand - 0.012, 0.035), mitten),
   ]);
 }
 
@@ -796,19 +1084,19 @@ function buildThigh(pants: Color): BufferGeometry {
  * The boot's upper cuff lives inside it (it follows the shin, so it never
  * pokes through the pants); only its bottom edge shows under the hem.
  */
-function buildShin(pants: Color): BufferGeometry {
+function buildShin(pants: Color, boot: Color): BufferGeometry {
   const s = BODY.shin;
   return merge([
     paint(prism(0.1, 0.112, s + 0.02, 12), pants),
     paint(prism(0.114, 0.115, 0.022, 12).translate(0, s - 0.004, 0), shade(pants, 0.8)),
-    paint(prism(0.078, 0.078, 0.2, 12).translate(0, s - 0.15, 0), FIXED.boot),
+    paint(prism(0.078, 0.078, 0.2, 12).translate(0, s - 0.15, 0), boot),
   ]);
 }
 
 /** Boot (shell, sole, buckles), binding and ski, in the foot frame (origin at the ankle). */
-function buildFoot(side: number): BufferGeometry {
+function buildFoot(side: number, boot: Color): BufferGeometry {
   const parts = [
-    paint(bootShell(), FIXED.boot),
+    paint(bootShell(), boot),
     paint(new BoxGeometry(0.118, 0.022, 0.33).translate(0, -0.104, -0.015), FIXED.bootSole),
     paint(new BoxGeometry(0.09, 0.025, 0.4).translate(0, -0.1275, 0), FIXED.binding),
     buildSki().translate(0, -BODY.ankleHeight, -BODY.ankleBack),

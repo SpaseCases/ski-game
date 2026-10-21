@@ -3,6 +3,7 @@ import { Vector3 } from 'three';
 import { createInputState, Keyboard, type Bindings } from './core/input.ts';
 import { startLoop } from './core/loop.ts';
 import { PointerOrbit } from './core/pointerOrbit.ts';
+import { loadOutfit, saveOutfit, type Outfit } from './core/outfit.ts';
 import { decorDensity, loadSettings, saveSettings, urlQuality, viewRange, type Quality } from './core/settings.ts';
 import { readStored, writeStored } from './core/storage.ts';
 import { buildMap, type BuiltMap } from './maps/build.ts';
@@ -10,6 +11,8 @@ import { parseMap } from './maps/loader.ts';
 import { mapEntry, MAPS, type MapEntry, type MapId } from './maps/registry.ts';
 import { CONFIG } from './config.ts';
 import { ChaseCamera, type OrbitDrag } from './render/chaseCamera.ts';
+import { clothTime } from './render/cloth.ts';
+import { LockerStage } from './render/lockerStage.ts';
 import { applyMap, createView, renderFrame, setViewRange, type View } from './render/scene.ts';
 import { createSkierPose, interpolateSkier, SkierView } from './render/skierView.ts';
 import { WorldView } from './render/world.ts';
@@ -34,6 +37,7 @@ import { mountFpsMeter } from './ui/fps.ts';
 import { mountCrashHint, mountFocusHint } from './ui/hints.ts';
 import { ControlsScreen } from './ui/controlsMenu.ts';
 import { mainKey } from './ui/keyNames.ts';
+import { LockerScreen } from './ui/lockerMenu.ts';
 import { PauseScreen, TitleScreen } from './ui/mainMenus.ts';
 import { MapSelect } from './ui/mapSelect.ts';
 import { Menus, type Screen } from './ui/menus.ts';
@@ -47,6 +51,8 @@ import { TrailMap } from './ui/trailMap.ts';
 const app = byId('app');
 const hud = byId('hud');
 const settings = loadSettings();
+/** The skier's look from the Locker. */
+let outfit: Outfit = loadOutfit();
 /** The preset in use: the saved one, unless the URL names one for this visit. */
 let quality: Quality = urlQuality() ?? settings.quality;
 
@@ -77,7 +83,7 @@ keyboard.attach(window);
 // and the screens they open. The game waits while any is open.
 const menus = new Menus(hud, onRootBack, onGameKey, () => [...windowBar.querySelectorAll<HTMLElement>('a, button')]);
 menus.scenery.innerHTML = titleArt();
-const titleScreen = new TitleScreen({ play: openMapSelect, settings: openSettings, controls: openControls, cheats: openCheats });
+const titleScreen = new TitleScreen({ play: openMapSelect, locker: openLocker, settings: openSettings, controls: openControls, cheats: openCheats });
 const pauseScreen = new PauseScreen({
   resume: closeMenus,
   respawn: () => {
@@ -89,6 +95,7 @@ const pauseScreen = new PauseScreen({
     backToTop();
   },
   maps: openMapSelect,
+  locker: openLocker,
   settings: openSettings,
   controls: openControls,
   cheats: openCheats,
@@ -125,7 +132,23 @@ const cheatsScreen = new CheatsScreen(
   },
   () => menus.back(),
 );
-for (const screen of [titleScreen, pauseScreen, mapSelect, settingsScreen, controlsScreen, cheatsScreen]) menus.add(screen);
+// The Locker: its preview draws through a hole in the menu while it's open (see drawLocker).
+const lockerStage = new LockerStage(outfit);
+let lockerOpen = false;
+const lockerScreen = new LockerScreen(
+  {
+    get: () => outfit,
+    set: setOutfit,
+    shown: (open) => {
+      lockerOpen = open;
+      // The painted mountain fills round the window, from the title and from pause.
+      menus.setScenery(open || !level);
+      if (!open) menus.setHole(null);
+    },
+  },
+  () => menus.back(),
+);
+for (const screen of [titleScreen, pauseScreen, mapSelect, settingsScreen, controlsScreen, cheatsScreen, lockerScreen]) menus.add(screen);
 
 // HUD buttons for the mouse, beside the window buttons; hidden while a menu is open.
 /** Under a finished timed run's result: the respawn key races the course again. */
@@ -225,7 +248,7 @@ async function loadMap(entry: MapEntry): Promise<void> {
       skierView.hf = built.hf;
       chase.hf = built.hf;
     } else {
-      skierView = new SkierView(scene, built.hf);
+      skierView = new SkierView(scene, built.hf, outfit);
       chase = new ChaseCamera(camera, built.hf);
     }
     writeStored('map', entry.id);
@@ -272,6 +295,33 @@ function openControls(): void {
 
 function openCheats(): void {
   menus.push(cheatsScreen);
+}
+
+function openLocker(): void {
+  menus.push(lockerScreen);
+}
+
+/** A new look from the Locker: on the skier at once (and the preview), and saved. */
+function setOutfit(next: Outfit): void {
+  outfit = next;
+  saveOutfit(outfit);
+  skierView?.rig.setOutfit(outfit);
+  lockerStage.setOutfit(outfit);
+}
+
+/**
+ * The Locker's preview, instead of the full frame (the painted menu covers
+ * the rest): the paused world round the skier, or the stage before any map.
+ * It turns, and the Santa hat's pom-pom sways, in real time.
+ */
+function drawLocker(realFrameTime: number): void {
+  const rect = lockerScreen.viewRect();
+  menus.setHole(rect);
+  if (rect.width <= 0 || rect.height <= 0) return;
+  lockerStage.turn(realFrameTime);
+  clothTime.value += realFrameTime;
+  if (level && skierView) lockerStage.renderWorld(view, rect, pose.center, level.built.hf);
+  else lockerStage.renderStage(renderer, rect);
 }
 
 /** "Cheats on" in a corner while any cheat is on or the tuning panel has changed a number. */
@@ -451,6 +501,10 @@ if (import.meta.env.DEV) {
       get skierView() {
         return skierView;
       },
+      get outfit() {
+        return outfit;
+      },
+      setOutfit,
     },
   });
 }
@@ -544,7 +598,8 @@ startLoop(
       level.world.update(level.run, level.race, frameTime);
     }
 
-    renderFrame(view);
+    if (lockerOpen) drawLocker(realFrameTime);
+    else renderFrame(view);
     fader.update(hudTime);
     crashHint.show(pose.bailed);
     toast.update(hudTime);

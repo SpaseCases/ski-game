@@ -743,6 +743,223 @@ body {
   margin-top: 10px;
 }
 
+/*
+ * Locker: the skier in a window cut into the sign (the game draws it there,
+ * through a hole in the menu), the choices beside it. Colors are paint
+ * chips in a strip per part; the picked chip wears the sign's white keyline.
+ */
+.locker-screen {
+  width: min(1080px, 100%);
+}
+
+.locker-layout {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.8fr) minmax(0, 1.3fr);
+  gap: 22px;
+}
+
+.locker-frame {
+  display: flex;
+  min-height: 380px;
+  padding: 6px;
+  border: 3px solid var(--snow);
+  border-radius: 4px;
+  background: var(--enamel-deep);
+}
+
+.locker-view {
+  flex: 1;
+  min-width: 0;
+}
+
+.locker-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid var(--plank);
+}
+
+.locker-tab {
+  padding: 7px 18px 6px;
+  border: 0;
+  border-radius: 3px 3px 0 0;
+  background: none;
+  color: var(--frost);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.locker-tab:hover {
+  color: var(--snow);
+}
+
+.locker-tab[aria-selected='true'] {
+  background: var(--plank);
+  color: var(--snow);
+}
+
+.locker-panel {
+  padding-top: 12px;
+}
+
+.locker-panel[hidden] {
+  display: none;
+}
+
+.locker-headwear {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.headwear-tile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 6px 10px 6px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--plank);
+  color: var(--snow);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+}
+
+.headwear-tile svg {
+  flex: none;
+  width: 40px;
+  height: 32px;
+}
+
+.headwear-tile:hover {
+  background: var(--plank-hover);
+}
+
+.headwear-tile[aria-pressed='true'] {
+  background: var(--snow);
+  color: var(--ink);
+  box-shadow: inset 6px 0 0 var(--flag);
+}
+
+.paint-row {
+  margin-top: 10px;
+}
+
+.paint-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 5px;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.paint-part {
+  font-weight: 700;
+}
+
+.paint-name {
+  color: var(--frost);
+  text-align: right;
+}
+
+.paint-chips {
+  display: grid;
+  grid-template-columns: repeat(20, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.chip {
+  aspect-ratio: 1;
+  min-width: 0;
+  max-height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: var(--chip);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
+  cursor: pointer;
+}
+
+.chip[aria-pressed='true'] {
+  box-shadow:
+    0 0 0 2px var(--enamel),
+    0 0 0 4px var(--snow);
+}
+
+.paint-row.is-covered .chip {
+  opacity: 0.45;
+}
+
+.locker-tab:focus,
+.headwear-tile:focus {
+  outline: 3px solid var(--flag);
+  outline-offset: 2px;
+}
+
+.chip:focus {
+  outline: 3px solid var(--flag);
+  outline-offset: 5px;
+}
+
+.ski-current {
+  padding: 14px 16px;
+  border-radius: 4px;
+  background: var(--enamel-deep);
+}
+
+.ski-current p {
+  margin: 0;
+}
+
+.ski-current .setting-note {
+  margin-top: 10px;
+}
+
+.ski-name {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.ski-current .ski-art {
+  margin-top: 4px;
+  color: var(--frost);
+  font-size: 15px;
+}
+
+@media (max-width: 900px) {
+  .locker-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .locker-frame {
+    min-height: 0;
+    height: clamp(200px, 36vh, 300px);
+  }
+}
+
+@media (max-width: 560px) {
+  .paint-chips {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+  }
+
+  .headwear-tile {
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 4px;
+    font-size: 13px;
+    text-align: center;
+  }
+}
+
 /* The HUD's reminder that the physics aren't the usual ones. */
 .cheats-tag {
   position: absolute;

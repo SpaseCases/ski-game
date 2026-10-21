@@ -441,6 +441,19 @@ export const CONFIG = {
     turboSpins: { air: { spinRate: 2, flipRate: 2, lincolnRate: 2, rotateAccel: 2 } },
   },
 
+  /** The Locker's live preview of the skier. */
+  locker: {
+    /** How fast it turns (rad/s). */
+    turnRate: 0.45,
+    /** Half the height and half the width (m) round the skier the camera keeps in view. */
+    halfHeight: 1.2,
+    halfWidth: 0.95,
+    /** Camera height above the aim (m). */
+    rise: 0.55,
+    /** Where the title's stage camera stands (rad from straight in front; < 0 is the skier's right). */
+    stageAngle: -0.35,
+  },
+
   debug: {
     /** Seconds between frame-rate readout updates. */
     fpsInterval: 0.5,

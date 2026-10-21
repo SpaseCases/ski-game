@@ -40,6 +40,8 @@ export class Menus {
   readonly scenery: HTMLElement;
   private readonly stack: Entry[] = [];
   private trap: ((e: KeyboardEvent) => void) | null = null;
+  /** The clip-path cutting the Locker's window, or '' for none. */
+  private hole = '';
   private readonly onRootBack: (screen: Screen) => void;
   private readonly onGameKey: (e: KeyboardEvent) => void;
   private readonly outside: () => HTMLElement[];
@@ -85,6 +87,24 @@ export class Menus {
   /** Whether the title's painted mountain covers the game (no map loaded) or the game shows through, dimmed. */
   setScenery(painted: boolean): void {
     this.root.classList.toggle('is-painted', painted);
+  }
+
+  /**
+   * Cuts a see-through hole in the menu at `rect` (viewport CSS pixels), so the
+   * game's canvas shows through it (the Locker's preview). Null fills it in.
+   */
+  setHole(rect: { x: number; y: number; width: number; height: number } | null): void {
+    let clip = '';
+    if (rect && rect.width > 0 && rect.height > 0) {
+      const { x, y } = rect;
+      const r = x + rect.width;
+      const b = y + rect.height;
+      clip = `polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${x}px ${y}px, ${r}px ${y}px, ${r}px ${b}px, ${x}px ${b}px, ${x}px ${y}px)`;
+    }
+    if (clip !== this.hole) {
+      this.hole = clip;
+      this.root.style.clipPath = clip;
+    }
   }
 
   /** Opens `screen` as the only screen (the title, or the pause menu). */

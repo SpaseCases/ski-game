@@ -15,6 +15,7 @@ import { groundAt } from '../sim/terrain.ts';
 import { TUNING } from '../sim/tuning.ts';
 import { addPoseDelta, createPoseBuffer, setPose, type PoseBuffer } from './poseBlend.ts';
 import { CROUCH, GRABS, STANCE, STANCE_HALF_WIDTH, TUCK, TUMBLE, TUMBLE_CENTER } from './skierPoses.ts';
+import { DEFAULT_OUTFIT, type Outfit } from '../core/outfit.ts';
 import { SkierRig } from './skierRig.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
 
@@ -107,7 +108,7 @@ const POLE_PUSHED: readonly [number, number, number] = [-0.2, -0.42, 0.88];
  */
 export class SkierView {
   /** The posed model; its root sits inside this view's groups. */
-  readonly rig = new SkierRig();
+  readonly rig: SkierRig;
   private readonly root = new Group();
   private readonly swing = new Group();
   private readonly lean = new Group();
@@ -132,8 +133,9 @@ export class SkierView {
   /** The snow the skier is on; swapped when another map loads. */
   hf: Heightfield;
 
-  constructor(scene: Scene, hf: Heightfield) {
+  constructor(scene: Scene, hf: Heightfield, outfit: Outfit = DEFAULT_OUTFIT) {
     this.hf = hf;
+    this.rig = new SkierRig(outfit);
     this.root.add(this.swing);
     this.swing.add(this.lean);
     this.lean.add(this.rig.root);

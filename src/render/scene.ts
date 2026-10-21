@@ -69,11 +69,11 @@ export function createView(container: HTMLElement): View {
   return { renderer, scene, camera, hemi, backdrop: new Backdrop() };
 }
 
-/** Draws a frame: the backdrop, then the world over it. */
-export function renderFrame(view: View): void {
-  view.backdrop.render(view.renderer, view.camera);
+/** Draws a frame: the backdrop, then the world over it (through `camera`, the game's own unless given). */
+export function renderFrame(view: View, camera: PerspectiveCamera = view.camera): void {
+  view.backdrop.render(view.renderer, camera);
   view.renderer.clearDepth();
-  view.renderer.render(view.scene, view.camera);
+  view.renderer.render(view.scene, camera);
 }
 
 /**
