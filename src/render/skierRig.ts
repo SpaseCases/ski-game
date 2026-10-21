@@ -42,9 +42,8 @@ const FIXED = {
   gaiter: '#1b1d21',
   gaiterSeam: '#2a2d33',
   vent: '#0e0f12',
-  /** Dark smoke lens, a shade lighter at the top. */
-  lensTop: '#5a6676',
-  lensBottom: '#45505e',
+  /** What a mirrored lens reflects: its top half takes a little of the sky's blue. */
+  lensSky: '#9fc3e6',
   zip: '#16181c',
   bootSole: '#202328',
   buckle: '#c9ced6',
@@ -206,7 +205,7 @@ export class SkierRig {
     if (changed('jacket', 'mittens')) swap(this.forearms, buildForearm(c.jacket, c.mittens));
     if (changed('pants', 'boots')) swap(this.shins, buildShin(c.pants, c.boots));
     if (changed('boots')) this.feet.forEach((m, i) => swap([m], buildFoot(i === 0 ? -1 : 1, c.boots)));
-    if (changed('helmet', 'goggleFrame', 'goggleStrap', 'headwear')) {
+    if (changed('helmet', 'goggleFrame', 'goggleLens', 'goggleStrap', 'headwear')) {
       swap([this.head], buildHead(next));
       this.setHeadwear();
     }
@@ -765,7 +764,7 @@ function buildHead(o: Outfit): BufferGeometry {
     paint(new SphereGeometry(0.105, 16, 12).scale(1, 1.08, 1.1).translate(0, 0.2, 0), FIXED.gaiter),
     ...buildGaiter(),
     ...buildHelmet(new Color(o.helmet), o.goggleStrap),
-    ...buildGoggles(o.goggleFrame),
+    ...buildGoggles(o.goggleFrame, new Color(o.goggleLens)),
   ]);
 }
 
@@ -855,9 +854,12 @@ function wrapAngle(a: number): number {
 
 /**
  * Goggles under the helmet's front edge: a matte frame with a notch for the
- * nose, and a dark tinted lens set just proud of it.
+ * nose, and a tinted mirror lens set just proud of it, lighter at the top
+ * where it catches the sky.
  */
-function buildGoggles(frame: string): BufferGeometry[] {
+function buildGoggles(frame: string, lens: Color): BufferGeometry[] {
+  const lensTop = lens.clone().lerp(new Color(FIXED.lensSky), 0.12);
+  const lensBottom = shade(lens, 0.92);
   const half = goggleHalf;
   const nose = goggleNose;
   const onFace = (g: BufferGeometry): BufferGeometry => g.scale(1, 1, GOGGLE_DEPTH).translate(0, GOGGLE_Y, 0);
@@ -868,10 +870,10 @@ function buildGoggles(frame: string): BufferGeometry[] {
       onFace(curvedPanel((a) => goggleOuter(a) - 0.012, goggleOuter, half, (a) => -half(a) + nose(a), -GOGGLE_SPAN, GOGGLE_SPAN, 26)),
       frame,
     ),
-    paint(onFace(curvedPanel(lensIn, lensOut, (a) => half(a) - 0.006, constant(-0.002), -LENS_SPAN, LENS_SPAN, 22)), FIXED.lensTop),
+    paint(onFace(curvedPanel(lensIn, lensOut, (a) => half(a) - 0.006, constant(-0.002), -LENS_SPAN, LENS_SPAN, 22)), lensTop),
     paint(
       onFace(curvedPanel(lensIn, lensOut, constant(-0.002), (a) => -half(a) + nose(a) + 0.006, -LENS_SPAN, LENS_SPAN, 22)),
-      FIXED.lensBottom,
+      lensBottom,
     ),
   ];
 }

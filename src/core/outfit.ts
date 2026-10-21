@@ -37,10 +37,11 @@ export const HEADWEAR: readonly { readonly id: Headwear; readonly name: string }
 ];
 
 /** The parts with a color, in the Locker's order. */
-export type ColorPart = 'helmet' | 'goggleFrame' | 'goggleStrap' | 'jacket' | 'pants' | 'boots' | 'mittens';
+export type ColorPart = 'helmet' | 'goggleFrame' | 'goggleLens' | 'goggleStrap' | 'jacket' | 'pants' | 'boots' | 'mittens';
 export const COLOR_PARTS: readonly { readonly id: ColorPart; readonly name: string }[] = [
   { id: 'helmet', name: 'Helmet' },
   { id: 'goggleFrame', name: 'Goggle frame' },
+  { id: 'goggleLens', name: 'Goggle lens' },
   { id: 'goggleStrap', name: 'Goggle strap' },
   { id: 'jacket', name: 'Jacket' },
   { id: 'pants', name: 'Pants' },
@@ -50,10 +51,11 @@ export const COLOR_PARTS: readonly { readonly id: ColorPart; readonly name: stri
 
 export type Outfit = Record<ColorPart, string> & { headwear: Headwear };
 
-/** Today's look: matte black helmet and goggles, a charcoal shell, olive pants, gray boots and mittens. */
+/** Today's look: matte black helmet and goggles with a smoke lens, a charcoal shell, olive pants, gray boots and mittens. */
 export const DEFAULT_OUTFIT: Readonly<Outfit> = {
   helmet: '#2c3037',
   goggleFrame: '#2c3037',
+  goggleLens: '#4d525b',
   goggleStrap: '#2c3037',
   jacket: '#2c3037',
   pants: '#677a52',

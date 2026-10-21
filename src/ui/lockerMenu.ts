@@ -197,7 +197,7 @@ export class LockerScreen implements Screen {
     for (const { id } of COLOR_PARTS) {
       const r = this.rows.get(id)!;
       for (const [hex, chip] of r.chips) chip.setAttribute('aria-pressed', String(o[id] === hex));
-      const hidden = o.headwear === 'pumpkin' && (id === 'helmet' || id === 'goggleFrame' || id === 'goggleStrap');
+      const hidden = o.headwear === 'pumpkin' && (id === 'helmet' || id === 'goggleFrame' || id === 'goggleLens' || id === 'goggleStrap');
       r.row.classList.toggle('is-covered', hidden);
       r.name.textContent = hidden ? `${colorName(o[id])}, under the pumpkin` : colorName(o[id]);
     }
