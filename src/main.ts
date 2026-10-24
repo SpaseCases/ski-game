@@ -377,6 +377,9 @@ function onGameKey(e: KeyboardEvent): void {
   // While the trail map is open, its key or Esc closes it (game keys are off then); the pause key pauses.
   if (trailMap.isOpen && (e.key === 'Escape' || keyboard.isBound('trailMap', e.code))) {
     e.preventDefault();
+    // Closing turns game keys back on; this same press mustn't then reach
+    // the Keyboard (listening on window after this) and open the map again.
+    e.stopPropagation();
     closeTrailMap();
     return;
   }

@@ -73,8 +73,15 @@ export function createSkierPose(): SkierPose {
 export function interpolateSkier(out: SkierPose, prev: SkierState, curr: SkierState, alpha: number): void {
   out.position.lerpVectors(prev.position, curr.position, alpha);
   out.velocity.lerpVectors(prev.velocity, curr.velocity, alpha);
-  out.normal.lerpVectors(prev.normal, curr.normal, alpha).normalize();
-  out.yaw = prev.yaw + wrapAngle(curr.yaw - prev.yaw) * alpha;
+  // The heading and normal on the snow only blend between two steps on the
+  // snow. In the air the sim leaves them as they were at takeoff, so across
+  // a landing (a 180 lands switch) blending would aim the skis halfway
+  // between the takeoff and landing headings for a frame, and the view's
+  // ease out of the air would take that as the starting point.
+  const onSnow = prev.grounded && curr.grounded;
+  if (onSnow) out.normal.lerpVectors(prev.normal, curr.normal, alpha).normalize();
+  else out.normal.copy(curr.normal);
+  out.yaw = onSnow ? prev.yaw + wrapAngle(curr.yaw - prev.yaw) * alpha : curr.yaw;
   out.lean = prev.lean + (curr.lean - prev.lean) * alpha;
   out.crouch = prev.crouch + (curr.crouch - prev.crouch) * alpha;
   out.brake = prev.brake + (curr.brake - prev.brake) * alpha;
