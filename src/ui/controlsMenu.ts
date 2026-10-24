@@ -35,6 +35,14 @@ const GRABS: readonly (readonly [Action, string, Action, string])[] = [
   ['grabLeftSafety', 'Left safety', 'grabRightSafety', 'Right safety'],
   ['grabLeftJapan', 'Left japan', 'grabRightJapan', 'Right japan'],
   ['grabLeftTail', 'Left tail', 'grabRightTail', 'Right tail'],
+  ['grabLeftNose', 'Left nose', 'grabRightNose', 'Right nose'],
+];
+
+const STYLE: readonly (readonly [Action, string, string])[] = [
+  ['styleSeaman', "Screamin' seaman", 'Right leg kicked out in front, left ski held up behind, chest out'],
+  ['styleDaffy', 'Daffy', 'One ski forward, one back, like running in the air'],
+  ['styleIronCross', 'Iron cross', 'Heels up behind, ski tips crossed in an X'],
+  ['styleSpreadEagle', 'Spread eagle', 'Arms and legs flung out wide'],
 ];
 
 export class ControlsScreen implements Screen {
@@ -118,6 +126,17 @@ export class ControlsScreen implements Screen {
     }
     grabs.appendChild(gbody);
 
+    const style = document.createElement('table');
+    style.className = 'controls-table grabs-table';
+    style.innerHTML = '<caption>Style moves (hold in the air, let go to release)</caption><thead><tr><th scope="col">Key</th><th scope="col">Move</th><th scope="col">What it looks like</th></tr></thead>';
+    const sbody = document.createElement('tbody');
+    for (const [action, name, look] of STYLE) {
+      const tr = document.createElement('tr');
+      tr.append(cell([action]), td(name), td(look));
+      sbody.appendChild(tr);
+    }
+    style.appendChild(sbody);
+
     const tips = document.createElement('ul');
     tips.className = 'controls-tips';
     for (const text of [
@@ -139,7 +158,7 @@ export class ControlsScreen implements Screen {
       div.appendChild(t);
       return div;
     };
-    this.body.replaceChildren(wrap(main), wrap(grabs), tips);
+    this.body.replaceChildren(wrap(main), wrap(grabs), wrap(style), tips);
   }
 }
 

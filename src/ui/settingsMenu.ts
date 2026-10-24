@@ -18,7 +18,22 @@ const QUALITY_TEXT: Record<Quality, [string, string]> = {
 const KEY_GROUPS: readonly (readonly [string, readonly Action[]])[] = [
   ['Riding', ['left', 'right', 'up', 'down', 'pole']],
   ['Tricks', ['lincolnLeft', 'lincolnRight']],
-  ['Grabs', ['grabLeftMute', 'grabLeftSafety', 'grabLeftJapan', 'grabLeftTail', 'grabRightMute', 'grabRightSafety', 'grabRightJapan', 'grabRightTail']],
+  [
+    'Grabs',
+    [
+      'grabLeftMute',
+      'grabLeftSafety',
+      'grabLeftJapan',
+      'grabLeftTail',
+      'grabLeftNose',
+      'grabRightMute',
+      'grabRightSafety',
+      'grabRightJapan',
+      'grabRightTail',
+      'grabRightNose',
+    ],
+  ],
+  ['Style moves', ['styleSeaman', 'styleDaffy', 'styleIronCross', 'styleSpreadEagle']],
   ['Run', ['checkpoint', 'respawn', 'confirm', 'trailMap', 'pause']],
 ];
 

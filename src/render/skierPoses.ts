@@ -189,6 +189,98 @@ export const LEFT_TAIL: PoseDef = {
   ],
 };
 
+/**
+ * Left hand forward to the outside edge of the left ski, just behind its tip. The leg
+ * reaches forward with the thigh level, the tip pulled up steeply to the
+ * hand, and the body folds forward over it.
+ */
+export const LEFT_NOSE: PoseDef = {
+  pelvis: AIR_PELVIS,
+  pelvisPitch: 0.35,
+  chestPitch: 0.9,
+  chestYaw: 0.1,
+  chestRoll: 0.2,
+  headPitch: -0.5,
+  feet: [{ ankle: [0, 0, 0], pitch: 1.1, knee: [-0.2, 0, -1] }, TUCKED_RIGHT],
+  hands: [
+    { at: [-0.2, 0.946, -0.843], grab: 0, on: [-EDGE - 0.01, TOP, -0.6], pole: [-0.3, -0.5, 0.8], elbow: [-0.9, -0.2, 0.2] },
+    { at: [0.42, 1.12, -0.22], pole: [0.55, -0.72, 0.4], elbow: [0.6, -0.6, 0.4] },
+  ],
+};
+
+// Style moves: one each, not mirrored.
+
+/**
+ * Screamin' seaman, the old-school way: the right leg kicks straight out in
+ * front, the left knee drops and the left ski bends up behind, its tail
+ * held by the left hand, chest out and back arched, the right arm thrown up.
+ */
+export const SEAMAN: PoseDef = {
+  pelvis: AIR_PELVIS,
+  pelvisPitch: 0.05,
+  chestPitch: -0.2,
+  chestYaw: 0.6,
+  chestRoll: 0.15,
+  headPitch: 0.15,
+  headYaw: -0.4,
+  feet: [
+    { ankle: [0, 0, 0], pitch: -0.4, knee: [-0.1, -1, -0.4] },
+    { ankle: [0.12, 0.47, -0.68], pitch: 0.3, knee: [0.1, 0.3, -1] },
+  ],
+  hands: [
+    { at: [-0.22, 0.902, 0.595], grab: 0, on: [-EDGE, TOP, 0.45], pole: [-0.4, -0.6, 0.7], elbow: [-0.8, 0, 0.5] },
+    { at: [0.35, 1.6, -0.15], pole: [0.4, 0.3, 0.85], elbow: [0.8, -0.3, 0.3] },
+  ],
+};
+
+/** Daffy: a running split in the air, left ski forward tip up, right ski back tip down, arms out wide. */
+export const DAFFY: PoseDef = {
+  pelvis: AIR_PELVIS,
+  pelvisPitch: 0.1,
+  chestPitch: 0.15,
+  headPitch: -0.15,
+  feet: [
+    { ankle: [-0.11, 0.27, -0.5], pitch: 0.35, knee: [-0.1, 0.3, -1] },
+    { ankle: [0.11, 0.35, 0.5], pitch: -0.45, knee: [0.1, -0.6, -1] },
+  ],
+  hands: [
+    { at: [-0.6, 1.2, -0.12], pole: [-0.6, -0.6, 0.5], elbow: [-0.3, -0.7, 0.6] },
+    { at: [0.6, 1.2, -0.12], pole: [0.6, -0.6, 0.5], elbow: [0.3, -0.7, 0.6] },
+  ],
+};
+
+/** Iron cross: knees bent, heels kicked up behind, the skis turned in so their tips cross in an X in front. */
+export const IRON_CROSS: PoseDef = {
+  pelvis: AIR_PELVIS,
+  pelvisPitch: 0.25,
+  chestPitch: 0.3,
+  headPitch: -0.35,
+  feet: [
+    { ankle: [-0.17, 0.62, 0.28], pitch: -0.9, yaw: -0.55, knee: [-0.15, -1, -0.4] },
+    { ankle: [0.17, 0.62, 0.28], pitch: -0.9, yaw: 0.55, knee: [0.15, -1, -0.4] },
+  ],
+  hands: [
+    { at: [-0.5, 1.05, -0.3], pole: [-0.5, -0.7, 0.5], elbow: [-0.6, -0.6, 0.4] },
+    { at: [0.5, 1.05, -0.3], pole: [0.5, -0.7, 0.5], elbow: [0.6, -0.6, 0.4] },
+  ],
+};
+
+/** Spread eagle: legs spread wide to the sides, arms flung up and out, like a star. */
+export const SPREAD_EAGLE: PoseDef = {
+  pelvis: AIR_PELVIS,
+  pelvisPitch: 0.05,
+  chestPitch: 0,
+  headPitch: -0.1,
+  feet: [
+    { ankle: [-0.55, 0.3, -0.02], roll: -0.5, knee: [-0.3, 0.2, -1] },
+    { ankle: [0.55, 0.3, -0.02], roll: 0.5, knee: [0.3, 0.2, -1] },
+  ],
+  hands: [
+    { at: [-0.72, 1.48, -0.05], pole: [-0.75, -0.3, 0.55], elbow: [-0.2, -0.8, 0.5] },
+    { at: [0.72, 1.48, -0.05], pole: [0.75, -0.3, 0.55], elbow: [0.2, -0.8, 0.5] },
+  ],
+};
+
 /** Mirrors a pose left to right: the right-hand version of a left-hand grab. */
 export function mirrorPose(p: PoseDef): PoseDef {
   return {
@@ -210,6 +302,7 @@ export const RIGHT_MUTE = mirrorPose(LEFT_MUTE);
 export const RIGHT_SAFETY = mirrorPose(LEFT_SAFETY);
 export const RIGHT_JAPAN = mirrorPose(LEFT_JAPAN);
 export const RIGHT_TAIL = mirrorPose(LEFT_TAIL);
+export const RIGHT_NOSE = mirrorPose(LEFT_NOSE);
 
 function mirrorFoot(f: FootDef): FootDef {
   return { ankle: flip(f.ankle), yaw: neg(f.yaw), pitch: f.pitch, roll: neg(f.roll), knee: flipOpt(f.knee) };
@@ -237,7 +330,7 @@ function neg(v: number | undefined): number | undefined {
   return v === undefined ? undefined : -v;
 }
 
-/** Every grab, in the order of GRAB_ACTIONS (core/input.ts). */
+/** Every grab and style move, in the order of GRAB_ACTIONS (core/input.ts). */
 export const GRABS: readonly PoseDef[] = [
   LEFT_MUTE,
   LEFT_SAFETY,
@@ -247,6 +340,12 @@ export const GRABS: readonly PoseDef[] = [
   RIGHT_SAFETY,
   RIGHT_JAPAN,
   RIGHT_TAIL,
+  LEFT_NOSE,
+  RIGHT_NOSE,
+  SEAMAN,
+  DAFFY,
+  IRON_CROSS,
+  SPREAD_EAGLE,
 ];
 
 /**

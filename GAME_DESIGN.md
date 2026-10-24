@@ -32,10 +32,18 @@ Grabs (hold in the air, release to let go):
 | S | Left safety | X | Right safety |
 | D | Left japan | C | Right japan |
 | F | Left tail | V | Right tail |
+| G | Left nose | B | Right nose |
+
+Style moves (hold in the air, release to let go; one of each, no left and right):
+
+| Key | Move | Key | Move |
+|---|---|---|---|
+| T | Screamin' seaman: right leg kicked out in front, left ski held up behind, chest out | 1 | Iron cross: heels up behind, ski tips crossed in an X |
+| W | Daffy: one ski forward, one back | 2 | Spread eagle: arms and legs flung out wide |
 
 - Holding a spin key and a flip key together tilts the rotation axis. That produces corks and misty flips.
 - Rotation continues while a key is held and slows after release. Letting go early is how you time the landing.
-- Grabs are poses: the hand reaches for that part of the ski. A grab can be held through rotations.
+- Grabs are poses: the hand reaches for that part of the ski. A grab can be held through rotations. Style moves are poses too, with no hand on a ski. Holding a newer grab or move key switches to it; letting go falls back to another one still held. Grabs and style moves don't change the physics.
 - Test multi-key combos (two arrows + grab + Shift) on a real Chromebook keyboard. If a combo drops keys, change the default binding.
 
 ## Crashes
@@ -116,7 +124,7 @@ Each map defines: name, heightfield (generated from parameters or loaded from a 
 ## Look
 - Low-poly and flat-shaded, close to Shredsauce's style but entirely original.
 - Snow uses white and blue-gray vertex-colored faces. Features use wood and metal colors. Trees are instanced low-poly cones.
-- The skier is a low-poly segmented body (helmet, torso, arms, legs) on a simple skeleton. Poses are procedural: stance, crouch, tuck, the 8 grabs, and the bail tumble. Skis and poles are separate meshes.
+- The skier is a low-poly segmented body (helmet, torso, arms, legs) on a simple skeleton. Poses are procedural: stance, crouch, tuck, the 10 grabs and 4 style moves, and the bail tumble. Skis and poles are separate meshes.
 - **Outfit:** colors, headwear and skis, chosen in the Locker and saved locally (below).
 - Sky is a gradient, with matching fog per map and weather.
 

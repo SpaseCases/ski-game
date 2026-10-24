@@ -24,15 +24,21 @@ import { SkierRig } from './render/skierRig.ts';
 import { COLOR_PARTS, DEFAULT_OUTFIT, HEADWEAR, type Outfit } from './core/outfit.ts';
 import {
   CROUCH,
+  DAFFY,
+  IRON_CROSS,
   LEFT_JAPAN,
   LEFT_MUTE,
+  LEFT_NOSE,
   LEFT_SAFETY,
   LEFT_TAIL,
   type PoseDef,
   RIGHT_JAPAN,
   RIGHT_MUTE,
+  RIGHT_NOSE,
   RIGHT_SAFETY,
   RIGHT_TAIL,
+  SEAMAN,
+  SPREAD_EAGLE,
   STANCE,
   TUCK,
   TUMBLE,
@@ -76,6 +82,12 @@ const POSES: (Entry | null)[] = [
   { name: 'Right japan', note: 'Right hand behind the leg to the right ski’s inside edge; tail up behind', pose: RIGHT_JAPAN, airborne: true },
   { name: 'Left tail', note: 'Left hand back to the left ski’s tail', pose: LEFT_TAIL, airborne: true },
   { name: 'Right tail', note: 'Right hand back to the right ski’s tail', pose: RIGHT_TAIL, airborne: true },
+  { name: 'Left nose', note: 'Left hand forward to the left ski’s nose, tip pulled up', pose: LEFT_NOSE, airborne: true },
+  { name: 'Right nose', note: 'Right hand forward to the right ski’s nose, tip pulled up', pose: RIGHT_NOSE, airborne: true },
+  { name: 'Screamin’ seaman', note: 'Right leg kicked out front, left ski held up behind, chest out', pose: SEAMAN, airborne: true },
+  { name: 'Daffy', note: 'One ski forward, one back', pose: DAFFY, airborne: true },
+  { name: 'Iron cross', note: 'Heels up behind, ski tips crossed', pose: IRON_CROSS, airborne: true },
+  { name: 'Spread eagle', note: 'Arms and legs flung out wide', pose: SPREAD_EAGLE, airborne: true },
   { name: 'Tumble', note: 'Crash: balled up, rolling to a stop', pose: TUMBLE, airborne: true },
   { name: 'Carve', note: 'In game: hard left turn at speed', ride: { speed: 12, lean: 0.85 }, airborne: false },
   { name: 'Crouch carve', note: 'In game: loading a pop mid-turn', ride: { speed: 5, crouch: 1, lean: 0.6 }, airborne: false },
@@ -105,8 +117,8 @@ const POLING: (Entry | null)[] = [
 ];
 const ENTRIES = new URLSearchParams(window.location.search).get('set') === 'poling' ? POLING : POSES;
 
-const COLS = 5;
-const ROWS = 4;
+const COLS = 6;
+const ROWS = 5;
 const AIR_HEIGHT = 0.55;
 
 const app = document.getElementById('app');
