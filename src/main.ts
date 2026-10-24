@@ -119,6 +119,11 @@ const settingsScreen = new SettingsScreen(
       settings.muted = muted;
       saveSettings(settings);
     },
+    setCrashWait: (wait) => {
+      settings.crashWait = wait;
+      saveSettings(settings);
+      syncKeyLabels();
+    },
     setBindings,
     trapNextKey: (fn) => menus.trapNextKey(fn),
   },
@@ -402,7 +407,7 @@ function syncKeyLabels(): void {
   const b = settings.bindings;
   setButtonKey(pauseButton, mainKey(b, 'pause'));
   setButtonKey(trailButton, mainKey(b, 'trailMap'));
-  crashHint.setKey(mainKey(b, 'respawn'));
+  crashHint.setKey(mainKey(b, 'respawn'), settings.crashWait);
   runHud.setKeys(mainKey(b, 'confirm'), mainKey(b, 'respawn'));
   raceAgainHint = `${mainKey(b, 'respawn')}: race it again`;
 }
@@ -606,8 +611,9 @@ startLoop(
       if (raceEvent === 'missed') toast.show('Missed gate');
     }
     if (event === 'flag' && !timedRun()) toast.show(`Checkpoint: flag ${run.flag + 1} of ${built.map.flags.length}`);
-    // After a crash, let the tumble play out, then fade and respawn.
-    if (skier.bailed && skier.bailTime >= CONFIG.bail.respawnDelay && !fader.busy) fader.fadeOut(respawn);
+    // After a crash, let the tumble play out, then fade and respawn (unless
+    // the crash setting says to stay down until the respawn key).
+    if (skier.bailed && !settings.crashWait && skier.bailTime >= CONFIG.bail.respawnDelay && !fader.busy) fader.fadeOut(respawn);
   },
   (alpha, realFrameTime) => {
     // While the game waits, everything that moves by time holds still too.

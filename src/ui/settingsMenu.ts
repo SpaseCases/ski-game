@@ -1,6 +1,7 @@
 import { DEFAULT_BINDINGS, type Action, type Bindings } from '../core/input.ts';
 import { assignKey, clearSecondKey, KEY_SLOTS, QUALITIES, type Quality, type Settings } from '../core/settings.ts';
-import { ACTION_NAMES, keyName } from './keyNames.ts';
+import { CONFIG } from '../config.ts';
+import { ACTION_NAMES, keyName, mainKey } from './keyNames.ts';
 import { addBackButton, board, setHints, type Screen } from './menus.ts';
 
 // The Settings screen: the quality preset (applied at once), sound volumes
@@ -52,6 +53,8 @@ export interface SettingsHooks {
   get: () => Settings;
   setQuality: (q: Quality) => void;
   setSound: (master: number, sfx: number, muted: boolean) => void;
+  /** After a crash: wait for the respawn key (true) or respawn by itself. */
+  setCrashWait: (wait: boolean) => void;
   setBindings: (b: Bindings) => void;
   /** Hands the next key pressed to `fn` and nothing else (null: stop listening). */
   trapNextKey: (fn: ((e: KeyboardEvent) => void) | null) => void;
@@ -66,6 +69,8 @@ export class SettingsScreen implements Screen {
   private readonly masterValue: HTMLElement;
   private readonly sfxValue: HTMLElement;
   private readonly mute: HTMLButtonElement;
+  private readonly crashButtons = new Map<boolean, HTMLButtonElement>();
+  private readonly crashNote: HTMLElement;
   private readonly slots = new Map<string, HTMLButtonElement>();
   private readonly status: HTMLElement;
   private listening: HTMLButtonElement | null = null;
@@ -126,6 +131,31 @@ export class SettingsScreen implements Screen {
       soonNote,
     );
 
+    // Crashes: respawn by itself after the tumble, or stay down until the respawn key.
+    const crashes = section('Crashes');
+    const crashGroup = document.createElement('div');
+    crashGroup.className = 'segmented';
+    crashGroup.setAttribute('role', 'group');
+    crashGroup.setAttribute('aria-label', 'After a crash');
+    for (const [wait, text] of [
+      [false, 'Respawn by itself'],
+      [true, 'Wait for respawn key'],
+    ] as const) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'segment';
+      btn.textContent = text;
+      btn.addEventListener('click', () => {
+        this.hooks.setCrashWait(wait);
+        this.syncCrash();
+      });
+      crashGroup.appendChild(btn);
+      this.crashButtons.set(wait, btn);
+    }
+    this.crashNote = document.createElement('p');
+    this.crashNote.className = 'setting-note';
+    crashes.append(labelRow('After a crash', crashGroup), this.crashNote);
+
     // Keys.
     const keys = section('Keys');
     keys.classList.add('keys-section');
@@ -179,7 +209,7 @@ export class SettingsScreen implements Screen {
     columns.className = 'settings-columns';
     const left = document.createElement('div');
     left.className = 'settings-column';
-    left.append(picture, sound);
+    left.append(picture, sound, crashes);
     columns.append(left, keys);
     b.body.appendChild(columns);
     setHints(b.foot, [
@@ -262,6 +292,15 @@ export class SettingsScreen implements Screen {
     this.syncKeys();
   }
 
+  private syncCrash(): void {
+    const s = this.hooks.get();
+    for (const [wait, btn] of this.crashButtons) btn.setAttribute('aria-pressed', String(wait === s.crashWait));
+    const key = mainKey(s.bindings, 'respawn');
+    this.crashNote.textContent = s.crashWait
+      ? `You stay down in the snow until you press ${key}.`
+      : `You respawn at your last checkpoint about ${CONFIG.bail.respawnDelay} s after the tumble starts (${key} skips the wait).`;
+  }
+
   private syncQuality(): void {
     const q = this.hooks.get().quality;
     for (const [id, btn] of this.qualityButtons) btn.setAttribute('aria-pressed', String(id === q));
@@ -284,6 +323,7 @@ export class SettingsScreen implements Screen {
   }
 
   private syncKeys(): void {
+    this.syncCrash();
     const b = this.hooks.get().bindings;
     for (const btn of this.slots.values()) {
       const action = btn.dataset.action as Action;

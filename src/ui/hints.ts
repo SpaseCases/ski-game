@@ -1,5 +1,5 @@
 /** "Crashed" notice shown while the skier tumbles, naming the respawn key. */
-export function mountCrashHint(hud: HTMLElement): { show(visible: boolean): void; setKey(key: string): void } {
+export function mountCrashHint(hud: HTMLElement): { show(visible: boolean): void; setKey(key: string, wait: boolean): void } {
   const el = document.createElement('div');
   el.className = 'crash-hint';
   el.hidden = true;
@@ -8,8 +8,9 @@ export function mountCrashHint(hud: HTMLElement): { show(visible: boolean): void
     show(visible: boolean): void {
       if (el.hidden === visible) el.hidden = !visible;
     },
-    setKey(key: string): void {
-      el.textContent = `Crashed! Press ${key} to skip`;
+    /** `wait`: the skier stays down until the key is pressed (the crash setting), so it isn't skipping anything. */
+    setKey(key: string, wait: boolean): void {
+      el.textContent = wait ? `Crashed! Press ${key} to get up` : `Crashed! Press ${key} to skip`;
     },
   };
 }

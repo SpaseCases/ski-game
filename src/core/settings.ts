@@ -19,6 +19,8 @@ export interface Settings {
   masterVolume: number;
   sfxVolume: number;
   muted: boolean;
+  /** After a crash, lie in the snow until the respawn key is pressed, instead of respawning by itself. */
+  crashWait: boolean;
   bindings: Bindings;
 }
 
@@ -31,7 +33,7 @@ function isQuality(value: unknown): value is Quality {
 }
 
 export function defaultSettings(): Settings {
-  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, bindings: { ...DEFAULT_BINDINGS } };
+  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, crashWait: false, bindings: { ...DEFAULT_BINDINGS } };
 }
 
 /** The saved settings, or the defaults for anything not saved (or unreadable). */
@@ -50,6 +52,7 @@ export function loadSettings(): Settings {
   out.masterVolume = unit(saved.masterVolume, out.masterVolume);
   out.sfxVolume = unit(saved.sfxVolume, out.sfxVolume);
   if (typeof saved.muted === 'boolean') out.muted = saved.muted;
+  if (typeof saved.crashWait === 'boolean') out.crashWait = saved.crashWait;
   out.bindings = readBindings(saved.bindings);
   return out;
 }

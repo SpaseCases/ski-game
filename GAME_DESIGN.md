@@ -49,6 +49,7 @@ Style moves (hold in the air, release to let go; one of each, no left and right)
 ## Crashes
 - **Bail triggers:** landing with the skis too far off the slope angle, landing on your back or head, or hitting an obstacle hard.
 - **On a bail:** the skier tumbles and slides to a stop. This is a cheap procedural tumble driven by the sim, not a full ragdoll. After about 1.5s the screen fades and you respawn at your most recent checkpoint. Pressing R skips the wait.
+- **Crash setting** (Settings, Crashes): *Respawn by itself* (the default, as above) or *Wait for respawn key*: the skier stays down in the snow until you press R.
 - A full ragdoll using Rapier is a possible later upgrade.
 
 ## Rails and boxes
