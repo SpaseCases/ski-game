@@ -75,9 +75,8 @@ const trackMaterial = new MeshLambertMaterial({
   polygonOffsetFactor: -2,
   polygonOffsetUnits: -4,
 });
-/** Track colors on groomed snow and in powder (deeper, so darker). */
-const GROOMED_TRACK = new Color('#a9bccf');
-const POWDER_TRACK = new Color('#8ea3bb');
+/** Track color: the same everywhere, powder or groomed. */
+const TRACK_COLOR = new Color('#a9bccf');
 
 const UP = new Vector3(0, 1, 0);
 
@@ -145,7 +144,6 @@ export class SnowFx {
   private readonly trackIndex: Uint16Array;
   private readonly birth: Float32Array;
   private readonly opacity: Float32Array;
-  private readonly shade: Uint8Array;
   private readonly head = [-1, -1];
   private readonly cursor = [0, 0];
   private readonly lastX = [0, 0];
@@ -231,7 +229,6 @@ export class SnowFx {
     this.trackIndex = new Uint16Array(2 * pts * 6);
     this.birth = new Float32Array(2 * pts).fill(-Infinity);
     this.opacity = new Float32Array(2 * pts);
-    this.shade = new Uint8Array(2 * pts);
     const geo = new BufferGeometry();
     geo.setAttribute('position', new BufferAttribute(this.trackPos, 3));
     geo.setAttribute('normal', new BufferAttribute(this.trackNormal, 3));
@@ -715,9 +712,8 @@ export class SnowFx {
     // A ski sliding sideways smears a track as wide as it shows across the way it moves.
     const across = Math.sqrt(Math.max(0, 1 - this.skiFwd.dot(this.travel) ** 2));
     const smear = Math.min(f.smearMax, across * f.skiLength);
-    const base = this.powder ? f.powderTrackWidth : f.trackWidth;
-    const opacity = (this.powder ? f.powderTrackOpacity : f.trackOpacity) * (1 - (1 - f.smearOpacity) * Math.min(1, smear / 0.4));
-    const half = Math.max(base, smear) / 2;
+    const opacity = f.trackOpacity * (1 - (1 - f.smearOpacity) * Math.min(1, smear / 0.4));
+    const half = Math.max(f.trackWidth, smear) / 2;
     // The track comes out from under the trailing end of the ski (the tail,
     // or the tip riding switch), so it never draws over the ski; skidding
     // sideways, the whole ski smears it, from the middle.
@@ -795,7 +791,6 @@ export class SnowFx {
     }
     this.birth[slot] = this.time;
     this.opacity[slot] = opacity;
-    this.shade[slot] = this.powder ? 1 : 0;
     this.trackMoved = true;
   }
 
@@ -834,7 +829,7 @@ export class SnowFx {
         const age = this.time - this.birth[slot]!;
         const a = age >= life ? 0 : this.opacity[slot]! * Math.min(1, (1 - age / life) * 3) * Math.min(1, rank / tail);
         if (a > 0) any = true;
-        const c = this.shade[slot] ? POWDER_TRACK : GROOMED_TRACK;
+        const c = TRACK_COLOR;
         for (let e = 0; e < 2; e++) {
           const o = (slot * 2 + e) * 4;
           col[o] = c.r;

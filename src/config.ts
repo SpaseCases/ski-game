@@ -421,11 +421,9 @@ export const CONFIG = {
     ridgeRange: { auto: 150, low: 90, medium: 150, high: 210 },
     /** Meters between track points. */
     trackSpacing: 0.6,
-    /** Width (m) and opacity of a ski's track on groomed snow and in powder (wider and deeper). */
+    /** Width (m) and opacity of a ski's track, the same in powder and on groomed snow. */
     trackWidth: 0.12,
     trackOpacity: 0.32,
-    powderTrackWidth: 0.3,
-    powderTrackOpacity: 0.55,
     /** Length (m) of a ski, for the smear it leaves skidding sideways; the smear is lighter and no wider than smearMax. */
     skiLength: 1.6,
     smearOpacity: 0.6,

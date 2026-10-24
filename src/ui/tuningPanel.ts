@@ -288,7 +288,7 @@ export function mountTuningPanel(actions: PanelActions): TuningPanel {
   // Snow effects read these every frame; the per-preset budgets apply when a map loads or the quality changes.
   const fx = gui.addFolder('Snow effects');
   const F = CONFIG.snowFx;
-  for (const key of ['trackSpacing', 'trackWidth', 'trackOpacity', 'powderTrackWidth', 'powderTrackOpacity', 'skiLength', 'smearOpacity', 'smearMax', 'windSpeed'] as const) {
+  for (const key of ['trackSpacing', 'trackWidth', 'trackOpacity', 'skiLength', 'smearOpacity', 'smearMax', 'windSpeed'] as const) {
     fx.add(F, key, 0, F[key] * 4 || 1, 0.01);
   }
   for (const block of ['carve', 'brake', 'spray', 'powder', 'landing', 'crash', 'sparks', 'ridge'] as const) {
