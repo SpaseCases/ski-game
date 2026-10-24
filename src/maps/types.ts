@@ -775,6 +775,25 @@ export interface MapDef {
   };
   /** Distant mountains around the map, or none. */
   peaks?: PeaksDef;
+  /** Snow off the named runs is powder (Freeride); without this the whole map is groomed. */
+  powder?: PowderDef;
+}
+
+/**
+ * Where a map's snow is powder: everywhere but its named runs (within each
+ * run's `clear`) and these groomed patches (a town).
+ */
+export interface PowderDef {
+  groomed: GroomedPatch[];
+}
+
+/** A rectangle of groomed snow: its middle, the heading its length runs along (degrees), and its size. */
+export interface GroomedPatch {
+  x: number;
+  z: number;
+  heading: number;
+  width: number;
+  length: number;
 }
 
 /**

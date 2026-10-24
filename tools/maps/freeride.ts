@@ -886,6 +886,8 @@ function mapJson(): Json {
     runs,
     colors: { sky: '#6fa6dd', fog: '#d6e4f1' },
     peaks,
+    // Off the named runs the mountain is powder; the town is groomed.
+    powder: { groomed: [{ ...xz(T(TOWN.length / 2)), heading: r1(TH), width: TOWN.width, length: TOWN.length }] },
   };
 }
 

@@ -285,6 +285,20 @@ export function mountTuningPanel(actions: PanelActions): TuningPanel {
   look.add(r, 'railBlendTime', 0.01, 0.5, 0.01);
   look.close();
 
+  // Snow effects read these every frame; the per-preset budgets apply when a map loads or the quality changes.
+  const fx = gui.addFolder('Snow effects');
+  const F = CONFIG.snowFx;
+  for (const key of ['trackSpacing', 'trackWidth', 'trackOpacity', 'powderTrackWidth', 'powderTrackOpacity', 'skiLength', 'smearOpacity', 'smearMax', 'windSpeed'] as const) {
+    fx.add(F, key, 0, F[key] * 4 || 1, 0.01);
+  }
+  for (const block of ['carve', 'brake', 'spray', 'powder', 'landing', 'crash', 'sparks', 'ridge'] as const) {
+    const f = fx.addFolder(block);
+    const values = F[block] as Record<string, number>;
+    for (const key of Object.keys(values)) f.add(values, key, 0, values[key]! * 4 || 1, 0.01);
+    f.close();
+  }
+  fx.close();
+
   const cam = gui.addFolder('Camera');
   const c = CONFIG.camera;
   cam.add(c, 'distNear', 1, 15, 0.1);

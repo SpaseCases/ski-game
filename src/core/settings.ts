@@ -153,3 +153,17 @@ export function viewRange(q: Quality): { far: number; fogStart: number; hazeEnd:
 export function decorDensity(q: Quality): number {
   return CONFIG.quality.decorDensity[q];
 }
+
+/** What a preset gives the snow effects: see CONFIG.snowFx. */
+export interface SnowBudget {
+  particles: number;
+  rate: number;
+  trackPoints: number;
+  trackLife: number;
+  ridgeRange: number;
+}
+
+export function snowBudget(q: Quality): SnowBudget {
+  const f = CONFIG.snowFx;
+  return { particles: f.particles[q], rate: f.rate[q], trackPoints: f.trackPoints[q], trackLife: f.trackLife[q], ridgeRange: f.ridgeRange[q] };
+}

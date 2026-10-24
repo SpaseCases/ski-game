@@ -4,7 +4,7 @@ import { createInputState, Keyboard, type Bindings } from './core/input.ts';
 import { startLoop } from './core/loop.ts';
 import { PointerOrbit } from './core/pointerOrbit.ts';
 import { loadOutfit, saveOutfit, type Outfit } from './core/outfit.ts';
-import { decorDensity, loadSettings, saveSettings, urlQuality, viewRange, type Quality } from './core/settings.ts';
+import { decorDensity, loadSettings, saveSettings, snowBudget, urlQuality, viewRange, type Quality } from './core/settings.ts';
 import { readStored, writeStored } from './core/storage.ts';
 import { buildMap, type BuiltMap } from './maps/build.ts';
 import { parseMap } from './maps/loader.ts';
@@ -241,7 +241,7 @@ async function loadMap(entry: MapEntry): Promise<void> {
     level?.world.dispose();
     level = null;
     const built = buildMap(map);
-    const world = new WorldView(built, decorDensity(quality), viewRange(quality).far);
+    const world = new WorldView(built, decorDensity(quality), viewRange(quality).far, snowBudget(quality));
     scene.add(world.group);
     applyMap(view, built);
     level = { id: entry.id, built, world, run: createRun(map), race: built.race ? createRace(built.race) : null };
@@ -403,7 +403,7 @@ function setQuality(q: Quality): void {
   settings.quality = q;
   saveSettings(settings);
   applyView();
-  level?.world.setQuality(decorDensity(q), viewRange(q).far);
+  level?.world.setQuality(decorDensity(q), viewRange(q).far, snowBudget(q));
 }
 
 /** The current preset's view range on the camera and fog. */
@@ -504,6 +504,10 @@ if (import.meta.env.DEV) {
       get skierView() {
         return skierView;
       },
+      /** The snow effects of the map being ridden; setWeather({ snowfall, ridgeSnow, wind, gust }) tries a storm. */
+      get snowFx() {
+        return level?.world.snow;
+      },
       get outfit() {
         return outfit;
       },
@@ -587,6 +591,7 @@ startLoop(
       if (snapView) {
         skierView.snap(pose);
         chase.snap(pose);
+        level.world.snow.snap(skier);
         snapView = false;
       }
       skierView.update(pose, frameTime);
@@ -599,6 +604,7 @@ startLoop(
       }
       level.world.view(camera.position.x, camera.position.z, camera.far, snapped || freeCamera !== null);
       level.world.update(level.run, level.race, frameTime);
+      level.world.snow.update(pose, skier, frameTime, camera.position);
     }
 
     if (lockerOpen) drawLocker(realFrameTime);

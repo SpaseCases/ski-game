@@ -404,6 +404,60 @@ export const CONFIG = {
     railPostWidth: 0.07,
   },
 
+  /**
+   * Snow effects (render/snowFx.ts): spray, ski tracks, landing puffs, crash
+   * bursts, rail sparks, powder clouds and snow blowing off ridges. Rates are
+   * particles per second at full strength; sizes are radii in meters.
+   */
+  snowFx: {
+    /** Most particles alive at once, per preset; the oldest give way to new ones. Auto uses Medium's. */
+    particles: { auto: 700, low: 320, medium: 700, high: 1200 },
+    /** Share of every emission rate each preset spawns, so a small pool isn't simply overrun. */
+    rate: { auto: 0.8, low: 0.5, medium: 0.8, high: 1 },
+    /** Points kept per ski track, and seconds a track takes to fade, per preset. */
+    trackPoints: { auto: 150, low: 64, medium: 150, high: 280 },
+    trackLife: { auto: 14, low: 6, medium: 14, high: 28 },
+    /** Ridge snow is blown only from emitters this close (m) to the camera. */
+    ridgeRange: { auto: 150, low: 90, medium: 150, high: 210 },
+    /** Meters between track points. */
+    trackSpacing: 0.6,
+    /** Width (m) and opacity of a ski's track on groomed snow and in powder (wider and deeper). */
+    trackWidth: 0.12,
+    trackOpacity: 0.32,
+    powderTrackWidth: 0.3,
+    powderTrackOpacity: 0.55,
+    /** Length (m) of a ski, for the smear it leaves skidding sideways; the smear is lighter and no wider than smearMax. */
+    skiLength: 1.6,
+    smearOpacity: 0.6,
+    smearMax: 1.3,
+    /** Carving: spray starts at edgeMin radians of lean and speedMin m/s, full at edgeFull and speedFull. */
+    carve: { edgeMin: 0.3, edgeFull: 0.8, speedMin: 5, speedFull: 16, rate: 320 },
+    /** Braking or hockey stopping: a sheet of spray off the skis' leading edges, full at speedFull m/s. */
+    brake: { speedMin: 2, speedFull: 12, rate: 480 },
+    /** Spray particles: life (s), start and end size, how hard gravity pulls them (share of 1 g), and air drag (per s). */
+    spray: { life: 0.6, size0: 0.025, size1: 0.085, gravity: 0.6, drag: 2.2 },
+    /**
+     * Powder (off the runs on maps with `powder`): spray grows bigger, lasts
+     * longer, floats, and comes thicker; just riding fast kicks up a trail.
+     */
+    powder: { size: 4, life: 2.2, gravity: 0.25, drag: 1.4, rate: 1.6, trailRate: 70, trailSpeed: 6 },
+    /** A puff on landings harder than impactMin m/s into the snow, full at impactFull: up to `count` particles. */
+    landing: { impactMin: 3, impactFull: 12, count: 70 },
+    /** A burst on a crash, and a trail while the body tumbles along the snow (per m/s of speed). */
+    crash: { count: 70, trailRate: 6 },
+    /** Sparks off metal rails (not boxes or logs): full at speedFull m/s along the rail. */
+    sparks: { speedMin: 1.5, speedFull: 10, rate: 150, life: 0.35 },
+    /**
+     * Snow blowing off ridges, wind lips and cornices (Freeride): an emitter
+     * every `spacing` m along each, gusting; `rate` per emitter at the top
+     * of a gust.
+     */
+    ridge: { spacing: 10, rate: 24, life: 2.4, size0: 0.08, size1: 0.36 },
+    /** Which way the wind blows (XZ, normalized at use), and how fast (m/s) on a clear day. Wind lips blow toward their own lee. */
+    wind: { x: 0.8, z: 0.6 },
+    windSpeed: 5,
+  },
+
   light: {
     hemiIntensity: 1.9,
     sunIntensity: 2.6,

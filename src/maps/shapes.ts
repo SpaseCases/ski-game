@@ -318,6 +318,47 @@ export function topShape(hf: Heightfield, x: number, z: number, out: ShapeSample
 }
 
 /** Height a shape adds at a point, and its gradient in world X and Z. */
+/**
+ * What the top of the shapes at world (x, z) is made of (see SURFACE): a
+ * ramp's stretch there (a start deck is wood), snow on its eased sides when
+ * they're drawn as snow, and snow everywhere else (pipes, plain slope).
+ */
+export function shapeSurfaceAt(hf: Heightfield, x: number, z: number): number {
+  const shapes = hf.shapes;
+  if (!shapes || shapes.length === 0) return SURFACE.snow;
+  let top = 0;
+  let surface: number = SURFACE.snow;
+  const visit = (s: TerrainShape): void => {
+    if (!sampleShape(s, x, z, scratch) || scratch.height <= top) return;
+    top = scratch.height;
+    surface = s.kind === 'ramp' ? rampSurface(s, x, z) : SURFACE.snow;
+  };
+  const g = hf.shapeCells;
+  if (g) {
+    const c = Math.floor((x - g.originX) / g.cell);
+    const r = Math.floor((z - g.originZ) / g.cell);
+    if (c < 0 || r < 0 || c >= g.cols || r >= g.rows) return SURFACE.snow;
+    const k = r * g.cols + c;
+    for (let j = g.start[k]!; j < g.start[k + 1]!; j++) visit(shapes[g.items[j]!]!);
+  } else {
+    for (let i = 0; i < shapes.length; i++) visit(shapes[i]!);
+  }
+  return surface;
+}
+
+/** The surface of ramp `r` at (x, z), already known to be on it. */
+function rampSurface(r: RampShape, x: number, z: number): number {
+  const dx = x - r.x;
+  const dz = z - r.z;
+  const u = dx * r.dirX + dz * r.dirZ;
+  const v = dx * r.rightX + dz * r.rightZ;
+  if (r.sides && Math.abs(v) > r.halfWidth) return SURFACE.snow;
+  const last = r.ku.length - 1;
+  let k = 0;
+  while (k < last - 1 && u > (r.ku[k + 1] ?? 0)) k++;
+  return r.surface[k + 1] ?? SURFACE.snow;
+}
+
 export interface ShapeSample {
   height: number;
   dhdx: number;

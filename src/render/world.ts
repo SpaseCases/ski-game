@@ -1,5 +1,6 @@
 import { Group, InstancedMesh, Mesh, type Material, type Object3D } from 'three';
 import { CONFIG } from '../config.ts';
+import type { SnowBudget } from '../core/settings.ts';
 import type { BuiltMap } from '../maps/build.ts';
 import { thinDecor } from '../maps/decor.ts';
 import type { RunState } from '../sim/checkpoints.ts';
@@ -7,6 +8,7 @@ import type { RaceState } from '../sim/race.ts';
 import { ChairliftView } from './chairlifts.ts';
 import { clothTime } from './cloth.ts';
 import { SmokeView } from './smoke.ts';
+import { SnowFx } from './snowFx.ts';
 import { CheckpointView } from './checkpointMeshes.ts';
 import { DistanceCuller } from './culling.ts';
 import { createDecor } from './decor.ts';
@@ -34,6 +36,8 @@ export class WorldView {
   private readonly checkpointView: CheckpointView;
   private readonly lifts: ChairliftView;
   private readonly smoke: SmokeView;
+  /** Spray, tracks, sparks and blowing snow (see render/snowFx.ts); rebuilt for another quality preset. */
+  snow: SnowFx;
   private decor: Group;
   /** Where the camera was last (view()), for placing the moving chairs near it. */
   private camX = 0;
@@ -41,8 +45,8 @@ export class WorldView {
   private range = 0;
   private culler = new DistanceCuller();
 
-  /** `density`: the share of scenery decoration to draw (see decorDensity); `range`: how far the camera sees (m). */
-  constructor(built: BuiltMap, density: number, range: number) {
+  /** `density`: the share of scenery decoration to draw (see decorDensity); `range`: how far the camera sees (m); `fx`: the snow effects' budget. */
+  constructor(built: BuiltMap, density: number, range: number, fx: SnowBudget) {
     this.built = built;
     this.group.matrixAutoUpdate = false;
     const { map, hf, starts, course, race } = built;
@@ -61,10 +65,15 @@ export class WorldView {
     this.group.add(this.lifts.group);
     this.smoke = new SmokeView(map.features, hf);
     if (this.smoke.mesh) this.group.add(this.smoke.mesh);
+    this.snow = new SnowFx(built, fx);
+    this.group.add(this.snow.group);
   }
 
-  /** Redraws the decoration for another quality preset: its density, and far trees if it sees past CONFIG.quality.treeDetail. */
-  setQuality(density: number, range: number): void {
+  /** Redraws for another quality preset: the decoration's density, far trees if it sees past CONFIG.quality.treeDetail, and the snow effects' budget. */
+  setQuality(density: number, range: number, fx: SnowBudget): void {
+    this.snow.dispose();
+    this.snow = new SnowFx(this.built, fx);
+    this.group.add(this.snow.group);
     this.culler.attachAll();
     this.group.remove(this.decor);
     disposeTree(this.decor);

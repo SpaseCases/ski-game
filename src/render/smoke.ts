@@ -1,4 +1,5 @@
 import { Color, IcosahedronGeometry, InstancedMesh, MeshLambertMaterial } from 'three';
+import { CONFIG } from '../config.ts';
 import { chimneySpot, framePoint, townFrame } from '../maps/town.ts';
 import type { Feature, Heightfield } from '../maps/types.ts';
 import { renderedHeightAt } from './terrainMesh.ts';
@@ -13,8 +14,8 @@ const PUFFS = 6;
 const LIFE = 7;
 const RISE = 11;
 const DRIFT = 6;
-/** Which way the wind carries the smoke (a unit direction in XZ). */
-const WIND = { x: 0.8, z: 0.6 };
+/** Which way the wind carries the smoke: the snow effects' wind (a unit direction in XZ). */
+const WIND = CONFIG.snowFx.wind;
 
 const material = new MeshLambertMaterial({ color: new Color('#e9edf2'), flatShading: true, transparent: true, opacity: 0.55, depthWrite: false });
 

@@ -13,6 +13,7 @@ import type {
   PeakTerrainDef,
   PeaksDef,
   PitchSection,
+  PowderDef,
   PropKind,
   RailPoint,
   RailStyle,
@@ -69,6 +70,19 @@ export function parseMap(raw: unknown): MapDef {
       fog: str(colors.fog, 'colors.fog'),
     },
     peaks: map.peaks === undefined ? undefined : parsePeaks(map.peaks),
+    powder: map.powder === undefined ? undefined : parsePowder(map.powder),
+  };
+}
+
+function parsePowder(raw: unknown): PowderDef {
+  const o = obj(raw, 'powder');
+  const groomed = o.groomed === undefined ? [] : arr(o.groomed, 'powder.groomed');
+  return {
+    groomed: groomed.map((g, i) => {
+      const path = `powder.groomed[${i}]`;
+      const n = reader(obj(g, path), path);
+      return { x: n('x'), z: n('z'), heading: n('heading', 0), width: n('width'), length: n('length') };
+    }),
   };
 }
 
