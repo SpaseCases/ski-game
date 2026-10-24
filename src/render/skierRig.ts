@@ -166,13 +166,12 @@ export class SkierRig {
     // Both sides share one geometry, apart from the feet (buckles on the outside).
     const upperArm = buildUpperArm(c.jacket);
     const forearm = buildForearm(c.jacket, c.mittens);
-    const thigh = buildThigh(c.pants);
     const shin = buildShin(c.pants, c.boots);
     const pole = buildPole();
     for (const side of [-1, 1] as const) {
       this.upperArms.push(add(upperArm));
       this.forearms.push(add(forearm));
-      this.thighs.push(add(thigh));
+      this.thighs.push(add(buildThigh(c.pants, side)));
       this.shins.push(add(shin));
       this.feet.push(add(buildFoot(side, c.boots, buildSki(outfit, side))));
       this.poles.push(add(pole));
@@ -187,7 +186,7 @@ export class SkierRig {
     const c = colors(next);
     if (changed('pants')) {
       swap([this.pelvis], buildPelvis(c.pants));
-      swap(this.thighs, buildThigh(c.pants));
+      this.thighs.forEach((m, i) => swap([m], buildThigh(c.pants, i === 0 ? -1 : 1)));
     }
     if (changed('jacket')) {
       swap([this.torso], buildTorso(c.jacket));
@@ -508,7 +507,7 @@ const constant =
     v;
 
 function buildPelvis(pants: Color): BufferGeometry {
-  return paint(prism(0.13, 0.15, 0.2, 12).translate(0, -0.13, 0).scale(1, 1, 0.72), pants);
+  return paint(prism(0.145, 0.165, 0.2, 12).translate(0, -0.13, 0).scale(1, 1, 0.72), pants);
 }
 
 /**
@@ -585,9 +584,11 @@ const ZIP_HALF = 0.007;
  * bands are the hem's edge and its turned-under lip, the rest the jacket's body.
  */
 export const JACKET_LAYOUT = { segments: LOWER_SEGMENTS, bodyBands: LOWER_RINGS.length - 3, hemLow };
+/** Radius (m) of the pants' thighs, for checks (tools/model). */
+export const THIGH_RADIUS = 0.112;
 
 /** Thigh radius plus a little room, for keeping the jacket outside the legs. */
-const THIGH_ROOM = 0.12;
+const THIGH_ROOM = 0.136;
 /** Furthest (m) a raised thigh lifts any point of the jacket. */
 const MAX_RIDE_UP = 0.17;
 /**
@@ -1124,28 +1125,43 @@ function buildForearm(jacket: Color, mitten: Color): BufferGeometry {
   ]);
 }
 
-/** Baggy thigh and a knee. */
-function buildThigh(pants: Color): BufferGeometry {
+/**
+ * Baggy thigh and a knee, with a cargo pocket on the outside of the leg
+ * (`side` -1 left, 1 right). In the segment's frame +X is the skier's left,
+ * so the outside is -side.
+ */
+function buildThigh(pants: Color, side: number): BufferGeometry {
   const t = BODY.thigh;
+  const r = PANTS.thigh;
+  const out = -side * (r - 0.006);
   return merge([
-    paint(prism(0.096, 0.097, t, 12), pants),
-    paint(new IcosahedronGeometry(0.099, 1).translate(0, t, 0), pants),
+    paint(prism(r, r + 0.002, t, 12), pants),
+    paint(new IcosahedronGeometry(PANTS.knee, 1).translate(0, t, 0), pants),
+    // The pocket, its flap above it (toward the hip), and a seam down the leg.
+    paint(new BoxGeometry(0.03, 0.13, 0.1).translate(out, t * 0.55, 0.004), shade(pants, 0.93)),
+    paint(new BoxGeometry(0.036, 0.032, 0.108).translate(out * 1.02, t * 0.55 - 0.072, 0.004), shade(pants, 0.82)),
   ]);
 }
 
 /**
- * Wide pant leg from the knee to just past the ankle, with a darker hem.
- * The boot's upper cuff lives inside it (it follows the shin, so it never
- * pokes through the pants); only its bottom edge shows under the hem.
+ * Wide pant leg from the knee, flaring to a hem that falls past the ankle
+ * over the boot, with a loose fold bunched above it. The boot's upper cuff
+ * lives inside it (it follows the shin, so it never pokes through the
+ * pants); only its bottom edge shows under the hem.
  */
 function buildShin(pants: Color, boot: Color): BufferGeometry {
   const s = BODY.shin;
+  const hem = PANTS.hem;
   return merge([
-    paint(prism(0.1, 0.112, s + 0.02, 12), pants),
-    paint(prism(0.114, 0.115, 0.022, 12).translate(0, s - 0.004, 0), shade(pants, 0.8)),
+    paint(prism(PANTS.knee - 0.002, hem, s + 0.04, 12), pants),
+    paint(prism(hem + 0.004, hem + 0.004, 0.035, 12).translate(0, s - 0.1, 0), shade(pants, 0.92)),
+    paint(prism(hem + 0.003, hem + 0.004, 0.024, 12).translate(0, s + 0.02, 0), shade(pants, 0.8)),
     paint(prism(0.078, 0.078, 0.2, 12).translate(0, s - 0.15, 0), boot),
   ]);
 }
+
+/** Baggy park pants: thigh and knee radius, and the flared hem's. */
+const PANTS = { thigh: THIGH_RADIUS, knee: 0.116, hem: 0.132 };
 
 /** Boot (shell, sole, buckles), binding and `ski` (from buildSki), in the foot frame (origin at the ankle). */
 function buildFoot(side: number, boot: Color, ski: BufferGeometry): BufferGeometry {

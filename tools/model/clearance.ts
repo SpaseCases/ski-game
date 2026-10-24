@@ -19,7 +19,7 @@ import { DoubleSide, Mesh, Raycaster, Scene, Vector3, type Material } from 'thre
 import { CONFIG } from '../../src/config.ts';
 import type { Heightfield } from '../../src/maps/types.ts';
 import { createSkierPose, SkierView, type SkierPose } from '../../src/render/skierView.ts';
-import { BODY, JACKET_LAYOUT, SkierRig } from '../../src/render/skierRig.ts';
+import { BODY, JACKET_LAYOUT, SkierRig, THIGH_RADIUS } from '../../src/render/skierRig.ts';
 import {
   CROUCH,
   LEFT_JAPAN,
@@ -117,6 +117,8 @@ function inside(mesh: Mesh, pt: Vector3, dir: Vector3): boolean {
 
 /** Height of the jacket's bottom edge in the hips' frame at angle a from the front. */
 const hemLow = JACKET_LAYOUT.hemLow;
+/** Lines along each thigh run just inside its surface. */
+const THIGH_LINE = THIGH_RADIUS - 0.006;
 
 const filter = process.argv[2]?.toLowerCase();
 let worst = 0;
@@ -176,8 +178,8 @@ for (const [name, def] of STATES) {
   for (const thigh of parts.thighs) {
     for (let k = 0; k < 8; k++) {
       const a = (k / 8) * Math.PI * 2;
-      p.set(Math.sin(a) * 0.09, 0, -Math.cos(a) * 0.09).applyMatrix4(thigh.matrixWorld);
-      q.set(Math.sin(a) * 0.09, BODY.thigh, -Math.cos(a) * 0.09).applyMatrix4(thigh.matrixWorld);
+      p.set(Math.sin(a) * THIGH_LINE, 0, -Math.cos(a) * THIGH_LINE).applyMatrix4(thigh.matrixWorld);
+      q.set(Math.sin(a) * THIGH_LINE, BODY.thigh, -Math.cos(a) * THIGH_LINE).applyMatrix4(thigh.matrixWorld);
       const dir = q.clone().sub(p);
       const len = dir.length();
       ray.set(p, dir.normalize());
