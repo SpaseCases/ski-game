@@ -161,9 +161,11 @@ export interface SnowBudget {
   trackPoints: number;
   trackLife: number;
   ridgeRange: number;
+  /** Falling flakes at full snowfall. */
+  flakes: number;
 }
 
 export function snowBudget(q: Quality): SnowBudget {
   const f = CONFIG.snowFx;
-  return { particles: f.particles[q], rate: f.rate[q], trackPoints: f.trackPoints[q], trackLife: f.trackLife[q], ridgeRange: f.ridgeRange[q] };
+  return { particles: f.particles[q], rate: f.rate[q], trackPoints: f.trackPoints[q], trackLife: f.trackLife[q], ridgeRange: f.ridgeRange[q], flakes: f.flakes[q] };
 }

@@ -6,6 +6,7 @@ import { thinDecor } from '../maps/decor.ts';
 import type { RunState } from '../sim/checkpoints.ts';
 import type { RaceState } from '../sim/race.ts';
 import { ChairliftView } from './chairlifts.ts';
+import { LightPools } from './lightPools.ts';
 import { clothTime } from './cloth.ts';
 import { SmokeView } from './smoke.ts';
 import { SnowFx } from './snowFx.ts';
@@ -16,6 +17,7 @@ import { createFeatureMeshes } from './features.ts';
 import { SlalomView } from './slalomView.ts';
 import { StartGateView } from './startGates.ts';
 import { TerrainView } from './terrainMesh.ts';
+import type { WeatherLook } from './weather.ts';
 
 /** Terrain chunks built per frame while riding (after a jump to a new spot, everything in view is built at once). */
 const CHUNKS_PER_FRAME = 3;
@@ -38,6 +40,9 @@ export class WorldView {
   private readonly smoke: SmokeView;
   /** Spray, tracks, sparks and blowing snow (see render/snowFx.ts); rebuilt for another quality preset. */
   snow: SnowFx;
+  /** Night lights: the lamps' and headlamp's pools of light, and the lamps' halos. */
+  readonly lights: LightPools;
+  private look: WeatherLook | null = null;
   private decor: Group;
   /** Where the camera was last (view()), for placing the moving chairs near it. */
   private camX = 0;
@@ -67,6 +72,15 @@ export class WorldView {
     if (this.smoke.mesh) this.group.add(this.smoke.mesh);
     this.snow = new SnowFx(built, fx);
     this.group.add(this.snow.group);
+    this.lights = new LightPools(built.decor, hf);
+    if (this.lights.halos) this.group.add(this.lights.halos);
+  }
+
+  /** The weather's part in the world: falling and blowing snow, and the night lights. */
+  setWeather(look: WeatherLook): void {
+    this.look = look;
+    this.snow.setWeather(look.def.fx);
+    this.lights.setStrength(look.def.lamps);
   }
 
   /** Redraws for another quality preset: the decoration's density, far trees if it sees past CONFIG.quality.treeDetail, and the snow effects' budget. */
@@ -74,6 +88,7 @@ export class WorldView {
     this.snow.dispose();
     this.snow = new SnowFx(this.built, fx);
     this.group.add(this.snow.group);
+    if (this.look) this.snow.setWeather(this.look.def.fx);
     this.culler.attachAll();
     this.group.remove(this.decor);
     disposeTree(this.decor);
@@ -106,6 +121,7 @@ export class WorldView {
 
   /** Frees every geometry and material. Shared materials just get rebuilt the next time they're drawn. */
   dispose(): void {
+    this.lights.dispose();
     this.culler.attachAll();
     this.group.removeFromParent();
     disposeTree(this.group);

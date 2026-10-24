@@ -2,6 +2,7 @@ import { BufferAttribute, BufferGeometry, Color, Group, Mesh, MeshLambertMateria
 import { topShape, type ShapeSample } from '../maps/shapes.ts';
 import { hash2 } from '../maps/terrain.ts';
 import type { Heightfield } from '../maps/types.ts';
+import { litByPools } from './lightPools.ts';
 
 const SNOW = new Color('#f5f8fc');
 const SNOW_SHADE = new Color('#c4d3e6');
@@ -38,7 +39,7 @@ export class TerrainView {
   readonly group = new Group();
   private readonly hf: Heightfield;
   private readonly seed: number;
-  private readonly material = new MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  private readonly material = litByPools(new MeshLambertMaterial({ vertexColors: true, flatShading: true }));
   /** Near chunks across and down, and far chunks across and down. */
   private readonly nx: number;
   private readonly nz: number;

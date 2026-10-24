@@ -19,6 +19,7 @@ import { clothMaterial } from './cloth.ts';
 import { drawSign } from './signs.ts';
 import { drawnHeightAt, renderedHeightAt } from './terrainMesh.ts';
 import { drawTown } from './town.ts';
+import { litByPools } from './lightPools.ts';
 
 // Draws a map's decoration: trees, snags and rocks as instanced meshes (one
 // draw call per model in each square tile of the map), everything else
@@ -37,17 +38,19 @@ const SCATTER_TOP = 14;
 /** How far (m) posts, trunks and rocks sink below the drawn snow so bumps never show a gap. */
 const SINK = 0.15;
 
-const material = new MeshLambertMaterial({ vertexColors: true, flatShading: true });
+const material = litByPools(new MeshLambertMaterial({ vertexColors: true, flatShading: true }));
 /** Lamp faces ignore lighting, so they look lit. */
 const glowMaterial = new MeshBasicMaterial({ vertexColors: true });
 /** Lines dyed into the snow sit right on it; draw them on top. */
-const decalMaterial = new MeshLambertMaterial({
-  vertexColors: true,
-  flatShading: true,
-  polygonOffset: true,
-  polygonOffsetFactor: -3,
-  polygonOffsetUnits: -3,
-});
+const decalMaterial = litByPools(
+  new MeshLambertMaterial({
+    vertexColors: true,
+    flatShading: true,
+    polygonOffset: true,
+    polygonOffsetFactor: -3,
+    polygonOffsetUnits: -3,
+  }),
+);
 
 /**
  * Draws the decoration and the town's buildings (from `features`); every

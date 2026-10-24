@@ -406,6 +406,12 @@ for (const x of [-67, 69]) {
   for (let d = D.s2 + 20; d < D.f4; d += 60) pts.push({ x: x + 1.2 * Math.sign(x), z: -d });
   decor.push({ kind: 'lightPole', points: pts, heading: x < 0 ? 90 : -90 });
 }
+// Floodlight towers on the fences between the lines, aimed down the hill (lit at night), staggered fence to fence.
+FENCES.slice(1).forEach((x, i) => {
+  const pts: Json[] = [];
+  for (const [a, b] of sections) for (let d = a + 12 + i * 37; d < b - 10; d += 110) pts.push({ x, z: -d });
+  decor.push({ kind: 'floodlight', points: pts, heading: 0 });
+});
 // Plain banners at the top of each section, on the flats between the lines.
 for (const d of [D.s1 + 6, D.s2 - 24, D.s3 - 30, D.s4 - 30, D.s5 - 24]) {
   decor.push({ kind: 'banner', points: [{ x: -67, z: -d }, { x: 69, z: -d }], heading: 0, color: '#ff7a1a' });

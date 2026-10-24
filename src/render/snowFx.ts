@@ -32,10 +32,15 @@ import { drawnHeightAt } from './terrainMesh.ts';
 // nothing allocated per frame. Everything is worked out from the sim's
 // state as it changes (a landing resets landTime, a crash sets bailed, and
 // so on); the sim knows nothing of it.
+//
+// Falling snow (the blizzard) has flakes of its own, apart from the pool:
+// a fixed number in a box round the camera, blown along by the wind and
+// wrapped round the box as the camera moves, so the snow stays as thick
+// at any speed: one more draw call while it snows.
 
-/** What the weather drives (milestone 6f's blizzard): see setWeather. */
+/** What the weather drives (the blizzard): see setWeather. */
 export interface SnowWeather {
-  /** Falling snow: flakes per second spawned round the camera (0: none). */
+  /** Falling snow: the share of the preset's flakes falling (0: none, 1: all of them). */
   snowfall: number;
   /** Multiplies the snow blowing off ridges, wind lips and cornices (1: a clear day's). */
   ridgeSnow: number;
@@ -59,14 +64,18 @@ const TRACK_LIFT = 0.01;
 const TAIL_SHARE = 0.2;
 /** Only check whether the skier is in powder again after moving this far (m). */
 const POWDER_STEP = 2;
-/** Falling snow spawns within this distance (m) of the camera, from this high above it. */
-const SNOWFALL_RADIUS = 28;
-const SNOWFALL_HEIGHT = 14;
+/** Flakes shrink away within this distance (m) of their box's sides, so wrapping round it never pops. */
+const FLAKE_EDGE = 3;
+/** Flakes closer than this (m) to the camera shrink away. */
+const FLAKE_NEAR = 2.5;
 
 // Smooth shaded with a little glow of its own, so a cloud reads as soft and bright rather than faceted gray.
-const snowMaterial = new MeshLambertMaterial({ color: new Color('#f3f7fb'), emissive: new Color('#2b3139'), transparent: true, opacity: 0.85, depthWrite: false });
+const SNOW_GLOW = new Color('#2b3139');
+const WISP_COLOR = new Color('#f7faff');
+const snowMaterial = new MeshLambertMaterial({ color: new Color('#f3f7fb'), emissive: SNOW_GLOW.clone(), transparent: true, opacity: 0.85, depthWrite: false });
 const sparkMaterial = new MeshBasicMaterial({ color: new Color('#ffd27a') });
-const wispMaterial = new MeshBasicMaterial({ color: new Color('#f7faff'), transparent: true, opacity: 0.55, depthWrite: false });
+const wispMaterial = new MeshBasicMaterial({ color: WISP_COLOR.clone(), transparent: true, opacity: 0.55, depthWrite: false });
+const flakeMaterial = new MeshBasicMaterial({ color: WISP_COLOR.clone(), transparent: true, opacity: 0.8, depthWrite: false });
 const trackMaterial = new MeshLambertMaterial({
   vertexColors: true,
   transparent: true,
@@ -117,7 +126,16 @@ export class SnowFx {
   private trailCarry = 0;
   private sparkCarry = 0;
   private bailCarry = 0;
-  private fallCarry = 0;
+  /** Falling flakes: position, radius and sway phase; the first `fallCount` fall. */
+  private readonly fx: Float32Array;
+  private readonly fy: Float32Array;
+  private readonly fz: Float32Array;
+  private readonly fsize: Float32Array;
+  private readonly fphase: Float32Array;
+  private readonly flakeMesh: InstancedMesh;
+  private fallCount = 0;
+  /** True until the flakes are first scattered round the camera. */
+  private flakesUnplaced = true;
   /** What the sim showed last frame, to see landings and crashes happen. */
   private lastLandTime = Infinity;
   private wasBailed = false;
@@ -189,6 +207,19 @@ export class SnowFx {
     this.sparkMesh = instanced(new OctahedronGeometry(1, 0), sparkMaterial, n);
     this.wispMesh = instanced(new OctahedronGeometry(1, 0), wispMaterial, n);
     this.group.add(this.snowMesh, this.sparkMesh, this.wispMesh);
+    const nf = Math.max(1, budget.flakes);
+    this.fx = new Float32Array(nf);
+    this.fy = new Float32Array(nf);
+    this.fz = new Float32Array(nf);
+    this.fsize = new Float32Array(nf);
+    this.fphase = new Float32Array(nf);
+    const fs = CONFIG.snowFx.flakeSize;
+    for (let i = 0; i < nf; i++) {
+      this.fsize[i] = fs.min + (fs.max - fs.min) * Math.random();
+      this.fphase[i] = Math.random() * Math.PI * 2;
+    }
+    this.flakeMesh = instanced(new OctahedronGeometry(1, 0), flakeMaterial, nf);
+    this.group.add(this.flakeMesh);
     const q = new Quaternion();
     const e = new Vector3();
     for (let i = 0; i < TURNS; i++) {
@@ -245,6 +276,21 @@ export class SnowFx {
   /** The weather's part in the effects: falling snow, ridge snow and wind (see SnowWeather). */
   setWeather(w: SnowWeather): void {
     this.weather = { ...w };
+    const count = Math.round(Math.min(1, Math.max(0, w.snowfall)) * this.fx.length);
+    if (count > 0 && this.fallCount === 0) this.flakesUnplaced = true;
+    this.fallCount = count;
+    if (count === 0) commit(this.flakeMesh, 0);
+  }
+
+  /**
+   * Tints what's drawn unlit (blowing and falling snow) and the spray's own
+   * glow by the weather's light, so at night they don't shine. Shared by
+   * every map's effects.
+   */
+  static setTint(tint: Color): void {
+    wispMaterial.color.copy(WISP_COLOR).multiply(tint);
+    flakeMaterial.color.copy(WISP_COLOR).multiply(tint);
+    snowMaterial.emissive.copy(SNOW_GLOW).multiply(tint);
   }
 
   /** The skier jumped to a new spot (start, respawn): the tracks break and nothing is taken for a landing or crash. */
@@ -264,13 +310,13 @@ export class SnowFx {
     this.checkPowder(pose.position);
     this.emitSkier(pose, sim, dt);
     this.emitRidges(dt, cam);
-    this.emitSnowfall(dt, cam);
     this.lastLandTime = sim.landTime;
     this.wasBailed = sim.bailed;
     this.layTracks(pose);
     this.move(dt);
     this.draw();
     this.drawTracks();
+    if (this.fallCount > 0) this.snowfall(dt, cam, pose.position);
   }
 
   /** Frees the meshes' geometry (the materials are shared). */
@@ -282,6 +328,8 @@ export class SnowFx {
     this.sparkMesh.dispose();
     this.wispMesh.geometry.dispose();
     this.wispMesh.dispose();
+    this.flakeMesh.geometry.dispose();
+    this.flakeMesh.dispose();
     this.trackMesh.geometry.dispose();
   }
 
@@ -543,22 +591,101 @@ export class SnowFx {
     }
   }
 
-  /** Falling snow round the camera (the weather's snowfall), blown by the wind. */
-  private emitSnowfall(dt: number, cam: Vector3): void {
-    const w = this.weather;
-    if (w.snowfall <= 0) return;
-    this.fallCarry += w.snowfall * this.budget.rate * dt;
-    const wind = CONFIG.snowFx.wind;
-    const len = Math.hypot(wind.x, wind.z) || 1;
-    const speed = CONFIG.snowFx.windSpeed * w.wind;
-    while (this.fallCarry >= 1) {
-      this.fallCarry -= 1;
-      const a = Math.random() * Math.PI * 2;
-      const d = Math.sqrt(Math.random()) * SNOWFALL_RADIUS;
-      // Spawn upwind, so the flakes blow through the view.
-      this.at.set(cam.x + Math.cos(a) * d - (wind.x / len) * speed, cam.y + 2 + Math.random() * SNOWFALL_HEIGHT, cam.z + Math.sin(a) * d - (wind.z / len) * speed);
-      this.spawn(this.at, (wind.x / len) * speed, -1.5, (wind.z / len) * speed, 4 + 2 * Math.random(), 0.035, 0.05, 0.25, 2, WISP);
+  /**
+   * Falling snow: moves the falling flakes on with the wind (each swaying
+   * a little) and wraps them round a box in front of the camera at `cam`,
+   * looking toward the skier at `skier`. Every flake streams the same way,
+   * so they all share one stretched orientation along the way they blow.
+   */
+  private snowfall(dt: number, cam: Vector3, skier: Vector3): void {
+    const f = CONFIG.snowFx;
+    const n = this.fallCount;
+    const half = f.flakeBox / 2;
+    const halfH = f.flakeHeight / 2;
+    // The box's middle: ahead of the camera toward the skier, just above it (flakes under the snow would be wasted).
+    let ax = skier.x - cam.x;
+    let az = skier.z - cam.z;
+    const al = Math.hypot(ax, az);
+    if (al > 1e-3) {
+      ax /= al;
+      az /= al;
     }
+    const cx = cam.x + ax * f.flakeAhead;
+    const cy = cam.y + 1;
+    const cz = cam.z + az * f.flakeAhead;
+    if (this.flakesUnplaced) {
+      this.flakesUnplaced = false;
+      for (let i = 0; i < this.fx.length; i++) {
+        this.fx[i] = cx + (Math.random() - 0.5) * f.flakeBox;
+        this.fy[i] = cy + (Math.random() - 0.5) * f.flakeHeight;
+        this.fz[i] = cz + (Math.random() - 0.5) * f.flakeBox;
+      }
+    }
+    const wind = f.wind;
+    const len = Math.hypot(wind.x, wind.z) || 1;
+    const speed = f.windSpeed * this.weather.wind * this.gust();
+    const vx = (wind.x / len) * speed;
+    const vz = (wind.z / len) * speed;
+    const vy = -f.flakeFall;
+    // The shared streak: long along the way they blow, round across it.
+    const v = Math.hypot(vx, vy, vz);
+    const dx = vx / v;
+    const dy = vy / v;
+    const dz = vz / v;
+    let sx = -dz;
+    let sz = dx;
+    const sl = Math.hypot(sx, sz) || 1;
+    sx /= sl;
+    sz /= sl;
+    const ux = -dy * sz;
+    const uy = sz * dx - sx * dz;
+    const uz = dy * sx;
+    const stretch = 1 + v * 0.18;
+    const sway = f.flakeSway;
+    const t = this.time;
+    const out = this.flakeMesh.instanceMatrix.array as Float32Array;
+    for (let i = 0; i < n; i++) {
+      const ph = this.fphase[i]!;
+      let x = this.fx[i]! + (vx + Math.sin(t * 1.7 + ph) * sway) * dt;
+      let y = this.fy[i]! + vy * dt;
+      let z = this.fz[i]! + (vz + Math.cos(t * 1.3 + ph * 1.7) * sway) * dt;
+      // Round the box: out one side, in at the other.
+      x -= f.flakeBox * Math.floor((x - cx) / f.flakeBox + 0.5);
+      y -= f.flakeHeight * Math.floor((y - cy) / f.flakeHeight + 0.5);
+      z -= f.flakeBox * Math.floor((z - cz) / f.flakeBox + 0.5);
+      this.fx[i] = x;
+      this.fy[i] = y;
+      this.fz[i] = z;
+      const edge = Math.min(half - Math.abs(x - cx), halfH - Math.abs(y - cy), half - Math.abs(z - cz));
+      // Shrinking away near the box's sides, and right in front of the lens (where one flake would fill the view).
+      const near = (x - cam.x) ** 2 + (y - cam.y) ** 2 + (z - cam.z) ** 2;
+      const s = this.fsize[i]! * Math.min(1, edge / FLAKE_EDGE, near / (FLAKE_NEAR * FLAKE_NEAR));
+      const l = s * stretch;
+      const o = i * 16;
+      out[o] = sx * s;
+      out[o + 1] = 0;
+      out[o + 2] = sz * s;
+      out[o + 3] = 0;
+      out[o + 4] = dx * l;
+      out[o + 5] = dy * l;
+      out[o + 6] = dz * l;
+      out[o + 7] = 0;
+      out[o + 8] = ux * s;
+      out[o + 9] = uy * s;
+      out[o + 10] = uz * s;
+      out[o + 11] = 0;
+      out[o + 12] = x;
+      out[o + 13] = y;
+      out[o + 14] = z;
+      out[o + 15] = 1;
+    }
+    commit(this.flakeMesh, n);
+  }
+
+  /** The wind's strength now, as a share of its mean: it rises and falls in gusts as gusty as the weather says. */
+  private gust(): number {
+    const t = this.time;
+    return 1 + this.weather.gust * 0.6 * Math.sin(t * 0.7) * Math.sin(t * 0.23 + 1);
   }
 
   /** Starts a particle in the next slot of the ring. */
@@ -587,8 +714,7 @@ export class SnowFx {
     const w = this.weather;
     const wind = CONFIG.snowFx.wind;
     const len = Math.hypot(wind.x, wind.z) || 1;
-    const gust = 1 + w.gust * 0.6 * Math.sin(this.time * 0.7) * Math.sin(this.time * 0.23 + 1);
-    const speed = CONFIG.snowFx.windSpeed * w.wind * gust;
+    const speed = CONFIG.snowFx.windSpeed * w.wind * this.gust();
     const ax = (wind.x / len) * speed;
     const az = (wind.z / len) * speed;
     const g = CONFIG.skier.gravity * dt;

@@ -642,13 +642,96 @@ body {
   color: var(--ink);
 }
 
-/* Room for each card's options (6f: weather). */
+/* Room for each card's options (the weather). */
 .map-options:empty {
   display: none;
 }
 
 .map-options {
   padding: 0 12px 12px;
+}
+
+/* Weather: a row of pictogram tiles, like a conditions board, and the pick's name beside it. */
+.weather-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.weather-tiles {
+  display: flex;
+  gap: 4px;
+}
+
+.weather-tile {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: var(--plank);
+  color: var(--frost);
+  cursor: pointer;
+}
+
+.weather-tile:hover {
+  background: var(--plank-hover);
+  color: var(--snow);
+}
+
+.weather-tile[aria-pressed='true'] {
+  background: var(--snow);
+  color: var(--ink);
+}
+
+.weather-tile:focus {
+  outline: 3px solid var(--flag);
+  outline-offset: 2px;
+}
+
+.weather-icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+
+.weather-name {
+  min-width: 0;
+  color: var(--snow);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* The pause menu's Weather plank: the pick between step marks. */
+.weather-plank .plank-keys {
+  align-items: center;
+  gap: 8px;
+}
+
+.weather-value {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 16px;
+}
+
+.weather-value .weather-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.weather-step {
+  color: var(--frost);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.weather-plank:focus .weather-step {
+  color: var(--flag);
 }
 
 /* Cheats: a lift status board, each row's tag On or Off. */

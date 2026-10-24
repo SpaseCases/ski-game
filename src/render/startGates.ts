@@ -7,6 +7,7 @@ import { pennantString } from './decor.ts';
 import { MeshKit } from './meshKit.ts';
 import { FLAG_COLORS, PALETTE } from './models.ts';
 import { drawnHeightAt, renderedHeightAt } from './terrainMesh.ts';
+import { litByPools } from './lightPools.ts';
 
 // The four start gates, drawn around the spot each one starts the rider
 // from. The decks and the tower's in-run are ramps (drawn with the other
@@ -15,7 +16,7 @@ import { drawnHeightAt, renderedHeightAt } from './terrainMesh.ts';
 
 const SINK = 0.2;
 const BANNER = new Color('#2f7de1');
-const material = new MeshLambertMaterial({ vertexColors: true, flatShading: true });
+const material = litByPools(new MeshLambertMaterial({ vertexColors: true, flatShading: true }));
 
 export class StartGateView {
   readonly group = new Group();

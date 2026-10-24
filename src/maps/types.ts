@@ -777,6 +777,11 @@ export interface MapDef {
   peaks?: PeaksDef;
   /** Snow off the named runs is powder (Freeride); without this the whole map is groomed. */
   powder?: PowderDef;
+  /**
+   * This map's own sky and fog colors in other weathers, in place of those
+   * CONFIG.weather derives from `colors` (which are its bluebird look).
+   */
+  weather?: Partial<Record<'overcast' | 'blizzard' | 'night', { sky?: string; fog?: string }>>;
 }
 
 /**

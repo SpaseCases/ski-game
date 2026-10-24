@@ -1,4 +1,6 @@
+import { stepWeather, type WeatherId } from '../core/weather.ts';
 import { board, plank, setHints, setPlankKeys, type Screen } from './menus.ts';
+import { setPlankWeather } from './weatherPicker.ts';
 
 // The two bottom screens: the title (before any map is loaded) and the pause
 // menu (Esc or P while riding). Both are a sign board of planks. Later
@@ -64,11 +66,16 @@ export interface PauseActions {
   settings: () => void;
   controls: () => void;
   cheats: () => void;
+  /** The weather picked, and picking another (it changes behind the menu at once). */
+  weather: () => WeatherId;
+  setWeather: (w: WeatherId) => void;
 }
 
 export class PauseScreen extends PlankScreen {
   private readonly resume: HTMLButtonElement;
   private readonly respawn: HTMLButtonElement;
+  private readonly weather: HTMLButtonElement;
+  private readonly actions: PauseActions;
   private readonly onResume: () => void;
   private resumeKey: (code: string) => boolean = () => false;
 
@@ -78,6 +85,9 @@ export class PauseScreen extends PlankScreen {
     this.resume = this.addItem('Resume', actions.resume);
     this.respawn = this.addItem('Respawn', actions.respawn);
     this.addItem('Back to top', actions.backToTop);
+    // Enter steps to the next weather, and left and right step either way.
+    this.weather = this.addItem('Weather', () => this.stepWeather(1));
+    this.weather.classList.add('weather-plank');
     this.addItem('Map select', actions.maps);
     this.addItem('Locker', actions.locker);
     this.addItem('Settings', actions.settings);
@@ -89,6 +99,18 @@ export class PauseScreen extends PlankScreen {
       [['Esc'], 'Resume'],
     ]);
     this.onResume = actions.resume;
+    this.actions = actions;
+  }
+
+  enter(): HTMLElement | null {
+    setPlankWeather(this.weather, this.actions.weather());
+    return super.enter();
+  }
+
+  private stepWeather(step: number): void {
+    const w = stepWeather(this.actions.weather(), step);
+    this.actions.setWeather(w);
+    setPlankWeather(this.weather, w);
   }
 
   /** The map name under the heading, and the keys shown on the planks (as bound now). */
@@ -101,6 +123,10 @@ export class PauseScreen extends PlankScreen {
 
   /** The pause key closes the menu again, like Esc (unless it's one the menu itself uses). */
   onKey(e: KeyboardEvent): boolean {
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && document.activeElement === this.weather) {
+      if (!e.repeat) this.stepWeather(e.key === 'ArrowLeft' ? -1 : 1);
+      return true;
+    }
     if (e.repeat || MENU_KEYS.has(e.key) || !this.resumeKey(e.code)) return false;
     this.onResume();
     return true;

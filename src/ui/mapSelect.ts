@@ -1,12 +1,13 @@
 import { MAPS, type MapEntry, type MapId } from '../maps/registry.ts';
 import { mapArt } from './mapArt.ts';
+import { WeatherRow, type WeatherHooks } from './weatherPicker.ts';
 import { addBackButton, board, setHints, type Screen } from './menus.ts';
 
 /**
  * The map select: a card per map, picked with the arrow keys and Enter or
  * with the mouse. Each card has a picture, the map's name and what's on it,
- * and an options row under it, empty for now: milestone 6f puts the weather
- * picker there (addCardOption).
+ * and the weather picker under it (one pick for every map, so every
+ * card's row shows it).
  */
 export class MapSelect implements Screen {
   readonly el: HTMLElement;
@@ -16,9 +17,12 @@ export class MapSelect implements Screen {
   private current: MapId | null = null;
   private focusOn: MapId = MAPS[0]!.id;
   private busy = false;
+  private readonly weatherRows: WeatherRow[] = [];
+  private readonly weather: WeatherHooks;
 
-  /** `onPick`: a map's card was chosen. `onBack`: the Back button. */
-  constructor(onPick: (entry: MapEntry) => void, onBack: () => void) {
+  /** `onPick`: a map's card was chosen. `onBack`: the Back button. `weather`: the weather picked and picking it. */
+  constructor(onPick: (entry: MapEntry) => void, onBack: () => void, weather: WeatherHooks) {
+    this.weather = weather;
     const b = board('Choose a map', 'maps-screen');
     this.el = b.el;
     addBackButton(b.head, onBack);
@@ -43,6 +47,11 @@ export class MapSelect implements Screen {
       });
       const opts = document.createElement('div');
       opts.className = 'map-options';
+      if (entry.load) {
+        const row = new WeatherRow(weather, () => this.syncWeather());
+        this.weatherRows.push(row);
+        opts.appendChild(row.el);
+      }
       card.append(pick, opts);
       grid.appendChild(card);
       this.picks.set(entry.id, pick);
@@ -75,6 +84,7 @@ export class MapSelect implements Screen {
       pick.classList.remove('is-loading');
     }
     this.status.textContent = '';
+    this.syncWeather();
     return this.picks.get(this.focusOn) ?? null;
   }
 
@@ -82,9 +92,15 @@ export class MapSelect implements Screen {
     return !this.busy;
   }
 
-  /** A row under a map's card for its options (milestone 6f: weather). */
+  /** A row under a map's card for its options (after the weather). */
   addCardOption(id: MapId, el: HTMLElement): void {
     this.options.get(id)?.appendChild(el);
+  }
+
+  /** Shows the picked weather on every card. */
+  syncWeather(): void {
+    const w = this.weather.get();
+    for (const row of this.weatherRows) row.sync(w);
   }
 
   /** Marks a card as loading (or clears it, with null) and says so under the cards. */

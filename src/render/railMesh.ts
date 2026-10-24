@@ -5,6 +5,7 @@ import type { Heightfield, RailShape } from '../maps/types.ts';
 import { railFrame } from '../sim/rails.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
 import { TriBuilder } from './triBuilder.ts';
+import { litByPools } from './lightPools.ts';
 
 // Rails and boxes, drawn from the slide lines the physics uses so the skis
 // sit exactly on what you see. They're merged into one vertex-colored mesh
@@ -43,7 +44,7 @@ const BURY = 0.25;
 /** Size (m) of a tile of merged rail meshes. */
 const TILE = 64;
 
-const material = new MeshLambertMaterial({ vertexColors: true, flatShading: true });
+const material = litByPools(new MeshLambertMaterial({ vertexColors: true, flatShading: true }));
 
 export function createRailMesh(rails: readonly RailShape[], hf: Heightfield): Group {
   const tiles = new Map<string, TriBuilder>();

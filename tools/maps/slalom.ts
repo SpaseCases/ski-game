@@ -261,6 +261,17 @@ const terrain = {
 };
 const peaks = { seed: 19, count: 12, rings: 3, distance: [12000, 30000], base: -900, height: [1400, 3000], snowLine: 500 };
 
+// Floodlight towers outside the netting, aimed across each course (lit at night), staggered side to side.
+// After the trees: their seeds count the decoration before them.
+for (const [x, heading, from] of [
+  [SLALOM.left - 18, -90, 40],
+  [GIANT.right + 18, 90, 80],
+] as const) {
+  const pts: Json[] = [];
+  for (let d = from; d < SLALOM.finish + 20; d += 80) pts.push(xz(x, d));
+  decor.push({ kind: 'floodlight', points: pts, heading });
+}
+
 const map = {
   name: 'Slalom',
   terrain,

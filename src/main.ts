@@ -1,11 +1,12 @@
 import './style.css';
-import { Vector3 } from 'three';
+import { Vector2, Vector3 } from 'three';
 import { createInputState, Keyboard, type Bindings } from './core/input.ts';
 import { startLoop } from './core/loop.ts';
 import { PointerOrbit } from './core/pointerOrbit.ts';
 import { loadOutfit, saveOutfit, type Outfit } from './core/outfit.ts';
 import { decorDensity, loadSettings, saveSettings, snowBudget, urlQuality, viewRange, type Quality } from './core/settings.ts';
 import { readStored, writeStored } from './core/storage.ts';
+import { loadWeather, saveWeather, urlWeather, type WeatherId } from './core/weather.ts';
 import { buildMap, type BuiltMap } from './maps/build.ts';
 import { parseMap } from './maps/loader.ts';
 import { mapEntry, MAPS, type MapEntry, type MapId } from './maps/registry.ts';
@@ -13,8 +14,10 @@ import { CONFIG } from './config.ts';
 import { ChaseCamera, type OrbitDrag } from './render/chaseCamera.ts';
 import { clothTime } from './render/cloth.ts';
 import { LockerStage } from './render/lockerStage.ts';
-import { applyMap, createView, renderFrame, setViewRange, type View } from './render/scene.ts';
+import { applyMap, applyWeather, createView, renderFrame, setViewRange, type View } from './render/scene.ts';
 import { createSkierPose, interpolateSkier, SkierView } from './render/skierView.ts';
+import { SnowFx } from './render/snowFx.ts';
+import { weatherLook, weatherRange } from './render/weather.ts';
 import { WorldView } from './render/world.ts';
 import {
   canSetPersonal,
@@ -56,6 +59,8 @@ let outfit: Outfit = loadOutfit();
 setSkiScale(CONFIG.skis[outfit.ski]);
 /** The preset in use: the saved one, unless the URL names one for this visit. */
 let quality: Quality = urlQuality() ?? settings.quality;
+/** The weather, the same on every map: the saved pick, unless the URL names one for this visit. */
+let weather: WeatherId = urlWeather() ?? loadWeather();
 
 let view: View;
 try {
@@ -100,8 +105,10 @@ const pauseScreen = new PauseScreen({
   settings: openSettings,
   controls: openControls,
   cheats: openCheats,
+  weather: () => weather,
+  setWeather,
 });
-const mapSelect = new MapSelect((entry) => void loadMap(entry), () => menus.back());
+const mapSelect = new MapSelect((entry) => void loadMap(entry), () => menus.back(), { get: () => weather, set: setWeather });
 const settingsScreen = new SettingsScreen(
   {
     get: () => ({ ...settings, quality }),
@@ -245,7 +252,6 @@ async function loadMap(entry: MapEntry): Promise<void> {
     scene.add(world.group);
     applyMap(view, built);
     level = { id: entry.id, built, world, run: createRun(map), race: built.race ? createRace(built.race) : null };
-    applyView();
     if (skierView && chase) {
       skierView.hf = built.hf;
       chase.hf = built.hf;
@@ -253,6 +259,7 @@ async function loadMap(entry: MapEntry): Promise<void> {
       skierView = new SkierView(scene, built.hf, outfit);
       chase = new ChaseCamera(camera, built.hf);
     }
+    applyWeatherLook();
     writeStored('map', entry.id);
     tuningPanel?.setMap(map);
     backToTop();
@@ -406,12 +413,27 @@ function setQuality(q: Quality): void {
   level?.world.setQuality(decorDensity(q), viewRange(q).far, snowBudget(q));
 }
 
-/** The current preset's view range on the camera and fog. */
+/** The current preset's view range, in this weather, on the camera and fog. */
 function applyView(): void {
-  const range = viewRange(quality);
   // Only a map with far ranges has the far stand-in the haze can fade into; elsewhere the fog ends at the far plane.
-  const hazeEnd = level?.built.map.peaks ? range.hazeEnd : range.far;
-  setViewRange(view, range.far, range.fogStart, hazeEnd);
+  setViewRange(view, weatherRange(weather, viewRange(quality), level?.built.map.peaks !== undefined));
+}
+
+/** Picks the weather for every map (and remembers it): it changes at once, behind any menu. */
+function setWeather(w: WeatherId): void {
+  weather = w;
+  saveWeather(w);
+  applyWeatherLook();
+}
+
+/** The weather's look on the map being ridden: sky, fog and lights, the view range, snow, night lights and the pumpkin's glow. */
+function applyWeatherLook(): void {
+  const look = weatherLook(weather, level?.built.map ?? null);
+  applyWeather(view, look);
+  SnowFx.setTint(look.fxTint);
+  level?.world.setWeather(look);
+  skierView?.rig.setGlow(look.def.glow);
+  applyView();
 }
 
 /** Dev testing: puts the skier at (x, z) facing `heading` (radians), moving along the skis at `speed`. */
@@ -478,6 +500,7 @@ if (import.meta.env.DEV) {
       backToTop,
       teleport,
       setQuality,
+      setWeather,
       loadMap: (id: MapId) => loadMap(mapEntry(id)!),
       /** Looks from (x, y, z) at (tx, ty, tz) until called with no arguments, which goes back to the chase camera. */
       lookFrom: (...v: number[]) => {
@@ -520,6 +543,9 @@ if (import.meta.env.DEV) {
 const fromUrl = mapEntry(new URLSearchParams(window.location.search).get('map'));
 openTitle();
 if (fromUrl?.load) void loadMap(fromUrl);
+
+/** Scratch for the drawing buffer's size (the lamp halos are sized in its pixels). */
+const bufferSize = new Vector2();
 
 /** True while the game waits: no map yet, or a menu or the trail map is open. Nothing moves then. */
 function gameWaits(): boolean {
@@ -605,6 +631,10 @@ startLoop(
       level.world.view(camera.position.x, camera.position.z, camera.far, snapped || freeCamera !== null);
       level.world.update(level.run, level.race, frameTime);
       level.world.snow.update(pose, skier, frameTime, camera.position);
+      const fog = scene.fog as { near: number; far: number };
+      const pxPerM = renderer.getDrawingBufferSize(bufferSize).y / (2 * Math.tan((camera.fov * Math.PI) / 360));
+      const p = pose.position;
+      level.world.lights.update(p.x, p.y, p.z, -Math.sin(pose.yaw), -Math.cos(pose.yaw), camera.position.x, camera.position.z, fog.near, fog.far, pxPerM);
     }
 
     if (lockerOpen) drawLocker(realFrameTime);

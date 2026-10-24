@@ -454,6 +454,20 @@ export const CONFIG = {
     /** Which way the wind blows (XZ, normalized at use), and how fast (m/s) on a clear day. Wind lips blow toward their own lee. */
     wind: { x: 0.8, z: 0.6 },
     windSpeed: 5,
+    /**
+     * Falling snow (the weather's snowfall): flakes of its own, apart from
+     * the particle pool, in a box round the camera (`box` m across, `height`
+     * m tall, its middle `ahead` m in front) that they wrap round as the
+     * camera moves. Flakes at full snowfall per preset; a flake's radius
+     * (m), how fast it falls (m/s), and how far a gust sways it.
+     */
+    flakes: { auto: 900, low: 520, medium: 900, high: 1400 },
+    flakeBox: 30,
+    flakeHeight: 16,
+    flakeAhead: 9,
+    flakeSize: { min: 0.045, max: 0.075 },
+    flakeFall: 1.6,
+    flakeSway: 0.8,
   },
 
   light: {
@@ -464,6 +478,127 @@ export const CONFIG = {
      * the left and a little behind, so the chase camera sees the skier lit.
      */
     sunFrom: { x: -0.4, y: 1.2, z: 0.3 },
+  },
+
+  /**
+   * Weather (picked on each map card and from pause; see render/weather.ts).
+   * A map's own colors are its bluebird look: each weather mixes the map's
+   * sky and fog toward its own `to` by `mix` (0 keeps the map's), unless the
+   * map overrides them (MapDef.weather). Lights: the sun (the moon at night)
+   * and the sky light's colors and strengths, `hemiSky` null meaning the
+   * map's own sky color. `skyFull`: degrees over the horizon where the
+   * sky reaches its full color (from the haze's at the horizon). `haze` scales each preset's fog start and haze end (Low's
+   * fog never reaches past its far plane); `view` instead pulls every
+   * preset's view in to `far` m, fogged from `fogStart`. `peaks` relights
+   * the far ranges (multipliers on their sky light and sunlight). `fx`
+   * drives the snow effects (render/snowFx.ts: snowfall is the share of the
+   * flake budget falling). `glow` lights the jack-o'-lantern's face, `lamps`
+   * switches on the light pools and lamp halos (see lights), `stars` the
+   * moon and stars, and `fxTint` multiplies the color of blowing and
+   * falling snow (drawn unlit) and the spray's own glow.
+   */
+  weather: {
+    bluebird: {
+      // A clear sky: deep blue down to a light blue haze at the horizon.
+      sky: { to: '#1f6fd1', mix: 0.75 },
+      skyFull: 9,
+      fog: { to: '#b9d6f3', mix: 0.5 },
+      sun: '#fff6e8',
+      sunIntensity: 2.6,
+      hemiSky: null as string | null,
+      hemiGround: '#7d8796',
+      hemiIntensity: 1.9,
+      haze: { fogStart: 1, hazeEnd: 1 },
+      view: null as { far: number; fogStart: number } | null,
+      peaks: { light: '#ffffff', sun: '#ffffff' },
+      fx: { snowfall: 0, ridgeSnow: 1, wind: 1, gust: 0.3 },
+      fxTint: '#ffffff',
+      glow: 0,
+      lamps: 0,
+      stars: 0,
+    },
+    overcast: {
+      skyFull: 32,
+      sky: { to: '#aab4c0', mix: 0.85 },
+      fog: { to: '#c8ced6', mix: 0.85 },
+      sun: '#eef0f3',
+      sunIntensity: 0.9,
+      hemiSky: '#d9dee5' as string | null,
+      hemiGround: '#8e949d',
+      hemiIntensity: 2.5,
+      haze: { fogStart: 0.6, hazeEnd: 0.35 },
+      view: null as { far: number; fogStart: number } | null,
+      peaks: { light: '#c3c9d1', sun: '#3a3d42' },
+      fx: { snowfall: 0, ridgeSnow: 1.4, wind: 1.4, gust: 0.4 },
+      fxTint: '#e8ebef',
+      glow: 0,
+      lamps: 0,
+      stars: 0,
+    },
+    blizzard: {
+      skyFull: 32,
+      sky: { to: '#adb4bd', mix: 1 },
+      fog: { to: '#bfc5cc', mix: 1 },
+      sun: '#eef1f5',
+      sunIntensity: 0.9,
+      hemiSky: '#d6dbe1' as string | null,
+      hemiGround: '#7d848e',
+      hemiIntensity: 2,
+      haze: { fogStart: 1, hazeEnd: 1 },
+      view: { far: 115, fogStart: 12 } as { far: number; fogStart: number } | null,
+      peaks: { light: '#c3c9d1', sun: '#3a3d42' },
+      fx: { snowfall: 1, ridgeSnow: 3, wind: 2.6, gust: 0.9 },
+      fxTint: '#f2f4f7',
+      glow: 0,
+      lamps: 0,
+      stars: 0,
+    },
+    night: {
+      skyFull: 32,
+      sky: { to: '#0a1430', mix: 1 },
+      fog: { to: '#1a2848', mix: 1 },
+      sun: '#9fb6ff',
+      sunIntensity: 0.5,
+      hemiSky: '#4d64a0' as string | null,
+      hemiGround: '#0d121c',
+      hemiIntensity: 0.65,
+      haze: { fogStart: 0.8, hazeEnd: 0.5 },
+      view: null as { far: number; fogStart: number } | null,
+      peaks: { light: '#2a3657', sun: '#56699c' },
+      fx: { snowfall: 0, ridgeSnow: 1, wind: 1, gust: 0.3 },
+      fxTint: '#4a5878',
+      glow: 1,
+      lamps: 1,
+      stars: 1,
+    },
+  },
+
+  /**
+   * Night lights (render/lightPools.ts), all faked: pools of light added to
+   * the snow and features' shading (no real lights), and soft halos round
+   * the lamps. Each pool: `ahead` m out from the lamp the way it faces, of
+   * `radius` m, lit from `height` m up, its color times `strength`.
+   */
+  lights: {
+    /** The skier's headlamp: a pool `ahead` m in front of them on the snow, lit from their head. */
+    headlamp: { ahead: 7, radius: 10, height: 1.7, color: '#e9f0ff', strength: 1.4 },
+    floodlight: { ahead: 22, radius: 38, height: 14, color: '#fff0d8', strength: 2.2 },
+    lightPole: { ahead: 4, radius: 16, height: 8, color: '#ffe9c8', strength: 1.6 },
+    streetLamp: { ahead: 0, radius: 9, height: 4.6, color: '#ffc883', strength: 1.5 },
+    /** Pools drawn at once, the headlamp's included (each costs the GPU a little per vertex). */
+    max: 10,
+    /** Pools fade out between these distances (m) from the camera, so the nearest ones swap in unseen. */
+    fadeStart: 260,
+    fadeEnd: 340,
+    /** Halo size (m across) round each floodlight head, light pole and street lamp, and their brightness. */
+    haloSize: { floodlight: 2.4, lightPole: 2.2, streetLamp: 1.8 },
+    haloStrength: 0.8,
+    haloColor: '#ffe7c0',
+    /** The moon: where it hangs (from the map's middle; normalized at use), its size (degrees across) and color, and how many stars. */
+    moonAt: { x: -0.45, y: 0.3, z: -0.84 },
+    moonSize: 3,
+    moonColor: '#eef2ff',
+    stars: 900,
   },
 
   /**

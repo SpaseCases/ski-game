@@ -4,6 +4,7 @@ import type { Heightfield } from '../maps/types.ts';
 import { sideOffset, type RaceDef, type RaceState } from '../sim/race.ts';
 import { MeshKit } from './meshKit.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
+import { litByPools } from './lightPools.ts';
 
 // Gates: one instanced mesh of slalom poles (a pole per side) and one of
 // giant slalom panels (each side a plain panel between two poles), red and
@@ -34,7 +35,7 @@ export class SlalomView {
   private readonly one = new Vector3(1, 1, 1);
 
   constructor(def: RaceDef, hf: Heightfield) {
-    const material = new MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    const material = litByPools(new MeshLambertMaterial({ vertexColors: true, flatShading: true }));
     let poleCount = 0;
     for (const p of def.panel) if (p === 0) poleCount += 2;
     const poles = new InstancedMesh(poleGeometry(), material, Math.max(1, poleCount));

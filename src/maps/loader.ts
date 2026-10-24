@@ -71,7 +71,23 @@ export function parseMap(raw: unknown): MapDef {
     },
     peaks: map.peaks === undefined ? undefined : parsePeaks(map.peaks),
     powder: map.powder === undefined ? undefined : parsePowder(map.powder),
+    weather: map.weather === undefined ? undefined : parseWeather(map.weather),
   };
+}
+
+/** Per-weather sky and fog colors (see MapDef.weather). */
+function parseWeather(raw: unknown): MapDef['weather'] {
+  const o = obj(raw, 'weather');
+  const out: NonNullable<MapDef['weather']> = {};
+  for (const [id, value] of Object.entries(o)) {
+    const path = `weather.${id}`;
+    const w = obj(value, path);
+    out[oneOf(id, ['overcast', 'blizzard', 'night'] as const, path)] = {
+      sky: w.sky === undefined ? undefined : str(w.sky, `${path}.sky`),
+      fog: w.fog === undefined ? undefined : str(w.fog, `${path}.fog`),
+    };
+  }
+  return out;
 }
 
 function parsePowder(raw: unknown): PowderDef {

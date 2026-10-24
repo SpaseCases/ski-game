@@ -4,6 +4,7 @@ import { hash2 } from '../maps/terrain.ts';
 import type { Heightfield, PipeShape, RailShape, RampShape, TerrainShape } from '../maps/types.ts';
 import { createRailMesh } from './railMesh.ts';
 import { renderedHeightAt } from './terrainMesh.ts';
+import { litByPools } from './lightPools.ts';
 
 // Shapes are snow, with dyed blue lines along park lips (and along the top
 // of a halfpipe's walls) so they read from a distance. Start decks are
@@ -30,14 +31,16 @@ const PIPE_TRANSITION_STEPS = 14;
 /** Size (m) of a tile of merged ramp meshes. */
 const TILE = 64;
 
-const material = new MeshLambertMaterial({
-  vertexColors: true,
-  flatShading: true,
-  // Where a shape meets the slope the two surfaces coincide; draw the shape on top.
-  polygonOffset: true,
-  polygonOffsetFactor: -2,
-  polygonOffsetUnits: -2,
-});
+const material = litByPools(
+  new MeshLambertMaterial({
+    vertexColors: true,
+    flatShading: true,
+    // Where a shape meets the slope the two surfaces coincide; draw the shape on top.
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  }),
+);
 
 /**
  * Builds meshes for every feature in the map, from the same shapes the

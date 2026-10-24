@@ -18,6 +18,7 @@ import type { FinishDef, Heightfield, MapDef } from '../maps/types.ts';
 import type { RunState } from '../sim/checkpoints.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
 import { TriBuilder } from './triBuilder.ts';
+import { litByPools } from './lightPools.ts';
 
 // Flag gates (instanced: one draw call for all poles, one for all pennants),
 // each finish arch with a checkered banner and line on the snow (one merged
@@ -51,7 +52,7 @@ export class CheckpointView {
 
     const poleGeometry = new CylinderGeometry(0.05, 0.05, c.poleHeight + BURY, 6);
     poleGeometry.translate(0, (c.poleHeight + BURY) / 2 - BURY, 0);
-    const poles = new InstancedMesh(poleGeometry, new MeshLambertMaterial({ color: POLE, flatShading: true }), count);
+    const poles = new InstancedMesh(poleGeometry, litByPools(new MeshLambertMaterial({ color: POLE, flatShading: true })), count);
 
     // A triangle off the pole top, pointing along local +X.
     const pennantGeometry = new BufferGeometry();
@@ -66,7 +67,7 @@ export class CheckpointView {
     pennantGeometry.computeVertexNormals();
     this.pennants = new InstancedMesh(
       pennantGeometry,
-      new MeshLambertMaterial({ flatShading: true, side: DoubleSide }),
+      litByPools(new MeshLambertMaterial({ flatShading: true, side: DoubleSide })),
       count,
     );
 
@@ -229,13 +230,15 @@ function createFinish(f: FinishDef, hf: Heightfield): Mesh {
   geometry.computeBoundingSphere();
   const mesh = new Mesh(
     geometry,
-    new MeshLambertMaterial({
-      vertexColors: true,
-      flatShading: true,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2,
-    }),
+    litByPools(
+      new MeshLambertMaterial({
+        vertexColors: true,
+        flatShading: true,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2,
+      }),
+    ),
   );
   mesh.matrixAutoUpdate = false;
   return mesh;
