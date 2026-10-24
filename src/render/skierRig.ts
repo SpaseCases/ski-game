@@ -164,12 +164,11 @@ export class SkierRig {
     this.head.add(this.hat, this.face);
     this.setHeadwear();
     // Both sides share one geometry, apart from the feet (buckles on the outside).
-    const upperArm = buildUpperArm(c.jacket);
     const forearm = buildForearm(c.jacket, c.mittens);
     const shin = buildShin(c.pants, c.boots);
     const pole = buildPole();
     for (const side of [-1, 1] as const) {
-      this.upperArms.push(add(upperArm));
+      this.upperArms.push(add(buildUpperArm(c.jacket, side)));
       this.forearms.push(add(forearm));
       this.thighs.push(add(buildThigh(c.pants, side)));
       this.shins.push(add(shin));
@@ -191,7 +190,7 @@ export class SkierRig {
     if (changed('jacket')) {
       swap([this.torso], buildTorso(c.jacket));
       this.hem.recolor(c.jacket);
-      swap(this.upperArms, buildUpperArm(c.jacket));
+      this.upperArms.forEach((m, i) => swap([m], buildUpperArm(c.jacket, i === 0 ? -1 : 1)));
     }
     if (changed('jacket', 'mittens')) swap(this.forearms, buildForearm(c.jacket, c.mittens));
     if (changed('pants', 'boots')) swap(this.shins, buildShin(c.pants, c.boots));
@@ -524,6 +523,9 @@ function buildTorso(jacket: Color): BufferGeometry {
     paint(new SphereGeometry(0.135, 12, 8).scale(1.25, 0.6, 0.75).translate(0, 0.53, 0.135), dark),
     paint(new BoxGeometry(0.014, 0.21, 0.012).translate(0, 0.405, -0.155), FIXED.zip),
     paint(new BoxGeometry(0.11, 0.085, 0.012).translate(-0.11, 0.38, -0.15), dark),
+    // Drawcord toggles hanging from the collar.
+    paint(new BoxGeometry(0.012, 0.022, 0.012).translate(-0.03, 0.47, -0.118), FIXED.zip),
+    paint(new BoxGeometry(0.012, 0.022, 0.012).translate(0.03, 0.47, -0.118), FIXED.zip),
   ];
   for (const s of [-1, 1]) {
     parts.push(paint(new IcosahedronGeometry(0.1, 1).translate(s * BODY.shoulderWidth, BODY.spine - BODY.shoulderDrop, 0), jacket));
@@ -1105,12 +1107,27 @@ function carvedPanel(top: AngleFn, bottom: AngleFn, a0: number, a1: number, segm
   return g;
 }
 
-/** Roomy sleeve, shoulder to elbow. */
-function buildUpperArm(jacket: Color): BufferGeometry {
-  return merge([
+/**
+ * Roomy sleeve, shoulder to elbow (`side` -1 left, 1 right). The left one
+ * has a zipped pocket on the outside of the arm. The segment's front (-Z)
+ * faces the elbow, out and back; the outside of the arm is between that and
+ * -X (out and forward).
+ */
+function buildUpperArm(jacket: Color, side: number): BufferGeometry {
+  const parts = [
     paint(prism(0.082, 0.076, BODY.upperArm, 9), jacket),
     paint(new IcosahedronGeometry(0.077, 1).translate(0, BODY.upperArm, 0), jacket),
-  ]);
+  ];
+  if (side < 0) {
+    const face = 2.13; // turns +X to point at the outside of the arm
+    const pocket = (g: BufferGeometry, out: number, y: number): BufferGeometry =>
+      g.rotateY(face).translate(Math.cos(face) * out, y, -Math.sin(face) * out);
+    parts.push(
+      paint(pocket(new BoxGeometry(0.02, 0.08, 0.07), 0.074, 0.11), shade(jacket, 0.88)),
+      paint(pocket(new BoxGeometry(0.022, 0.006, 0.06), 0.076, 0.075), FIXED.zip),
+    );
+  }
+  return merge(parts);
 }
 
 /** Sleeve flaring toward the wrist, then a glove with a thumb. */
@@ -1120,8 +1137,10 @@ function buildForearm(jacket: Color, mitten: Color): BufferGeometry {
     paint(prism(0.076, 0.084, f, 9), jacket),
     paint(prism(0.087, 0.087, 0.025, 9).translate(0, f - 0.03, 0), shade(jacket, 0.78)),
     paint(prism(0.058, 0.056, 0.05, 10).translate(0, f - 0.01, 0), shade(mitten, 0.74)),
-    paint(new CapsuleGeometry(0.04, 0.05, 3, 10).scale(1.05, 1, 0.82).translate(0, f + BODY.hand, 0), mitten),
-    paint(new CapsuleGeometry(0.016, 0.03, 2, 6).rotateX(-0.5).translate(0, f + BODY.hand - 0.012, 0.035), mitten),
+    // A big mitt with a clear thumb, and a darker band over the knuckles.
+    paint(new CapsuleGeometry(0.045, 0.055, 3, 10).scale(1.05, 1, 0.84).translate(0, f + BODY.hand, 0), mitten),
+    paint(prism(0.049, 0.049, 0.018, 10).scale(1.05, 1, 0.86).translate(0, f + BODY.hand + 0.006, 0), shade(mitten, 0.8)),
+    paint(new CapsuleGeometry(0.019, 0.035, 2, 6).rotateX(-0.55).translate(0, f + BODY.hand - 0.012, 0.04), mitten),
   ]);
 }
 
@@ -1169,6 +1188,10 @@ function buildFoot(side: number, boot: Color, ski: BufferGeometry): BufferGeomet
     paint(bootShell(), boot),
     paint(new BoxGeometry(0.118, 0.022, 0.33).translate(0, -0.104, -0.015), FIXED.bootSole),
     paint(new BoxGeometry(0.09, 0.025, 0.4).translate(0, -0.1275, 0), FIXED.binding),
+    // Binding toe and heel pieces hugging the sole.
+    paint(new BoxGeometry(0.075, 0.04, 0.06).translate(0, -0.1, -0.205), FIXED.binding),
+    paint(new BoxGeometry(0.08, 0.05, 0.07).translate(0, -0.095, 0.18), FIXED.binding),
+    paint(new BoxGeometry(0.05, 0.012, 0.03).translate(0, -0.074, 0.19), FIXED.buckle),
     ski,
   ];
   // Buckles on the outside of the instep and cuff.
@@ -1177,7 +1200,7 @@ function buildFoot(side: number, boot: Color, ski: BufferGeometry): BufferGeomet
     [0.0, 0.0],
     [0.06, 0.02],
   ] as const) {
-    parts.push(paint(new BoxGeometry(0.012, 0.016, 0.05).translate(side * 0.068, y, z), FIXED.buckle));
+    parts.push(paint(new BoxGeometry(0.014, 0.02, 0.056).translate(side * 0.069, y, z), FIXED.buckle));
   }
   return merge(parts);
 }
