@@ -5,6 +5,9 @@
 // - jacket: thigh points that poke out through the jacket: above its hem and
 //   inside its usual outline (where the jacket should cover them), yet
 //   outside the jacket as it's drawn.
+// - grabbing arm: how close the forearm passes to the grabbed ski's
+//   centerline (about 10 cm is the hand on the ski; much less is the arm
+//   through it);
 // - elbows: through each pole push, the furthest an elbow moves in 1% of the
 //   stroke, against how far the hand moves (an elbow flipping round the arm
 //   moves far while the hand barely does).
@@ -197,8 +200,28 @@ for (const [name, def] of STATES) {
       ray.far = Infinity;
     }
   }
+  // Grabbing arm: elbow to wrist against the grabbed ski's centerline, tip to tail.
+  let armReport = '';
+  if ('pelvis' in def) {
+    for (let h = 0; h < 2; h++) {
+      const ski = def.hands[h === 0 ? 0 : 1].grab;
+      if (ski === undefined) continue;
+      const foot = parts.feet[ski]!;
+      const fore = parts.forearms[h]!;
+      const elbow = fore.getWorldPosition(new Vector3());
+      const wrist = new Vector3(0, BODY.forearm - 0.02, 0).applyMatrix4(fore.matrixWorld);
+      const tip = new Vector3(0, 0.02 - BODY.ankleHeight, -0.9 - BODY.ankleBack).applyMatrix4(foot.matrixWorld);
+      const tail = new Vector3(0, 0.02 - BODY.ankleHeight, 0.9 - BODY.ankleBack).applyMatrix4(foot.matrixWorld);
+      let near = Infinity;
+      for (let i = 0; i <= 20; i++) {
+        p.lerpVectors(elbow, wrist, i / 20);
+        for (let j = 0; j <= 60; j++) near = Math.min(near, p.distanceTo(q.lerpVectors(tip, tail, j / 60)));
+      }
+      armReport = `arm ${(near * 100).toFixed(0)} cm from the ski${near < 0.08 ? ' (through it)' : ''}`;
+    }
+  }
   const jacket = poke ? `jacket: ${poke}/16 thigh lines through the panel, up to ${(deepest * 100).toFixed(0)} cm above where the hem hangs` : '';
-  console.log(`${name.padEnd(22)} ${[...poleReport, jacket].filter(Boolean).join(' | ') || 'clear'}`);
+  console.log(`${name.padEnd(22)} ${[...poleReport, armReport, jacket].filter(Boolean).join(' | ') || 'clear'}`);
   rig.dispose();
 }
 console.log(`worst pole: ${worst} cm inside the body`);

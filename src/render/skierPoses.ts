@@ -147,7 +147,7 @@ export const LEFT_SAFETY: PoseDef = {
 };
 
 /**
- * Left hand reaches back to the left ski's inside edge under the boot. The
+ * Left hand reaches back, past the hip, to the left ski's inside edge under the boot. The
  * knee drops forward and the heel kicks up behind the hip and out to the
  * side, so the boot points toe-down: the ski stands beside the body, tip
  * down and in, its tail up and out past the shoulder.
@@ -166,7 +166,8 @@ export const LEFT_JAPAN: PoseDef = {
     { ankle: [0.13, 0.38, -0.1], knee: [0.15, 0.3, -1] },
   ],
   hands: [
-    { at: [-0.403, 0.813, 0.325], grab: 0, on: [EDGE, TOP, 0], pole: [-0.45, -0.5, 0.7], elbow: [-1, 0.1, 0.3] },
+    // The arm comes in from the body side, elbow back, so it stays clear of the ski.
+    { at: [-0.403, 0.813, 0.325], grab: 0, on: [EDGE + 0.035, TOP, 0], pole: [-0.45, -0.5, 0.7], elbow: [0.6, -0.2, 0.8] },
     { at: [0.42, 1.12, -0.22], pole: [0.55, -0.72, 0.4], elbow: [0.6, -0.6, 0.4] },
   ],
 };
