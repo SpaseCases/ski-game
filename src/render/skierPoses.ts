@@ -102,8 +102,8 @@ export const TUCK: PoseDef = {
   feet: SNOW_FEET,
   hands: [
     // Fists low in front of the knees, poles clamped under the arms along the ribs.
-    { at: [-0.08, 0.68, -0.44], pole: [-0.32, 0.14, 1], elbow: [-0.6, -1, 0.1] },
-    { at: [0.08, 0.68, -0.44], pole: [0.32, 0.14, 1], elbow: [0.6, -1, 0.1] },
+    { at: [-0.08, 0.68, -0.44], pole: [-0.35, 0.14, 1], elbow: [-0.6, -1, 0.1] },
+    { at: [0.08, 0.68, -0.44], pole: [0.35, 0.14, 1], elbow: [0.6, -1, 0.1] },
   ],
 };
 

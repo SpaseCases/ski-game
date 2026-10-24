@@ -115,8 +115,8 @@ function inside(mesh: Mesh, pt: Vector3, dir: Vector3): boolean {
   return ray.intersectObject(mesh, false).length % 2 === 1;
 }
 
-/** Height of the jacket's bottom edge in the hips' frame at angle a from the front (skierRig's hemLow). */
-const hemLow = (a: number): number => -0.16 - 0.07 * ((1 - Math.cos(a)) / 2) ** 1.5;
+/** Height of the jacket's bottom edge in the hips' frame at angle a from the front. */
+const hemLow = JACKET_LAYOUT.hemLow;
 
 const filter = process.argv[2]?.toLowerCase();
 let worst = 0;
