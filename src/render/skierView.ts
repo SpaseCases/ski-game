@@ -107,6 +107,11 @@ const SHADOW_OPACITY = 0.45;
 // for the left hand; the right hand mirrors X.
 const POLE_PLANTED: readonly [number, number, number] = [-0.1, -0.94, 0.32];
 const POLE_PUSHED: readonly [number, number, number] = [-0.2, -0.42, 0.88];
+// Where the elbows point while pushing: back and out. It never lines up with
+// the arm anywhere in the stroke, so the elbows can't flip round it.
+const ELBOW_PUSH: readonly [number, number, number] = [-0.7, 0.1, 0.7];
+/** How far out (m) the hands go to plant: a tuck's fists swing out wide of the legs. */
+const HAND_WIDE = 0.36;
 
 /**
  * Draws the skier and its blob shadow from interpolated sim state.
@@ -383,9 +388,11 @@ function poleStroke(p: PoseBuffer, phase: number): void {
 
   // reach: hands forward (+) or back (-) in meters. The pole goes riding ->
   // planted -> pushed through -> riding; `from`/`to` pick the two angles.
+  // `elbow` is how far the elbows have turned to point back (ELBOW_PUSH).
   let reach: number;
   let lift: number;
   let crunch = 0;
+  let elbow: number;
   let from: PoleKey;
   let to: PoleKey;
   let t: number;
@@ -393,19 +400,24 @@ function poleStroke(p: PoseBuffer, phase: number): void {
     t = ease(phase / plant);
     reach = 0.34 * t;
     lift = 0.22 * t;
+    elbow = t;
     from = 'riding';
     to = 'planted';
   } else if (phase < done) {
     t = ease((phase - plant) / (done - plant));
     reach = 0.34 - 0.7 * t;
-    lift = 0.22 - 0.34 * t;
+    // The hands drive down past the hips in an arc, so the arms stay open
+    // while the crunch brings the shoulders forward.
+    lift = 0.22 - 0.34 * t - 0.16 * Math.sin(Math.PI * t);
     crunch = 0.32 * Math.sin(Math.PI * t);
+    elbow = 1;
     from = 'planted';
     to = 'pushed';
   } else {
     t = ease((phase - done) / (1 - done));
     reach = -0.36 * (1 - t);
     lift = -0.12 * (1 - t);
+    elbow = 1 - t;
     from = 'pushed';
     to = 'riding';
   }
@@ -414,6 +426,7 @@ function poleStroke(p: PoseBuffer, phase: number): void {
   for (let i = 0; i < 2; i++) {
     const h = p.hands[i === 0 ? 0 : 1];
     const mirror = i === 0 ? 1 : -1;
+    h.at[0] += (-HAND_WIDE * mirror - h.at[0]) * elbow * Math.max(0, 1 - Math.abs(h.at[0]) / HAND_WIDE);
     h.at[1] += lift;
     h.at[2] -= reach;
     for (let k = 0; k < 3; k++) {
@@ -421,6 +434,8 @@ function poleStroke(p: PoseBuffer, phase: number): void {
       const sign = k === 0 ? mirror : 1;
       const a = poleAngle(from, riding, k, sign);
       h.pole[k] = a + (poleAngle(to, riding, k, sign) - a) * t;
+      const bend = h.elbow[k] ?? 0;
+      h.elbow[k] = bend + ((ELBOW_PUSH[k] ?? 0) * sign - bend) * elbow;
     }
   }
 }

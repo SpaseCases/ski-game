@@ -260,9 +260,10 @@ ENTRIES.forEach((entry, i) => {
 });
 
 // View angle shared by all cells: 0 looks at the skier's front.
-const DEFAULT_YAW = 0.6;
-const DEFAULT_PITCH = 0.18;
-const DEFAULT_ZOOM = 1;
+// ?yaw=, ?pitch= and ?zoom= start from another angle (for repeatable screenshots).
+const DEFAULT_YAW = Number(params.get('yaw') ?? 0.6);
+const DEFAULT_PITCH = Number(params.get('pitch') ?? 0.18);
+const DEFAULT_ZOOM = Number(params.get('zoom') ?? 1);
 let viewYaw = DEFAULT_YAW;
 let viewPitch = DEFAULT_PITCH;
 let zoom = DEFAULT_ZOOM;

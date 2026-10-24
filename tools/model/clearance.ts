@@ -5,11 +5,15 @@
 // - jacket: thigh points that poke out through the jacket: above its hem and
 //   inside its usual outline (where the jacket should cover them), yet
 //   outside the jacket as it's drawn.
+// - elbows: through each pole push, the furthest an elbow moves in 1% of the
+//   stroke, against how far the hand moves (an elbow flipping round the arm
+//   moves far while the hand barely does).
 //   node tools/model/clearance.ts            every state
 //   node tools/model/clearance.ts tuck       states whose name contains "tuck"
 // Inside means inside a part's closed surface, found by counting how many
-// times a ray from the point crosses it (the hem is an open tube, so its rays
-// run across the tube, sideways in the hips' frame).
+// times a ray from the point crosses it, along two rays that must agree (a
+// ray grazing a seam can miscount). The hem is an open tube, so its rays run
+// across the tube: sideways and front to back in the hips' frame.
 
 import { DoubleSide, Mesh, Raycaster, Scene, Vector3, type Material } from 'three';
 import { CONFIG } from '../../src/config.ts';
@@ -101,6 +105,7 @@ const TUNING_INTERVAL = CONFIG.skier.polePushInterval;
 
 const ray = new Raycaster();
 const across = new Vector3();
+const ahead = new Vector3();
 const p = new Vector3();
 const q = new Vector3();
 
@@ -131,6 +136,7 @@ for (const [name, def] of STATES) {
   });
   // Sideways in the hips' frame: across the jacket's tube.
   across.set(1, 0, 0).transformDirection(parts.hem.matrixWorld);
+  ahead.set(0, 0.2, -1).normalize().transformDirection(parts.hem.matrixWorld);
 
   // Poles: 2 cm steps along the shaft, past the glove.
   const bodies: [string, Mesh][] = [
@@ -153,7 +159,7 @@ for (const [name, def] of STATES) {
       p.set(0, -t, 0).applyMatrix4(pole.matrixWorld);
       for (const [part, mesh] of bodies) {
         if (part === `forearm${side}` && t < 0.2) continue;
-        if (inside(mesh, p, across)) hits.set(part, (hits.get(part) ?? 0) + 2);
+        if (inside(mesh, p, across) && inside(mesh, p, ahead)) hits.set(part, (hits.get(part) ?? 0) + 2);
       }
     }
     const total = [...hits.values()].reduce((a, b) => a + b, 0);
@@ -194,3 +200,48 @@ for (const [name, def] of STATES) {
   rig.dispose();
 }
 console.log(`worst pole: ${worst} cm inside the body`);
+
+// Elbow swing through a whole pole push, in 1% steps of the stroke.
+const elbow = [new Vector3(), new Vector3()];
+const hand = [new Vector3(), new Vector3()];
+for (const [name, r] of [
+  ['stance', { speed: 4 }],
+  ['crouch', { speed: 4, crouch: 1 }],
+  ['part tuck', { speed: 8.5, crouch: 1 }],
+  ['tuck', { speed: 15, crouch: 1 }],
+] as const) {
+  if (filter && !`push ${name}`.includes(filter)) continue;
+  const view = new SkierView(new Scene(), flat);
+  const pose: SkierPose = createSkierPose();
+  pose.center.set(0, CONFIG.air.comHeight, 0);
+  pose.velocity.set(0, 0, -r.speed);
+  pose.crouch = 'crouch' in r ? r.crouch : 0;
+  view.snap(pose);
+  view.update(pose, 0.05);
+  const parts = view.rig.parts();
+  let worstElbow = 0;
+  let at = 0;
+  let handThen = 0;
+  for (let step = 0; step <= 100; step++) {
+    pose.polePhase = step < 100 ? step / 100 : 1;
+    view.update(pose, TUNING_INTERVAL / 100);
+    view.rig.root.updateMatrixWorld(true);
+    for (let i = 0; i < 2; i++) {
+      const fa = parts.forearms[i]!;
+      p.copy(fa.position);
+      q.set(0, BODY.forearm + BODY.hand, 0).applyQuaternion(fa.quaternion).add(fa.position);
+      if (step > 0) {
+        const moved = p.distanceTo(elbow[i]!);
+        if (moved > worstElbow) {
+          worstElbow = moved;
+          at = step;
+          handThen = q.distanceTo(hand[i]!);
+        }
+      }
+      elbow[i]!.copy(p);
+      hand[i]!.copy(q);
+    }
+  }
+  console.log(`push ${name.padEnd(17)} elbow: up to ${(worstElbow * 100).toFixed(1)} cm in 1% of the stroke (at ${at}%, hand moved ${(handThen * 100).toFixed(1)} cm)`);
+  view.rig.dispose();
+}
