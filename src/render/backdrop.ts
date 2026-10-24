@@ -22,7 +22,7 @@ import {
 import { CONFIG } from '../config.ts';
 import type { ScatterItem } from '../maps/decor.ts';
 import { fbm } from '../maps/peak.ts';
-import { hash2 } from '../maps/terrain.ts';
+import { hash2, smoothstep } from '../maps/terrain.ts';
 import type { Heightfield, MapDef, PeaksDef } from '../maps/types.ts';
 import { boundsDistance, insideBounds } from '../sim/bounds.ts';
 import { weatherLook, type WeatherLook } from './weather.ts';
@@ -62,6 +62,16 @@ const STAND_IN_SINK_FOG = 12;
 const STAND_IN_REACH = 150;
 /** Distance (m) over which the far ranges fade halfway into the haze. */
 const HAZE_HALF = 16000;
+/**
+ * Foothills between the map and the ranges: their tallest ridges as a share
+ * of the ranges' lowest peaks above their base, facets around and rings out,
+ * and how far (m) past the map's edge their haze takes to go over from the
+ * world's to their own.
+ */
+const PLAIN_RELIEF = 0.28;
+const PLAIN_AROUND = 192;
+const PLAIN_RINGS = 28;
+const PLAIN_BLEND = 2500;
 /** Azimuth samples around each ring of peaks, and samples across it. */
 const AROUND = 150;
 const ACROSS = 6;
@@ -93,6 +103,7 @@ export class Backdrop {
   private peaks: Mesh | null = null;
   /** The far ranges' facets before lighting, to relight them for the weather. */
   private peakColors: PeakColors | null = null;
+  private plainColors: PeakColors | null = null;
   private readonly sun: DirectionalLight;
   /** The moon (with its halo) and the stars: out at night. */
   private readonly night = new Group();
@@ -164,6 +175,7 @@ export class Backdrop {
     this.fog.color.copy(look.fog);
     fogMaterial.color.copy(look.fog);
     if (this.peakColors) relightPeaks(this.peakColors, look);
+    if (this.plainColors) relightPeaks(this.plainColors, look, this.fog.near, this.fog.far);
     this.night.visible = look.def.stars > 0;
     starMaterial.opacity = Math.min(1, look.def.stars);
   }
@@ -184,6 +196,8 @@ export class Backdrop {
     if (lit !== this.lit) {
       this.lit = lit;
       this.buildGround();
+    } else if (this.plainColors) {
+      relightPeaks(this.plainColors, this.look, start, end);
     }
   }
 
@@ -214,10 +228,15 @@ export class Backdrop {
     }
     this.standIn = null;
     this.plain = null;
+    this.plainColors = null;
     const src = this.source;
     if (!src || !src.map.peaks) return;
     this.standIn = this.lit ? new Mesh(litGroundGeometry(src.hf, src.trees), groundMaterial) : new Mesh(fogGroundGeometry(src.hf), fogMaterial);
-    if (this.lit) this.plain = new Mesh(plainGeometry(src.hf, src.map.peaks), groundMaterial);
+    if (this.lit) {
+      this.plainColors = plainGeometry(src.hf, src.map.peaks);
+      relightPeaks(this.plainColors, this.look, this.fog.near, this.fog.far);
+      this.plain = new Mesh(this.plainColors.geometry, peaksMaterial);
+    }
     for (const m of [this.standIn, this.plain]) {
       if (!m) continue;
       m.matrixAutoUpdate = false;
@@ -253,21 +272,33 @@ interface PeakColors {
   ambient: Float32Array;
   direct: Float32Array;
   haze: Float32Array;
+  /**
+   * The foothills only: each facet's distance from the map's middle, and how
+   * far (0 to 1) its haze has gone over from the world's (by distance, as
+   * the world fades) to its own.
+   */
+  dist?: Float32Array;
+  blend?: Float32Array;
 }
 
 /**
- * Lights the far ranges for a weather: each facet's color in its sky light
- * and sunlight (times the weather's multipliers), a touch of the sky, then
- * faded toward the haze.
+ * Lights the far ranges (or the foothills) for a weather: each facet's
+ * color in its sky light and sunlight (times the weather's multipliers), a
+ * touch of the sky, then faded toward the haze; the foothills' haze starts
+ * out as the world's (fading from `fogNear` to `fogFar` m).
  */
-function relightPeaks(p: PeakColors, look: WeatherLook): void {
+function relightPeaks(p: PeakColors, look: WeatherLook, fogNear = 0, fogFar = 1): void {
   const col = p.geometry.getAttribute('color');
   const { peaksLight: L, peaksSun: S, sky, fog } = look;
   const n = p.ambient.length;
   for (let i = 0; i < n; i++) {
     const a = p.ambient[i]!;
     const d = p.direct[i]!;
-    const k = p.haze[i]!;
+    let k = p.haze[i]!;
+    if (p.dist && p.blend) {
+      const world = Math.min(1, Math.max(0, (p.dist[i]! - fogNear) / Math.max(1, fogFar - fogNear)));
+      k = world + (k - world) * p.blend[i]!;
+    }
     let r = p.albedo[i * 3]! * (L.r * a + S.r * d);
     let g = p.albedo[i * 3 + 1]! * (L.g * a + S.g * d);
     let b = p.albedo[i * 3 + 2]! * (L.b * a + S.b * d);
@@ -604,11 +635,15 @@ function litGroundGeometry(hf: Heightfield, trees: readonly ScatterItem[]): Buff
 }
 
 /**
- * A valley plain from the edge of the map's ground out to the foot of the
- * nearest ranges: rolling snow and forest, sloping from below the map's
- * edge down to the ranges' base, so the land carries on into the haze.
+ * Foothills from the edge of the map's ground out to the foot of the
+ * nearest ranges: from below the map's edge, rolling ridges rise toward the
+ * ranges, forested low down, snowy up high and rocky where steep, so the
+ * land carries on to the mountains instead of a flat void. Built like the
+ * ranges (unlit facets, relit for the weather), with each facet's distance
+ * from the middle, so its haze can carry on from the world's at the map's
+ * edge into the ranges' gentler haze further out (see relightPeaks).
  */
-function plainGeometry(hf: Heightfield, def: PeaksDef): BufferGeometry {
+function plainGeometry(hf: Heightfield, def: PeaksDef): PeakColors {
   // Round the middle of the heightfield (a mountain's summit, or halfway down a long slope).
   const cx = hf.originX + ((hf.cols - 1) * hf.cellSize) / 2;
   const cz = hf.originZ + ((hf.rows - 1) * hf.cellSize) / 2;
@@ -625,46 +660,87 @@ function plainGeometry(hf: Heightfield, def: PeaksDef): BufferGeometry {
     low = Math.min(low, hf.heights[Math.min(hf.rows - 1, Math.max(0, r)) * hf.cols + Math.min(hf.cols - 1, Math.max(0, c))] ?? 0);
   }
   const top = low - 30;
-  const around = 72;
-  const rings = 9;
-  const radii = Array.from({ length: rings }, (_, i) => inner + (outer - inner) * (i / (rings - 1)) ** 1.6);
-  const positions = new Float32Array(around * rings * 3);
-  const colors = new Float32Array(around * rings * 3);
-  const color = new Color();
+  const relief = (def.height[0] - def.base) * PLAIN_RELIEF;
+  const sun = new Vector3(CONFIG.light.sunFrom.x, CONFIG.light.sunFrom.y, CONFIG.light.sunFrom.z).normalize();
+  const around = PLAIN_AROUND;
+  const rings = PLAIN_RINGS;
+  const grid: Vector3[][] = [];
   for (let i = 0; i < rings; i++) {
     const t = i / (rings - 1);
+    const rr0 = inner + (outer - inner) * t ** 1.5;
+    const row: Vector3[] = [];
     for (let j = 0; j < around; j++) {
       const a = ((j + (i % 2) * 0.5) / around) * Math.PI * 2;
-      const rr = radii[i]! * (1 + 0.03 * hash2(i, j, def.seed + 11));
+      const rr = rr0 * (1 + (i === 0 ? 0 : 0.02 * hash2(i, j, def.seed + 11)));
       const x = cx - Math.sin(a) * rr;
       const z = cz - Math.cos(a) * rr;
-      const roll = i === 0 ? 0 : 60 * fbm(x / 1800, z / 1800, def.seed + 13);
-      const y = top + (def.base - top) * t + roll;
-      const k = i * around + j;
-      positions[k * 3] = x;
-      positions[k * 3 + 1] = y;
-      positions[k * 3 + 2] = z;
-      const forest = Math.max(0, Math.min(1, 0.5 + 1.4 * fbm(x / 900, z / 900, def.seed + 17)));
-      color.copy(SNOW).lerp(SNOW_SHADE, 0.2).lerp(FOREST, forest * 0.75);
-      colors[k * 3] = color.r;
-      colors[k * 3 + 1] = color.g;
-      colors[k * 3 + 2] = color.b;
+      // Ridges (folded noise) growing from nothing at the map's edge, and smaller rolls on them.
+      const ridge = 1 - Math.abs(fbm(x / 2400, z / 2400, def.seed + 21));
+      const grow = smoothstep(0.04, 0.5, t);
+      const y = top + (def.base - top) * t + grow * (relief * ridge * ridge + relief * 0.25 * fbm(x / 800, z / 800, def.seed + 13));
+      row.push(new Vector3(x, y, z));
     }
+    grid.push(row);
   }
-  const index: number[] = [];
+  const positions: number[] = [];
+  const albedo: number[] = [];
+  const ambient: number[] = [];
+  const direct: number[] = [];
+  const hazes: number[] = [];
+  const dist: number[] = [];
+  const blend: number[] = [];
+  const color = new Color();
+  const n = new Vector3();
+  const e1 = new Vector3();
+  const e2 = new Vector3();
+  const tri = (p0: Vector3, p1: Vector3, p2: Vector3): void => {
+    n.crossVectors(e1.subVectors(p1, p0), e2.subVectors(p2, p0)).normalize();
+    // Facing up, toward the sky (and the camera above it).
+    const flip = n.y < 0;
+    if (flip) n.negate();
+    const mx = (p0.x + p1.x + p2.x) / 3;
+    const my = (p0.y + p1.y + p2.y) / 3;
+    const mz = (p0.z + p1.z + p2.z) / 3;
+    const steep = 1 - n.y;
+    const above = my - def.snowLine;
+    const forest = 0.5 + 1.3 * fbm(mx / 700, mz / 700, def.seed + 17);
+    const t = 0.5 + 0.5 * hash2(Math.round(mx), Math.round(mz), def.seed + 3);
+    if (steep > 0.5) color.copy(ROCK).lerp(SNOW_SHADE, 0.35 * t);
+    else if (forest > 0.3 && above < 250 * (1 - t)) color.copy(FOREST).lerp(SNOW_SHADE, 0.15 * t);
+    else color.copy(SNOW).lerp(SNOW_SHADE, 0.15 + 0.3 * t);
+    albedo.push(color.r, color.g, color.b);
+    ambient.push(0.62 + 0.08 * n.y);
+    direct.push(0.5 * Math.max(0, n.dot(sun)));
+    const d = Math.hypot(mx - cx, mz - cz);
+    const far = 1 - Math.pow(0.5, d / HAZE_HALF);
+    hazes.push(Math.min(1, far * 1.45 + 0.1));
+    dist.push(d);
+    blend.push(smoothstep(inner, inner + PLAIN_BLEND, d));
+    for (const p of flip ? [p0, p2, p1] : [p0, p1, p2]) positions.push(p.x, p.y, p.z);
+  };
   for (let i = 0; i < rings - 1; i++) {
     for (let j = 0; j < around; j++) {
-      const a = i * around + j;
-      const b = i * around + ((j + 1) % around);
-      const d = (i + 1) * around + j;
-      const e = (i + 1) * around + ((j + 1) % around);
-      index.push(a, b, d, b, e, d);
+      const a = grid[i]![j]!;
+      const b = grid[i]![(j + 1) % around]!;
+      // Odd rings are turned half a step: pair each point with the two beside it on the next ring.
+      const shift = i % 2 === 0 ? 0 : 1;
+      const d = grid[i + 1]![(j + shift) % around]!;
+      const e = grid[i + 1]![(j + shift - 1 + around) % around]!;
+      tri(a, d, b);
+      tri(a, e, d);
     }
   }
   const g = new BufferGeometry();
-  g.setAttribute('position', new BufferAttribute(positions, 3));
-  g.setAttribute('color', new BufferAttribute(colors, 3));
-  g.setIndex(index);
+  g.setAttribute('position', new BufferAttribute(new Float32Array(positions), 3));
+  g.setAttribute('color', new BufferAttribute(new Float32Array(positions.length), 3));
   g.computeBoundingSphere();
-  return g;
+  return {
+    geometry: g,
+    albedo: new Float32Array(albedo),
+    ambient: new Float32Array(ambient),
+    direct: new Float32Array(direct),
+    haze: new Float32Array(hazes),
+    dist: new Float32Array(dist),
+    blend: new Float32Array(blend),
+  };
 }
