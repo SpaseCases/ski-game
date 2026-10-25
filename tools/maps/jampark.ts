@@ -191,24 +191,31 @@ const QP = (toward: 1 | -1, length = 56, radius = 4.5): Item => {
 };
 
 /** A rail or box straight down the hill from d: points as [m down from d, m to the right, height above the snow]. */
-function slide(kind: 'rail' | 'box', x: number, d: number, pts: Pt[], width = 0.6, follow = 0): void {
+/** Rail looks: a park rail, or a fat tube (see RailStyle). */
+type Look = 'metal' | 'tube';
+
+function slide(kind: 'rail' | 'box', x: number, d: number, pts: Pt[], width = 0.6, follow = 0, look: Look = 'metal'): void {
   const f: Json = { type: kind, points: pts.map(([a, b, h]) => ({ x: r2(x + b), z: r2(-(d + a)), height: r2(h) })) };
   if (kind === 'box') f.width = width;
   if (follow > 0) f.follow = follow;
+  if (kind === 'rail' && look !== 'metal') f.style = look;
   features.push(f);
 }
 
 /** A ride-on rail or box as a line item, `dx` m right of the line. */
-const S = (kind: 'rail' | 'box', pts: Pt[], width = 0.6, dx = 0): Item => ({
+const S = (kind: 'rail' | 'box', pts: Pt[], width = 0.6, dx = 0, look: Look = 'metal'): Item => ({
   len: pts[pts.length - 1]![0],
-  place: (x, d) => slide(kind, x + dx, d, pts, width),
+  place: (x, d) => slide(kind, x + dx, d, pts, width, 0, look),
 });
 
-/** Ride-on slides side by side across the line, each [dx, kind, points, width]: the line item is as long as the longest. */
-const PAIR = (...slides: [dx: number, kind: 'rail' | 'box', pts: Pt[], width?: number][]): Item => ({
+/** A ride-on tube (a fat painted pipe) as a line item. */
+const TUBE = (pts: Pt[], dx = 0): Item => S('rail', pts, 0, dx, 'tube');
+
+/** Ride-on slides side by side across the line, each [dx, kind, points, width, look]: the line item is as long as the longest. */
+const PAIR = (...slides: [dx: number, kind: 'rail' | 'box', pts: Pt[], width?: number, look?: Look][]): Item => ({
   len: Math.max(...slides.map(([, , pts]) => pts[pts.length - 1]![0])),
   place: (x, d) => {
-    for (const [dx, kind, pts, width] of slides) slide(kind, x + dx, d, pts, width ?? 0.6);
+    for (const [dx, kind, pts, width, look] of slides) slide(kind, x + dx, d, pts, width ?? 0.6, 0, look);
   },
 });
 
@@ -224,6 +231,7 @@ interface KickerOpts {
   gap?: number;
   width?: number;
   dx?: number;
+  look?: Look;
 }
 
 /**
@@ -233,7 +241,7 @@ interface KickerOpts {
  */
 function kickerTo(kind: 'rail' | 'box', x: number, d: number, pts: Pt[], o: KickerOpts = {}): void {
   const lip = kicker(x + (o.dx ?? 0), d, o.lip ?? 0.6, o.angle ?? 10, kind === 'box' ? 3.5 : 3);
-  slide(kind, x + (o.dx ?? 0), lip + (o.gap ?? 1), pts, o.width ?? 0.7);
+  slide(kind, x + (o.dx ?? 0), lip + (o.gap ?? 1), pts, o.width ?? 0.7, 0, o.look);
 }
 
 const K = (kind: 'rail' | 'box', pts: Pt[], o: KickerOpts = {}): Item => ({
@@ -258,6 +266,30 @@ const SLIDES = {
   arc: (len: number, base: number, rise: number, n = 8): Pt[] => {
     const pts: Pt[] = [];
     for (let i = 0; i <= n; i++) pts.push([len * (i / n), 0, base + rise * Math.sin((Math.PI * i) / n)]);
+    return pts;
+  },
+  /**
+   * A C-rail: curving `bend` degrees in all (toward `side`, 1 right, -1 left)
+   * over `len` m along it, ridden on from the snow, a point every meter.
+   * Riders come off its end heading `bend` degrees across the hill, so it
+   * needs open snow that way: in the middle of a line, bending toward the
+   * side with the most room before the next fence, with room after it.
+   */
+  c: (len: number, bend: number, h = 0.45, side = 1): Pt[] => {
+    const k = (bend * DEG) / len;
+    const pts: Pt[] = [];
+    for (let s = 0; s <= len + 1e-6; s += len / Math.ceil(len)) {
+      pts.push([Math.sin(k * s) / k, (side * (1 - Math.cos(k * s))) / k, s < 3.5 ? (h * s) / 3.5 : h]);
+    }
+    return pts;
+  },
+  /** An S-rail: eases `offset` m across over its length and runs on straight, ridden on from the snow. */
+  s: (len: number, offset: number, h = 0.45): Pt[] => {
+    const pts: Pt[] = [[0, 0, 0], [3.5, 0, h]];
+    for (let i = 1; i <= 10; i++) {
+      const t = i / 10;
+      pts.push([3.5 + (len - 3.5) * t, offset * t * t * (3 - 2 * t), h]);
+    }
     return pts;
   },
   /** Kicker-fed: level at the lip's height. */
@@ -351,14 +383,16 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
     WALL(6, 16),
     K('box', SLIDES.fed(13), { width: 0.8 }),
     PAIR([-7, 'rail', SLIDES.downFlatDown(17, 0.45)], [7, 'box', SLIDES.flatDown(15, 0.4), 0.8]),
-    S('rail', SLIDES.flat(16, 0.45)),
+    S('rail', SLIDES.c(15, 24, 0.4, 1)),
+    12,
+    TUBE(SLIDES.flat(14, 0.7)),
     K('rail', SLIDES.fedDown(15)),
   ]), lim);
 
   sectionEnd('S1 combo', line(X.combo, 75, 10, [
     S('box', SLIDES.flat(12, 0.3), 1.0),
     J({ lip: 1.2, angle: 15, gap: 5, land: 13, knuckle: 2, transition: 4 }),
-    S('rail', SLIDES.flatDown(14)),
+    S('rail', SLIDES.s(15, 1.5)),
     J({ lip: 1.5, angle: 16, gap: 6, land: 13 }),
     K('box', SLIDES.fed(12), { width: 0.8 }),
     J({ lip: 1.8, angle: 17, gap: 7, land: 13 }),
@@ -406,12 +440,14 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
 
   sectionEnd('S2 jib', line(X.jib, D.s2 + 10, 9, [
     PAIR([-8, 'rail', SLIDES.downFlatDown(18)], [8, 'box', SLIDES.flat(16, 0.45), 0.9]),
-    K('rail', [[0, 0, FED], [6, 0, 0.75], [15, 0, 0.4]]),
+    K('rail', [[0, 0, FED + 0.1], [15, 0, FED + 0.1]], { look: 'tube' }),
     PAIR([-8, 'rail', SLIDES.kinked(20, -1)], [8, 'box', SLIDES.downFlatDown(18, 0.4), 0.8]),
+    S('rail', SLIDES.c(18, 24, 0.45, 1)),
+    14,
     K('box', SLIDES.arc(14, FED, 0.45), { width: 0.9 }),
     S('rail', SLIDES.flat(20, 0.5)),
     WALL(-6),
-    PAIR([-8, 'rail', SLIDES.kinked(20, -1)], [8, 'rail', SLIDES.rainbow(12, 0.4, 0.6)]),
+    PAIR([-8, 'rail', SLIDES.kinked(20, -1)], [8, 'rail', SLIDES.rainbow(13, 0.7, 0.6), 0, 'tube']),
     K('box', [[0, 0, FED], [7, 0, 1.0], [15, 0, 0.45]], { width: 0.8 }),
     S('rail', SLIDES.downFlatDown(22)),
   ]), lim);
@@ -469,10 +505,12 @@ const lanes: Json[] = [];
     PAIR([-8, 'rail', SLIDES.rainbow(14, 0.5, 0.8, 10)], [8, 'rail', SLIDES.downFlatDown(24)]),
     K('rail', SLIDES.fed(18)),
     PAIR([-8, 'box', SLIDES.flat(20, 0.45), 1.0], [8, 'rail', SLIDES.kinked(24, 1)]),
-    S('rail', SLIDES.flat(26, 0.5)),
+    S('rail', SLIDES.c(22, 24, 0.5, 1)),
+    14,
+    TUBE(SLIDES.flat(24, 0.75)),
     K('box', SLIDES.fedDown(18, 0.45), { width: 0.9 }),
     PAIR([-8, 'rail', SLIDES.downFlatDown(26)], [8, 'box', SLIDES.rainbow(14, 0.4, 0.7, 10), 1.0]),
-    S('rail', SLIDES.jog(26, -2)),
+    S('rail', SLIDES.flatDown(26, 0.5)),
     WALL(-6, 22, 4.2),
     K('rail', SLIDES.fed(20)),
     PAIR([-8, 'box', SLIDES.flatDown(22, 0.45), 0.9], [8, 'rail', SLIDES.flat(24, 0.5)]),
@@ -530,16 +568,18 @@ const lanes: Json[] = [];
     K('rail', SLIDES.arc(14, FED, 0.45)),
     PAIR([-8, 'box', SLIDES.downFlatDown(20, 0.4), 0.9], [8, 'rail', SLIDES.downFlatDown(20)]),
     K('box', [[0, 0, FED], [7, 0, 1.0], [15, 0, 0.45]], { width: 0.8 }),
-    S('rail', SLIDES.flat(16, 0.5)),
-    PAIR([-8, 'rail', SLIDES.fed(15).map(([a, b, h], i) => [a, b, i === 0 ? 0 : h] as Pt)], [8, 'box', SLIDES.flat(16), 0.9]),
-    S('rail', SLIDES.rainbow(12, 0.4, 0.6)),
+    S('rail', SLIDES.s(16, 1.2, 0.5)),
+    PAIR([-8, 'rail', SLIDES.flatDown(16)], [8, 'box', SLIDES.flat(16), 0.9]),
+    S('rail', SLIDES.c(16, 24, 0.45, 1)),
+    14,
+    TUBE(SLIDES.rainbow(14, 0.7, 0.7)),
   ]), lim);
 
   // The combo and jump lines meet in a jib garden: everything ride-on, side by side.
   sectionEnd('S4 garden', line((X.combo + X.jump) / 2, D.s4 + 8, 10, [
-    PAIR([-30, 'box', SLIDES.flat(14, 0.3), 1.2], [-15, 'rail', SLIDES.flat(14)], [0, 'box', SLIDES.downFlatDown(18, 0.35), 0.8], [15, 'rail', SLIDES.rainbow(12, 0.4, 0.6)], [30, 'box', SLIDES.flatDown(14, 0.35), 0.9]),
+    PAIR([-30, 'rail', SLIDES.c(16, 30, 0.45, 1)], [-15, 'rail', SLIDES.flat(14, 0.7), 0, 'tube'], [0, 'box', SLIDES.downFlatDown(18, 0.35), 0.8], [15, 'rail', SLIDES.rainbow(12, 0.4, 0.6)], [30, 'rail', SLIDES.c(16, 30, 0.45, 1)]),
     PAIR([-22, 'rail', SLIDES.kinked(18, -1)], [-7, 'box', SLIDES.flat(16), 0.6], [8, 'rail', SLIDES.downFlatDown(18)], [23, 'box', SLIDES.rainbow(11, 0.3, 0.6), 1.0]),
-    PAIR([-30, 'rail', SLIDES.flatDown(16)], [0, 'box', SLIDES.flat(18, 0.4), 1.0], [30, 'rail', SLIDES.flat(16, 0.45)]),
+    PAIR([-30, 'rail', SLIDES.flatDown(16)], [0, 'rail', SLIDES.rainbow(16, 0.7, 0.9, 10), 0, 'tube'], [30, 'rail', SLIDES.flat(16, 0.45)]),
     PAIR([-15, 'box', SLIDES.rainbow(10, 0.3, 0.6), 1.0], [15, 'rail', SLIDES.downFlatDown(20)]),
     // Wallrides on both edges of the garden.
     { len: 18, place: (x, d) => [WALL(-32), WALL(32)].forEach((w) => w.place(x, d)) },
