@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite';
 import { wavSink } from './tools/vite/wavSink.js';
 
-// GitHub Pages serves the site from https://<user>.github.io/ski-game/,
-// so every asset path needs the repo name as its base.
+// Relative asset paths, so one build works wherever it's served from:
+// GitHub Pages (https://<user>.github.io/ski-game/) and Firebase Hosting
+// (at the site's root).
 export default defineConfig({
-  base: '/ski-game/',
+  base: './',
   // Dev builds can save every sound as a WAV file (src/audio/wav.ts).
   plugins: [wavSink()],
   build: {

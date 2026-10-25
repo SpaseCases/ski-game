@@ -59,5 +59,5 @@ src/
 - When a mechanic feels wrong, adjust numbers in `config.ts` before rewriting logic.
 
 ## Deploy
-- A GitHub Actions workflow builds on every push to `main` and deploys `/dist` to GitHub Pages
-- Set Vite's `base` to the repo name so asset paths resolve on Pages
+- A GitHub Actions workflow builds on every push to `main` and deploys `/dist` to GitHub Pages and to Firebase Hosting (https://parklaps.web.app, project `parklaps-3b60f`, site `parklaps`; `firebase.json`). GitHub is blocked on the school network, so Firebase is the address players use
+- Vite's `base` is `./` (relative paths), so one build works at Pages' `/ski-game/` and at Firebase's root

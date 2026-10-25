@@ -2,9 +2,11 @@
 
 A small, physics-driven, low-poly 3D freeski game that runs in the browser on school Chromebooks. Keyboard only, no accounts, no backend.
 
-- **Play:** https://spasecases.github.io/ski-game/
-- **Embed test:** https://spasecases.github.io/ski-game/embed-test.html (loads the game in an iframe like a Google Sites page)
-- **Skier poses:** https://spasecases.github.io/ski-game/poses.html (the low-poly skier in every pose, side by side; ← → rotates)
+- **Play:** https://parklaps.web.app (Firebase Hosting; GitHub is blocked on school networks). Also at https://spasecases.github.io/ski-game/
+- **Embed test:** https://parklaps.web.app/embed-test.html (loads the game in an iframe like a Google Sites page)
+- **Skier poses:** https://parklaps.web.app/poses.html (the low-poly skier in every pose, side by side; ← → rotates)
+
+Embedded in a Google Site the game can't go fullscreen (Sites' frame doesn't allow it), so it shows an Open in new tab button: opened directly, its Fullscreen button works.
 
 `GAME_DESIGN.md` describes what is being built and the milestone order. `CLAUDE.md` holds the technical rules.
 
@@ -19,7 +21,7 @@ npm run build     # type-check and build to dist/
 npm run preview   # serve the built dist/ at http://localhost:4173/ski-game/
 ```
 
-Every push to `main` builds the game and deploys `dist/` to GitHub Pages through GitHub Actions.
+Every push to `main` builds the game and deploys `dist/` to GitHub Pages and Firebase Hosting through GitHub Actions (`npx firebase-tools deploy --only hosting` deploys from this computer once logged in).
 
 ## Status
 
