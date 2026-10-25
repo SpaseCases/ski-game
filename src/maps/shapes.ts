@@ -6,13 +6,15 @@ import type {
   KickerFeature,
   LandingFeature,
   PipeShape,
+  QuarterFeature,
+  QuarterShape,
   RampShape,
   ShapeCells,
   TerrainShape,
 } from './types.ts';
 
-// Shapes built on top of the slope: jumps, kickers, landings, halfpipes and
-// the raised start decks. They're exact functions added over the heightfield
+// Shapes built on top of the slope: jumps, kickers, landings, halfpipes,
+// quarterpipes and wallrides, and the raised start decks. They're exact functions added over the heightfield
 // rather than baked into its 2 m grid, which would round a lip into a hump.
 // Where two overlap, the higher one wins.
 //
@@ -177,6 +179,7 @@ export function buildShapes(features: readonly Feature[]): TerrainShape[] {
     else if (f.type === 'kicker') shapes.push(kickerShape(f));
     else if (f.type === 'landing') shapes.push(landingShape(f));
     else if (f.type === 'halfpipe') shapes.push(pipeShape(f));
+    else if (f.type === 'quarter') shapes.push(quarterShape(f));
   }
   return shapes;
 }
@@ -249,6 +252,41 @@ function pipeShape(f: HalfpipeFeature): PipeShape {
   if (f.dropIn + f.entry + f.exit >= f.length) throw new Error('Map: a halfpipe is too short for its drop-in and exit');
   setBox(s, -f.back, f.length, pipeHalfWidth(s));
   return s;
+}
+
+function quarterShape(f: QuarterFeature): QuarterShape {
+  const a = f.yaw * DEG;
+  const wall = Math.min(f.wallAngle, 86) * DEG;
+  const s: QuarterShape = {
+    kind: 'quarter',
+    x: f.x,
+    z: f.z,
+    dirX: -Math.sin(a),
+    dirZ: -Math.cos(a),
+    rightX: Math.cos(a) * f.side,
+    rightZ: -Math.sin(a) * f.side,
+    radius: f.radius,
+    transition: f.radius * Math.sin(wall),
+    height: f.radius * (1 - Math.cos(wall)),
+    deckWidth: f.deckWidth,
+    back: f.back,
+    length: f.length,
+    taper: f.taper,
+    wood: f.style === 'wood',
+    minX: 0,
+    maxX: 0,
+    minZ: 0,
+    maxZ: 0,
+  };
+  if (2 * f.taper > f.length) throw new Error('Map: a quarter is shorter than its two tapers');
+  // The box covers the foot to the bottom of the back bank (setBox spans v both ways; the floor side is empty).
+  setBox(s, 0, f.length, quarterWidth(s));
+  return s;
+}
+
+/** Width of a quarter from its foot to the bottom of the bank behind it. */
+export function quarterWidth(s: QuarterShape): number {
+  return s.transition + s.deckWidth + s.back;
 }
 
 /** Half the full width of a pipe, out to the bottom of its outer banks. */
@@ -331,7 +369,7 @@ export function shapeSurfaceAt(hf: Heightfield, x: number, z: number): number {
   const visit = (s: TerrainShape): void => {
     if (!sampleShape(s, x, z, scratch) || scratch.height <= top) return;
     top = scratch.height;
-    surface = s.kind === 'ramp' ? rampSurface(s, x, z) : SURFACE.snow;
+    surface = s.kind === 'ramp' ? rampSurface(s, x, z) : s.kind === 'quarter' ? quarterSurface(s, x, z) : SURFACE.snow;
   };
   const g = hf.shapeCells;
   if (g) {
@@ -344,6 +382,13 @@ export function shapeSurfaceAt(hf: Heightfield, x: number, z: number): number {
     for (let i = 0; i < shapes.length; i++) visit(shapes[i]!);
   }
   return surface;
+}
+
+/** A wallride's face is wood up to its coping; its deck and bank, and a quarterpipe, are snow. */
+function quarterSurface(q: QuarterShape, x: number, z: number): number {
+  if (!q.wood) return SURFACE.snow;
+  const a = (x - q.x) * q.rightX + (z - q.z) * q.rightZ;
+  return a <= q.transition ? SURFACE.wood : SURFACE.snow;
 }
 
 /** The surface of ramp `r` at (x, z), already known to be on it. */
@@ -370,7 +415,7 @@ const scratch: ShapeSample = { height: 0, dhdx: 0, dhdz: 0 };
 /** Samples one shape at world (x, z). Returns false (and leaves `out` alone) outside it. */
 export function sampleShape(s: TerrainShape, x: number, z: number, out: ShapeSample): boolean {
   if (x < s.minX || x > s.maxX || z < s.minZ || z > s.maxZ) return false;
-  return s.kind === 'ramp' ? sampleRamp(s, x, z, out) : samplePipe(s, x, z, out);
+  return s.kind === 'ramp' ? sampleRamp(s, x, z, out) : s.kind === 'pipe' ? samplePipe(s, x, z, out) : sampleQuarter(s, x, z, out);
 }
 
 function sampleRamp(r: RampShape, x: number, z: number, out: ShapeSample): boolean {
@@ -511,6 +556,46 @@ function samplePipe(s: PipeShape, x: number, z: number, out: ShapeSample): boole
   return true;
 }
 
+/** How much of a quarter's height stands at distance u along it: none at its ends, all of it past its tapers (slope into taperSlope). */
+let taperSlope = 0;
+function quarterTaper(q: QuarterShape, u: number): number {
+  const t = Math.min(u, q.length - u);
+  if (t >= q.taper) {
+    taperSlope = 0;
+    return 1;
+  }
+  const k = Math.max(0, t) / q.taper;
+  taperSlope = ((6 * k * (1 - k)) / q.taper) * (u < q.length / 2 ? 1 : -1);
+  return k * k * (3 - 2 * k);
+}
+
+function sampleQuarter(q: QuarterShape, x: number, z: number, out: ShapeSample): boolean {
+  const dx = x - q.x;
+  const dz = z - q.z;
+  const u = dx * q.dirX + dz * q.dirZ;
+  const a = dx * q.rightX + dz * q.rightZ;
+  if (u <= 0 || u >= q.length || a <= 0 || a >= quarterWidth(q)) return false;
+  // Across: the transition (a quarter circle), the deck, then the bank behind.
+  let p: number;
+  let dpda: number;
+  if (a <= q.transition) {
+    const r = Math.sqrt(q.radius * q.radius - a * a);
+    p = q.radius - r;
+    dpda = a / r;
+  } else {
+    const t = Math.min(1, Math.max(0, (a - q.transition - q.deckWidth) / q.back));
+    p = q.height * (1 - t * t * (3 - 2 * t));
+    dpda = t > 0 && t < 1 ? (-q.height * 6 * t * (1 - t)) / q.back : 0;
+  }
+  const f = quarterTaper(q, u);
+  const dpdu = p * taperSlope;
+  out.height = p * f;
+  dpda *= f;
+  out.dhdx = dpdu * q.dirX + dpda * q.rightX;
+  out.dhdz = dpdu * q.dirZ + dpda * q.rightZ;
+  return true;
+}
+
 /** True on the face of a ramp's takeoff, from where it starts curving up to its lip (and a little past). */
 export function onTakeoff(hf: Heightfield, x: number, z: number): boolean {
   const shapes = hf.shapes;
@@ -538,7 +623,10 @@ export function onTakeoff(hf: Heightfield, x: number, z: number): boolean {
 /** How far (m) past the edge of a pipe's floor the wall counts as a wall, not floor. */
 const PIPE_WALL_START = 0.5;
 
-/** True on a halfpipe's wall: past the edge of its floor, up the transition (or on the deck). */
+/**
+ * True on a halfpipe's wall (past the edge of its floor, up the transition,
+ * or on the deck) or up a quarterpipe's or wallride's transition.
+ */
 export function onPipeWall(shapes: readonly TerrainShape[] | undefined, x: number, z: number): boolean {
   return pipeInward(shapes, x, z, inwardScratch);
 }
@@ -551,6 +639,7 @@ const inwardScratch = { x: 0, z: 0 };
  * a little down the pipe's slope, so it isn't quite square to the pipe.)
  */
 export function pipeInward(shapes: readonly TerrainShape[] | undefined, x: number, z: number, out: { x: number; z: number }): boolean {
+  if (quarterInward(shapes, x, z, out)) return true;
   const s = pipeAt(shapes, x, z);
   if (!s) return false;
   const v = (x - s.x) * s.rightX + (z - s.z) * s.rightZ;
@@ -559,6 +648,28 @@ export function pipeInward(shapes: readonly TerrainShape[] | undefined, x: numbe
   out.x = s.rightX * sign;
   out.z = s.rightZ * sign;
   return true;
+}
+
+/**
+ * Up a quarter's transition (past the first PIPE_WALL_START m of it, to just
+ * over its coping): writes the level direction straight back out from the
+ * wall into `out` and returns true.
+ */
+function quarterInward(shapes: readonly TerrainShape[] | undefined, x: number, z: number, out: { x: number; z: number }): boolean {
+  if (!shapes) return false;
+  for (let i = 0; i < shapes.length; i++) {
+    const q = shapes[i]!;
+    if (q.kind !== 'quarter' || x < q.minX || x > q.maxX || z < q.minZ || z > q.maxZ) continue;
+    const dx = x - q.x;
+    const dz = z - q.z;
+    const u = dx * q.dirX + dz * q.dirZ;
+    const a = dx * q.rightX + dz * q.rightZ;
+    if (u < 0 || u > q.length || a <= PIPE_WALL_START || a > q.transition + PIPE_WALL_START) continue;
+    out.x = -q.rightX;
+    out.z = -q.rightZ;
+    return true;
+  }
+  return false;
 }
 
 /** The halfpipe whose inside (floor, walls and decks) holds (x, z), or undefined. */

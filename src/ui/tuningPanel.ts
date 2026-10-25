@@ -48,7 +48,8 @@ export interface TestSpot {
 /**
  * Places to try each feature from: every start gate and flag, the top of
  * each run, a run-up before each jump, kicker, landing, rail and box, the
- * halfpipe's drop-in deck, and the slalom's first gate.
+ * halfpipe's drop-in deck, a run-up along each quarterpipe and wallride,
+ * and the slalom's first gate.
  */
 export function testSpots(map: MapDef): Record<string, TestSpot> {
   const spots: Record<string, TestSpot> = { spawn: { x: map.spawn.x, z: map.spawn.z, heading: map.spawn.heading / DEG } };
@@ -84,6 +85,14 @@ export function testSpots(map: MapDef): Record<string, TestSpot> {
       case 'halfpipe':
         spots[name('halfpipe deck')] = before(f.x, f.z, f.yaw, -f.dropIn / 2);
         break;
+      case 'quarter': {
+        // 20 m before its start, a few meters out from the wall's foot.
+        const h = f.yaw / DEG;
+        const out = 4 * f.side;
+        const at = before(f.x - Math.cos(h) * out, f.z + Math.sin(h) * out, f.yaw, 20);
+        spots[name(f.style === 'wood' ? 'wallride' : 'quarterpipe')] = at;
+        break;
+      }
       case 'rail':
       case 'box': {
         const [a, b] = f.points;

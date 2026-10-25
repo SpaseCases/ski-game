@@ -15,6 +15,7 @@ import type {
   PitchSection,
   PowderDef,
   PropKind,
+  QuarterStyle,
   RailPoint,
   RailStyle,
   Ramp4,
@@ -37,6 +38,7 @@ const PROP_KINDS: readonly PropKind[] = ['lightPole', 'floodlight', 'banner', 'f
 const START_STYLES: readonly StartStyle[] = ['deck', 'tower', 'ridge', 'race'];
 const RAIL_STYLES: readonly RailStyle[] = ['metal', 'handrail', 'log'];
 const BOX_STYLES: readonly BoxStyle[] = ['wood', 'ledge', 'bench', 'rock', 'stump'];
+const QUARTER_STYLES: readonly QuarterStyle[] = ['snow', 'wood'];
 const ROOF_STYLES: readonly RoofStyle[] = ['gable', 'shed', 'flat'];
 const BUILDING_STYLES: readonly BuildingStyle[] = ['chalet', 'shop', 'lodge', 'station'];
 const RUN_LEVELS: readonly RunLevel[] = ['green', 'blue', 'black', 'double'];
@@ -443,6 +445,24 @@ function parseFeature(raw: unknown, path: string): Feature {
         back: n('back', 30),
         exit: n('exit', 10),
       };
+    case 'quarter': {
+      const side = n('side', 1);
+      if (side !== 1 && side !== -1) throw new Error(`Map: ${path}.side must be 1 or -1`);
+      return {
+        type: 'quarter',
+        x: n('x'),
+        z: n('z'),
+        yaw: n('yaw', 0),
+        side,
+        length: n('length'),
+        radius: n('radius', 4),
+        wallAngle: n('wallAngle', 82),
+        deckWidth: n('deckWidth', 2),
+        back: n('back', 5),
+        taper: n('taper', 5),
+        style: f.style === undefined ? 'snow' : oneOf(f.style, QUARTER_STYLES, `${path}.style`),
+      };
+    }
     case 'slalom':
       return {
         type: 'slalom',

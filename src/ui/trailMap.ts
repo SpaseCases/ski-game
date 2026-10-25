@@ -350,6 +350,7 @@ function drawOverlay(g: CanvasRenderingContext2D, map: MapDef, f: Frame, at: XZ,
   });
 
   // Jumps and booters: a small chevron pointing the way off them. Rails, boxes and logs: a short bar along them.
+  // Quarterpipes and wallrides: a bar along the top of the wall.
   // Gates: a dot each, red and blue in turn along the course.
   for (const feat of map.features) {
     if (feat.type === 'slalom') {
@@ -375,6 +376,20 @@ function drawOverlay(g: CanvasRenderingContext2D, map: MapDef, f: Frame, at: XZ,
       g.lineCap = 'round';
       g.lineJoin = 'round';
       g.strokeStyle = feat.natural ? '#1b2430' : '#2f6fe0';
+      g.stroke();
+    } else if (feat.type === 'quarter') {
+      const h = feat.yaw * DEG;
+      const top = feat.radius + feat.deckWidth / 2;
+      const ox = Math.cos(h) * feat.side * top;
+      const oz = -Math.sin(h) * feat.side * top;
+      const a = px({ x: feat.x + ox, z: feat.z + oz });
+      const b = px({ x: feat.x + ox - Math.sin(h) * feat.length, z: feat.z + oz - Math.cos(h) * feat.length });
+      g.beginPath();
+      g.moveTo(a[0], a[1]);
+      g.lineTo(b[0], b[1]);
+      g.lineWidth = 3;
+      g.lineCap = 'round';
+      g.strokeStyle = feat.style === 'wood' ? '#a87443' : '#2f6fe0';
       g.stroke();
     } else if (feat.type === 'rail' || feat.type === 'box') {
       const a = px(feat.points[0]!);

@@ -16,8 +16,8 @@
 // speed instead of standing; "brake=<m/s>" brakes down to that speed before
 // each takeoff (a controlled huck). "lip=<d>" adds a takeoff with no kicker
 // (a ski jump's edge), reported against the landing hill below it. "steer" steers back
-// onto the line on the snow, clear of lips (a kinked rail or a hip leaves the rider off
-// it, heading away). After a crash the rider starts again from a standstill 15 m further down.
+// onto the line on the snow, clear of lips and off walls (a kinked rail, a hip or a
+// quarterpipe leaves the rider off it, heading away). After a crash the rider starts again from a standstill 15 m further down.
 
 import type { Action } from '../../src/core/input.ts';
 import { heightAt } from '../../src/sim/terrain.ts';
@@ -148,7 +148,8 @@ while (r.t < 600) {
     const crouchFor = r.speed * 0.4;
     if (tuck ? toLip > release : pop && toLip > release && toLip < release + crouchFor) keys.push('up');
     if (r.speed > brakeTo && toLip < 40 && toLip > release + crouchFor) keys.push('down');
-    const steering = steer ? r.s.rail < 0 && toLip > 6 : startX !== undefined && r.s.grounded && d > from + 30 && toLip > 25;
+    // "steer" leaves walls alone (a quarterpipe, a halfpipe): a carve up one turns into a spin off it.
+    const steering = steer ? r.s.rail < 0 && toLip > 6 && r.s.normal.y > Math.cos(20 * DEG) : startX !== undefined && r.s.grounded && d > from + 30 && toLip > 25;
     if (steering) {
       // Clear of the start (a tower's deck is narrow), steer onto the line: aim at a point on it 25 m ahead
       // (15 m with "steer"). Not near a lip, where carving into it would set off a spin.

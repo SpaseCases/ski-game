@@ -203,6 +203,9 @@ function keepOutZones(map: MapDef): KeepOut {
       // The run-up, the feature, and the landing below it (natural kickers land on the slope).
       const length = f.type === 'jump' ? f.gap + 2 * f.lipHeight + 20 : f.type === 'kicker' ? (2 * f.lipHeight) / Math.tan((f.lipAngle * Math.PI) / 180) : f.back + f.top + 15;
       runway(f.x, f.z, f.yaw, -18, length + 55, f.width / 2 + f.sideWidth + 5);
+    } else if (f.type === 'quarter') {
+      // The wall, the bank behind it and the snow riders swing in on.
+      runway(f.x, f.z, f.yaw, -15, f.length + 15, f.radius + f.deckWidth + f.back + 8);
     } else if (f.type === 'building' || f.type === 'terrace') {
       // The whole footprint and a few meters round it; for one built to be
       // ridden, the run-up to its drift and the landing below it too.
