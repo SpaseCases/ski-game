@@ -504,7 +504,7 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
 
   // Tables, then a gap jump, a step-up and a step-down: open gaps with
   // nothing to land on short, sized for the 14 to 20 m/s riders carry here
-  // (like the tables, popped faster they fly onto the next takeoff).
+  // (like the tables, popped faster than ~21 m/s they fly onto the next takeoff).
   sectionEnd('S2 jump', line(X.jump, D.s2 + 6, 11, [
     J({ lip: 2.2, angle: 20, gap: 9, land: 14, width: 9 }),
     J({ lip: 2.4, angle: 20, gap: 10, land: 14, width: 9 }),
@@ -512,6 +512,8 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
     J({ lip: 2.6, angle: 24, gap: 12, deck: false, landingHeight: 2.6, land: 15, width: 10 }),
     J({ lip: 2.4, angle: 24, gap: 8, deck: false, landingHeight: 3.6, land: 14, width: 10 }),
     J({ lip: 3, angle: 22, gap: 9, deck: false, landingHeight: 1.8, land: 13, width: 10 }),
+    // The step-down's short landing would throw a fast pop onto the next takeoff.
+    16,
     J({ lip: 2.4, angle: 20, gap: 10, land: 14, width: 9 }),
   ]), lim);
 
