@@ -185,28 +185,28 @@ export const LEFT_SAFETY: PoseDef = {
 };
 
 /**
- * Left hand reaches back past the hip to the left ski's inside edge, just
- * above the boot. The thigh hangs nearly straight down, the knee a little
- * forward, and the shin runs back so the boot is up behind the seat, toe
- * down: the ski stands close behind the body, tip down, its tail up past the
- * shoulder.
+ * Left japan: a mute tweaked behind the back. The right knee drops and the
+ * right heel kicks up behind the seat, tucked behind the left leg; the left
+ * hand reaches down past the left knee to the right ski's inside edge just
+ * behind the boot. The ski stands up behind the body, tip down, its tail up
+ * past the shoulders.
  */
 export const LEFT_JAPAN: PoseDef = {
   pelvis: AIR_PELVIS,
   pelvisPitch: 0.3,
-  pelvisYaw: 0.1,
-  chestPitch: 0.4,
-  chestYaw: 0.55,
-  chestRoll: 0.35,
+  pelvisYaw: -0.1,
+  chestPitch: 0.35,
+  chestYaw: 0.3,
+  chestRoll: 0.2,
   headPitch: -0.3,
-  headYaw: -0.35,
+  headYaw: 0.35,
   feet: [
-    { ankle: [0, 0, 0], pitch: -1.5, yaw: -0.2, knee: [-0.15, -1, -0.5] },
-    { ankle: [0.13, 0.36, -0.1], knee: [0.15, 0.3, -1] },
+    { ankle: [-0.12, 0.4, -0.12], knee: [-0.15, 0.3, -1] },
+    { ankle: [0, 0, 0], pitch: -1.55, yaw: -0.4, knee: [0.1, -1, -0.5] },
   ],
   hands: [
-    { at: [-0.168, 0.971, 0.407], grab: 0, on: [EDGE + 0.035, TOP, 0.2], pole: [-0.45, -0.5, 0.7], elbow: [0.5, -0.8, 0.3] },
-    { at: [0.42, 1.12, -0.22], pole: [0.55, -0.72, 0.4], elbow: [0.6, -0.6, 0.4] },
+    { at: [-0.158, 0.977, 0.303], grab: 1, on: [-EDGE - 0.035, TOP, 0.3], pole: [-0.45, -0.5, 0.7], elbow: [-0.8, -0.3, 0.5] },
+    { at: [0.5, 1.12, -0.2], pole: [0.55, -0.72, 0.4], elbow: [0.6, -0.6, 0.4] },
   ],
 };
 
