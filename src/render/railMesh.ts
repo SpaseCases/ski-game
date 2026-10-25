@@ -10,8 +10,9 @@ import { litByPools } from './lightPools.ts';
 // Rails and boxes, drawn from the slide lines the physics uses so the skis
 // sit exactly on what you see. They're merged into one vertex-colored mesh
 // per 64 m tile, so a long rail drops out of view past the fog. Each has its
-// look: park rails and handrails on posts, fallen logs lying on the snow,
-// park boxes, concrete ledges, benches, flat-topped rocks and stumps.
+// look: park rails and handrails on posts, fat tubes on saddles, fallen logs
+// lying on the snow, park boxes, concrete ledges, benches, flat-topped rocks
+// and stumps.
 
 const BOX_DECK = new Color('#9aa4ad');
 const BOX_SIDE = new Color('#8a5a32');
@@ -19,6 +20,8 @@ const RAIL = new Color('#b4bec8');
 const POST = new Color('#56606b');
 const HANDRAIL = new Color('#2f4a3c');
 const HANDRAIL_POST = new Color('#26372e');
+const TUBE = new Color('#e0a526');
+const TUBE_BAND = new Color('#2b3138');
 const BARK = new Color('#5a4232');
 const BARK_DARK = new Color('#47342a');
 const LOG_END = new Color('#c9a273');
@@ -31,8 +34,14 @@ const BENCH_LEG = new Color('#2c333b');
 const ROCK = new Color('#7d848c');
 const ROCK_DARK = new Color('#666d75');
 const STUMP_TOP = new Color('#c49a6c');
-/** Sides around a rail tube. With 6, one flat face is on top. */
+/** Sides around a rail tube, and around a fat tube. With 6, one flat face is on top. */
 const RAIL_SIDES = 6;
+const TUBE_SIDES = 12;
+/** A fat tube's saddles: how far apart, and their size along and across it (m). */
+const SADDLE_SPACING = 3;
+const SADDLE_LENGTH = 0.25;
+/** Length (m) of the dark band at each end of a fat tube. */
+const TUBE_BAND_LENGTH = 0.5;
 /** Sides around a log, and around a stump. */
 const LOG_SIDES = 8;
 const STUMP_SIDES = 9;
@@ -64,6 +73,9 @@ export function createRailMesh(rails: readonly RailShape[], hf: Heightfield): Gr
         break;
       case 'handrail':
         addRail(near, r, hf, HANDRAIL, HANDRAIL_POST);
+        break;
+      case 'tube':
+        addTube(near, r, hf);
         break;
       case 'log':
         addLog(near, r, i);
@@ -192,6 +204,76 @@ function addRail(near: Near, r: RailShape, hf: Heightfield, tube: Color, postCol
       const c1 = corners[(c + 1) % 4]!;
       const at = (o: Vector3, y: number): Vector3 => new Vector3(pos.x + o.x, y, pos.z + o.z);
       b.quad(at(c0, top), at(c1, top), at(c1, bottom), at(c0, bottom), postColor, c0.clone().add(c1));
+    }
+  }
+}
+
+/**
+ * A fat tube: a painted pipe under its top line with a dark band at each
+ * end, capped, on low saddles down to the snow wherever it stands above it.
+ */
+function addTube(near: Near, r: RailShape, hf: Heightfield): void {
+  const radius = r.halfWidth;
+  // Pieces along the tube: at each of its points, at the edges of the dark end bands, and every 2 m between.
+  const cuts = [...r.dist, TUBE_BAND_LENGTH, r.length - TUBE_BAND_LENGTH].filter((v) => v >= 0 && v <= r.length).sort((m, n) => m - n);
+  const at: number[] = [];
+  for (let i = 0; i < cuts.length; i++) {
+    const s = cuts[i]!;
+    if (at.length > 0 && s - at[at.length - 1]! < 0.05) continue;
+    const prev = at.length > 0 ? at[at.length - 1]! : s;
+    const n = Math.ceil((s - prev) / 2);
+    for (let k = 1; k < n; k++) at.push(prev + ((s - prev) * k) / n);
+    at.push(s);
+  }
+  const ring = Array.from({ length: TUBE_SIDES }, () => new Vector3());
+  const a = new Vector3();
+  const e = new Vector3();
+  const dir = new Vector3();
+  for (let k = 0; k < at.length - 1; k++) {
+    const s0 = at[k]!;
+    const s1 = at[k + 1]!;
+    railFrame(r, s0, a, dir);
+    railFrame(r, s1, e, dir);
+    const b = near(a.x, a.z);
+    dir.subVectors(e, a).normalize();
+    // Overlap the pieces a little where the tube bends, so a joint has no gap.
+    if (k > 0) a.addScaledVector(dir, -radius * 0.3);
+    if (k < at.length - 2) e.addScaledVector(dir, radius * 0.3);
+    a.y -= radius;
+    e.y -= radius;
+    const side = new Vector3().crossVectors(dir, UP).normalize();
+    const up = new Vector3().crossVectors(side, dir);
+    for (let i = 0; i < TUBE_SIDES; i++) {
+      const t = (i / TUBE_SIDES) * Math.PI * 2;
+      ring[i]!.copy(side).multiplyScalar(Math.cos(t) * radius).addScaledVector(up, Math.sin(t) * radius);
+    }
+    const band = s1 <= TUBE_BAND_LENGTH + 1e-3 || s0 >= r.length - TUBE_BAND_LENGTH - 1e-3;
+    for (let i = 0; i < TUBE_SIDES; i++) {
+      const o0 = ring[i]!;
+      const o1 = ring[(i + 1) % TUBE_SIDES]!;
+      b.quad(a.clone().add(o0), a.clone().add(o1), e.clone().add(o1), e.clone().add(o0), band ? TUBE_BAND : TUBE, o0.clone().add(o1));
+    }
+    if (k === 0) cap(b, a, ring, dir.clone().negate(), TUBE_BAND);
+    if (k === at.length - 2) cap(b, e, ring, dir, TUBE_BAND);
+  }
+  // Saddles: a short dark block under the tube down into the snow, wherever there's a gap to fill.
+  const count = Math.max(2, Math.ceil(r.length / SADDLE_SPACING) + 1);
+  const pos = new Vector3();
+  for (let i = 0; i < count; i++) {
+    const s = 0.5 + ((r.length - 1) * i) / (count - 1);
+    railFrame(r, s, pos, dir);
+    const top = pos.y - 1.4 * radius;
+    const bottom = drawnHeightAt(hf, pos.x, pos.z) - BURY;
+    if (top - bottom < 0.05) continue;
+    const along = new Vector3(dir.x, 0, dir.z).normalize().multiplyScalar(SADDLE_LENGTH / 2);
+    const right = new Vector3(-along.z, 0, along.x).normalize().multiplyScalar(radius * 0.9);
+    const b = near(pos.x, pos.z);
+    const corners = [along.clone().add(right), along.clone().sub(right), along.clone().negate().sub(right), along.clone().negate().add(right)];
+    for (let c = 0; c < 4; c++) {
+      const c0 = corners[c]!;
+      const c1 = corners[(c + 1) % 4]!;
+      const at = (o: Vector3, y: number): Vector3 => new Vector3(pos.x + o.x, y, pos.z + o.z);
+      b.quad(at(c0, top), at(c1, top), at(c1, bottom), at(c0, bottom), TUBE_BAND, c0.clone().add(c1));
     }
   }
 }

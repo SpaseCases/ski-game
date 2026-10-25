@@ -321,9 +321,10 @@ export interface RailPoint {
 
 /**
  * What a rail is: a park rail (metal, on posts), a handrail (metal, on
- * posts down stairs), or a fallen tree (a log lying on the snow; wood).
+ * posts down stairs), a fallen tree (a log lying on the snow; wood), or a
+ * tube (a fat painted metal pipe on low saddles).
  */
-export type RailStyle = 'metal' | 'handrail' | 'log';
+export type RailStyle = 'metal' | 'handrail' | 'log' | 'tube';
 
 /**
  * A rail: a polyline the rider slides along. Flat, down, flat-down, kinked
@@ -340,7 +341,7 @@ export interface RailFeature {
    */
   follow: number;
   style: RailStyle;
-  /** Radius (m) of the tube or log; 0 uses the style's own (CONFIG.rails.radius, or a log's). */
+  /** Radius (m) of the tube or log; 0 uses the style's own (CONFIG.rails.radius, or a log's or a tube's). */
   radius: number;
 }
 
