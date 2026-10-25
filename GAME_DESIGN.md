@@ -16,7 +16,7 @@ The right hand works the arrow keys. The left hand handles grabs, pole push, and
 |---|---|---|---|
 | ← / → | Turn | Spin left / right | Rotate skis (free, any angle) |
 | ↑ hold, then release | Crouch (less drag), then pop | Front flip | Crouch, then pop off |
-| ↓ | Brake | Back flip | — |
+| ↓ | Brake | Back flip | Brake (drags the skis on the rail) |
 | Shift | Pole push | — | — |
 | Q / E | — | Lincoln loop left / right | — |
 | Tab | Set personal checkpoint | — | — |
@@ -48,6 +48,7 @@ Grabs (hold in the air, release to let go):
 - There is no grind button. You get on by landing on the rail.
 - You land on with the skis roughly straight (parallel) or sideways (perpendicular), and that angle carries over. On the rail ←/→ rotate the skis freely; they stay at whatever angle you leave them.
 - You leave by riding off the end or by popping off with ↑. Spinning off is allowed.
+- Holding ↓ brakes: the skis drag against the rail or box (`rails.brakeDecel`, 6 m/s², ramping in like the snow brake), enough to stop on any rail in the maps, even the long rails down 19° stretches. On a metal rail the sparks come thicker. The skis stay at their angle (no hockey-stop swing); the body sinks a little.
 - Too far off-angle or off-center and you slip off. That's not a bail unless you then land badly.
 - v1 features: flat box, flat rail, down rail, flat-down rail. Rails are defined as polylines in the map JSON.
 
@@ -258,7 +259,7 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - Volume and mute are saved but nothing plays until milestone 7.
 - Cheats: Low gravity slows in-runs too (gravity drives them), so its airs are slower as well as longer; with Low gravity or Moon jump, flights that fall steeply onto flat snow can land nose-down and crash (No crashes covers it). Moon jump in a halfpipe is still capped by `air.wallLaunchMax`. The tuning panel can cover the right of a menu in a small embed (close it from its own button).
 - Far forests show as flat dark facets past the far plane (Freeride; the Slalom on Medium); far stand-in trees are plain cones.
-- Park: huge jumps sized for tucking from their flag; the long rail has no brake.
+- Park: huge jumps sized for tucking from their flag.
 - Freeride: couloirs reach ~36 m/s; the camera can't see past a convex rollover; trail map labels crowd.
 - Slalom: course times come from a bot that steers more finely than keys.
 - Big air: no speed-check rise below the tower, so landings are sized for tucking from it; full-speed knuckle hucks overshoot Massive, Steep and Aerials; a 720 off the aerials kicker corks into a flip; the outer lanes are a ~160 m swing out; the tower's deck needs a pole push.

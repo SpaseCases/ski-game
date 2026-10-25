@@ -189,6 +189,8 @@ export const CONFIG = {
     /** Sliding friction coefficient on a metal rail and on a box. */
     railFriction: 0.05,
     boxFriction: 0.09,
+    /** Extra deceleration (m/s²) at full brake on a rail or box: ↓ drags the skis against it (it ramps in over skier.brakeRampTime). */
+    brakeDecel: 6,
     /** Top speed (rad/s) ←/→ turns the skis on a rail, and how fast that speed builds and stops (rad/s²). */
     turnRate: 4,
     turnAccel: 30,
@@ -450,8 +452,8 @@ export const CONFIG = {
     landing: { impactMin: 3, impactFull: 12, count: 70 },
     /** A burst on a crash, and a trail while the body tumbles along the snow (per m/s of speed). */
     crash: { count: 70, trailRate: 6 },
-    /** Sparks off metal rails (not boxes or logs): full at speedFull m/s along the rail. */
-    sparks: { speedMin: 1.5, speedFull: 10, rate: 150, life: 0.35 },
+    /** Sparks off metal rails (not boxes or logs): full at speedFull m/s along the rail, and (1 + brake) times as many at full brake. */
+    sparks: { speedMin: 1.5, speedFull: 10, rate: 150, life: 0.35, brake: 2 },
     /**
      * Snow blowing off ridges, wind lips and cornices (Freeride): an emitter
      * every `spacing` m along each, gusting; `rate` per emitter at the top

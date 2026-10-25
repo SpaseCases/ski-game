@@ -244,6 +244,7 @@ export function mountTuningPanel(actions: PanelActions): TuningPanel {
   rails.add(R, 'tiltMax', 0.05, 1.6, 0.01);
   rails.add(R, 'railFriction', 0, 0.5, 0.005);
   rails.add(R, 'boxFriction', 0, 0.5, 0.005);
+  rails.add(R, 'brakeDecel', 0, 12, 0.1);
   rails.add(R, 'turnRate', 0.5, 15, 0.1);
   rails.add(R, 'turnAccel', 1, 100, 1);
   rails.add(R, 'spinCarry', 0, 2, 0.05);

@@ -308,7 +308,7 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
   s.crouch = approach(s.crouch, crouchTarget, dt / (crouchTarget > s.crouch ? c.crouchTime : c.standTime));
 
   if (s.rail >= 0) {
-    slideRail(s, course, steer, dt);
+    slideRail(s, input, course, steer, dt);
     return;
   }
   if (s.grounded) rideSnow(s, input, dt);
@@ -320,28 +320,28 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
 
 /**
  * Sliding a rail or box: locked to its line, pulled along it by gravity and
- * slowed by friction. ←/→ turn the skis freely, to any angle. Leaves off
- * either end, onto snow that rises to meet the skis, or with a pop (see
- * stepSkier).
+ * slowed by friction, and by ↓, which drags the skis against it. ←/→ turn
+ * the skis freely, to any angle. Leaves off either end, onto snow that rises
+ * to meet the skis, or with a pop (see stepSkier).
  */
-function slideRail(s: SkierState, course: Course, steer: number, dt: number): void {
+function slideRail(s: SkierState, input: InputState, course: Course, steer: number, dt: number): void {
   const c = TUNING.skier;
   const R = TUNING.rails;
   const rail = course.rails[s.rail]!;
-  s.brake = approach(s.brake, 0, dt / c.brakeRampTime);
+  s.brake = approach(s.brake, input.down.held ? 1 : 0, dt / c.brakeRampTime);
   s.lean += (0 - s.lean) * (1 - Math.exp(-c.leanResponse * dt));
 
   // Free rotation: ←/→ turn the skis at any angle, and they stay where they're left.
   s.yawRate = approach(s.yawRate, steer * R.turnRate, R.turnAccel * dt); // carries into a spin off the rail
   s.railAngle = wrapAngle(s.railAngle + s.yawRate * dt);
 
-  // Along the rail: gravity's pull down it, friction from the load on it, air drag.
+  // Along the rail: gravity's pull down it, friction from the load on it and the brake, air drag.
   railFrame(rail, s.railS, s.position, railDir);
   const g = c.gravity;
   const load = g * Math.sqrt(Math.max(0, 1 - railDir.y * railDir.y));
   const friction = rail.kind === 'rail' && rail.metal ? R.railFriction : R.boxFriction;
   let v = s.railSpeed - g * railDir.y * dt;
-  v = approach(v, 0, friction * load * dt);
+  v = approach(v, 0, (friction * load + R.brakeDecel * s.brake) * dt);
   const drag = c.dragStand + (c.dragCrouch - c.dragStand) * s.crouch;
   v /= 1 + drag * Math.abs(v) * dt;
   s.railSpeed = v;
