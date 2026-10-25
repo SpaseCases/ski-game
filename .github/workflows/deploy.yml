@@ -1,4 +1,6 @@
-# Builds the game on every push to main and deploys /dist to GitHub Pages.
+# Builds the game on every push to main and deploys /dist to GitHub Pages and
+# to Firebase Hosting (https://parklaps.web.app; GitHub is blocked on school
+# networks). Each deploy is its own job, so one failing doesn't stop the other.
 name: Deploy to GitHub Pages
 
 on:
@@ -42,3 +44,24 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+  firebase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PARKLAPS_3B60F }}
+          projectId: parklaps-3b60f
+          channelId: live

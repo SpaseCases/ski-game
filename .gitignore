@@ -15,3 +15,6 @@ Thumbs.db
 # Private reference data (the owner's GPS archive for milestone 9): never
 # commit or deploy it; only derived results go into the repo.
 reference/
+
+# Firebase deploy cache
+.firebase/
