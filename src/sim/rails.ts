@@ -17,7 +17,8 @@ export function buildRailShapes(features: readonly Feature[], hf: Heightfield): 
   for (const f of features) {
     if (f.type !== 'box' && f.type !== 'rail') continue;
     const halfWidth = f.type === 'box' ? f.width / 2 : f.radius > 0 ? f.radius : f.style === 'log' ? LOG_RADIUS : f.style === 'tube' ? TUBE_RADIUS : TUNING.rails.radius;
-    // Logs, benches and stumps are wood, ledges and rocks stone; park box decks and rails are metal.
+    // Logs, benches, stumps, tables and spools are wood, ledges and rocks stone; park box decks and rails are metal
+    // (barrels are steel, but slide like any box).
     const metal = f.type === 'rail' ? f.style !== 'log' : f.style === 'wood';
     const points = f.points.map((p) => [p.x, p.z, p.height] as const);
     shapes.push(makeShape(f.type, f.style, metal, halfWidth, f.follow > 0 ? followSnow(points, f.follow) : points, hf));

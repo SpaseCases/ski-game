@@ -347,9 +347,12 @@ export interface RailFeature {
 
 /**
  * What a box is: a park box (wooden sides, a metal deck), a concrete ledge,
- * a bench, a flat-topped rock, or a tree stump.
+ * a bench, a flat-topped rock, a tree stump, or a bonk feature: a picnic
+ * table (slid along its top, a bench seat each side), a row of steel
+ * barrels lying across the line (slid along their tops), or a wooden cable
+ * spool standing on end (slid or bonked across its round top).
  */
-export type BoxStyle = 'wood' | 'ledge' | 'bench' | 'rock' | 'stump';
+export type BoxStyle = 'wood' | 'ledge' | 'bench' | 'rock' | 'stump' | 'table' | 'barrels' | 'spool';
 
 /** A box: a wide deck along a polyline, like a rail. */
 export interface BoxFeature {

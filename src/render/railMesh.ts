@@ -12,7 +12,7 @@ import { litByPools } from './lightPools.ts';
 // per 64 m tile, so a long rail drops out of view past the fog. Each has its
 // look: park rails and handrails on posts, fat tubes on saddles, fallen logs
 // lying on the snow, park boxes, concrete ledges, benches, flat-topped rocks
-// and stumps.
+// and stumps, and bonk features: picnic tables, rows of barrels and cable spools.
 
 const BOX_DECK = new Color('#9aa4ad');
 const BOX_SIDE = new Color('#8a5a32');
@@ -34,6 +34,15 @@ const BENCH_LEG = new Color('#2c333b');
 const ROCK = new Color('#7d848c');
 const ROCK_DARK = new Color('#666d75');
 const STUMP_TOP = new Color('#c49a6c');
+const TABLE = new Color('#b07a46');
+const TABLE_DARK = new Color('#8a5c33');
+const BARREL_COLORS = [new Color('#2f62d0'), new Color('#d8342c'), new Color('#e0a526'), new Color('#3a9d5d')];
+const BARREL_RIM = new Color('#2b3138');
+const SPOOL = new Color('#c08a52');
+const SPOOL_DARK = new Color('#8f6236');
+/** Sides around a barrel and around a spool's flanges. */
+const BARREL_SIDES = 10;
+const SPOOL_SIDES = 14;
 /** Sides around a rail tube, and around a fat tube. With 6, one flat face is on top. */
 const RAIL_SIDES = 6;
 const TUBE_SIDES = 12;
@@ -94,6 +103,15 @@ export function createRailMesh(rails: readonly RailShape[], hf: Heightfield): Gr
         break;
       case 'stump':
         addStump(near, r, hf);
+        break;
+      case 'table':
+        addTable(near, r, hf);
+        break;
+      case 'barrels':
+        addBarrels(near, r);
+        break;
+      case 'spool':
+        addSpool(near, r, hf);
         break;
     }
   });
@@ -413,6 +431,129 @@ function addStump(near: Near, r: RailShape, hf: Heightfield): void {
     const mid1 = center.clone().addScaledVector(o1, 0.55);
     b.quad(mid0, mid1, top1, top0, STUMP_TOP, UP);
     b.tri(center.clone().setY(center.y + 0.04), mid0, mid1, SNOW, UP);
+  }
+}
+
+/**
+ * A picnic table: a planked top along its line, a bench seat each side a
+ * little lower, and an A-frame of legs at each end.
+ */
+function addTable(near: Near, r: RailShape, hf: Heightfield): void {
+  const w = r.halfWidth;
+  const thick = 0.07;
+  const segs = r.dist.length - 1;
+  for (let k = 0; k < segs; k++) {
+    const a = point(r, k);
+    const e = point(r, k + 1);
+    const b = near(a.x, a.z);
+    const along = new Vector3(e.x - a.x, 0, e.z - a.z).normalize();
+    const right = new Vector3(-along.z, 0, along.x);
+    const p = (q: Vector3, v: number, y = 0): Vector3 => q.clone().addScaledVector(right, v).setY(q.y + y);
+    // The top: four planks along it.
+    const planks = 4;
+    for (let i = 0; i < planks; i++) {
+      const v0 = -w + (2 * w * i) / planks + 0.015;
+      const v1 = -w + (2 * w * (i + 1)) / planks - 0.015;
+      b.quad(p(a, v0), p(a, v1), p(e, v1), p(e, v0), i % 2 === 0 ? TABLE : TABLE_DARK, UP);
+    }
+    b.quad(p(a, w), p(e, w), p(e, w, -thick), p(a, w, -thick), TABLE_DARK, right);
+    b.quad(p(a, -w), p(e, -w), p(e, -w, -thick), p(a, -w, -thick), TABLE_DARK, right.clone().negate());
+    if (k === 0) b.quad(p(a, -w), p(a, w), p(a, w, -thick), p(a, -w, -thick), TABLE_DARK, along.clone().negate());
+    if (k === segs - 1) b.quad(p(e, -w), p(e, w), p(e, w, -thick), p(e, -w, -thick), TABLE_DARK, along);
+    // A bench seat each side, 0.3 m lower and 0.35 m out.
+    for (const side of [-1, 1]) {
+      const v0 = side * (w + 0.2);
+      const v1 = side * (w + 0.5);
+      const [lo, hi] = side < 0 ? [v1, v0] : [v0, v1];
+      b.quad(p(a, lo, -0.3), p(a, hi, -0.3), p(e, hi, -0.3), p(e, lo, -0.3), TABLE, UP);
+      b.quad(p(a, v1, -0.3), p(e, v1, -0.3), p(e, v1, -0.3 - thick), p(a, v1, -0.3 - thick), TABLE_DARK, right.clone().multiplyScalar(side));
+    }
+  }
+  // A-frame legs near each end, from the snow out wide up under the top.
+  const pos = new Vector3();
+  const dir = new Vector3();
+  for (const s of [0.25, r.length - 0.25]) {
+    railFrame(r, Math.min(r.length, Math.max(0, s)), pos, dir);
+    const right = new Vector3(-dir.z, 0, dir.x).normalize();
+    for (const side of [-1, 1]) {
+      const foot = pos.clone().addScaledVector(right, side * (w + 0.55));
+      foot.y = drawnHeightAt(hf, foot.x, foot.z) - BURY;
+      const top = pos.clone().addScaledVector(right, side * w * 0.3);
+      top.y -= 0.07;
+      beam(near(pos.x, pos.z), foot, top, 0.07, TABLE_DARK);
+    }
+  }
+}
+
+/** A row of steel barrels lying across the line, their tops along it, rims at each end. */
+function addBarrels(near: Near, r: RailShape): void {
+  const w = r.halfWidth;
+  const diameter = 0.6;
+  const radius = diameter / 2;
+  const n = Math.max(1, Math.round(r.length / (diameter + 0.02)));
+  const pos = new Vector3();
+  const dir = new Vector3();
+  const ring = Array.from({ length: BARREL_SIDES }, () => new Vector3());
+  for (let i = 0; i < n; i++) {
+    railFrame(r, ((i + 0.5) * r.length) / n, pos, dir);
+    const b = near(pos.x, pos.z);
+    const along = new Vector3(dir.x, 0, dir.z).normalize();
+    const right = new Vector3(-along.z, 0, along.x);
+    const center = pos.clone();
+    center.y -= radius;
+    for (let k = 0; k < BARREL_SIDES; k++) {
+      const t = (k / BARREL_SIDES) * Math.PI * 2;
+      ring[k]!.copy(along).multiplyScalar(Math.cos(t) * radius).addScaledVector(UP, Math.sin(t) * radius);
+    }
+    const color = BARREL_COLORS[i % BARREL_COLORS.length]!;
+    const l = center.clone().addScaledVector(right, -w);
+    const rr = center.clone().addScaledVector(right, w);
+    // Body, with a dark rim band at each end.
+    const bands = [-w, -w + 0.06, w - 0.06, w];
+    for (let j = 0; j < 3; j++) {
+      const c0 = center.clone().addScaledVector(right, bands[j]!);
+      const c1 = center.clone().addScaledVector(right, bands[j + 1]!);
+      for (let k = 0; k < BARREL_SIDES; k++) {
+        const o0 = ring[k]!;
+        const o1 = ring[(k + 1) % BARREL_SIDES]!;
+        b.quad(c0.clone().add(o0), c0.clone().add(o1), c1.clone().add(o1), c1.clone().add(o0), j === 1 ? color : BARREL_RIM, o0.clone().add(o1));
+      }
+    }
+    cap(b, l, ring, right.clone().negate(), BARREL_RIM);
+    cap(b, rr, ring, right, BARREL_RIM);
+  }
+}
+
+/** A cable spool standing on end: a round wooden top and bottom flange joined by a narrower core. */
+function addSpool(near: Near, r: RailShape, hf: Heightfield): void {
+  const pos = new Vector3();
+  const dir = new Vector3();
+  railFrame(r, r.length / 2, pos, dir);
+  const b = near(pos.x, pos.z);
+  const radius = Math.max(r.halfWidth, r.length / 2);
+  const ground = drawnHeightAt(hf, pos.x, pos.z) - BURY;
+  const flange = 0.08;
+  const rim = (rad: number): Vector3[] =>
+    Array.from({ length: SPOOL_SIDES }, (_, i) => new Vector3(Math.cos((i / SPOOL_SIDES) * Math.PI * 2) * rad, 0, Math.sin((i / SPOOL_SIDES) * Math.PI * 2) * rad));
+  const outer = rim(radius);
+  const core = rim(radius * 0.45);
+  const at = (o: Vector3, y: number): Vector3 => new Vector3(pos.x + o.x, y, pos.z + o.z);
+  const top = pos.y;
+  const bottomTop = ground + BURY + flange;
+  for (let i = 0; i < SPOOL_SIDES; i++) {
+    const o0 = outer[i]!;
+    const o1 = outer[(i + 1) % SPOOL_SIDES]!;
+    const c0 = core[i]!;
+    const c1 = core[(i + 1) % SPOOL_SIDES]!;
+    const out = o0.clone().add(o1);
+    // Top flange: its face (with a ring of darker wood) and its edge.
+    b.tri(at(new Vector3(), top), at(c1, top), at(c0, top), SPOOL, UP);
+    b.quad(at(c0, top), at(c1, top), at(o1, top), at(o0, top), i % 2 === 0 ? SPOOL : SPOOL_DARK, UP);
+    b.quad(at(o0, top), at(o1, top), at(o1, top - flange), at(o0, top - flange), SPOOL_DARK, out);
+    // The core, down to the bottom flange, and that flange's edge.
+    b.quad(at(c0, top - flange), at(c1, top - flange), at(c1, bottomTop), at(c0, bottomTop), SPOOL_DARK, c0.clone().add(c1));
+    b.quad(at(c0, bottomTop), at(c1, bottomTop), at(o1, bottomTop), at(o0, bottomTop), SPOOL, UP);
+    b.quad(at(o0, bottomTop), at(o1, bottomTop), at(o1, ground), at(o0, ground), SPOOL_DARK, out);
   }
 }
 
