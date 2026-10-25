@@ -204,7 +204,8 @@ export const LEFT_NOSE: PoseDef = {
   feet: [{ ankle: [0, 0, 0], pitch: 1.1, knee: [-0.2, 0, -1] }, TUCKED_RIGHT],
   hands: [
     { at: [-0.2, 0.946, -0.843], grab: 0, on: [-EDGE - 0.01, TOP, -0.6], pole: [-0.3, -0.5, 0.8], elbow: [-0.9, -0.2, 0.2] },
-    { at: [0.42, 1.12, -0.22], pole: [0.55, -0.72, 0.4], elbow: [0.6, -0.6, 0.4] },
+    // The free arm reaches out to the side for balance, nearly straight.
+    { at: [0.58, 1.02, -0.15], pole: [0.6, -0.6, 0.5], elbow: [0.3, -0.5, 0.8] },
   ],
 };
 
@@ -212,23 +213,25 @@ export const LEFT_NOSE: PoseDef = {
 
 /**
  * Screamin' seaman, the old-school way: the right leg kicks straight out in
- * front, the left knee drops and the left ski bends up behind, its tail
- * held by the left hand, chest out and back arched, the right arm thrown up.
+ * front, ski tipped up; the left thigh swings back and the knee bends so the
+ * boot comes up behind, and the left ski stands up behind the back, held
+ * toward its tail behind the shoulder by the left hand; chest out and back
+ * arched, the right arm thrown up.
  */
 export const SEAMAN: PoseDef = {
   pelvis: AIR_PELVIS,
-  pelvisPitch: 0.05,
+  pelvisPitch: 0,
   chestPitch: -0.2,
-  chestYaw: 0.6,
-  chestRoll: 0.15,
+  chestYaw: 0.35,
+  chestRoll: 0.1,
   headPitch: 0.15,
   headYaw: -0.4,
   feet: [
-    { ankle: [0, 0, 0], pitch: -0.4, knee: [-0.1, -1, -0.4] },
-    { ankle: [0.12, 0.47, -0.68], pitch: 0.3, knee: [0.1, 0.3, -1] },
+    { ankle: [0, 0, 0], pitch: -1.85, knee: [-0.1, -0.6, 0.8] },
+    { ankle: [0.12, 0.55, -0.75], pitch: 0.6, knee: [0.1, 0.4, -1] },
   ],
   hands: [
-    { at: [-0.22, 0.902, 0.595], grab: 0, on: [-EDGE, TOP, 0.45], pole: [-0.4, -0.6, 0.7], elbow: [-0.8, 0, 0.5] },
+    { at: [-0.2, 1.316, 0.488], grab: 0, on: [-EDGE, TOP, 0.5], pole: [-0.4, -0.6, 0.7], elbow: [-0.8, 0, 0.5] },
     { at: [0.35, 1.6, -0.15], pole: [0.4, 0.3, 0.85], elbow: [0.8, -0.3, 0.3] },
   ],
 };
@@ -256,8 +259,9 @@ export const IRON_CROSS: PoseDef = {
   chestPitch: 0.3,
   headPitch: -0.35,
   feet: [
-    { ankle: [-0.17, 0.62, 0.28], pitch: -0.9, yaw: -0.55, knee: [-0.15, -1, -0.4] },
-    { ankle: [0.17, 0.62, 0.28], pitch: -0.9, yaw: 0.55, knee: [0.15, -1, -0.4] },
+    // One boot a touch further back, so the skis pass one in front of the other where they cross.
+    { ankle: [-0.17, 0.62, 0.24], pitch: -0.8, yaw: -1.0, knee: [-0.15, -1, -0.4] },
+    { ankle: [0.17, 0.62, 0.32], pitch: -0.8, yaw: 1.0, knee: [0.15, -1, -0.4] },
   ],
   hands: [
     { at: [-0.5, 1.05, -0.3], pole: [-0.5, -0.7, 0.5], elbow: [-0.6, -0.6, 0.4] },
