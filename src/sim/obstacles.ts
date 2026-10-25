@@ -5,7 +5,9 @@ import { heightAt, type Vec3Like } from './terrain.ts';
 // Solid things on the course that aren't snow or rails: trees, rocks,
 // fences, poles, huts. Each is a capsule seen from above (a segment from a to
 // b with a radius; a = b for something round) standing from its base up to
-// its top. A uniform grid keeps the per-step check to the few nearby ones.
+// its top. A fence's top follows the snow along it, so on a slope it's no
+// taller at its low end than it looks. A uniform grid keeps the per-step
+// check to the few nearby ones.
 
 export interface Obstacles {
   count: number;
@@ -14,8 +16,13 @@ export interface Obstacles {
   bx: Float32Array;
   bz: Float32Array;
   radius: Float32Array;
+  /** World heights it stands between; for one that follows the snow, the lowest and highest along it. */
   bottom: Float32Array;
   top: Float32Array;
+  /** Height above the snow for one whose top follows the snow (a fence), or -1. */
+  rise: Float32Array;
+  /** The snow the fences follow. */
+  hf: Heightfield;
   /** Grid: cell size, origin and size, and for each cell its slice of `items`. */
   cell: number;
   originX: number;
@@ -34,6 +41,10 @@ export interface Course {
 }
 
 const CELL = 8;
+/** Spacing (m) of the snow samples that find how low and high a fence runs. */
+const FOLLOW_STEP = 2;
+/** How far (m) under the snow an obstacle's base reaches. */
+const SINK = 0.5;
 
 export function buildObstacles(defs: readonly ObstacleDef[], hf: Heightfield): Obstacles {
   const n = defs.length;
@@ -46,6 +57,8 @@ export function buildObstacles(defs: readonly ObstacleDef[], hf: Heightfield): O
     radius: new Float32Array(n),
     bottom: new Float32Array(n),
     top: new Float32Array(n),
+    rise: new Float32Array(n),
+    hf,
     cell: CELL,
     originX: hf.originX,
     originZ: hf.originZ,
@@ -66,10 +79,26 @@ export function buildObstacles(defs: readonly ObstacleDef[], hf: Heightfield): O
     o.bx[i] = d.bx;
     o.bz[i] = d.bz;
     o.radius[i] = d.radius;
-    const ha = d.y0 !== undefined && d.y1 !== undefined ? 0 : heightAt(hf, d.ax, d.az);
-    const hb = d.y0 !== undefined && d.y1 !== undefined ? 0 : heightAt(hf, d.bx, d.bz);
-    o.bottom[i] = d.y0 ?? Math.min(ha, hb) - 0.5;
-    o.top[i] = d.y1 ?? Math.max(ha, hb) + d.height;
+    o.rise[i] = -1;
+    if (d.follow && d.y0 === undefined && d.y1 === undefined) {
+      // The lowest and highest snow along it bound it; the check uses the snow at the nearest point.
+      const steps = Math.max(1, Math.ceil(Math.hypot(d.bx - d.ax, d.bz - d.az) / FOLLOW_STEP));
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (let k = 0; k <= steps; k++) {
+        const g = heightAt(hf, d.ax + ((d.bx - d.ax) * k) / steps, d.az + ((d.bz - d.az) * k) / steps);
+        lo = Math.min(lo, g);
+        hi = Math.max(hi, g);
+      }
+      o.bottom[i] = lo - SINK;
+      o.top[i] = hi + d.height;
+      o.rise[i] = d.height;
+    } else {
+      const ha = d.y0 !== undefined && d.y1 !== undefined ? 0 : heightAt(hf, d.ax, d.az);
+      const hb = d.y0 !== undefined && d.y1 !== undefined ? 0 : heightAt(hf, d.bx, d.bz);
+      o.bottom[i] = d.y0 ?? Math.min(ha, hb) - SINK;
+      o.top[i] = d.y1 ?? Math.max(ha, hb) + d.height;
+    }
     const r = d.radius + reach;
     span[i * 4] = cellOf(o, Math.min(d.ax, d.bx) - r, o.originX, o.cols);
     span[i * 4 + 1] = cellOf(o, Math.max(d.ax, d.bx) + r, o.originX, o.cols);
@@ -119,11 +148,19 @@ export function collideObstacles(o: Obstacles, p: Vec3Like, v: Vec3Like): number
     const sz = (o.bz[i] ?? 0) - az;
     const len2 = sx * sx + sz * sz;
     const t = len2 > 1e-9 ? Math.min(1, Math.max(0, ((p.x - ax) * sx + (p.z - az) * sz) / len2)) : 0;
-    let nx = p.x - (ax + sx * t);
-    let nz = p.z - (az + sz * t);
+    const cx = ax + sx * t;
+    const cz = az + sz * t;
+    let nx = p.x - cx;
+    let nz = p.z - cz;
     const reach = (o.radius[i] ?? 0) + TUNING.rails.bodyRadius;
     const d = Math.hypot(nx, nz);
     if (d >= reach) continue;
+    const rise = o.rise[i] ?? -1;
+    if (rise >= 0) {
+      // A fence: as high as it stands above the snow right here.
+      const g = heightAt(o.hf, cx, cz);
+      if (p.y > g + rise || p.y + head < g - SINK) continue;
+    }
     if (d > 1e-6) {
       nx /= d;
       nz /= d;

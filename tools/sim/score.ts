@@ -5,10 +5,10 @@
 //   node tools/sim/score.ts [map.json] [x] [--tricks a,b,c] [--verbose]
 // Defaults: the Park, its x = -38 line of tables. Tricks (cycled, one per
 // jump): 360, 540, 720, cork540, cork720, backflip, frontflip, rodeo, misty,
-// lincoln, straight, and any of those with +<grab> (mute, safety, japan,
-// tail; left hand, or rmute and so on for the right), or a grab alone.
+// lincoln, straight, and any of those with +<grab> (see GRAB_KEYS), or a
+// grab alone.
 
-import type { Action, GrabAction } from '../../src/core/input.ts';
+import { GRAB_ACTIONS, type Action, type GrabAction } from '../../src/core/input.ts';
 import { comboMult, comboTotal, createScore, endCombo, scoreEvent, stepScore } from '../../src/sim/score.ts';
 import { wrapAngle } from '../../src/sim/skier.ts';
 import { TUNING } from '../../src/sim/tuning.ts';
@@ -73,6 +73,9 @@ interface Trick {
   grab: GrabAction | null;
 }
 
+// Short names: mute, safety, japan, tail (left hand) and rmute and so on, plus
+// every grab in GRAB_ACTIONS by its name without the prefix, lowercased
+// (leftnose, rightnose, seaman, daffy, ironcross, spreadeagle...).
 const GRAB_KEYS: Record<string, GrabAction> = {
   mute: 'grabLeftMute',
   safety: 'grabLeftSafety',
@@ -83,6 +86,7 @@ const GRAB_KEYS: Record<string, GrabAction> = {
   rjapan: 'grabRightJapan',
   rtail: 'grabRightTail',
 };
+for (const g of GRAB_ACTIONS) GRAB_KEYS[g.replace(/^(grab|style)/, '').toLowerCase()] ??= g;
 
 function parseTrick(text: string): Trick {
   const [move = '', grabName] = text.split('+');

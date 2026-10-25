@@ -101,16 +101,55 @@ export const TUCK: PoseDef = {
   headPitch: -1.05,
   feet: SNOW_FEET,
   hands: [
-    { at: [-0.1, 0.76, -0.44], pole: [-0.08, -0.05, 1], elbow: [-0.3, -1, 0.1] },
-    { at: [0.1, 0.76, -0.44], pole: [0.08, -0.05, 1], elbow: [0.3, -1, 0.1] },
+    // Fists low in front of the knees, poles clamped under the arms along the ribs.
+    { at: [-0.08, 0.68, -0.44], pole: [-0.35, 0.14, 1], elbow: [-0.6, -1, 0.1] },
+    { at: [0.08, 0.68, -0.44], pole: [0.35, 0.14, 1], elbow: [0.6, -1, 0.1] },
+  ],
+};
+
+// Butters: the skis tip up about 12.5° onto the tips or the tails, turning
+// about where that end meets the snow (0.75 m from the middle), which lifts
+// the boots ~16 cm. Over the tips the body leans forward; over the tails it
+// sits back, arms forward.
+const PRESS_TILT = 0.22;
+
+/** Nose press: up on the ski tips, tails off the snow. */
+export const NOSE_PRESS: PoseDef = {
+  pelvis: [0, 1.01, -0.05],
+  pelvisPitch: 0.3,
+  chestPitch: 0.22,
+  headPitch: -0.45,
+  feet: [
+    { ankle: [-STANCE_HALF_WIDTH, 0.324, -0.034], pitch: -PRESS_TILT },
+    { ankle: [STANCE_HALF_WIDTH, 0.324, -0.034], pitch: -PRESS_TILT },
+  ],
+  hands: [
+    { at: [-0.46, 0.98, -0.3], pole: [-0.35, -0.75, 0.55], elbow: [-0.7, -0.4, 0.5] },
+    { at: [0.46, 0.98, -0.3], pole: [0.35, -0.75, 0.55], elbow: [0.7, -0.4, 0.5] },
+  ],
+};
+
+/** Tail press: back on the ski tails, tips up off the snow. */
+export const TAIL_PRESS: PoseDef = {
+  pelvis: [0, 0.97, 0.2],
+  pelvisPitch: 0.12,
+  chestPitch: 0.12,
+  headPitch: -0.2,
+  feet: [
+    { ankle: [-STANCE_HALF_WIDTH, 0.315, 0.003], pitch: PRESS_TILT },
+    { ankle: [STANCE_HALF_WIDTH, 0.315, 0.003], pitch: PRESS_TILT },
+  ],
+  hands: [
+    { at: [-0.36, 1.1, -0.37], pole: [-0.2, -0.85, 0.5], elbow: [-0.7, -0.4, 0.5] },
+    { at: [0.36, 1.1, -0.37], pole: [0.2, -0.85, 0.5], elbow: [0.7, -0.4, 0.5] },
   ],
 };
 
 // Shared pieces of the air poses: hips over the tucked-up skis, the free
 // hand out to the side for balance.
 const AIR_PELVIS: Vec3 = [0, 0.92, 0.05];
-const TUCKED_LEFT: FootDef = { ankle: [-0.14, 0.6, -0.08], knee: [-0.1, 0.5, -1] };
-const TUCKED_RIGHT: FootDef = { ankle: [0.14, 0.6, -0.08], knee: [0.1, 0.5, -1] };
+const TUCKED_LEFT: FootDef = { ankle: [-0.13, 0.5, -0.06], knee: [-0.15, 0.3, -1] };
+const TUCKED_RIGHT: FootDef = { ankle: [0.13, 0.5, -0.06], knee: [0.15, 0.3, -1] };
 const BALANCE_RIGHT: HandDef = { at: [0.52, 1.1, -0.1], pole: [0.55, -0.72, 0.4], elbow: [0.6, -0.6, 0.4] };
 
 /** Left hand across the body to the right ski's outside edge, in front of the boot. */
@@ -118,14 +157,14 @@ export const LEFT_MUTE: PoseDef = {
   pelvis: AIR_PELVIS,
   pelvisPitch: 0.35,
   pelvisYaw: -0.1,
-  chestPitch: 0.55,
+  chestPitch: 1.0,
   chestYaw: -0.4,
-  chestRoll: -0.15,
-  headPitch: -0.4,
+  chestRoll: -0.2,
+  headPitch: -0.75,
   headYaw: 0.25,
-  feet: [TUCKED_LEFT, { ankle: [0, 0, 0], yaw: 0.3, pitch: 0.2, roll: -0.1, knee: [0.6, 0.3, -1] }],
+  feet: [TUCKED_LEFT, { ankle: [0, 0, 0], yaw: 0.3, pitch: 0.2, roll: -0.1, knee: [0.5, 0.1, -1] }],
   hands: [
-    { at: [0.02, 0.62, -0.45], grab: 1, on: [EDGE, TOP, -0.32], pole: [-0.3, -0.4, 0.85], elbow: [-0.3, -0.6, 0.3] },
+    { at: [0.06, 0.44, -0.4], grab: 1, on: [EDGE, TOP, -0.32], pole: [-0.3, -0.4, 0.85], elbow: [-0.3, -0.6, 0.3] },
     BALANCE_RIGHT,
   ],
 };
@@ -133,36 +172,41 @@ export const LEFT_MUTE: PoseDef = {
 /** Left hand to the left ski's outside edge, right beside the boot. */
 export const LEFT_SAFETY: PoseDef = {
   pelvis: AIR_PELVIS,
-  pelvisPitch: 0.35,
-  chestPitch: 0.5,
+  pelvisPitch: 0.45,
+  chestPitch: 1.0,
   chestYaw: 0.05,
-  chestRoll: 0.3,
-  headPitch: -0.35,
-  feet: [{ ankle: [0, 0, 0], roll: 0.15, knee: [-1, -0.3, -0.6] }, TUCKED_RIGHT],
+  chestRoll: 0.6,
+  headPitch: -0.65,
+  feet: [{ ankle: [0, 0, 0], roll: 0.15, knee: [-0.35, -1, -1] }, TUCKED_RIGHT],
   hands: [
-    { at: [-0.3, 0.6, -0.16], grab: 0, on: [-EDGE, TOP, -0.06], pole: [-0.35, -0.3, 0.9], elbow: [-0.9, -0.1, 0.3] },
-    BALANCE_RIGHT,
+    { at: [-0.29, 0.38, -0.1], grab: 0, on: [-EDGE, TOP, -0.06], pole: [-0.35, -0.3, 0.9], elbow: [-0.9, -0.1, 0.3] },
+    { at: [0.4, 1.1, -0.24], pole: [0.55, -0.72, 0.4], elbow: [0.6, -0.6, 0.4] },
   ],
 };
 
 /**
- * Left hand reaches behind the left leg to the left ski's inside edge by the
- * heel. The knee drops and the heel kicks up, so the boot points toe-down:
- * the ski hangs tip-down with its tail up behind the back.
+ * Left japan: a mute tweaked behind the back. The right knee drops and the
+ * right heel kicks up behind the seat, tucked behind the left leg; the left
+ * hand reaches down past the left knee to the right ski's inside edge just
+ * behind the boot. The ski stands up behind the body, tip down, its tail up
+ * past the shoulders.
  */
 export const LEFT_JAPAN: PoseDef = {
   pelvis: AIR_PELVIS,
   pelvisPitch: 0.3,
-  pelvisYaw: 0.1,
-  chestPitch: 0.2,
-  chestYaw: 0.5,
-  chestRoll: 0.35,
+  pelvisYaw: -0.1,
+  chestPitch: 0.35,
+  chestYaw: 0.3,
+  chestRoll: 0.2,
   headPitch: -0.3,
-  headYaw: -0.35,
-  feet: [{ ankle: [0, 0, 0], pitch: -1.55, yaw: 0.2, knee: [0.05, -0.5, -0.87] }, TUCKED_RIGHT],
+  headYaw: 0.35,
+  feet: [
+    { ankle: [-0.12, 0.4, -0.12], knee: [-0.15, 0.3, -1] },
+    { ankle: [0, 0, 0], pitch: -1.55, yaw: -0.4, knee: [0.1, -1, -0.5] },
+  ],
   hands: [
-    { at: [-0.055, 0.8, 0.2], grab: 0, on: [EDGE, TOP, 0.05], pole: [-0.45, -0.5, 0.7], elbow: [-1, 0.1, 0.3] },
-    { at: [0.42, 1.12, -0.14], pole: [0.55, -0.72, 0.4], elbow: [0.6, -0.6, 0.4] },
+    { at: [-0.158, 0.977, 0.303], grab: 1, on: [-EDGE - 0.035, TOP, 0.3], pole: [-0.45, -0.5, 0.7], elbow: [-0.8, -0.3, 0.5] },
+    { at: [0.5, 1.12, -0.2], pole: [0.55, -0.72, 0.4], elbow: [0.6, -0.6, 0.4] },
   ],
 };
 
@@ -176,10 +220,116 @@ export const LEFT_TAIL: PoseDef = {
   chestRoll: 0.3,
   headPitch: -0.3,
   headYaw: -0.3,
-  feet: [{ ankle: [0, 0, 0], pitch: -0.6, yaw: 0.1, knee: [-0.15, 0.4, -1] }, TUCKED_RIGHT],
+  feet: [{ ankle: [0, 0, 0], pitch: -0.6, yaw: 0.1, knee: [-0.15, -0.1, -1] }, TUCKED_RIGHT],
   hands: [
     { at: [-0.3, 0.95, 0.35], grab: 0, on: [-0.04, 0.05, 0.72], pole: [-0.5, -0.6, 0.5], elbow: [-1, -0.2, 0.2] },
     { at: [0.46, 1.1, -0.2], pole: [0.55, -0.72, 0.4], elbow: [0.6, -0.6, 0.4] },
+  ],
+};
+
+/**
+ * Left hand forward to the outside edge of the left ski, just behind its tip. The leg
+ * reaches forward with the thigh level, the tip pulled up steeply to the
+ * hand, and the body folds forward over it.
+ */
+export const LEFT_NOSE: PoseDef = {
+  pelvis: AIR_PELVIS,
+  pelvisPitch: 0.35,
+  chestPitch: 0.9,
+  chestYaw: 0.1,
+  chestRoll: 0.2,
+  headPitch: -0.5,
+  feet: [{ ankle: [0, 0, 0], pitch: 1.1, knee: [-0.2, 0, -1] }, TUCKED_RIGHT],
+  hands: [
+    { at: [-0.2, 0.946, -0.843], grab: 0, on: [-EDGE - 0.01, TOP, -0.6], pole: [-0.3, -0.5, 0.8], elbow: [-0.9, -0.2, 0.2] },
+    // The free arm reaches out to the side for balance, nearly straight.
+    { at: [0.58, 1.02, -0.15], pole: [0.6, -0.6, 0.5], elbow: [0.3, -0.5, 0.8] },
+  ],
+};
+
+// Style moves: one each, not mirrored.
+
+/**
+ * Screamin' seaman: a daffy with the legs crossed. The left leg kicks out in
+ * front and across to the right, the right leg back and across to the left,
+ * both nearly straight, the skis still pointing straight ahead (the front
+ * one tip up, the back one tip down), so seen from the side the skis cross.
+ * No grab: arms out and up.
+ */
+export const SEAMAN: PoseDef = {
+  pelvis: AIR_PELVIS,
+  pelvisPitch: 0.05,
+  chestPitch: 0.05,
+  headPitch: -0.1,
+  feet: [
+    { ankle: [0.08, 0.6, -0.74], pitch: 0.6, knee: [0, 0.4, -1] },
+    { ankle: [-0.08, 0.3, 0.66], pitch: -0.5, knee: [0, -0.4, -1] },
+  ],
+  hands: [
+    { at: [-0.6, 1.3, -0.1], pole: [-0.6, -0.55, 0.55], elbow: [-0.3, -0.7, 0.6] },
+    { at: [0.6, 1.3, -0.1], pole: [0.6, -0.55, 0.55], elbow: [0.3, -0.7, 0.6] },
+  ],
+};
+
+/**
+ * Daffy: a split in the air. The left leg out in front, nearly straight and
+ * nearly level, ski tip up; the right leg straight back, ski tip down; arms
+ * out wide.
+ */
+export const DAFFY: PoseDef = {
+  pelvis: AIR_PELVIS,
+  pelvisPitch: 0.1,
+  chestPitch: 0.1,
+  headPitch: -0.15,
+  feet: [
+    { ankle: [-0.11, 0.6, -0.76], pitch: 0.63, knee: [-0.1, 0.4, -1] },
+    { ankle: [0.11, 0.3, 0.66], pitch: -0.5, knee: [0.1, -0.4, -1] },
+  ],
+  hands: [
+    { at: [-0.6, 1.2, -0.12], pole: [-0.6, -0.6, 0.5], elbow: [-0.3, -0.7, 0.6] },
+    { at: [0.6, 1.2, -0.12], pole: [0.6, -0.6, 0.5], elbow: [0.3, -0.7, 0.6] },
+  ],
+};
+
+/**
+ * Iron cross: a back-scratcher with the skis crossed. The knees hang down and
+ * the heels come up behind the seat; the skis lie flat behind the legs, tips
+ * down, tails up past the shoulders, crossing in an X just below the boots
+ * (each 40° off vertical). One boot sits a touch further back so the skis
+ * pass one over the other.
+ */
+export const IRON_CROSS: PoseDef = {
+  pelvis: AIR_PELVIS,
+  pelvisPitch: 0.1,
+  chestPitch: 0.15,
+  headPitch: -0.3,
+  feet: [
+    { ankle: [-0.1, 0.85, 0.3], pitch: -0.871, yaw: -1.648, roll: 1.63, knee: [-0.1, -1, -0.5] },
+    { ankle: [0.1, 0.85, 0.36], pitch: -0.871, yaw: 1.648, roll: -1.63, knee: [0.1, -1, -0.5] },
+  ],
+  hands: [
+    { at: [-0.55, 1.1, -0.2], pole: [-0.5, -0.7, 0.5], elbow: [-0.6, -0.6, 0.4] },
+    { at: [0.55, 1.1, -0.2], pole: [0.5, -0.7, 0.5], elbow: [0.6, -0.6, 0.4] },
+  ],
+};
+
+/**
+ * Spread eagle: legs spread at least 90° apart seen from the front, skis
+ * flat, parallel and pointing straight ahead, upper body upright, arms flung
+ * up and out like a star.
+ */
+export const SPREAD_EAGLE: PoseDef = {
+  pelvis: AIR_PELVIS,
+  pelvisPitch: 0.05,
+  chestPitch: 0,
+  headPitch: -0.1,
+  feet: [
+    { ankle: [-0.62, 0.36, 0], knee: [-0.2, 0.1, -1] },
+    { ankle: [0.62, 0.36, 0], knee: [0.2, 0.1, -1] },
+  ],
+  hands: [
+    { at: [-0.72, 1.48, -0.05], pole: [-0.75, -0.3, 0.55], elbow: [-0.2, -0.8, 0.5] },
+    { at: [0.72, 1.48, -0.05], pole: [0.75, -0.3, 0.55], elbow: [0.2, -0.8, 0.5] },
   ],
 };
 
@@ -204,6 +354,7 @@ export const RIGHT_MUTE = mirrorPose(LEFT_MUTE);
 export const RIGHT_SAFETY = mirrorPose(LEFT_SAFETY);
 export const RIGHT_JAPAN = mirrorPose(LEFT_JAPAN);
 export const RIGHT_TAIL = mirrorPose(LEFT_TAIL);
+export const RIGHT_NOSE = mirrorPose(LEFT_NOSE);
 
 function mirrorFoot(f: FootDef): FootDef {
   return { ankle: flip(f.ankle), yaw: neg(f.yaw), pitch: f.pitch, roll: neg(f.roll), knee: flipOpt(f.knee) };
@@ -231,7 +382,7 @@ function neg(v: number | undefined): number | undefined {
   return v === undefined ? undefined : -v;
 }
 
-/** Every grab, in the order of GRAB_ACTIONS (core/input.ts). */
+/** Every grab and style move, in the order of GRAB_ACTIONS (core/input.ts). */
 export const GRABS: readonly PoseDef[] = [
   LEFT_MUTE,
   LEFT_SAFETY,
@@ -241,6 +392,12 @@ export const GRABS: readonly PoseDef[] = [
   RIGHT_SAFETY,
   RIGHT_JAPAN,
   RIGHT_TAIL,
+  LEFT_NOSE,
+  RIGHT_NOSE,
+  SEAMAN,
+  DAFFY,
+  IRON_CROSS,
+  SPREAD_EAGLE,
 ];
 
 /**

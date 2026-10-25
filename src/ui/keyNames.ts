@@ -72,6 +72,12 @@ export const ACTION_NAMES: Record<Action, string> = {
   grabRightSafety: 'Right safety',
   grabRightJapan: 'Right japan',
   grabRightTail: 'Right tail',
+  grabLeftNose: 'Left nose',
+  grabRightNose: 'Right nose',
+  styleSeaman: "Screamin' seaman",
+  styleDaffy: 'Daffy',
+  styleIronCross: 'Iron cross',
+  styleSpreadEagle: 'Spread eagle',
 };
 
 /** The name of an action's main key, or "none" when it has no key. */

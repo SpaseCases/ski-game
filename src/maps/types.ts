@@ -321,9 +321,10 @@ export interface RailPoint {
 
 /**
  * What a rail is: a park rail (metal, on posts), a handrail (metal, on
- * posts down stairs), or a fallen tree (a log lying on the snow; wood).
+ * posts down stairs), a fallen tree (a log lying on the snow; wood), or a
+ * tube (a fat painted metal pipe on low saddles).
  */
-export type RailStyle = 'metal' | 'handrail' | 'log';
+export type RailStyle = 'metal' | 'handrail' | 'log' | 'tube';
 
 /**
  * A rail: a polyline the rider slides along. Flat, down, flat-down, kinked
@@ -340,15 +341,18 @@ export interface RailFeature {
    */
   follow: number;
   style: RailStyle;
-  /** Radius (m) of the tube or log; 0 uses the style's own (CONFIG.rails.radius, or a log's). */
+  /** Radius (m) of the tube or log; 0 uses the style's own (CONFIG.rails.radius, or a log's or a tube's). */
   radius: number;
 }
 
 /**
  * What a box is: a park box (wooden sides, a metal deck), a concrete ledge,
- * a bench, a flat-topped rock, or a tree stump.
+ * a bench, a flat-topped rock, a tree stump, or a bonk feature: a picnic
+ * table (slid along its top, a bench seat each side), a row of steel
+ * barrels lying across the line (slid along their tops), or a wooden cable
+ * spool standing on end (slid or bonked across its round top).
  */
-export type BoxStyle = 'wood' | 'ledge' | 'bench' | 'rock' | 'stump';
+export type BoxStyle = 'wood' | 'ledge' | 'bench' | 'rock' | 'stump' | 'table' | 'barrels' | 'spool';
 
 /** A box: a wide deck along a polyline, like a rail. */
 export interface BoxFeature {
@@ -527,6 +531,39 @@ export interface HalfpipeFeature {
   exit: number;
 }
 
+/** What a quarter's face is: snow (a quarterpipe) or wooden boards (a wallride). */
+export type QuarterStyle = 'snow' | 'wood';
+
+/**
+ * One wall standing on its own: a quarterpipe to air out of, or a wallride
+ * to ride along. Like one wall of a halfpipe: its foot runs along `yaw` for
+ * `length` m and the wall rises on one side of it, curving up (a quarter
+ * circle) to `wallAngle`, with a flat deck along its top and a bank behind
+ * it down to the slope. Both ends ease in over `taper`, so it can be ridden
+ * onto from either end. Riding up it and off the top launches straight up,
+ * coming back down onto it, as in a halfpipe.
+ */
+export interface QuarterFeature {
+  type: 'quarter';
+  /** The uphill end of the wall's foot, where the transition starts curving up. */
+  x: number;
+  z: number;
+  /** Heading in degrees the wall runs along; 0 runs down the hill. */
+  yaw: number;
+  /** Which side of its foot the wall stands, seen facing along yaw: 1 right, -1 left. */
+  side: number;
+  length: number;
+  /** Radius of the transition, and the wall angle at the top in degrees. */
+  radius: number;
+  wallAngle: number;
+  /** Flat deck along the top, and the bank behind it down to the slope. */
+  deckWidth: number;
+  back: number;
+  /** Length over which the wall grows from nothing at each end. */
+  taper: number;
+  style: QuarterStyle;
+}
+
 /** One gate: the rider must pass between its two sides. */
 export interface SlalomGateDef {
   /** Middle of the gate. */
@@ -585,6 +622,7 @@ export type Feature =
   | KickerFeature
   | LandingFeature
   | HalfpipeFeature
+  | QuarterFeature
   | SlalomFeature
   | StartFeature
   | BuildingFeature
@@ -818,6 +856,12 @@ export interface ObstacleDef {
   /** World heights of its bottom and top, when they aren't the snow at its ends (a wall under a roof). */
   y0?: number;
   y1?: number;
+  /**
+   * Its top follows the snow along it (a fence, netting): `height` above the
+   * snow at whatever point along it is nearest. Otherwise the whole thing
+   * stands as high as `height` above the higher of its ends (a hut, a wall).
+   */
+  follow?: boolean;
 }
 
 /** The part of the map the skier can reach: a rectangle, cut down to a polygon when there is one. */
@@ -933,7 +977,33 @@ export interface PipeShape {
   maxZ: number;
 }
 
-export type TerrainShape = RampShape | PipeShape;
+/** A quarterpipe or wallride with its dimensions worked out (see QuarterFeature). */
+export interface QuarterShape {
+  kind: 'quarter';
+  /** The foot's uphill end, its unit direction along, and the unit direction across toward the wall. */
+  x: number;
+  z: number;
+  dirX: number;
+  dirZ: number;
+  rightX: number;
+  rightZ: number;
+  radius: number;
+  /** Width of the transition seen from above, and the wall height. */
+  transition: number;
+  height: number;
+  deckWidth: number;
+  back: number;
+  length: number;
+  taper: number;
+  /** A wooden face (a wallride). */
+  wood: boolean;
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
+export type TerrainShape = RampShape | PipeShape | QuarterShape;
 
 /**
  * Something to slide on (a rail or a box), built from its feature for the

@@ -21,6 +21,8 @@ export interface Settings {
   muted: boolean;
   /** Combo scoring and its HUD (GAME_DESIGN.md, Scoring); off, nothing is scored or shown. */
   score: boolean;
+  /** After a crash, lie in the snow until the respawn key is pressed, instead of respawning by itself. */
+  crashWait: boolean;
   bindings: Bindings;
 }
 
@@ -33,7 +35,7 @@ function isQuality(value: unknown): value is Quality {
 }
 
 export function defaultSettings(): Settings {
-  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, bindings: { ...DEFAULT_BINDINGS } };
+  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, bindings: { ...DEFAULT_BINDINGS } };
 }
 
 /** The saved settings, or the defaults for anything not saved (or unreadable). */
@@ -53,6 +55,7 @@ export function loadSettings(): Settings {
   out.sfxVolume = unit(saved.sfxVolume, out.sfxVolume);
   if (typeof saved.muted === 'boolean') out.muted = saved.muted;
   if (typeof saved.score === 'boolean') out.score = saved.score;
+  if (typeof saved.crashWait === 'boolean') out.crashWait = saved.crashWait;
   out.bindings = readBindings(saved.bindings);
   return out;
 }
@@ -73,20 +76,29 @@ function unit(value: unknown, fallback: number): number {
 
 /**
  * Saved bindings, checked: each action keeps its saved keys if they're a
- * list of up to KEY_SLOTS key codes (none: unbound by a swap), else its defaults (so an action added in
- * a later version gets its default key). A key may belong to one action only;
- * if saved data breaks that, the defaults are used.
+ * list of up to KEY_SLOTS key codes (none: unbound by a swap), else its
+ * defaults, so an action added in a later version gets its default key,
+ * minus any key the saved bindings already use (a player who moved
+ * something onto it keeps their key, and the new action starts unbound
+ * there). A key may belong to one action only; if saved data breaks that,
+ * the defaults are used.
  */
 function readBindings(value: unknown): Bindings {
   if (!value || typeof value !== 'object') return { ...DEFAULT_BINDINGS };
   const saved = value as Record<string, unknown>;
   const out = { ...DEFAULT_BINDINGS };
+  const taken = new Set<string>();
+  const missing: Action[] = [];
   for (const action of ACTIONS) {
     const keys = saved[action];
     if (Array.isArray(keys) && keys.length <= KEY_SLOTS && keys.every((k) => typeof k === 'string' && k !== '' && k !== 'Escape')) {
       out[action] = keys as string[];
+      for (const k of keys as string[]) taken.add(k);
+    } else {
+      missing.push(action);
     }
   }
+  for (const action of missing) out[action] = DEFAULT_BINDINGS[action].filter((k) => !taken.has(k));
   const seen = new Set<string>();
   for (const action of ACTIONS) {
     for (const code of out[action]) {

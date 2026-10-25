@@ -28,7 +28,7 @@ import { clothMaterial } from './cloth.ts';
 import { buildSkiGeometry } from './skiModel.ts';
 import type { PoseDef, Vec3 } from './skierPoses.ts';
 
-// Low-poly freeskier: a straight hip-length shell jacket, wide pants over
+// Low-poly freeskier: a roomy shell jacket down to the thighs, wide pants over
 // chunky boots, a snug matte helmet, small goggles and a neck gaiter that
 // close up the face, twin-tip skis and poles. Each body segment is its own
 // mesh (vertex colors, flat shading, one shared material) placed every pose
@@ -164,15 +164,13 @@ export class SkierRig {
     this.head.add(this.hat, this.face);
     this.setHeadwear();
     // Both sides share one geometry, apart from the feet (buckles on the outside).
-    const upperArm = buildUpperArm(c.jacket);
     const forearm = buildForearm(c.jacket, c.mittens);
-    const thigh = buildThigh(c.pants);
     const shin = buildShin(c.pants, c.boots);
     const pole = buildPole();
     for (const side of [-1, 1] as const) {
-      this.upperArms.push(add(upperArm));
+      this.upperArms.push(add(buildUpperArm(c.jacket, side)));
       this.forearms.push(add(forearm));
-      this.thighs.push(add(thigh));
+      this.thighs.push(add(buildThigh(c.pants, side)));
       this.shins.push(add(shin));
       this.feet.push(add(buildFoot(side, c.boots, buildSki(outfit, side))));
       this.poles.push(add(pole));
@@ -187,12 +185,12 @@ export class SkierRig {
     const c = colors(next);
     if (changed('pants')) {
       swap([this.pelvis], buildPelvis(c.pants));
-      swap(this.thighs, buildThigh(c.pants));
+      this.thighs.forEach((m, i) => swap([m], buildThigh(c.pants, i === 0 ? -1 : 1)));
     }
     if (changed('jacket')) {
       swap([this.torso], buildTorso(c.jacket));
       this.hem.recolor(c.jacket);
-      swap(this.upperArms, buildUpperArm(c.jacket));
+      this.upperArms.forEach((m, i) => swap([m], buildUpperArm(c.jacket, i === 0 ? -1 : 1)));
     }
     if (changed('jacket', 'mittens')) swap(this.forearms, buildForearm(c.jacket, c.mittens));
     if (changed('pants', 'boots')) swap(this.shins, buildShin(c.pants, c.boots));
@@ -508,7 +506,7 @@ const constant =
     v;
 
 function buildPelvis(pants: Color): BufferGeometry {
-  return paint(prism(0.13, 0.15, 0.2, 12).translate(0, -0.13, 0).scale(1, 1, 0.72), pants);
+  return paint(prism(0.145, 0.165, 0.2, 12).translate(0, -0.13, 0).scale(1, 1, 0.72), pants);
 }
 
 /**
@@ -520,27 +518,33 @@ function buildTorso(jacket: Color): BufferGeometry {
   const dark = shade(jacket, 0.78);
   const parts = [
     // As many sides as the lower jacket, corner for corner, so the two meet flush.
-    paint(prism(0.205, 0.222, BODY.spine - TORSO_BOTTOM, LOWER_SEGMENTS).translate(0, TORSO_BOTTOM, 0).scale(1, 1, 0.66), jacket),
-    paint(prism(0.112, 0.102, 0.09, 12).translate(0, 0.49, 0.008).scale(1, 1, 0.95), jacket),
-    paint(new SphereGeometry(0.12, 12, 8).scale(1.2, 0.55, 0.7).translate(0, 0.53, 0.12), dark),
-    paint(new BoxGeometry(0.014, 0.21, 0.012).translate(0, 0.405, -0.144), FIXED.zip),
-    paint(new BoxGeometry(0.11, 0.085, 0.012).translate(-0.1, 0.38, -0.14), dark),
+    paint(prism(JACKET.waist, JACKET.chest, BODY.spine - TORSO_BOTTOM, LOWER_SEGMENTS).translate(0, TORSO_BOTTOM, 0).scale(1, 1, JACKET.depth), jacket),
+    paint(prism(0.116, 0.106, 0.09, 12).translate(0, 0.49, 0.008).scale(1, 1, 0.95), jacket),
+    paint(new SphereGeometry(0.135, 12, 8).scale(1.25, 0.6, 0.75).translate(0, 0.53, 0.135), dark),
+    paint(new BoxGeometry(0.014, 0.21, 0.012).translate(0, 0.405, -0.155), FIXED.zip),
+    paint(new BoxGeometry(0.11, 0.085, 0.012).translate(-0.11, 0.38, -0.15), dark),
+    // Drawcord toggles hanging from the collar.
+    paint(new BoxGeometry(0.012, 0.022, 0.012).translate(-0.03, 0.47, -0.118), FIXED.zip),
+    paint(new BoxGeometry(0.012, 0.022, 0.012).translate(0.03, 0.47, -0.118), FIXED.zip),
   ];
   for (const s of [-1, 1]) {
-    parts.push(paint(new IcosahedronGeometry(0.09, 1).translate(s * BODY.shoulderWidth, BODY.spine - BODY.shoulderDrop, 0), jacket));
+    parts.push(paint(new IcosahedronGeometry(0.1, 1).translate(s * BODY.shoulderWidth, BODY.spine - BODY.shoulderDrop, 0), jacket));
   }
   return merge(parts);
 }
 
 /** Height (chest frame) where the rigid upper jacket ends and the rebuilt lower jacket takes over. */
 const TORSO_BOTTOM = 0.3;
+/** A roomy freeski shell: radius at the waist seam and the chest, and its front-to-back depth. */
+const JACKET = { waist: 0.226, chest: 0.242, depth: 0.68 };
 
 // Lower jacket: rings of points from inside the upper jacket, down past the
 // waist to a straight hem that drops a little lower at the back, then
 // turned under. The top rings follow the chest, the rest the hips. Angle 0
 // is the front.
 const LOWER_SEGMENTS = 18;
-const hemLow = (a: number): number => -0.16 - 0.07 * ((1 - Math.cos(a)) / 2) ** 1.5;
+// Long, to the top of the thighs, and a little longer at the back.
+const hemLow = (a: number): number => -0.245 - 0.06 * ((1 - Math.cos(a)) / 2) ** 1.5;
 interface LowerRing {
   /**
    * How much of the chest's bend (relative to the hips) the ring follows:
@@ -559,17 +563,18 @@ const waist = (a: number, f: number): number => -0.01 + (hemLow(a) + 0.042) * f;
 const LOWER_RINGS: readonly LowerRing[] = [
   // Tucked inside the upper jacket, then flush with its bottom edge
   // (TORSO_BOTTOM), so the seam neither shows a step nor flickers.
-  { bend: 1, push: false, at: () => [0.33, 0.19, 0.62] },
-  { bend: 1, push: true, at: () => [TORSO_BOTTOM - 0.004, 0.205, 0.66] },
-  { bend: 1, push: true, at: () => [0.25, 0.205, 0.66] },
-  { bend: 0.7, push: true, at: () => [0.12, 0.202, 0.67] },
-  { bend: 0.3, push: true, at: () => [-0.01, 0.198, 0.7] },
+  { bend: 1, push: false, at: () => [0.33, JACKET.waist - 0.015, JACKET.depth - 0.04] },
+  { bend: 1, push: true, at: () => [TORSO_BOTTOM - 0.004, JACKET.waist, JACKET.depth] },
+  { bend: 1, push: true, at: () => [0.25, JACKET.waist, JACKET.depth] },
+  { bend: 0.7, push: true, at: () => [0.12, 0.226, 0.69] },
+  { bend: 0.3, push: true, at: () => [-0.01, 0.227, 0.71] },
   // Close together here, so the jacket can follow a thigh swinging out under it.
-  { bend: 0.1, push: true, at: (a) => [waist(a, 1 / 3), 0.199, 0.707] },
-  { bend: 0, push: true, at: (a) => [waist(a, 2 / 3), 0.2, 0.713] },
-  { bend: 0, push: true, at: (a) => [hemLow(a) + 0.032, 0.2, 0.72] },
-  { bend: 0, push: true, at: (a) => [hemLow(a), 0.201, 0.72] },
-  { bend: 0, push: true, at: (a) => [hemLow(a) + 0.008, 0.184, 0.7] },
+  // Flaring a little toward the hem, so it hangs loose.
+  { bend: 0.1, push: true, at: (a) => [waist(a, 1 / 3), 0.232, 0.72] },
+  { bend: 0, push: true, at: (a) => [waist(a, 2 / 3), 0.238, 0.73] },
+  { bend: 0, push: true, at: (a) => [hemLow(a) + 0.032, 0.243, 0.74] },
+  { bend: 0, push: true, at: (a) => [hemLow(a), 0.245, 0.74] },
+  { bend: 0, push: true, at: (a) => [hemLow(a) + 0.008, 0.228, 0.72] },
 ];
 /** Rings the zip runs between (it carries on up the upper jacket), and its half-width. */
 const ZIP_FIRST = 1;
@@ -580,12 +585,14 @@ const ZIP_HALF = 0.007;
  * run band by band between the rings, `segments` quads a band; the last two
  * bands are the hem's edge and its turned-under lip, the rest the jacket's body.
  */
-export const JACKET_LAYOUT = { segments: LOWER_SEGMENTS, bodyBands: LOWER_RINGS.length - 3 };
+export const JACKET_LAYOUT = { segments: LOWER_SEGMENTS, bodyBands: LOWER_RINGS.length - 3, hemLow };
+/** Radius (m) of the pants' thighs, for checks (tools/model). */
+export const THIGH_RADIUS = 0.112;
 
 /** Thigh radius plus a little room, for keeping the jacket outside the legs. */
-const THIGH_ROOM = 0.12;
+const THIGH_ROOM = 0.136;
 /** Furthest (m) a raised thigh lifts any point of the jacket. */
-const MAX_RIDE_UP = 0.12;
+const MAX_RIDE_UP = 0.17;
 /**
  * How far a thigh must swing up before it lifts the jacket rather than the
  * jacket lying over it: the sine of its angle from hanging straight down,
@@ -1100,47 +1107,80 @@ function carvedPanel(top: AngleFn, bottom: AngleFn, a0: number, a1: number, segm
   return g;
 }
 
-function buildUpperArm(jacket: Color): BufferGeometry {
-  return merge([
-    paint(prism(0.074, 0.066, BODY.upperArm, 9), jacket),
-    paint(new IcosahedronGeometry(0.068, 1).translate(0, BODY.upperArm, 0), jacket),
-  ]);
+/**
+ * Roomy sleeve, shoulder to elbow (`side` -1 left, 1 right). The left one
+ * has a zipped pocket on the outside of the arm. The segment's front (-Z)
+ * faces the elbow, out and back; the outside of the arm is between that and
+ * -X (out and forward).
+ */
+function buildUpperArm(jacket: Color, side: number): BufferGeometry {
+  const parts = [
+    paint(prism(0.082, 0.076, BODY.upperArm, 9), jacket),
+    paint(new IcosahedronGeometry(0.077, 1).translate(0, BODY.upperArm, 0), jacket),
+  ];
+  if (side < 0) {
+    const face = 2.13; // turns +X to point at the outside of the arm
+    const pocket = (g: BufferGeometry, out: number, y: number): BufferGeometry =>
+      g.rotateY(face).translate(Math.cos(face) * out, y, -Math.sin(face) * out);
+    parts.push(
+      paint(pocket(new BoxGeometry(0.02, 0.08, 0.07), 0.074, 0.11), shade(jacket, 0.88)),
+      paint(pocket(new BoxGeometry(0.022, 0.006, 0.06), 0.076, 0.075), FIXED.zip),
+    );
+  }
+  return merge(parts);
 }
 
 /** Sleeve flaring toward the wrist, then a glove with a thumb. */
 function buildForearm(jacket: Color, mitten: Color): BufferGeometry {
   const f = BODY.forearm;
   return merge([
-    paint(prism(0.066, 0.072, f, 9), jacket),
-    paint(prism(0.074, 0.074, 0.025, 9).translate(0, f - 0.03, 0), shade(jacket, 0.78)),
+    paint(prism(0.076, 0.084, f, 9), jacket),
+    paint(prism(0.087, 0.087, 0.025, 9).translate(0, f - 0.03, 0), shade(jacket, 0.78)),
     paint(prism(0.058, 0.056, 0.05, 10).translate(0, f - 0.01, 0), shade(mitten, 0.74)),
-    paint(new CapsuleGeometry(0.04, 0.05, 3, 10).scale(1.05, 1, 0.82).translate(0, f + BODY.hand, 0), mitten),
-    paint(new CapsuleGeometry(0.016, 0.03, 2, 6).rotateX(-0.5).translate(0, f + BODY.hand - 0.012, 0.035), mitten),
-  ]);
-}
-
-/** Baggy thigh and a knee. */
-function buildThigh(pants: Color): BufferGeometry {
-  const t = BODY.thigh;
-  return merge([
-    paint(prism(0.096, 0.097, t, 12), pants),
-    paint(new IcosahedronGeometry(0.099, 1).translate(0, t, 0), pants),
+    // A big mitt with a clear thumb, and a darker band over the knuckles.
+    paint(new CapsuleGeometry(0.045, 0.055, 3, 10).scale(1.05, 1, 0.84).translate(0, f + BODY.hand, 0), mitten),
+    paint(prism(0.049, 0.049, 0.018, 10).scale(1.05, 1, 0.86).translate(0, f + BODY.hand + 0.006, 0), shade(mitten, 0.8)),
+    paint(new CapsuleGeometry(0.019, 0.035, 2, 6).rotateX(-0.55).translate(0, f + BODY.hand - 0.012, 0.04), mitten),
   ]);
 }
 
 /**
- * Wide pant leg from the knee to just past the ankle, with a darker hem.
- * The boot's upper cuff lives inside it (it follows the shin, so it never
- * pokes through the pants); only its bottom edge shows under the hem.
+ * Baggy thigh and a knee, with a cargo pocket on the outside of the leg
+ * (`side` -1 left, 1 right). In the segment's frame +X is the skier's left,
+ * so the outside is -side.
+ */
+function buildThigh(pants: Color, side: number): BufferGeometry {
+  const t = BODY.thigh;
+  const r = PANTS.thigh;
+  const out = -side * (r - 0.006);
+  return merge([
+    paint(prism(r, r + 0.002, t, 12), pants),
+    paint(new IcosahedronGeometry(PANTS.knee, 1).translate(0, t, 0), pants),
+    // The pocket, its flap above it (toward the hip), and a seam down the leg.
+    paint(new BoxGeometry(0.03, 0.13, 0.1).translate(out, t * 0.55, 0.004), shade(pants, 0.93)),
+    paint(new BoxGeometry(0.036, 0.032, 0.108).translate(out * 1.02, t * 0.55 - 0.072, 0.004), shade(pants, 0.82)),
+  ]);
+}
+
+/**
+ * Wide pant leg from the knee, flaring to a hem that falls past the ankle
+ * over the boot, with a loose fold bunched above it. The boot's upper cuff
+ * lives inside it (it follows the shin, so it never pokes through the
+ * pants); only its bottom edge shows under the hem.
  */
 function buildShin(pants: Color, boot: Color): BufferGeometry {
   const s = BODY.shin;
+  const hem = PANTS.hem;
   return merge([
-    paint(prism(0.1, 0.112, s + 0.02, 12), pants),
-    paint(prism(0.114, 0.115, 0.022, 12).translate(0, s - 0.004, 0), shade(pants, 0.8)),
+    paint(prism(PANTS.knee - 0.002, hem, s + 0.04, 12), pants),
+    paint(prism(hem + 0.004, hem + 0.004, 0.035, 12).translate(0, s - 0.1, 0), shade(pants, 0.92)),
+    paint(prism(hem + 0.003, hem + 0.004, 0.024, 12).translate(0, s + 0.02, 0), shade(pants, 0.8)),
     paint(prism(0.078, 0.078, 0.2, 12).translate(0, s - 0.15, 0), boot),
   ]);
 }
+
+/** Baggy park pants: thigh and knee radius, and the flared hem's. */
+const PANTS = { thigh: THIGH_RADIUS, knee: 0.116, hem: 0.132 };
 
 /** Boot (shell, sole, buckles), binding and `ski` (from buildSki), in the foot frame (origin at the ankle). */
 function buildFoot(side: number, boot: Color, ski: BufferGeometry): BufferGeometry {
@@ -1148,6 +1188,10 @@ function buildFoot(side: number, boot: Color, ski: BufferGeometry): BufferGeomet
     paint(bootShell(), boot),
     paint(new BoxGeometry(0.118, 0.022, 0.33).translate(0, -0.104, -0.015), FIXED.bootSole),
     paint(new BoxGeometry(0.09, 0.025, 0.4).translate(0, -0.1275, 0), FIXED.binding),
+    // Binding toe and heel pieces hugging the sole.
+    paint(new BoxGeometry(0.075, 0.04, 0.06).translate(0, -0.1, -0.205), FIXED.binding),
+    paint(new BoxGeometry(0.08, 0.05, 0.07).translate(0, -0.095, 0.18), FIXED.binding),
+    paint(new BoxGeometry(0.05, 0.012, 0.03).translate(0, -0.074, 0.19), FIXED.buckle),
     ski,
   ];
   // Buckles on the outside of the instep and cuff.
@@ -1156,7 +1200,7 @@ function buildFoot(side: number, boot: Color, ski: BufferGeometry): BufferGeomet
     [0.0, 0.0],
     [0.06, 0.02],
   ] as const) {
-    parts.push(paint(new BoxGeometry(0.012, 0.016, 0.05).translate(side * 0.068, y, z), FIXED.buckle));
+    parts.push(paint(new BoxGeometry(0.014, 0.02, 0.056).translate(side * 0.069, y, z), FIXED.buckle));
   }
   return merge(parts);
 }

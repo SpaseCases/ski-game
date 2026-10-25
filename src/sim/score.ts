@@ -415,6 +415,10 @@ const LOOK_NAMES: Record<RailStyle | BoxStyle, string> = {
   bench: 'bench',
   rock: 'rock',
   stump: 'stump',
+  tube: 'tube',
+  table: 'table',
+  barrels: 'barrel',
+  spool: 'spool',
 };
 
 function endRail(sc: ScoreState, rails: readonly RailShape[]): void {

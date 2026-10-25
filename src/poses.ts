@@ -24,15 +24,21 @@ import { SkierRig } from './render/skierRig.ts';
 import { COLOR_PARTS, DEFAULT_OUTFIT, HEADWEAR, type Outfit } from './core/outfit.ts';
 import {
   CROUCH,
+  DAFFY,
+  IRON_CROSS,
   LEFT_JAPAN,
   LEFT_MUTE,
+  LEFT_NOSE,
   LEFT_SAFETY,
   LEFT_TAIL,
   type PoseDef,
   RIGHT_JAPAN,
   RIGHT_MUTE,
+  RIGHT_NOSE,
   RIGHT_SAFETY,
   RIGHT_TAIL,
+  SEAMAN,
+  SPREAD_EAGLE,
   STANCE,
   TUCK,
   TUMBLE,
@@ -58,6 +64,8 @@ interface RideState {
   railYaw: number;
   /** How far through a pole push (0..1); 1 is not pushing. */
   polePhase: number;
+  /** Butter: 1 on the tips, -1 on the tails. */
+  butter: number;
 }
 
 const RAIL_HEIGHT = 0.45;
@@ -72,10 +80,16 @@ const POSES: (Entry | null)[] = [
   { name: 'Right mute', note: 'Right hand, left ski, outside edge in front of the boot', pose: RIGHT_MUTE, airborne: true },
   { name: 'Left safety', note: 'Left hand, left ski, outside edge beside the boot', pose: LEFT_SAFETY, airborne: true },
   { name: 'Right safety', note: 'Right hand, right ski, outside edge beside the boot', pose: RIGHT_SAFETY, airborne: true },
-  { name: 'Left japan', note: 'Left hand behind the leg to the left ski’s inside edge; tail up behind', pose: LEFT_JAPAN, airborne: true },
-  { name: 'Right japan', note: 'Right hand behind the leg to the right ski’s inside edge; tail up behind', pose: RIGHT_JAPAN, airborne: true },
+  { name: 'Left japan', note: 'Left hand to the right ski’s inside edge behind the boot; that ski tucked up behind', pose: LEFT_JAPAN, airborne: true },
+  { name: 'Right japan', note: 'Right hand to the left ski’s inside edge behind the boot; that ski tucked up behind', pose: RIGHT_JAPAN, airborne: true },
   { name: 'Left tail', note: 'Left hand back to the left ski’s tail', pose: LEFT_TAIL, airborne: true },
   { name: 'Right tail', note: 'Right hand back to the right ski’s tail', pose: RIGHT_TAIL, airborne: true },
+  { name: 'Left nose', note: 'Left hand forward to the left ski’s nose, tip pulled up', pose: LEFT_NOSE, airborne: true },
+  { name: 'Right nose', note: 'Right hand forward to the right ski’s nose, tip pulled up', pose: RIGHT_NOSE, airborne: true },
+  { name: 'Screamin’ seaman', note: 'A daffy with the legs crossed: left leg forward, right leg back', pose: SEAMAN, airborne: true },
+  { name: 'Daffy', note: 'One ski forward, one back', pose: DAFFY, airborne: true },
+  { name: 'Iron cross', note: 'Heels up behind, skis crossed flat in an X behind the legs', pose: IRON_CROSS, airborne: true },
+  { name: 'Spread eagle', note: 'Arms and legs flung out wide', pose: SPREAD_EAGLE, airborne: true },
   { name: 'Tumble', note: 'Crash: balled up, rolling to a stop', pose: TUMBLE, airborne: true },
   { name: 'Carve', note: 'In game: hard left turn at speed', ride: { speed: 12, lean: 0.85 }, airborne: false },
   { name: 'Crouch carve', note: 'In game: loading a pop mid-turn', ride: { speed: 5, crouch: 1, lean: 0.6 }, airborne: false },
@@ -83,6 +97,8 @@ const POSES: (Entry | null)[] = [
   { name: 'Tuck carve', note: 'In game: tucked in a hard left turn', ride: { speed: 15, crouch: 1, lean: 0.85 }, airborne: false },
   { name: 'Hockey stop', note: 'In game: full brake', ride: { speed: 8, brake: 1, brakeSide: 1 }, airborne: false },
   { name: 'Rail', note: 'In game: sliding a rail sideways', ride: { speed: 6, onRail: true, railYaw: Math.PI / 2 }, airborne: false },
+  { name: 'Nose press', note: 'In game: buttering on the tips (nose grab key on the snow)', ride: { speed: 6, butter: 1 }, airborne: false },
+  { name: 'Tail press', note: 'In game: buttering on the tails (tail grab key on the snow)', ride: { speed: 6, butter: -1 }, airborne: false },
 ];
 
 /** ?set=poling: a pole push from the stance, a crouch and a tuck, at five points through the stroke. */
@@ -105,8 +121,8 @@ const POLING: (Entry | null)[] = [
 ];
 const ENTRIES = new URLSearchParams(window.location.search).get('set') === 'poling' ? POLING : POSES;
 
-const COLS = 5;
-const ROWS = 4;
+const COLS = 6;
+const ROWS = 5;
 const AIR_HEIGHT = 0.55;
 
 const app = document.getElementById('app');
@@ -159,7 +175,7 @@ const flat: Heightfield = {
   bounds: { minX: -4, maxX: 4, minZ: -4, maxZ: 4, polygon: new Float32Array(0) },
 };
 
-const RIDE_DEFAULTS: RideState = { speed: 0, crouch: 0, lean: 0, brake: 0, brakeSide: 1, onRail: false, railYaw: 0, polePhase: 1 };
+const RIDE_DEFAULTS: RideState = { speed: 0, crouch: 0, lean: 0, brake: 0, brakeSide: 1, onRail: false, railYaw: 0, polePhase: 1, butter: 0 };
 
 /** The interpolated state the game would hand SkierView while riding like this. */
 function ridePose(r: RideState): SkierPose {
@@ -174,6 +190,8 @@ function ridePose(r: RideState): SkierPose {
   pose.onRail = r.onRail;
   pose.yaw = r.railYaw;
   pose.polePhase = r.polePhase;
+  pose.butter = r.butter;
+  pose.butterAmount = r.butter !== 0 ? 1 : 0;
   return pose;
 }
 
@@ -260,9 +278,10 @@ ENTRIES.forEach((entry, i) => {
 });
 
 // View angle shared by all cells: 0 looks at the skier's front.
-const DEFAULT_YAW = 0.6;
-const DEFAULT_PITCH = 0.18;
-const DEFAULT_ZOOM = 1;
+// ?yaw=, ?pitch= and ?zoom= start from another angle (for repeatable screenshots).
+const DEFAULT_YAW = Number(params.get('yaw') ?? 0.6);
+const DEFAULT_PITCH = Number(params.get('pitch') ?? 0.18);
+const DEFAULT_ZOOM = Number(params.get('zoom') ?? 1);
 let viewYaw = DEFAULT_YAW;
 let viewPitch = DEFAULT_PITCH;
 let zoom = DEFAULT_ZOOM;

@@ -16,7 +16,11 @@ export type Action =
   | 'pause'
   | GrabAction;
 
-/** Grab keys, in the order of the GRABS list (render/skierPoses.ts): left hand first. */
+/**
+ * Grab and style move keys, in the order of the GRABS list
+ * (render/skierPoses.ts): the left hand's grabs, the right hand's, the noses,
+ * then the style moves. New moves go on the end.
+ */
 export const GRAB_ACTIONS = [
   'grabLeftMute',
   'grabLeftSafety',
@@ -26,6 +30,12 @@ export const GRAB_ACTIONS = [
   'grabRightSafety',
   'grabRightJapan',
   'grabRightTail',
+  'grabLeftNose',
+  'grabRightNose',
+  'styleSeaman',
+  'styleDaffy',
+  'styleIronCross',
+  'styleSpreadEagle',
 ] as const;
 
 export type GrabAction = (typeof GRAB_ACTIONS)[number];
@@ -70,6 +80,12 @@ export const DEFAULT_BINDINGS: Bindings = {
   grabRightSafety: ['KeyX'],
   grabRightJapan: ['KeyC'],
   grabRightTail: ['KeyV'],
+  grabLeftNose: ['KeyG'],
+  grabRightNose: ['KeyB'],
+  styleSeaman: ['KeyT'],
+  styleDaffy: ['KeyW'],
+  styleIronCross: ['Digit1'],
+  styleSpreadEagle: ['Digit2'],
 };
 
 export interface ButtonState {

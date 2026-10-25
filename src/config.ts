@@ -93,6 +93,24 @@ export const CONFIG = {
     curveLoad: 1,
     curveLoadMax: 60,
     curveSmoothing: 15,
+
+    /**
+     * Butters: on the snow, holding a nose grab key presses onto the ski tips
+     * and a tail grab key onto the tails, easing in over butterBlendTime (s).
+     * Pressed, ←/→ pivot the skis at butterSpinRate (rad/s, reached at
+     * butterSpinResponse rad/s²) instead of carving. The edges grip only
+     * butterGrip of usual, so the skier keeps sliding the way they were
+     * going, and sliding sideways scrapes off only butterSkid of the usual
+     * speed. Popping out of a press (an ollie off the tails, a nollie off the
+     * tips) is butterPop times as strong; the pivot carries into the air like
+     * a carving turn's (air.spinCarry).
+     */
+    butterBlendTime: 0.12,
+    butterSpinRate: 4.5,
+    butterSpinResponse: 25,
+    butterGrip: 0.08,
+    butterSkid: 0.25,
+    butterPop: 1.1,
   },
 
   air: {
@@ -137,6 +155,13 @@ export const CONFIG = {
     wallPop: 0.4,
     /** Fastest (m/s) a wall air launches upward; about 3.4 m above the lip. Faster is lost, which keeps pipe speed in check. */
     wallLaunchMax: 9,
+    /**
+     * A wall air that comes out over snow that isn't a wall (off the end of a
+     * quarterpipe or wallride, or out over a deck) tips back toward that
+     * snow at this rate (per second), so the skier comes down upright on it
+     * instead of still leaning out at the wall's angle.
+     */
+    wallLevel: 3,
   },
 
   landing: {
@@ -182,6 +207,8 @@ export const CONFIG = {
     /** Sliding friction coefficient on a metal rail and on a box. */
     railFriction: 0.05,
     boxFriction: 0.09,
+    /** Extra deceleration (m/s²) at full brake on a rail or box: ↓ drags the skis against it (it ramps in over skier.brakeRampTime). */
+    brakeDecel: 6,
     /** Top speed (rad/s) ←/→ turns the skis on a rail, and how fast that speed builds and stops (rad/s²). */
     turnRate: 4,
     turnAccel: 30,
@@ -528,8 +555,8 @@ export const CONFIG = {
     landing: { impactMin: 3, impactFull: 12, count: 70 },
     /** A burst on a crash, and a trail while the body tumbles along the snow (per m/s of speed). */
     crash: { count: 70, trailRate: 6 },
-    /** Sparks off metal rails (not boxes or logs): full at speedFull m/s along the rail. */
-    sparks: { speedMin: 1.5, speedFull: 10, rate: 150, life: 0.35 },
+    /** Sparks off metal rails (not boxes or logs): full at speedFull m/s along the rail, and (1 + brake) times as many at full brake. */
+    sparks: { speedMin: 1.5, speedFull: 10, rate: 150, life: 0.35, brake: 2 },
     /**
      * Snow blowing off ridges, wind lips and cornices (Freeride): an emitter
      * every `spacing` m along each, gusting; `rate` per emitter at the top

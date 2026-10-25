@@ -14,7 +14,7 @@ import { wrapAngle, type SkierState } from '../sim/skier.ts';
 import { groundAt } from '../sim/terrain.ts';
 import { TUNING } from '../sim/tuning.ts';
 import { addPoseDelta, createPoseBuffer, setPose, type PoseBuffer } from './poseBlend.ts';
-import { CROUCH, GRABS, STANCE, STANCE_HALF_WIDTH, TUCK, TUMBLE, TUMBLE_CENTER } from './skierPoses.ts';
+import { CROUCH, GRABS, NOSE_PRESS, STANCE, STANCE_HALF_WIDTH, TAIL_PRESS, TUCK, TUMBLE, TUMBLE_CENTER } from './skierPoses.ts';
 import { DEFAULT_OUTFIT, type Outfit } from '../core/outfit.ts';
 import { SkierRig } from './skierRig.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
@@ -38,6 +38,9 @@ export interface SkierPose {
   /** Rotation speed in the air (rad/s). */
   spinRate: number;
   grab: number;
+  /** Butter: 1 on the tips, -1 on the tails, 0 neither; how far into the press (0..1). */
+  butter: number;
+  butterAmount: number;
   landTime: number;
   landDepth: number;
   bailed: boolean;
@@ -62,6 +65,8 @@ export function createSkierPose(): SkierPose {
     center: new Vector3(),
     spinRate: 0,
     grab: -1,
+    butter: 0,
+    butterAmount: 0,
     landTime: Infinity,
     landDepth: 0,
     bailed: false,
@@ -92,6 +97,8 @@ export function interpolateSkier(out: SkierPose, prev: SkierState, curr: SkierSt
   out.center.lerpVectors(prev.center, curr.center, alpha);
   out.spinRate = curr.grounded ? 0 : curr.spin.length();
   out.grab = curr.grab;
+  out.butter = curr.butter !== 0 ? curr.butter : prev.butter;
+  out.butterAmount = prev.butterAmount + (curr.butterAmount - prev.butterAmount) * alpha;
   out.landTime = curr.landTime;
   out.landDepth = curr.landDepth;
   out.bailed = curr.bailed;
@@ -107,6 +114,11 @@ const SHADOW_OPACITY = 0.45;
 // for the left hand; the right hand mirrors X.
 const POLE_PLANTED: readonly [number, number, number] = [-0.1, -0.94, 0.32];
 const POLE_PUSHED: readonly [number, number, number] = [-0.2, -0.42, 0.88];
+// Where the elbows point while pushing: back and out. It never lines up with
+// the arm anywhere in the stroke, so the elbows can't flip round it.
+const ELBOW_PUSH: readonly [number, number, number] = [-0.7, 0.1, 0.7];
+/** How far out (m) the hands go to plant: a tuck's fists swing out wide of the legs. */
+const HAND_WIDE = 0.36;
 
 /**
  * Draws the skier and its blob shadow from interpolated sim state.
@@ -137,6 +149,9 @@ export class SkierView {
   private readonly grabWeights = new Float32Array(GRABS.length);
   private bailWeight = 0;
   private railWeight = 0;
+  /** Butter presses: on the tips, on the tails. */
+  private noseWeight = 0;
+  private tailWeight = 0;
   /** The snow the skier is on; swapped when another map loads. */
   hf: Heightfield;
 
@@ -179,6 +194,8 @@ export class SkierView {
     this.grabWeights.fill(0);
     this.bailWeight = pose.bailed ? 1 : 0;
     this.railWeight = pose.onRail ? 1 : 0;
+    this.noseWeight = pose.butter === 1 ? pose.butterAmount : 0;
+    this.tailWeight = pose.butter === -1 ? pose.butterAmount : 0;
   }
 
   update(state: SkierPose, frameTime: number): void {
@@ -208,6 +225,9 @@ export class SkierView {
     this.airWeight = approach(this.airWeight, state.grounded ? 0 : 1, frameTime / r.grabBlendTime);
     this.bailWeight = approach(this.bailWeight, state.bailed ? 1 : 0, frameTime / r.bailBlendTime);
     this.railWeight = approach(this.railWeight, state.onRail ? 1 : 0, frameTime / r.railBlendTime);
+    // The sim eases a press in and out on the snow but drops it at takeoff; ease that out here.
+    this.noseWeight = approach(this.noseWeight, state.butter === 1 ? state.butterAmount : 0, frameTime / r.grabBlendTime);
+    this.tailWeight = approach(this.tailWeight, state.butter === -1 ? state.butterAmount : 0, frameTime / r.grabBlendTime);
     let grabTotal = 0;
     for (let i = 0; i < GRABS.length; i++) {
       const w = approach(this.grabWeights[i] ?? 0, state.grab === i ? 1 : 0, frameTime / r.grabBlendTime);
@@ -241,8 +261,10 @@ export class SkierView {
     // skid. Only part of a lean tilts the whole body; the rest comes from the
     // knees and hips (see angulate). Folded up in a crouch or tuck the legs
     // have no room for that, so more of the lean tilts the whole body.
-    const swing = state.brake * r.brakeTwist * state.brakeSide * live;
-    const leanTotal = (state.lean + state.brake * r.brakeLean * state.brakeSide) * live;
+    // On a rail, braking only sinks: the skis stay where ←/→ left them.
+    const stop = state.brake * (1 - this.railWeight);
+    const swing = stop * r.brakeTwist * state.brakeSide * live;
+    const leanTotal = (state.lean + stop * r.brakeLean * state.brakeSide) * live;
     const onSnow = (1 - this.airWeight) * live;
     const deep = Math.min(1, groundCrouch + state.crouch * tuck);
     const legShare = (1 - r.leanBodyShare) * (1 - (1 - r.crouchAngulation) * deep);
@@ -256,6 +278,8 @@ export class SkierView {
     setPose(p, STANCE);
     addPoseDelta(p, STANCE, CROUCH, free * (groundCrouch * (1 - air) + airCrouch * air));
     addPoseDelta(p, STANCE, TUCK, free * state.crouch * tuck * (1 - air));
+    addPoseDelta(p, STANCE, NOSE_PRESS, free * this.noseWeight * (1 - air));
+    addPoseDelta(p, STANCE, TAIL_PRESS, free * this.tailWeight * (1 - air));
     for (let i = 0; i < GRABS.length; i++) {
       const w = (this.grabWeights[i] ?? 0) * grabScale;
       if (w > 0) addPoseDelta(p, STANCE, GRABS[i]!, w);
@@ -294,6 +318,8 @@ export class SkierView {
     let lift = -Infinity;
     for (let i = 0; i < SKI_POINTS.length; i++) {
       const pt = SKI_POINTS[i]!;
+      // In a butter only the pressed end touches: the other is up off the snow.
+      if ((pt[1] > 0 && this.noseWeight > 0.5) || (pt[1] < 0 && this.tailWeight > 0.5)) continue;
       skiPoint.set(pt[0], 0, pt[1]).applyQuaternion(this.swing.quaternion).applyMatrix4(this.root.matrix);
       lift = Math.max(lift, drawnHeightAt(this.hf, skiPoint.x, skiPoint.z) - skiPoint.y);
     }
@@ -383,9 +409,11 @@ function poleStroke(p: PoseBuffer, phase: number): void {
 
   // reach: hands forward (+) or back (-) in meters. The pole goes riding ->
   // planted -> pushed through -> riding; `from`/`to` pick the two angles.
+  // `elbow` is how far the elbows have turned to point back (ELBOW_PUSH).
   let reach: number;
   let lift: number;
   let crunch = 0;
+  let elbow: number;
   let from: PoleKey;
   let to: PoleKey;
   let t: number;
@@ -393,19 +421,24 @@ function poleStroke(p: PoseBuffer, phase: number): void {
     t = ease(phase / plant);
     reach = 0.34 * t;
     lift = 0.22 * t;
+    elbow = t;
     from = 'riding';
     to = 'planted';
   } else if (phase < done) {
     t = ease((phase - plant) / (done - plant));
     reach = 0.34 - 0.7 * t;
-    lift = 0.22 - 0.34 * t;
+    // The hands drive down past the hips in an arc, so the arms stay open
+    // while the crunch brings the shoulders forward.
+    lift = 0.22 - 0.34 * t - 0.16 * Math.sin(Math.PI * t);
     crunch = 0.32 * Math.sin(Math.PI * t);
+    elbow = 1;
     from = 'planted';
     to = 'pushed';
   } else {
     t = ease((phase - done) / (1 - done));
     reach = -0.36 * (1 - t);
     lift = -0.12 * (1 - t);
+    elbow = 1 - t;
     from = 'pushed';
     to = 'riding';
   }
@@ -414,6 +447,7 @@ function poleStroke(p: PoseBuffer, phase: number): void {
   for (let i = 0; i < 2; i++) {
     const h = p.hands[i === 0 ? 0 : 1];
     const mirror = i === 0 ? 1 : -1;
+    h.at[0] += (-HAND_WIDE * mirror - h.at[0]) * elbow * Math.max(0, 1 - Math.abs(h.at[0]) / HAND_WIDE);
     h.at[1] += lift;
     h.at[2] -= reach;
     for (let k = 0; k < 3; k++) {
@@ -421,6 +455,8 @@ function poleStroke(p: PoseBuffer, phase: number): void {
       const sign = k === 0 ? mirror : 1;
       const a = poleAngle(from, riding, k, sign);
       h.pole[k] = a + (poleAngle(to, riding, k, sign) - a) * t;
+      const bend = h.elbow[k] ?? 0;
+      h.elbow[k] = bend + ((ELBOW_PUSH[k] ?? 0) * sign - bend) * elbow;
     }
   }
 }

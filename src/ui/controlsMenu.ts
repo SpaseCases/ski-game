@@ -21,7 +21,7 @@ interface Row {
 const ROWS: readonly Row[] = [
   { keys: ['left', '/', 'right'], ground: 'Turn', air: 'Spin left or right', rail: 'Turn the skis (any angle)' },
   { keys: ['up'], note: 'hold, then release', ground: 'Crouch (less drag), then pop', air: 'Front flip', rail: 'Crouch, then pop off' },
-  { keys: ['down'], ground: 'Brake', air: 'Back flip', rail: '' },
+  { keys: ['down'], ground: 'Brake', air: 'Back flip', rail: 'Brake' },
   { keys: ['pole'], ground: 'Pole push', air: '', rail: '' },
   { keys: ['lincolnLeft', '/', 'lincolnRight'], ground: '', air: 'Lincoln loop left or right', rail: '' },
   { keys: ['checkpoint'], ground: 'Set your checkpoint', air: '', rail: '' },
@@ -35,6 +35,14 @@ const GRABS: readonly (readonly [Action, string, Action, string])[] = [
   ['grabLeftSafety', 'Left safety', 'grabRightSafety', 'Right safety'],
   ['grabLeftJapan', 'Left japan', 'grabRightJapan', 'Right japan'],
   ['grabLeftTail', 'Left tail', 'grabRightTail', 'Right tail'],
+  ['grabLeftNose', 'Left nose', 'grabRightNose', 'Right nose'],
+];
+
+const STYLE: readonly (readonly [Action, string, string])[] = [
+  ['styleSeaman', "Screamin' seaman", 'A daffy with the legs crossed: one ski forward, one back, crossed over'],
+  ['styleDaffy', 'Daffy', 'One ski forward, one back, like running in the air'],
+  ['styleIronCross', 'Iron cross', 'Heels up behind, skis crossed in an X behind the legs'],
+  ['styleSpreadEagle', 'Spread eagle', 'Arms and legs flung out wide'],
 ];
 
 export class ControlsScreen implements Screen {
@@ -118,11 +126,23 @@ export class ControlsScreen implements Screen {
     }
     grabs.appendChild(gbody);
 
+    const style = document.createElement('table');
+    style.className = 'controls-table grabs-table';
+    style.innerHTML = '<caption>Style moves (hold in the air, let go to release)</caption><thead><tr><th scope="col">Key</th><th scope="col">Move</th><th scope="col">What it looks like</th></tr></thead>';
+    const sbody = document.createElement('tbody');
+    for (const [action, name, look] of STYLE) {
+      const tr = document.createElement('tr');
+      tr.append(cell([action]), td(name), td(look));
+      sbody.appendChild(tr);
+    }
+    style.appendChild(sbody);
+
     const tips = document.createElement('ul');
     tips.className = 'controls-tips';
     for (const text of [
       'Hold a spin key and a flip key together to tilt the spin: that makes corks and misty flips.',
       'Spins and flips keep going while the key is held and slow down after you let go. Let go early to time the landing.',
+      `Butter on the snow: hold a nose grab key (${mainKeys(keys, 'grabLeftNose', 'grabRightNose')}) to press onto your tips or a tail grab key (${mainKeys(keys, 'grabLeftTail', 'grabRightTail')}) onto your tails. ← → pivot the skis; releasing ${keys.up[0] ? keyName(keys.up[0]) : '↑'} pops off that end.`,
       'Land on a rail or box to slide it. There is no grind button.',
       `At the finish, ${keys.confirm[0] ? keyName(keys.confirm[0]) : 'the Back to top button'} takes you back to the top.`,
       'Drag the game view with the mouse to look around the skier.',
@@ -139,8 +159,14 @@ export class ControlsScreen implements Screen {
       div.appendChild(t);
       return div;
     };
-    this.body.replaceChildren(wrap(main), wrap(grabs), tips);
+    this.body.replaceChildren(wrap(main), wrap(grabs), wrap(style), tips);
   }
+}
+
+/** The main keys of two actions, "G / B" (or "none"). */
+function mainKeys(keys: Bindings, a: Action, b: Action): string {
+  const name = (action: Action): string => (keys[action][0] ? keyName(keys[action][0]) : 'none');
+  return `${name(a)} / ${name(b)}`;
 }
 
 function td(text: string, span = 1): HTMLTableCellElement {
