@@ -56,7 +56,7 @@ export const ACTION_NAMES: Record<Action, string> = {
   right: 'Turn or spin right',
   up: 'Crouch and pop, front flip',
   down: 'Brake, back flip',
-  pole: 'Pole push',
+  pole: 'Pole push / tuck',
   lincolnLeft: 'Lincoln loop left',
   lincolnRight: 'Lincoln loop right',
   checkpoint: 'Set checkpoint',

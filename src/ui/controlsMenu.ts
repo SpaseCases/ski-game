@@ -20,9 +20,9 @@ interface Row {
 
 const ROWS: readonly Row[] = [
   { keys: ['left', '/', 'right'], ground: 'Turn', air: 'Spin left or right', rail: 'Turn the skis (any angle)' },
-  { keys: ['up'], note: 'hold, then release', ground: 'Crouch (less drag), then pop', air: 'Front flip', rail: 'Crouch, then pop off' },
+  { keys: ['up'], note: 'hold, then release', ground: 'Crouch (less drag), then pop (↓ while crouching: no pop)', air: 'Front flip', rail: 'Crouch, then pop off' },
   { keys: ['down'], ground: 'Brake', air: 'Back flip', rail: 'Brake' },
-  { keys: ['pole'], ground: 'Pole push', air: '', rail: '' },
+  { keys: ['pole'], ground: 'Pole push; tuck once fast (↑ from a tuck pops at full strength)', air: '', rail: '' },
   { keys: ['lincolnLeft', '/', 'lincolnRight'], ground: '', air: 'Lincoln loop left or right', rail: '' },
   { keys: ['checkpoint'], ground: 'Set your checkpoint', air: '', rail: '' },
   { keys: ['respawn'], ground: 'Back to your last checkpoint (hold 1 s: back to the top)' },

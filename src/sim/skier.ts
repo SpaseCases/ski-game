@@ -59,6 +59,8 @@ export interface SkierState {
   airTime: number;
   /** True while a pop is available: on the snow, and briefly after leaving it. */
   canPop: boolean;
+  /** False once ↓ has cancelled the pop ↑ is loading; ↑ pressed again arms it. */
+  popArmed: boolean;
   /** Snow normal under the skier; the last contact normal while airborne. */
   normal: Vector3;
   /** 0 standing, 1 full crouch. */
@@ -150,6 +152,7 @@ export function createSkierState(): SkierState {
     grounded: true,
     airTime: 0,
     canPop: true,
+    popArmed: true,
     normal: new Vector3(0, 1, 0),
     crouch: 0,
     brake: 0,
@@ -197,6 +200,7 @@ export function copySkierState(dst: SkierState, src: SkierState): void {
   dst.grounded = src.grounded;
   dst.airTime = src.airTime;
   dst.canPop = src.canPop;
+  dst.popArmed = src.popArmed;
   dst.normal.copy(src.normal);
   dst.crouch = src.crouch;
   dst.brake = src.brake;
@@ -300,7 +304,10 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
   // normal there would throw the skier out across the pipe. Off a takeoff
   // steeper than a wall (an aerials kicker) it pushes straight up: the
   // normal there points back down the in-run.
-  if (input.up.released && s.canPop && (s.grounded || s.airTime <= c.popCoyoteTime)) {
+  // ↓ while ↑ is loading a pop on the snow or a rail cancels it: stand up without popping.
+  if (input.up.pressed) s.popArmed = true;
+  if (input.down.pressed && input.up.held && (s.grounded || s.rail >= 0)) s.popArmed = false;
+  if (input.up.released && s.canPop && s.popArmed && (s.grounded || s.airTime <= c.popCoyoteTime)) {
     // Out of a butter it's an ollie (off the tails) or a nollie (off the tips): a stronger pop.
     const pop = (c.popMin + (c.popMax - c.popMin) * s.crouch) * (1 + (c.butterPop - 1) * s.butterAmount);
     if (onWall(s, course.hf)) s.velocity.y += pop * TUNING.air.wallPop;
@@ -310,8 +317,11 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
     s.canPop = false;
     s.crouch = 0;
   }
-  // ↑ crouches while a pop is still possible; after that, in the air, it flips.
-  const crouchTarget = input.up.held && s.canPop ? 1 : 0;
+  // ↑ crouches while a pop is still possible; after that, in the air, it
+  // flips. The pole key tucks on the snow once past tuckSpeed (below it, it
+  // poles): as low as a full crouch, so ↑ from a tuck pops at full strength.
+  const tuck = input.pole.held && s.grounded && s.rail < 0 && s.velocity.lengthSq() >= c.tuckSpeed * c.tuckSpeed;
+  const crouchTarget = (input.up.held && s.canPop && s.popArmed) || tuck ? 1 : 0;
   s.crouch = approach(s.crouch, crouchTarget, dt / (crouchTarget > s.crouch ? c.crouchTime : c.standTime));
 
   if (s.rail >= 0) {

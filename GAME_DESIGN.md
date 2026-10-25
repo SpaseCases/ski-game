@@ -15,9 +15,9 @@ The right hand works the arrow keys. The left hand handles grabs, pole push, and
 | Key | On the ground | In the air | On a rail |
 |---|---|---|---|
 | ← / → | Turn | Spin left / right | Rotate skis (free, any angle) |
-| ↑ hold, then release | Crouch (less drag), then pop | Front flip | Crouch, then pop off |
+| ↑ hold, then release | Crouch (less drag), then pop; ↓ while crouching cancels the pop | Front flip | Crouch, then pop off |
 | ↓ | Brake | Back flip | Brake (drags the skis on the rail) |
-| Shift | Pole push | — | — |
+| Shift | Pole push; once faster than 8 m/s, hold to tuck (as low as a full crouch, so a tap of ↑ pops at full strength, and letting go of Shift stands up without popping) | — | — |
 | Q / E | — | Lincoln loop left / right | — |
 | Tab | Set personal checkpoint | — | — |
 | R | Respawn at last checkpoint (hold 1s: back to top) | same | same |

@@ -72,6 +72,8 @@ export const CONFIG = {
 
     /** Seconds to reach full crouch, and to stand back up. */
     crouchTime: 0.22,
+    /** Above this speed (m/s) holding the pole key tucks (a full crouch's low drag) instead of poling. */
+    tuckSpeed: 8,
     standTime: 0.1,
     /** Pop speed (m/s, along the snow normal) from no crouch and from full crouch. */
     popMin: 3.2,
