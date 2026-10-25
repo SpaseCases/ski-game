@@ -82,6 +82,8 @@ function flag(x: number, d: number, width = 30): void {
 interface Item {
   len: number;
   place: (x: number, d: number) => void;
+  /** A jump's options, for things placed around it. */
+  opts?: JumpOpts;
 }
 
 /** Lays items down a line from d, `run` m of snow between each, and returns the d past the last one. */
@@ -143,7 +145,23 @@ function jump(x: number, d: number, o: JumpOpts): void {
   features.push(f);
 }
 
-const J = (o: JumpOpts): Item => ({ len: jumpLength(o), place: (x, d) => jump(x, d, o) });
+const J = (o: JumpOpts): Item => ({ len: jumpLength(o), place: (x, d) => jump(x, d, o), opts: o });
+
+/** Distance from an open gap's takeoff start to the middle of its floor, where the slope shows between the takeoff's back and the landing's (as maps/shapes.ts builds it). */
+function gapMiddle(o: JumpOpts): number {
+  const down = Math.max(1, 1.2 * o.lip);
+  const up = Math.max(1, 1.2 * (o.landingHeight ?? o.lip));
+  return (2 * o.lip) / Math.tan(o.angle * DEG) + down + (o.gap - 1.5 - down - up) / 2;
+}
+
+/** An open gap jump with something parked across the middle of its gap. */
+function OVER(gap: Item, kind: 'groomer'): Item {
+  const o = gap.opts!;
+  return { ...gap, place: (x, d) => {
+    gap.place(x, d);
+    decor.push({ kind, points: [{ x: r2(x + (o.dx ?? 0)), z: r2(-(d + gapMiddle(o))) }], heading: 90 });
+  } };
+}
 
 /**
  * A hip: a kicker angled off the fall line from one side, and a landing in
@@ -484,13 +502,16 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
     S('box', SLIDES.rainbow(12, 0.35, 0.6), 1.0),
   ]), lim);
 
+  // Tables, then a gap jump, a step-up and a step-down: open gaps with
+  // nothing to land on short, sized for the 14 to 20 m/s riders carry here
+  // (like the tables, popped faster they fly onto the next takeoff).
   sectionEnd('S2 jump', line(X.jump, D.s2 + 6, 11, [
     J({ lip: 2.2, angle: 20, gap: 9, land: 14, width: 9 }),
     J({ lip: 2.4, angle: 20, gap: 10, land: 14, width: 9 }),
     J({ lip: 2.6, angle: 21, gap: 11, land: 14, width: 9 }),
-    J({ lip: 2.2, angle: 22, gap: 6, deck: false, landingHeight: 3.2, land: 13, width: 9 }),
-    J({ lip: 3, angle: 19, gap: 7, deck: false, landingHeight: 2.2, land: 12, width: 9 }),
-    J({ lip: 2.6, angle: 21, gap: 12, land: 14, width: 9 }),
+    J({ lip: 2.6, angle: 24, gap: 12, deck: false, landingHeight: 2.6, land: 15, width: 10 }),
+    J({ lip: 2.4, angle: 24, gap: 8, deck: false, landingHeight: 3.6, land: 14, width: 10 }),
+    J({ lip: 3, angle: 22, gap: 9, deck: false, landingHeight: 1.8, land: 13, width: 10 }),
     J({ lip: 2.4, angle: 20, gap: 10, land: 14, width: 9 }),
   ]), lim);
 
@@ -540,25 +561,35 @@ const lanes: Json[] = [];
   // natural speed they land on the face, tucked a little past it, and
   // rolled off without a pop they land on the deck.
   const BIG = (lip: number, gap: number): Item => J({ lip, angle: 14, gap, land: 17, width: 11 });
+  // Open gaps (gap jumps, step-ups and step-downs) for 20 m/s and up: short of that, there's nothing to land on.
+  const GAP = (lip: number, gap: number, landingHeight: number, land = 17): Item =>
+    J({ lip, angle: 14, gap, deck: false, landingHeight, land, width: 11 });
   sectionEnd('S3 combo', line(X.combo, D.s3 + 8, 14, [
     K('rail', SLIDES.fedDown(18, 0.45), { angle: 10 }),
     BIG(3.4, 22),
     S('rail', SLIDES.downFlatDown(24)),
     BIG(3.6, 24),
     S('box', SLIDES.flat(20, 0.45), 1.0),
-    BIG(3.2, 20),
+    GAP(3.6, 14, 4.2, 18),
+    10,
     S('rail', SLIDES.rainbow(16, 0.5, 0.8, 10)),
-    BIG(3.4, 22),
+    GAP(3.4, 14, 3.4),
   ]), lim);
 
+  // Big open gaps after the first tables, once riders carry 20 m/s or more:
+  // a gap jump over a parked groomer, a step-up and a step-down. Each has
+  // extra snow after it: popped at 27 m/s they fly well past the landing.
   sectionEnd('S3 jump', line(X.jump, D.s3 + 6, 14, [
     BIG(3.2, 20),
     BIG(3.4, 22),
+    OVER(GAP(3.4, 14, 3.4), 'groomer'),
+    10,
     BIG(3.6, 24),
-    J({ lip: 3.2, angle: 14, gap: 16, deck: false, landingHeight: 2.4, land: 16, width: 11 }),
-    BIG(3.6, 24),
+    GAP(3.6, 14, 4.2, 18),
+    10,
+    GAP(3.2, 14, 2.4, 16),
+    10,
     BIG(3.4, 22),
-    BIG(3.6, 24),
   ]), lim);
 
   const pipe3 = D.f3 - 8 - 16 - 210;
