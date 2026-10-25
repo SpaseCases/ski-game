@@ -29,7 +29,8 @@ export class GameAudio {
     this.engine.onStart((ctx) => {
       this.riding = new RidingSounds(this.engine, ctx);
       this.ambient = new AmbientSounds(this.engine, ctx);
-      this.riding.onCleanLanding = (x, z) => this.ambient?.cheer(x, z);
+      this.riding.onCleanLanding = (x, z) => this.ambient?.react(x, z, true);
+      this.riding.onCrash = (x, z) => this.ambient?.react(x, z, false);
       this.ambient.setMap(this.built);
       this.ambient.setWeather(this.weather);
     });

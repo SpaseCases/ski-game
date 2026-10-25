@@ -8,8 +8,9 @@ import { smooth } from './riding.ts';
 // The world's sounds round the skier: the weather (a low bed of wind and a
 // howl that follows the snow effects' gusts), and places that sound and
 // fade with distance: spectators (the `skier` props: Big air's crowd, which
-// cheers a clean landing near it), Freeride's town (its buildings), and
-// the chairlifts' hum, loudest at their stations. A place is heard from the
+// cheers a clean landing near it and jeers a crash), Freeride's town (its
+// buildings), and the chairlifts' hum, loudest at their stations, with the
+// riders on the chairs cheering and heckling what happens under them. A place is heard from the
 // skier and panned by the camera's right, and its voice exists only on a
 // map that has the place.
 
@@ -186,22 +187,47 @@ export class AmbientSounds {
     }
   }
 
-  /** A clean landing at (x, z): the crowd cheers if it came down near spectators. */
-  cheer(x: number, z: number): void {
-    const crowd = this.voices.crowd;
-    if (!crowd) return;
+  /**
+   * A clean landing (`clean`) or a crash at (x, z): spectators near it cheer
+   * or jeer, and so do the riders on a chairlift whose cable passes near.
+   */
+  react(x: number, z: number, clean: boolean): void {
     const a = CONFIG.audio;
-    let nearest = Infinity;
-    let count = 0;
-    for (let i = 0; i < this.crowdX.length; i++) {
-      const d = Math.hypot(this.crowdX[i]! - x, this.crowdZ[i]! - z);
-      nearest = Math.min(nearest, d);
-      if (d < a.cheer.range) count += this.crowdN[i]!;
+    const crowd = this.voices.crowd;
+    if (crowd) {
+      let nearest = Infinity;
+      let count = 0;
+      for (let i = 0; i < this.crowdX.length; i++) {
+        const d = Math.hypot(this.crowdX[i]! - x, this.crowdZ[i]! - z);
+        nearest = Math.min(nearest, d);
+        if (d < a.cheer.range) count += this.crowdN[i]!;
+      }
+      if (nearest <= a.cheer.range) {
+        const k = (1 - smooth(a.crowd.near, a.cheer.range, nearest)) * Math.min(1, 0.4 + count / a.crowd.full);
+        // Into the crowd's pan, so it comes from where they stand.
+        this.engine.play(clean ? 'cheer' : 'jeer', k, crowd.panner);
+      }
     }
-    if (nearest > a.cheer.range) return;
-    const k = (1 - smooth(a.crowd.near, a.cheer.range, nearest)) * Math.min(1, 0.4 + count / a.crowd.full);
-    // Into the crowd's pan, so the cheer comes from where they stand.
-    this.engine.play('cheer', k, crowd.panner);
+    const lift = this.voices.lift;
+    if (lift) {
+      const d = this.cableDistance(x, z);
+      if (d <= a.cheer.liftRange) this.engine.play(clean ? 'liftCheer' : 'liftJeer', 1 - smooth(a.lift.near, a.cheer.liftRange, d), lift.panner);
+    }
+  }
+
+  /** Distance (m, seen from above) from (x, z) to the nearest chairlift cable. */
+  private cableDistance(x: number, z: number): number {
+    let best = Infinity;
+    for (let i = 0; i < this.liftAx.length; i++) {
+      const ax = this.liftAx[i]!;
+      const az = this.liftAz[i]!;
+      const ex = this.liftBx[i]! - ax;
+      const ez = this.liftBz[i]! - az;
+      const len2 = ex * ex + ez * ez;
+      const t = len2 > 0 ? Math.min(1, Math.max(0, ((x - ax) * ex + (z - az) * ez) / len2)) : 0;
+      best = Math.min(best, Math.hypot(ax + ex * t - x, az + ez * t - z));
+    }
+    return best;
   }
 
   /** The gains the ambience is heading for (dev readout). */

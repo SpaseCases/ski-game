@@ -199,6 +199,25 @@ function demos(shots: Map<ShotId, AudioBuffer>, loops: Map<LoopId, AudioBuffer>)
         sh(s, 'cheer', 3);
       },
     ],
+    [
+      'place-crowd-jeer',
+      9,
+      (s) => {
+        loop(s, loops.get('crowd')!, a.crowd.gain, 9, 8000);
+        sh(s, 'jeer', 3);
+      },
+    ],
+    [
+      'place-lift-reactions',
+      9,
+      (s) => {
+        // Under a lift's cable: its riders cheer a landing at 1.5 s, then heckle a crash at 5 s.
+        loop(s, loops.get('lift')!, a.lift.gain, 9, 3900);
+        sh(s, 'liftCheer', 1.5);
+        sh(s, 'bail', 5, 0.7);
+        sh(s, 'liftJeer', 5.4);
+      },
+    ],
     ['place-town', 12, (s) => loop(s, loops.get('town')!, a.town.gain, 12, 8000)],
     ['place-lift', 12, (s) => loop(s, loops.get('lift')!, a.lift.gain * a.lift.station, 12, 3900)],
   ];

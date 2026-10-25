@@ -7,7 +7,23 @@
 // in plain JS. A seeded random keeps every render the same, so the dev WAV
 // export (audio/wav.ts) is what the game plays.
 
-export type ShotId = 'pop' | 'landSoft' | 'landHard' | 'bail' | 'pole' | 'railMetal' | 'railWood' | 'cheer' | 'bank' | 'best' | 'lost' | 'click' | 'tick';
+export type ShotId =
+  | 'pop'
+  | 'landSoft'
+  | 'landHard'
+  | 'bail'
+  | 'pole'
+  | 'railMetal'
+  | 'railWood'
+  | 'cheer'
+  | 'jeer'
+  | 'liftCheer'
+  | 'liftJeer'
+  | 'bank'
+  | 'best'
+  | 'lost'
+  | 'click'
+  | 'tick';
 export type LoopId = 'crowd' | 'town' | 'lift' | 'metal' | 'wood';
 export type NoiseId = 'white' | 'pink' | 'brown' | 'scrape';
 
@@ -425,6 +441,72 @@ const SHOTS: Record<ShotId, Recipe> = {
       }
     },
   },
+  // The crowd seeing a crash: a long "ooooh" sinking, a few boos, a laugh.
+  jeer: {
+    seconds: 3,
+    build(ctx, out, r) {
+      const bus = lowpass(ctx, out, 3000);
+      for (let i = 0; i < 14; i++) {
+        const p = 200 + 140 * r();
+        shout(ctx, bus, r, { t: 0.03 + 0.2 * r(), len: 1.1 + 0.6 * r(), f0: p, f1: p * 0.6, from: OO, to: AW, gain: 0.22 });
+      }
+      for (let i = 0; i < 3; i++) {
+        const p = 110 + 40 * r();
+        const t = 0.8 + 0.3 * r();
+        shout(ctx, bus, r, { t, len: 0.45, f0: p, f1: p * 0.9, from: BOO, to: BOO, gain: 0.25 });
+        shout(ctx, bus, r, { t: t + 0.6, len: 0.5, f0: p * 0.98, f1: p * 0.85, from: BOO, to: BOO, gain: 0.22 });
+      }
+      laugh(ctx, bus, 1.3 + 0.3 * r(), 240 + 40 * r(), 5, 0.22);
+    },
+  },
+  // Riders on a chairlift overhead seeing a clean landing: a few whoops, a whistle, muffled mitten claps.
+  liftCheer: {
+    seconds: 2.4,
+    build(ctx, out, r, n) {
+      const bus = lowpass(ctx, out, 3400);
+      for (let i = 0; i < 4; i++) {
+        const p = (i % 2 === 0 ? 170 : 260) + 60 * r();
+        shout(ctx, bus, r, { t: 0.02 + 0.3 * r(), len: 0.5 + 0.3 * r(), f0: p * 0.85, f1: p * 1.45, from: OO, to: AH, gain: 0.3 });
+      }
+      // A wolf whistle: up, then down.
+      const t = 0.5 + 0.2 * r();
+      const osc = ctx.createOscillator();
+      osc.frequency.setValueAtTime(1500, t);
+      osc.frequency.exponentialRampToValueAtTime(2600, t + 0.18);
+      osc.frequency.setValueAtTime(2300, t + 0.32);
+      osc.frequency.exponentialRampToValueAtTime(1300, t + 0.7);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.08, t + 0.04);
+      g.gain.setValueAtTime(0.08, t + 0.18);
+      g.gain.linearRampToValueAtTime(0, t + 0.24);
+      g.gain.linearRampToValueAtTime(0.08, t + 0.34);
+      g.gain.setTargetAtTime(0, t + 0.55, 0.06);
+      osc.connect(g).connect(bus);
+      osc.start(t);
+      osc.stop(t + 1);
+      // Mittens clapping: dull.
+      let c = 0.2;
+      while (c < 1.8) {
+        burst(ctx, bus, r, { noise: n.pink, t: c, decay: 0.02, gain: 0.3 * (1 - c / 2), type: 'lowpass', freq: 700 });
+        c += 0.09 + 0.08 * r();
+      }
+    },
+  },
+  // Riders on a chairlift overhead seeing a crash: an "ohhh", a boo and a laugh.
+  liftJeer: {
+    seconds: 2.4,
+    build(ctx, out, r) {
+      const bus = lowpass(ctx, out, 3400);
+      for (let i = 0; i < 2; i++) {
+        const p = 180 + 120 * r();
+        shout(ctx, bus, r, { t: 0.03 + 0.15 * r(), len: 0.9, f0: p * 1.1, f1: p * 0.65, from: OH, to: AW, gain: 0.3 });
+      }
+      const b = 115 + 30 * r();
+      shout(ctx, bus, r, { t: 0.7, len: 0.55, f0: b, f1: b * 0.88, from: BOO, to: BOO, gain: 0.3 });
+      laugh(ctx, bus, 1.0 + 0.2 * r(), 230 + 50 * r(), 6, 0.28);
+    },
+  },
   // A combo banked: two soft bell notes, a fifth apart.
   bank: {
     seconds: 1,
@@ -471,6 +553,75 @@ const SHOTS: Record<ShotId, Recipe> = {
     },
   },
 };
+
+/** Vowels for shouts: first and second formants (Hz). */
+const OO: readonly [number, number] = [440, 1020];
+const OH: readonly [number, number] = [500, 900];
+const AW: readonly [number, number] = [570, 840];
+const AH: readonly [number, number] = [730, 1090];
+const BOO: readonly [number, number] = [300, 870];
+
+interface ShoutOpts {
+  t: number;
+  len: number;
+  /** Pitch (Hz) at the start and the end. */
+  f0: number;
+  f1: number;
+  /** Vowel at the start and the end. */
+  from: readonly [number, number];
+  to: readonly [number, number];
+  gain: number;
+}
+
+/** One voice calling out: a buzzy voice through a vowel's formants, the pitch and vowel gliding over `len` s. */
+function shout(ctx: BaseAudioContext, out: AudioNode, r: Rng, o: ShoutOpts): void {
+  const osc = ctx.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(o.f0, o.t);
+  osc.frequency.exponentialRampToValueAtTime(o.f1, o.t + o.len);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, o.t);
+  g.gain.linearRampToValueAtTime(o.gain, o.t + Math.min(0.1, o.len * 0.25));
+  g.gain.setTargetAtTime(o.gain * 0.7, o.t + o.len * 0.4, o.len * 0.3);
+  g.gain.setTargetAtTime(0, o.t + o.len, 0.08);
+  const shift = 0.92 + 0.16 * r();
+  for (const [k, q, level] of [
+    [0, 5, 1],
+    [1, 7, 0.6],
+  ] as const) {
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.Q.value = q;
+    f.frequency.setValueAtTime(o.from[k] * shift, o.t);
+    f.frequency.linearRampToValueAtTime(o.to[k] * shift, o.t + o.len);
+    const fg = ctx.createGain();
+    fg.gain.value = level;
+    osc.connect(f).connect(fg).connect(g);
+  }
+  g.connect(out);
+  osc.start(o.t);
+  osc.stop(o.t + o.len + 0.6);
+}
+
+/** A laugh: `count` falling "ha"s from `t` at pitch `p`. */
+function laugh(ctx: BaseAudioContext, out: AudioNode, t0: number, p: number, count: number, gain: number): void {
+  const osc = ctx.createOscillator();
+  osc.type = 'sawtooth';
+  const f = ctx.createBiquadFilter();
+  f.type = 'bandpass';
+  f.frequency.value = 780;
+  f.Q.value = 3;
+  const g = ctx.createGain();
+  g.gain.value = 0;
+  osc.connect(f).connect(g).connect(out);
+  for (let i = 0; i < count; i++) {
+    const t = t0 + i * 0.15;
+    osc.frequency.setValueAtTime(p - i * 12, t);
+    env(g.gain, t, 0.015, gain * (1 - i * 0.12), 0.05);
+  }
+  osc.start(t0);
+  osc.stop(t0 + count * 0.15 + 0.4);
+}
 
 /** A crunch: grains of snow breaking, thick at first and thinning, from `t` over `len` s. */
 function crunch(ctx: BaseAudioContext, out: AudioNode, r: Rng, n: Noise, t: number, len: number, gain: number, freq: number): void {
@@ -520,23 +671,7 @@ const LOOPS: Record<LoopId, Recipe> = {
       const lp = lowpass(ctx, out, 3200);
       for (let i = 0; i < 5; i++) talker(ctx, lp, r, { start: 0, end: 6.6, pitch: i % 2 === 0 ? [180, 250] : [100, 140], gain: 0.3, rate: 4.2, pause: [0.4, 1.6] });
       // A laugh: "ha-ha-ha" falling.
-      const osc = ctx.createOscillator();
-      osc.type = 'sawtooth';
-      const f = ctx.createBiquadFilter();
-      f.type = 'bandpass';
-      f.frequency.value = 780;
-      f.Q.value = 3;
-      const g = ctx.createGain();
-      g.gain.value = 0;
-      osc.connect(f).connect(g).connect(lp);
-      const t0 = 2.2;
-      for (let i = 0; i < 5; i++) {
-        const t = t0 + i * 0.16;
-        osc.frequency.setValueAtTime(260 - i * 12, t);
-        env(g.gain, t, 0.015, 0.3 * (1 - i * 0.12), 0.05);
-      }
-      osc.start(t0);
-      osc.stop(t0 + 1.2);
+      laugh(ctx, lp, 2.2, 260, 5, 0.3);
       // Cups and cutlery.
       for (const t of [0.7, 1.05, 3.6, 4.4, 4.55, 5.5]) {
         const p = 2400 + 2000 * r();

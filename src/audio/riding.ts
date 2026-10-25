@@ -92,8 +92,9 @@ export class RidingSounds {
   private metal: Voice | null = null;
   private wood: Voice | null = null;
   private readonly t: Target = { gain: 0, freq: 0 };
-  /** Called with where a clean landing came down (for the crowd). */
+  /** Called with where a clean landing came down, or a crash happened (for the crowd and the lift riders). */
   onCleanLanding: (x: number, z: number) => void = () => {};
+  onCrash: (x: number, z: number) => void = () => {};
 
   constructor(engine: AudioEngine, ctx: AudioContext) {
     this.engine = engine;
@@ -115,7 +116,10 @@ export class RidingSounds {
     const e = this.engine;
     const a = CONFIG.audio;
     if (s.bailed) {
-      if (!prev.bailed) e.play('bail');
+      if (!prev.bailed) {
+        e.play('bail');
+        this.onCrash(s.position.x, s.position.z);
+      }
       return;
     }
     // Pop: the pop was spent and the skier was thrown up off the snow (not just rolling off an edge).

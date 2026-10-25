@@ -857,6 +857,9 @@ export const CONFIG = {
       railMetal: { gain: 0.45, spread: 0.06 },
       railWood: { gain: 0.55, spread: 0.08 },
       cheer: { gain: 0.33, spread: 0.05 },
+      jeer: { gain: 0.3, spread: 0.05 },
+      liftCheer: { gain: 0.24, spread: 0.08 },
+      liftJeer: { gain: 0.24, spread: 0.08 },
       bank: { gain: 0.22, spread: 0 },
       best: { gain: 0.28, spread: 0 },
       lost: { gain: 0.25, spread: 0 },
@@ -910,8 +913,12 @@ export const CONFIG = {
     crowd: { gain: 0.055, near: 12, far: 110, full: 60, cell: 15 },
     town: { gain: 0.064, near: 25, far: 150 },
     lift: { gain: 0.042, near: 6, far: 80, station: 1.6, stationNear: 10, stationFar: 110 },
-    /** Big air: a clean landing within `range` m of spectators, after at least `minAir` s in the air, cheers. */
-    cheer: { range: 70, minAir: 0.8 },
+    /**
+     * Reactions: spectators within `range` m cheer a clean landing (after at
+     * least `minAir` s in the air) and jeer a crash; so do the riders on a
+     * chairlift when it happens within `liftRange` m of its cable (seen from above).
+     */
+    cheer: { range: 70, minAir: 0.8, liftRange: 30 },
     /** Menus: a soft click when something is picked; focus moving ticks (this quiet) unless the mouse just clicked. */
     tickAfterPointer: 0.4,
   },
