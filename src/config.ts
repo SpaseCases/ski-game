@@ -219,6 +219,84 @@ export const CONFIG = {
     fadeTime: 0.3,
   },
 
+  /**
+   * Scoring (GAME_DESIGN.md, Scoring): tricks, grabs, rails and big airs
+   * build a combo while its timer keeps getting topped up; when the timer
+   * runs out on the snow the combo is banked (its points times its
+   * multiplier), and a crash loses it. The timer runs on game time, so slow
+   * motion slows it too. Angles here are degrees.
+   */
+  score: {
+    /** Seconds on the combo timer after a new trick. */
+    comboTime: 4,
+    /** In the air the timer drains at this share of real speed, and can't run out there: it holds at airFloor s (or what was left, if less). On a rail it holds. */
+    airDrain: 0.5,
+    airFloor: 0.75,
+    /**
+     * Flow: carving hard at speed slows the drain by up to flowSlow (0..1)
+     * and adds flowPoints per second to a live combo. Full flow from
+     * flowLeanFull rad of edge angle and flowSpeedFull m/s; none below the
+     * Min values. It never starts or refills a combo.
+     */
+    flowSlow: 0.6,
+    flowPoints: 25,
+    flowLeanMin: 0.25,
+    flowLeanFull: 0.6,
+    flowSpeedMin: 8,
+    flowSpeedFull: 16,
+    /** A small air with no trick adds this many points per second of air to a live combo (flow, no refill). */
+    smallAirPoints: 40,
+    /** An air this long (s) with no trick still counts as a jump ("Air"): it scores and refills the timer but adds no multiplier. Longer than a full pop on the flat (~0.9 s). */
+    jumpAir: 1.2,
+    /** Points per second of air on a trick or a jump. */
+    airPoints: 50,
+    /** Points per 180° of spin; a cork (spinning with corkMin° or more off-axis) adds corkBonus of that. */
+    spinPoints: 150,
+    corkBonus: 0.5,
+    corkMin: 50,
+    /** Points per full flip and per full Lincoln loop. */
+    flipPoints: 400,
+    lincolnPoints: 400,
+    /** How far short (degrees) of a 180 a spin, and of 360 a flip or Lincoln loop, still counts. Onto or off a rail spins count in 90s, half as short. */
+    spinShort: 45,
+    flipShort: 90,
+    /** Spinning onto or off a rail counts from this many degrees (the 90 to land sideways is the slide itself). */
+    railSpinMin: 180,
+    /** A grab held at least grabMin s scores grabPoints, plus grabHoldPoints per second held, up to grabHoldMax s. */
+    grabMin: 0.2,
+    grabPoints: 100,
+    grabHoldPoints: 100,
+    grabHoldMax: 2,
+    /** Rails and boxes: points per meter slid (from railMin m), times railSideways sliding sideways and railSwitch riding them switch. */
+    railMin: 1,
+    railPoints: 30,
+    railSideways: 1.5,
+    railSwitch: 1.25,
+    /** Landings: clean adds cleanBonus of the trick's points; sketchy scores sketchyScale of them and adds no multiplier. Taking off or landing switch adds switchBonus each. */
+    cleanBonus: 0.25,
+    sketchyScale: 0.5,
+    switchBonus: 0.25,
+    /** Sketchy: past these shares of the landing limits (CONFIG.landing: pitchMax, rollMax, sideMax, impactMax). */
+    sketchyPitch: 0.75,
+    sketchyRoll: 0.5,
+    sketchySide: 0.5,
+    sketchyImpact: 0.9,
+    /**
+     * Each repeat of a trick in one combo scores and adds to the multiplier
+     * repeatScale times what the time before did (a new trick adds 1 to the
+     * multiplier; a gain under multGainMin adds nothing), and tops the timer
+     * up to repeatRefill times the time before (so spamming one trick on the
+     * flat can't keep a combo alive). The multiplier stops at multMax.
+     */
+    repeatScale: 0.5,
+    repeatRefill: 0.75,
+    multGainMin: 0.25,
+    multMax: 10,
+    /** HUD (real time): seconds a trick line stays up, and a banked or lost combo. */
+    hudTrickTime: 2.6,
+    hudBankTime: 2.6,
+  },
+
   checkpoints: {
     /** Seconds R must be held to go back to the top. */
     holdToTop: 1,
