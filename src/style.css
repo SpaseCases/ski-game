@@ -1645,6 +1645,7 @@ body {
 
 .score-hud[hidden],
 .score-panel[hidden],
+.score-slide[hidden],
 .score-best[hidden] {
   display: none;
 }
@@ -1671,7 +1672,16 @@ body {
   transition: opacity 0.35s;
 }
 
-.score-trick.is-gone {
+/* Older lines step back, so the newest (at the bottom) reads first. */
+.score-tricks .score-trick:nth-last-child(2) {
+  opacity: 0.82;
+}
+
+.score-tricks .score-trick:nth-last-child(3) {
+  opacity: 0.64;
+}
+
+.score-tricks .score-trick.is-gone {
   opacity: 0;
 }
 
@@ -1708,6 +1718,15 @@ body {
 
 .score-trick.is-sketchy .score-trick-points {
   color: #ffc58f;
+}
+
+/* The slide in progress: the same line, lettered in frost until it lands. */
+.score-slide .score-trick-name {
+  color: var(--frost);
+}
+
+.score-slide .score-trick-points {
+  color: var(--snow);
 }
 
 /* The panel: an enamel sign with a white keyline, like the menus' boards. */
@@ -1768,6 +1787,22 @@ body {
 
 .score-panel:not(.is-live) .score-timer {
   display: none;
+}
+
+/* Under a second left: the bar turns red and pulses. */
+.score-panel.is-low .score-timer {
+  background: rgb(255 95 77 / 0.32);
+}
+
+.score-panel.is-low .score-fill {
+  background: #ff5f4d;
+  animation: score-low 0.4s ease-in-out infinite alternate;
+}
+
+@keyframes score-low {
+  to {
+    opacity: 0.45;
+  }
 }
 
 .score-note {
@@ -1833,4 +1868,18 @@ body {
 .score-best-value {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .score-trick.is-new,
+  .score-panel.is-low .score-fill {
+    animation: none;
+  }
+}
+
+/* A short window (a small embed): only the newest trick line, so the skier stays in view. */
+@media (max-height: 400px) {
+  .score-tricks .score-trick:not(:last-child) {
+    display: none;
+  }
 }

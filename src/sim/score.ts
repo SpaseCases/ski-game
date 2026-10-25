@@ -381,6 +381,7 @@ function trackRail(r: RailTrack, s: SkierState, dt: number): void {
   if (!r.active) return;
   const C = CONFIG.score;
   const m = Math.abs(s.railSpeed) * dt;
+  const scored = Math.max(0, Math.min(m, C.railMax - r.meters));
   // The skis' angle to the direction of travel along the rail.
   const angle = s.railAngle + (s.railSpeed < 0 ? Math.PI : 0);
   const sideways = Math.abs(Math.sin(angle)) > SIDEWAYS;
@@ -388,7 +389,20 @@ function trackRail(r: RailTrack, s: SkierState, dt: number): void {
   r.meters += m;
   if (sideways) r.sideMeters += m;
   if (sw) r.switchMeters += m;
-  r.points += m * C.railPoints * (sideways ? C.railSideways : 1) * (sw ? C.railSwitch : 1);
+  r.points += scored * C.railPoints * (sideways ? C.railSideways : 1) * (sw ? C.railSwitch : 1);
+}
+
+/** The slide in progress ("Rail slide", "Switch box 50-50"), or '' when not on a rail or not past railMin yet. */
+export function liveSlide(sc: ScoreState, rails: readonly RailShape[]): string {
+  const r = sc.rail;
+  return r.active && r.meters >= CONFIG.score.railMin ? slideName(r, rails) : '';
+}
+
+function slideName(r: RailTrack, rails: readonly RailShape[]): string {
+  const shape = rails[r.rail];
+  const what = shape ? LOOK_NAMES[shape.look] : 'rail';
+  const style = r.sideMeters * 2 > r.meters ? 'slide' : '50-50';
+  return capitalize(`${r.switchMeters * 2 > r.meters ? 'switch ' : ''}${what} ${style}`);
 }
 
 /** What a slide on each look is called. */
@@ -409,10 +423,7 @@ function endRail(sc: ScoreState, rails: readonly RailShape[]): void {
   r.active = false;
   const C = CONFIG.score;
   if (r.meters < C.railMin) return;
-  const shape = rails[r.rail];
-  const what = shape ? LOOK_NAMES[shape.look] : 'rail';
-  const style = r.sideMeters * 2 > r.meters ? 'slide' : '50-50';
-  const name = capitalize(`${r.switchMeters * 2 > r.meters ? 'switch ' : ''}${what} ${style}`);
+  const name = slideName(r, rails);
   const ev = nextEvent(sc);
   ev.grabCount = 0;
   addTrick(sc, ev, name, name, r.points, true);

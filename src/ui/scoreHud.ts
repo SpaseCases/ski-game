@@ -1,5 +1,6 @@
 import { CONFIG } from '../config.ts';
-import { comboMult, scoreEvent, type ScoreEvent, type ScoreState } from '../sim/score.ts';
+import type { RailShape } from '../maps/types.ts';
+import { comboMult, liveSlide, scoreEvent, type ScoreEvent, type ScoreState } from '../sim/score.ts';
 import { multText, pointsText, trickTags, trickText } from './scoreText.ts';
 
 /** What became of a banked combo: a new best, an ordinary bank, or one ridden with cheats (never a best). */
@@ -20,9 +21,10 @@ interface TrickLine {
 }
 
 /**
- * The combo HUD, bottom center: the last few tricks as they land, and a
- * trail-sign panel with the combo's points, its multiplier and its timer
- * draining. When a combo ends the panel shows what it banked (or that it was
+ * The combo HUD, bottom center: the last few tricks as they land (and the
+ * rail or box being slid, as it goes), and a trail-sign panel with the
+ * combo's points, its multiplier and its timer draining (it warns near the
+ * end). When a combo ends the panel shows what it banked (or that it was
  * lost) for a moment. The best combo on this map sits bottom left. It reads
  * the sim's ScoreState and its events; it never changes them.
  */
@@ -30,6 +32,10 @@ export class ScoreHud {
   private readonly root: HTMLElement;
   private readonly tricks: HTMLElement;
   private readonly lines: TrickLine[] = [];
+  /** The slide in progress, under the trick lines. */
+  private readonly slide: HTMLElement;
+  private readonly slideName: HTMLElement;
+  private readonly slideMeters: HTMLElement;
   private readonly panel: HTMLElement;
   private readonly base: HTMLElement;
   private readonly mult: HTMLElement;
@@ -48,7 +54,10 @@ export class ScoreHud {
   private shownMult = -1;
   private shownFill = -1;
   private shownFlow = false;
+  private shownLow = false;
   private shownBest = -1;
+  private shownSlide = '';
+  private shownSlideMeters = -1;
   /** Nothing is shown (so switching off, or a map without scoring, costs nothing per frame). */
   private blank = true;
 
@@ -67,6 +76,11 @@ export class ScoreHud {
       this.tricks.appendChild(el);
       this.lines.push({ el, name, points, tags, age: Infinity });
     }
+    this.slide = div('score-trick score-slide');
+    this.slide.hidden = true;
+    this.slideName = span('score-trick-name');
+    this.slideMeters = span('score-trick-points');
+    this.slide.append(this.slideName, this.slideMeters);
     this.panel = div('score-panel');
     this.panel.hidden = true;
     const row = div('score-row');
@@ -78,7 +92,7 @@ export class ScoreHud {
     this.timer.appendChild(this.fill);
     this.note = div('score-note');
     this.panel.append(row, this.timer, this.note);
-    this.root.append(this.tricks, this.panel);
+    this.root.append(this.tricks, this.slide, this.panel);
     hud.appendChild(this.root);
 
     this.best = div('score-best ride-only');
@@ -92,10 +106,11 @@ export class ScoreHud {
 
   /**
    * Once per frame. `on`: scoring runs on this map (and in Settings);
-   * `best`: this map's best combo (0: none); `hudTime`: real seconds since
-   * the last frame (0 while the game waits).
+   * `rails`: the map's, for naming a slide; `best`: this map's best combo
+   * (0: none); `hudTime`: real seconds since the last frame (0 while the
+   * game waits).
    */
-  update(on: boolean, sc: ScoreState, best: number, hudTime: number): void {
+  update(on: boolean, sc: ScoreState, rails: readonly RailShape[], best: number, hudTime: number): void {
     if (this.root.hidden === on) this.root.hidden = !on;
     const showBest = on && best > 0;
     if (this.best.hidden === showBest) this.best.hidden = !showBest;
@@ -116,6 +131,7 @@ export class ScoreHud {
       line.age += hudTime;
       if (line.age > C.hudTrickTime) line.el.classList.add('is-gone');
     }
+    this.updateSlide(sc, rails);
     if (sc.active) {
       if (this.mode !== 'live') this.showLive();
       const base = Math.floor(sc.base);
@@ -128,7 +144,7 @@ export class ScoreHud {
         this.shownMult = mult;
         this.mult.textContent = multText(mult);
       }
-      // Quantized, so the style changes a hundred times per combo at most.
+      // Quantized to a hundred steps from full to empty, so the style changes only as often as it shows.
       const step = Math.round(Math.min(1, Math.max(0, sc.timer / C.comboTime)) * 100);
       if (step !== this.shownFill) {
         this.shownFill = step;
@@ -139,6 +155,12 @@ export class ScoreHud {
         this.shownFlow = flow;
         this.note.textContent = flow ? 'Carving' : '';
         this.panel.classList.toggle('is-flow', flow);
+      }
+      // Running out: the bar warns (not in the air or on a rail, where it can't run out).
+      const low = sc.timer < C.hudTimerLow && !sc.air.active && !sc.rail.active;
+      if (low !== this.shownLow) {
+        this.shownLow = low;
+        this.panel.classList.toggle('is-low', low);
       }
     } else if (this.mode === 'ended') {
       this.endedAge += hudTime;
@@ -177,8 +199,9 @@ export class ScoreHud {
     this.mode = 'ended';
     this.endedAge = 0;
     this.panel.hidden = false;
-    this.panel.classList.remove('is-live', 'is-flow', 'is-best', 'is-lost', 'is-cheats');
+    this.panel.classList.remove('is-live', 'is-flow', 'is-low', 'is-best', 'is-lost', 'is-cheats');
     this.shownFlow = false;
+    this.shownLow = false;
     this.base.textContent = pointsText(ev.total);
     this.shownBase = -1;
     this.mult.textContent = '';
@@ -197,13 +220,30 @@ export class ScoreHud {
     this.blank = false;
     this.mode = 'live';
     this.panel.hidden = false;
-    this.panel.classList.remove('is-best', 'is-lost', 'is-cheats', 'is-banked');
+    this.panel.classList.remove('is-best', 'is-lost', 'is-cheats', 'is-banked', 'is-low');
     this.panel.classList.add('is-live');
     this.note.textContent = '';
     this.shownFlow = false;
+    this.shownLow = false;
     this.shownBase = -1;
     this.shownMult = -1;
     this.shownFill = -1;
+  }
+
+  /** The slide in progress, named as it goes and its meters counted; text changes only when they do. */
+  private updateSlide(sc: ScoreState, rails: readonly RailShape[]): void {
+    const meters = sc.rail.active ? Math.floor(sc.rail.meters) : -1;
+    if (meters === this.shownSlideMeters) return;
+    this.shownSlideMeters = meters;
+    const name = meters < 0 ? '' : liveSlide(sc, rails);
+    if (this.slide.hidden === (name !== '')) this.slide.hidden = name === '';
+    if (name === '') return;
+    this.blank = false;
+    if (name !== this.shownSlide) {
+      this.shownSlide = name;
+      this.slideName.textContent = name;
+    }
+    this.slideMeters.textContent = `${meters} m`;
   }
 
   private clear(): void {
@@ -211,6 +251,8 @@ export class ScoreHud {
     this.blank = true;
     this.mode = 'none';
     this.panel.hidden = true;
+    this.slide.hidden = true;
+    this.shownSlideMeters = -1;
     for (const line of this.lines) {
       line.age = Infinity;
       line.el.classList.add('is-gone');

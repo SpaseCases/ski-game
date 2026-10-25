@@ -11,6 +11,7 @@ import { loadWeather, saveWeather, urlWeather, type WeatherId } from './core/wea
 import { buildMap, type BuiltMap } from './maps/build.ts';
 import { parseMap } from './maps/loader.ts';
 import { mapEntry, MAPS, type MapEntry, type MapId } from './maps/registry.ts';
+import type { RailShape } from './maps/types.ts';
 import { CONFIG } from './config.ts';
 import { ChaseCamera, type OrbitDrag } from './render/chaseCamera.ts';
 import { clothTime } from './render/cloth.ts';
@@ -574,6 +575,9 @@ const fromUrl = mapEntry(new URLSearchParams(window.location.search).get('map'))
 openTitle();
 if (fromUrl?.load) void loadMap(fromUrl);
 
+/** The rails before any map is loaded (the score HUD's, never allocated per frame). */
+const NO_RAILS: readonly RailShape[] = [];
+
 /** Scratch for the drawing buffer's size (the lamp halos are sized in its pixels). */
 const bufferSize = new Vector2();
 
@@ -679,7 +683,7 @@ startLoop(
     const finished = level?.run.finished ?? false;
     const result = finished && race?.finished ? `${course?.name ?? ''} · ${formatTime(race.time)} · ${missedText(race.missed)}` : '';
     runHud.update(finished, result, result === '' ? '' : raceAgainHint, heldToTop ? 0 : holdTime);
-    scoreHud.update(scoring(), score, level ? bestCombo(level.id) : 0, hudTime);
+    scoreHud.update(scoring(), score, level?.built.course.rails ?? NO_RAILS, level ? bestCombo(level.id) : 0, hudTime);
     fps.frame(realFrameTime);
     tuningPanel?.update(pose, skier);
   },

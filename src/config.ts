@@ -267,8 +267,14 @@ export const CONFIG = {
     grabPoints: 100,
     grabHoldPoints: 100,
     grabHoldMax: 2,
-    /** Rails and boxes: points per meter slid (from railMin m), times railSideways sliding sideways and railSwitch riding them switch. */
+    /**
+     * Rails and boxes: points per meter slid (from railMin m, up to railMax m:
+     * past that a slide keeps the combo alive but scores no more, so the
+     * Park's top-to-bottom rail isn't worth more than every trick), times
+     * railSideways sliding sideways and railSwitch riding them switch.
+     */
     railMin: 1,
+    railMax: 40,
     railPoints: 30,
     railSideways: 1.5,
     railSwitch: 1.25,
@@ -292,9 +298,10 @@ export const CONFIG = {
     repeatRefill: 0.75,
     multGainMin: 0.25,
     multMax: 10,
-    /** HUD (real time): seconds a trick line stays up, and a banked or lost combo. */
+    /** HUD (real time): seconds a trick line stays up, and a banked or lost combo; the timer bar warns with this many seconds (game time) left. */
     hudTrickTime: 2.6,
     hudBankTime: 2.6,
+    hudTimerLow: 1,
   },
 
   checkpoints: {

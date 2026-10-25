@@ -241,4 +241,30 @@ if (kicker >= 0) {
   }
 }
 
+// ---------------------------------------------------------------- a long rail
+
+// The longest rail (the Park's runs top to bottom): ride onto it and slide
+// it to its end. Its points stop at railMax m; the combo timer holds on it.
+const longest = sim.course.rails.reduce((best, rail, i, all) => (rail.length > (all[best]?.length ?? 0) ? i : best), -1);
+const long = sim.course.rails[longest];
+if (long && long.length > 100) {
+  const p = long.points;
+  const heading = (Math.atan2(-(p[3]! - p[0]!), -(p[5]! - p[2]!)) * 180) / Math.PI;
+  console.log(`the longest rail (${long.length.toFixed(0)} m): onto it from the snow, to its end:`);
+  const t0 = r.t;
+  r.place(p[0]! + Math.sin((heading * Math.PI) / 180) * 6, p[2]! + Math.cos((heading * Math.PI) / 180) * 6, heading, 7);
+  r.t = t0;
+  let started = false;
+  while (r.t - t0 < 300) {
+    step(r, []);
+    if (r.s.bailed) {
+      console.log(`  crashed (${r.s.bailReason})`);
+      endCombo(score, r.s);
+      break;
+    }
+    started ||= score.active;
+    if (started && !score.active) break;
+  }
+}
+
 console.log(`${banked} banked, ${lost} lost; best combo ${pointsText(best)}; last state: ${score.active ? `live, ${pointsText(comboTotal(score))}` : 'no combo'}`);
