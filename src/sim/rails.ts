@@ -82,27 +82,23 @@ export interface RailSpot {
   side: number;
 }
 
-// Segment scratch, filled by segment().
-let ax = 0;
-let ay = 0;
-let az = 0;
-let by = 0;
-let hx = 0;
-let hz = 0;
-let lenH = 0;
+// Segment scratch, filled by segment(): the start, the end's height, the
+// direction and length seen from above (fields of an object, not loose
+// numbers, so filling it every step never allocates).
+const seg = { ax: 0, ay: 0, az: 0, by: 0, hx: 0, hz: 0, lenH: 0 };
 
 /** Loads segment k of a rail into the scratch: start, end height, direction and length seen from above. */
 function segment(r: RailShape, k: number): void {
   const p = r.points;
-  ax = p[k * 3] ?? 0;
-  ay = p[k * 3 + 1] ?? 0;
-  az = p[k * 3 + 2] ?? 0;
+  seg.ax = p[k * 3] ?? 0;
+  seg.ay = p[k * 3 + 1] ?? 0;
+  seg.az = p[k * 3 + 2] ?? 0;
   const bx = p[k * 3 + 3] ?? 0;
-  by = p[k * 3 + 4] ?? 0;
+  seg.by = p[k * 3 + 4] ?? 0;
   const bz = p[k * 3 + 5] ?? 0;
-  lenH = Math.hypot(bx - ax, bz - az);
-  hx = lenH > 1e-6 ? (bx - ax) / lenH : 0;
-  hz = lenH > 1e-6 ? (bz - az) / lenH : -1;
+  seg.lenH = Math.hypot(bx - seg.ax, bz - seg.az);
+  seg.hx = seg.lenH > 1e-6 ? (bx - seg.ax) / seg.lenH : 0;
+  seg.hz = seg.lenH > 1e-6 ? (bz - seg.az) / seg.lenH : -1;
 }
 
 /**
@@ -117,18 +113,18 @@ export function railUnder(rails: readonly RailShape[], x: number, z: number, rea
     const segs = r.dist.length - 1;
     for (let k = 0; k < segs; k++) {
       segment(r, k);
-      const rx = x - ax;
-      const rz = z - az;
-      const u = rx * hx + rz * hz;
-      if (u < 0 || u > lenH) continue;
-      const v = -rx * hz + rz * hx;
+      const rx = x - seg.ax;
+      const rz = z - seg.az;
+      const u = rx * seg.hx + rz * seg.hz;
+      if (u < 0 || u > seg.lenH) continue;
+      const v = -rx * seg.hz + rz * seg.hx;
       const across = Math.abs(v);
       if (across > r.halfWidth + reach || across >= best) continue;
       best = across;
-      const t = lenH > 1e-6 ? u / lenH : 0;
+      const t = seg.lenH > 1e-6 ? u / seg.lenH : 0;
       out.rail = i;
       out.seg = k;
-      out.top = ay + t * (by - ay);
+      out.top = seg.ay + t * (seg.by - seg.ay);
       out.s = (r.dist[k] ?? 0) + t * ((r.dist[k + 1] ?? 0) - (r.dist[k] ?? 0));
       out.side = v;
     }
@@ -186,30 +182,30 @@ export function collideRails(rails: readonly RailShape[], p: Vec3Like, v: Vec3Li
       segment(r, k);
       const first = k === 0;
       const last = k === segs - 1;
-      const rx = p.x - ax;
-      const rz = p.z - az;
-      const u = rx * hx + rz * hz;
-      const side = -rx * hz + rz * hx;
+      const rx = p.x - seg.ax;
+      const rz = p.z - seg.az;
+      const u = rx * seg.hx + rz * seg.hz;
+      const side = -rx * seg.hz + rz * seg.hx;
       const reach = r.halfWidth + radius;
-      if (u <= (first ? -radius : 0) || u >= (last ? lenH + radius : lenH)) continue;
+      if (u <= (first ? -radius : 0) || u >= (last ? seg.lenH + radius : seg.lenH)) continue;
       if (Math.abs(side) >= reach) continue;
-      const t = lenH > 1e-6 ? Math.min(1, Math.max(0, u / lenH)) : 0;
-      if (p.y > ay + t * (by - ay) - R.stepTolerance) continue;
+      const t = seg.lenH > 1e-6 ? Math.min(1, Math.max(0, u / seg.lenH)) : 0;
+      if (p.y > seg.ay + t * (seg.by - seg.ay) - R.stepTolerance) continue;
 
       // Out the nearest way: off a side, or off either end of the whole line.
       const sign = side < 0 ? -1 : 1;
       let depth = reach - Math.abs(side);
-      let nx = -hz * sign;
-      let nz = hx * sign;
+      let nx = -seg.hz * sign;
+      let nz = seg.hx * sign;
       if (first && u + radius < depth) {
         depth = u + radius;
-        nx = -hx;
-        nz = -hz;
+        nx = -seg.hx;
+        nz = -seg.hz;
       }
-      if (last && lenH + radius - u < depth) {
-        depth = lenH + radius - u;
-        nx = hx;
-        nz = hz;
+      if (last && seg.lenH + radius - u < depth) {
+        depth = seg.lenH + radius - u;
+        nx = seg.hx;
+        nz = seg.hz;
       }
       p.x += nx * depth;
       p.z += nz * depth;

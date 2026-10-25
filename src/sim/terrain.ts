@@ -29,8 +29,8 @@ const wx: AxisWeights = { w0: 0, w1: 0, w2: 0, w3: 0, d0: 0, d1: 0, d2: 0, d3: 0
 const wz: AxisWeights = { w0: 0, w1: 0, w2: 0, w3: 0, d0: 0, d1: 0, d2: 0, d3: 0 };
 const surface = { height: 0, dhdx: 0, dhdz: 0 };
 const shape: ShapeSample = { height: 0, dhdx: 0, dhdz: 0 };
-let rowHeight = 0;
-let rowSlope = 0;
+/** One row's interpolated height and slope, from sampleRow (fields of an object, not loose numbers, so writing them never allocates). */
+const rowOut = { height: 0, slope: 0 };
 
 function setWeights(t: number, a: AxisWeights): void {
   const t2 = t * t;
@@ -45,7 +45,7 @@ function setWeights(t: number, a: AxisWeights): void {
   a.d3 = 0.5 * (-2 * t + 3 * t2);
 }
 
-/** Interpolates along one heightfield row; sets rowHeight and rowSlope (per cell). */
+/** Interpolates along one heightfield row; sets rowOut.height and rowOut.slope (per cell). */
 function sampleRow(hf: Heightfield, row: number, c0: number, c1: number, c2: number, c3: number): void {
   const base = row * hf.cols;
   const h = hf.heights;
@@ -53,8 +53,8 @@ function sampleRow(hf: Heightfield, row: number, c0: number, c1: number, c2: num
   const v1 = h[base + c1] ?? 0;
   const v2 = h[base + c2] ?? 0;
   const v3 = h[base + c3] ?? 0;
-  rowHeight = wx.w0 * v0 + wx.w1 * v1 + wx.w2 * v2 + wx.w3 * v3;
-  rowSlope = wx.d0 * v0 + wx.d1 * v1 + wx.d2 * v2 + wx.d3 * v3;
+  rowOut.height = wx.w0 * v0 + wx.w1 * v1 + wx.w2 * v2 + wx.w3 * v3;
+  rowOut.slope = wx.d0 * v0 + wx.d1 * v1 + wx.d2 * v2 + wx.d3 * v3;
 }
 
 function sampleSurface(hf: Heightfield, x: number, z: number, withShapes = true): typeof surface {
@@ -74,21 +74,21 @@ function sampleSurface(hf: Heightfield, x: number, z: number, withShapes = true)
   let dx = 0;
   let dz = 0;
   sampleRow(hf, r0, c0, col, col + 1, c3);
-  height += wz.w0 * rowHeight;
-  dx += wz.w0 * rowSlope;
-  dz += wz.d0 * rowHeight;
+  height += wz.w0 * rowOut.height;
+  dx += wz.w0 * rowOut.slope;
+  dz += wz.d0 * rowOut.height;
   sampleRow(hf, row, c0, col, col + 1, c3);
-  height += wz.w1 * rowHeight;
-  dx += wz.w1 * rowSlope;
-  dz += wz.d1 * rowHeight;
+  height += wz.w1 * rowOut.height;
+  dx += wz.w1 * rowOut.slope;
+  dz += wz.d1 * rowOut.height;
   sampleRow(hf, row + 1, c0, col, col + 1, c3);
-  height += wz.w2 * rowHeight;
-  dx += wz.w2 * rowSlope;
-  dz += wz.d2 * rowHeight;
+  height += wz.w2 * rowOut.height;
+  dx += wz.w2 * rowOut.slope;
+  dz += wz.d2 * rowOut.height;
   sampleRow(hf, r3, c0, col, col + 1, c3);
-  height += wz.w3 * rowHeight;
-  dx += wz.w3 * rowSlope;
-  dz += wz.d3 * rowHeight;
+  height += wz.w3 * rowOut.height;
+  dx += wz.w3 * rowOut.slope;
+  dz += wz.d3 * rowOut.height;
 
   surface.height = height;
   surface.dhdx = dx / hf.cellSize;

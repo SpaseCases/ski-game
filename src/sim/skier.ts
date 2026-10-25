@@ -280,8 +280,7 @@ const CREASE_COS = Math.cos(10 * DEG);
 /** Speed (m/s) away from the snow past a crease that leaves it. */
 const CREASE_LEAVE = 0.5;
 /** Body against a rail, from railFit: tilt off the rail's up, and the skis' angle against its direction. */
-let fitTilt = 0;
-let fitAngle = 0;
+const fit = { tilt: 0, angle: 0 };
 
 /** Advances the skier by one fixed step. */
 export function stepSkier(s: SkierState, input: InputState, course: Course, dt: number): void {
@@ -762,11 +761,11 @@ function catchRail(s: SkierState, rails: readonly RailShape[]): boolean {
   // Body upright on the rail, skis straight or sideways along it.
   const railYaw = Math.atan2(-railDir.x, -railDir.z);
   const off = railFit(s, n, railYaw);
-  s.landPitch = fitTilt;
+  s.landPitch = fit.tilt;
   s.landRoll = 0;
   s.landSide = off;
   s.landImpact = into;
-  if (fitTilt > R.tiltMax || off > R.angleMax) {
+  if (fit.tilt > R.tiltMax || off > R.angleMax) {
     slipOff(s, rail.halfWidth, railYaw);
     return false;
   }
@@ -795,7 +794,7 @@ function mountRail(s: SkierState, rails: readonly RailShape[]): boolean {
   const speed = s.velocity.length();
   if (speed < 0.5 || Math.abs(s.velocity.dot(railDir)) < R.mountAlign * speed) return false;
   const railYaw = Math.atan2(-railDir.x, -railDir.z);
-  if (railFit(s, n, railYaw) > R.angleMax || fitTilt > R.tiltMax) return false;
+  if (railFit(s, n, railYaw) > R.angleMax || fit.tilt > R.tiltMax) return false;
   p.copy(head);
   s.normal.copy(n);
   lockOn(s, railYaw, 0);
@@ -810,18 +809,18 @@ function railSpot(rail: RailShape): Vector3 {
 }
 
 /**
- * How the body sits against a rail with up `n`: sets fitTilt (body away from
- * upright) and fitAngle (skis against the rail's direction), and returns how
+ * How the body sits against a rail with up `n`: sets fit.tilt (body away from
+ * upright) and fit.angle (skis against the rail's direction), and returns how
  * far the skis are from straight or sideways (radians).
  */
 function railFit(s: SkierState, n: Vector3, railYaw: number): number {
   bodyUp.set(0, 1, 0).applyQuaternion(s.orient);
   bodyForward.set(0, 0, -1).applyQuaternion(s.orient);
   bodyForward.addScaledVector(n, -bodyForward.dot(n));
-  fitTilt = Math.acos(clamp(bodyUp.dot(n), -1, 1));
-  if (bodyForward.lengthSq() < 0.04) fitTilt = Math.PI; // skis pointing at the rail: no way on
-  fitAngle = wrapAngle(Math.atan2(-bodyForward.x, -bodyForward.z) - railYaw);
-  return Math.abs(fitAngle - Math.round(fitAngle / (Math.PI / 2)) * (Math.PI / 2));
+  fit.tilt = Math.acos(clamp(bodyUp.dot(n), -1, 1));
+  if (bodyForward.lengthSq() < 0.04) fit.tilt = Math.PI; // skis pointing at the rail: no way on
+  fit.angle = wrapAngle(Math.atan2(-bodyForward.x, -bodyForward.z) - railYaw);
+  return Math.abs(fit.angle - Math.round(fit.angle / (Math.PI / 2)) * (Math.PI / 2));
 }
 
 /** Locks onto the rail at `spot` (feet already on it, normal set), keeping the skis' angle from railFit. */
@@ -830,9 +829,9 @@ function lockOn(s: SkierState, railYaw: number, into: number): void {
   s.railExit = false;
   s.railS = spot.s;
   s.railSpeed = s.velocity.dot(railDir);
-  s.railAngle = fitAngle;
+  s.railAngle = fit.angle;
   s.velocity.copy(railDir).multiplyScalar(s.railSpeed);
-  s.yaw = wrapAngle(railYaw + fitAngle);
+  s.yaw = wrapAngle(railYaw + fit.angle);
   s.yawRate = 0;
   s.grounded = true;
   s.airTime = 0;

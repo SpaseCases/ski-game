@@ -1,4 +1,6 @@
 import {
+  type Camera,
+  type Object3D,
   Color,
   DirectionalLight,
   Fog,
@@ -28,13 +30,21 @@ export interface View {
 const DEFAULT_SKY = '#9fc3e6';
 const DEFAULT_FOG = '#dce8f3';
 
-/** Creates the renderer, scene, lights, fog and camera. Throws if WebGL is unavailable. */
-export function createView(container: HTMLElement): View {
+/**
+ * Creates the renderer, scene, lights, fog and camera. Throws if WebGL is
+ * unavailable. `antialias` (smooth edges) can only be chosen here, when the
+ * WebGL context is made; the pixel ratio can change later (setPixelRatio).
+ */
+export function createView(container: HTMLElement, antialias: boolean, pixelRatio: number): View {
   const renderer = new WebGLRenderer({
-    antialias: CONFIG.render.antialias,
+    antialias,
     powerPreference: 'high-performance',
   });
-  renderer.setPixelRatio(CONFIG.render.pixelRatio);
+  renderer.setPixelRatio(pixelRatio);
+  // Checking each shader for errors the first time it's used waits on the
+  // GPU (a stall the first time something new comes into view). Our shaders
+  // are fixed, so production skips it; dev builds keep it to catch mistakes.
+  renderer.debug.checkShaderErrors = import.meta.env.DEV;
   renderer.setSize(window.innerWidth, window.innerHeight);
   // Each frame clears once, draws the backdrop, then the world over it (see renderFrame).
   renderer.autoClear = false;
@@ -70,6 +80,22 @@ export function createView(container: HTMLElement): View {
   });
 
   return { renderer, scene, camera, hemi, sun, backdrop: new Backdrop() };
+}
+
+/**
+ * Compiles every shader program `scene` can draw: alongside the game where
+ * the GPU can (KHR_parallel_shader_compile; resolves once they're ready),
+ * else at once.
+ */
+export function compileShaders(renderer: WebGLRenderer, scene: Object3D, camera: Camera, target?: Scene): Promise<unknown> {
+  if (renderer.extensions.has('KHR_parallel_shader_compile')) return renderer.compileAsync(scene, camera, target);
+  renderer.compile(scene, camera, target);
+  return Promise.resolve();
+}
+
+/** Draws `ratio` pixels per CSS pixel from now on (the canvas is resized to match). */
+export function setPixelRatio(view: View, ratio: number): void {
+  if (view.renderer.getPixelRatio() !== ratio) view.renderer.setPixelRatio(ratio);
 }
 
 /** Draws a frame: the backdrop, then the world over it (through `camera`, the game's own unless given). */

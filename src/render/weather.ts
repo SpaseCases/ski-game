@@ -44,7 +44,7 @@ export function weatherLook(id: WeatherId, map: MapDef | null): WeatherLook {
     sun: new Color(def.sun),
     sunIntensity: def.sunIntensity,
     // The sky light keeps the map's own sky color unless the weather sets one (a deeper sky overhead doesn't tint the snow).
-    hemiSky: new Color(def.hemiSky ?? map?.colors.sky ?? DEFAULT_SKY),
+    hemiSky: new Color(def.hemiSky ?? map?.colors.sky ?? DEFAULT_SKY).lerp(new Color(def.hemiShift.to), def.hemiShift.mix),
     hemiGround: new Color(def.hemiGround),
     hemiIntensity: def.hemiIntensity,
     peaksLight: new Color(def.peaks.light),

@@ -6,7 +6,21 @@ import { startLoop } from './core/loop.ts';
 import { PointerOrbit } from './core/pointerOrbit.ts';
 import { bestCombo, submitCombo } from './core/bests.ts';
 import { loadOutfit, saveOutfit, type Outfit } from './core/outfit.ts';
-import { decorDensity, loadSettings, saveSettings, snowBudget, urlQuality, viewRange, type Quality } from './core/settings.ts';
+import {
+  clampRung,
+  decorDensity,
+  loadSettings,
+  pixelRatioFor,
+  qualityLevel,
+  sameLevel,
+  saveSettings,
+  snowBudget,
+  urlQuality,
+  viewRange,
+  wantsAntialias,
+  type Quality,
+  type QualityLevel,
+} from './core/settings.ts';
 import { readStored, writeStored } from './core/storage.ts';
 import { loadWeather, saveWeather, urlWeather, type WeatherId } from './core/weather.ts';
 import { buildMap, type BuiltMap } from './maps/build.ts';
@@ -17,7 +31,8 @@ import { CONFIG } from './config.ts';
 import { ChaseCamera, type OrbitDrag } from './render/chaseCamera.ts';
 import { clothTime } from './render/cloth.ts';
 import { LockerStage } from './render/lockerStage.ts';
-import { applyMap, applyWeather, createView, renderFrame, setViewRange, type View } from './render/scene.ts';
+import { AutoQuality } from './render/autoQuality.ts';
+import { applyMap, applyWeather, compileShaders, createView, renderFrame, setPixelRatio, setViewRange, type View } from './render/scene.ts';
 import { createSkierPose, interpolateSkier, SkierView } from './render/skierView.ts';
 import { SnowFx } from './render/snowFx.ts';
 import { weatherLook, weatherRange } from './render/weather.ts';
@@ -64,18 +79,35 @@ let outfit: Outfit = loadOutfit();
 setSkiScale(CONFIG.skis[outfit.ski]);
 /** The preset in use: the saved one, unless the URL names one for this visit. */
 let quality: Quality = urlQuality() ?? settings.quality;
+/** Auto's rung: one better than where it settled last visit (skipping rungs that draw the same here), stepping down while riding if frames are slow. */
+const auto = new AutoQuality(tryBetter(settings.autoRung));
+/** What the quality setting draws now (Auto's depends on its rung), and what the world was last built for. */
+let drawn: QualityLevel = currentLevel();
 /** The weather, the same on every map: the saved pick, unless the URL names one for this visit. */
 let weather: WeatherId = urlWeather() ?? loadWeather();
 
 let view: View;
 try {
-  view = createView(app);
+  view = createView(app, wantsAntialias(quality), pixelRatioFor(drawn));
 } catch (err) {
   console.error(err);
   showFatal('This game needs WebGL, which this browser could not start. Try updating Chrome or turning on hardware acceleration.');
   throw err;
 }
 const { renderer, scene, camera } = view;
+/**
+ * True once the graphics stop (the WebGL context was lost: a GPU reset, or
+ * a computer short of memory). Nothing can be drawn after that, so the game
+ * waits behind a message with a Reload button (settings are saved).
+ */
+let graphicsLost = false;
+renderer.domElement.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  if (graphicsLost) return;
+  graphicsLost = true;
+  keyboard.setEnabled(false);
+  showFatal('The graphics stopped (the computer may be short of memory). Reload to keep riding; your settings are kept.', 'Reload', () => window.location.reload());
+});
 
 const windowBar = mountWindowButtons(hud);
 mountFocusHint(hud);
@@ -131,6 +163,8 @@ const settingsScreen = new SettingsScreen(
   {
     get: () => ({ ...settings, quality }),
     setQuality,
+    autoNow: () => levelName(qualityLevel('auto', auto.rung)),
+    antialiased: () => renderer.getContextAttributes()?.antialias === true,
     setSound: (master, sfx, muted) => {
       settings.masterVolume = master;
       settings.sfxVolume = sfx;
@@ -216,6 +250,8 @@ interface Level {
   race: RaceState | null;
 }
 let level: Level | null = null;
+/** True while a new map's shaders compile (see loadMap): no frame is drawn, so none waits on the compiler. */
+let warming = false;
 applyView();
 
 // Render state. The skier and camera are made with the first map.
@@ -226,6 +262,8 @@ const orbit = new PointerOrbit();
 orbit.attach(renderer.domElement);
 const drag: OrbitDrag = { x: 0, y: 0, active: false };
 let snapView = true;
+/** Build the snow's near chunks at once next frame (the view range changed), without snapping the camera. */
+let rebuildView = false;
 /** Dev only: a fixed camera spot and aim (parkLaps.lookFrom), instead of the chase camera. */
 let freeCamera: { from: Vector3; at: Vector3 } | null = null;
 
@@ -262,6 +300,7 @@ function respawn(): void {
   copySkierState(skierPrev, skier);
   snapView = true;
   fader.reveal();
+  auto.hold();
 }
 
 /** A fresh run from the top: every checkpoint and passed flag is forgotten. */
@@ -289,7 +328,7 @@ async function loadMap(entry: MapEntry): Promise<void> {
     sound.setMap(null);
     resetScore(score);
     const built = buildMap(map);
-    const world = new WorldView(built, decorDensity(quality), viewRange(quality).far, snowBudget(quality));
+    const world = new WorldView(built, decorDensity(drawn.detail), viewRange(drawn.view).far, snowBudget(drawn.detail));
     scene.add(world.group);
     applyMap(view, built);
     level = { id: entry.id, built, world, run: createRun(map), race: built.race ? createRace(built.race) : null };
@@ -305,6 +344,18 @@ async function loadMap(entry: MapEntry): Promise<void> {
     writeStored('map', entry.id);
     tuningPanel?.setMap(map);
     backToTop();
+    // While "Loading" still shows: build the snow round the start and compile
+    // every shader the map draws, so the first frames (and the first spray,
+    // night or new corner of the map) don't stall. Nothing is drawn meanwhile.
+    world.view(skier.position.x, skier.position.z, camera.far, true);
+    warming = true;
+    try {
+      await Promise.all([world.warm(renderer, camera, scene), compileShaders(renderer, view.backdrop.scene, view.backdrop.camera)]);
+    } finally {
+      warming = false;
+    }
+    // The first frame also uploads every mesh to the GPU: draw it behind "Loading" too.
+    await nextPaint();
     mapSelect.setLoading(null);
     closeMenus();
   } catch (err) {
@@ -372,7 +423,7 @@ function drawLocker(realFrameTime: number): void {
   if (rect.width <= 0 || rect.height <= 0) return;
   lockerStage.turn(realFrameTime);
   clothTime.value += realFrameTime;
-  if (level && skierView) lockerStage.renderWorld(view, rect, pose.center, level.built.hf);
+  if (level && skierView) lockerStage.renderWorld(view, rect, pose.center, level.built.hf, level.built.course.obstacles);
   else lockerStage.renderStage(renderer, rect);
 }
 
@@ -451,19 +502,59 @@ function syncKeyLabels(): void {
   raceAgainHint = `${mainKey(b, 'respawn')}: race it again`;
 }
 
-/** Switches to a quality preset (and remembers it): view range and decoration. */
+/** Switches to a quality preset (and remembers it): view range, decoration and pixel ratio. */
 function setQuality(q: Quality): void {
   quality = q;
   settings.quality = q;
   saveSettings(settings);
+  applyQuality();
+}
+
+/** What the quality setting draws now. */
+function currentLevel(): QualityLevel {
+  return qualityLevel(quality, auto.rung);
+}
+
+/** Applies what the quality setting draws now: the pixel ratio, the view range, and (if they changed) the decoration and snow effects. */
+function applyQuality(): void {
+  const next = currentLevel();
+  setPixelRatio(view, pixelRatioFor(next));
+  const rebuild = next.view !== drawn.view || next.detail !== drawn.detail;
+  drawn = next;
   applyView();
-  level?.world.setQuality(decorDensity(q), viewRange(q).far, snowBudget(q));
+  if (rebuild) level?.world.setQuality(decorDensity(next.detail), viewRange(next.view).far, snowBudget(next.detail));
+  // A shorter or longer view can start the snow's chunks over: build the near ones at once.
+  rebuildView = true;
+  auto.hold();
+}
+
+/** Auto settled on a rung: remember it, so the next visit starts near it. */
+function saveAutoRung(): void {
+  if (settings.autoRung === auto.rung) return;
+  settings.autoRung = auto.rung;
+  saveSettings(settings);
+}
+
+/** The rung to try first: one better than `saved`, past any rung that draws the same as the one above it on this screen. */
+function tryBetter(saved: number): number {
+  const rungs = CONFIG.quality.auto.rungs;
+  let r = clampRung(saved) - 1;
+  while (r > 0 && sameLevel(rungs[r]!, rungs[r - 1]!)) r--;
+  return Math.max(0, r);
+}
+
+/** A level's name for Settings: "Medium", or what it mixes ("Medium, Low view distance"). */
+function levelName(l: QualityLevel): string {
+  const name = (p: string): string => p[0]!.toUpperCase() + p.slice(1);
+  if (l.view !== l.detail) return `${name(l.detail)}, ${name(l.view)} view distance`;
+  const full = pixelRatioFor({ ...l, pixelRatio: CONFIG.quality.pixelRatio[l.view] });
+  return pixelRatioFor(l) < full ? `${name(l.view)} at 1× sharpness` : name(l.view);
 }
 
 /** The current preset's view range, in this weather, on the camera and fog. */
 function applyView(): void {
   // Only a map with far ranges has the far stand-in the haze can fade into; elsewhere the fog ends at the far plane.
-  setViewRange(view, weatherRange(weather, viewRange(quality), level?.built.map.peaks !== undefined));
+  setViewRange(view, weatherRange(weather, viewRange(drawn.view), level?.built.map.peaks !== undefined));
 }
 
 /** Picks the weather for every map (and remembers it): it changes at once, behind any menu. */
@@ -601,17 +692,18 @@ if (import.meta.env.DEV) {
 // Start on the title, or straight on a map named in the URL (?map=park).
 const fromUrl = mapEntry(new URLSearchParams(window.location.search).get('map'));
 openTitle();
+document.getElementById('boot')?.remove();
 if (fromUrl?.load) void loadMap(fromUrl);
 
 /** The rails before any map is loaded (the score HUD's, never allocated per frame). */
 const NO_RAILS: readonly RailShape[] = [];
 
-/** Scratch for the drawing buffer's size (the lamp halos are sized in its pixels). */
+/** Scratch for the drawing buffer's size (the lamp halos and snow wisps are sized in its pixels). */
 const bufferSize = new Vector2();
 
 /** True while the game waits: no map yet, or a menu or the trail map is open. Nothing moves then. */
 function gameWaits(): boolean {
-  return !level || menus.isOpen || trailMap.isOpen;
+  return !level || menus.isOpen || trailMap.isOpen || graphicsLost;
 }
 
 startLoop(
@@ -694,11 +786,13 @@ startLoop(
         camera.position.copy(freeCamera.from);
         camera.lookAt(freeCamera.at);
       }
-      level.world.view(camera.position.x, camera.position.z, camera.far, snapped || freeCamera !== null);
+      level.world.view(camera.position.x, camera.position.z, camera.far, snapped || rebuildView, freeCamera !== null);
+      rebuildView = false;
       level.world.update(level.run, level.race, frameTime);
       level.world.snow.update(pose, skier, frameTime, camera.position);
       const fog = scene.fog as { near: number; far: number };
       const pxPerM = renderer.getDrawingBufferSize(bufferSize).y / (2 * Math.tan((camera.fov * Math.PI) / 360));
+      SnowFx.setPointScale(pxPerM);
       const p = pose.position;
       level.world.lights.update(p.x, p.y, p.z, -Math.sin(pose.yaw), -Math.cos(pose.yaw), camera.position.x, camera.position.z, fog.near, fog.far, pxPerM);
       // The camera's right, flat, for panning places left and right.
@@ -710,7 +804,7 @@ startLoop(
     }
 
     if (lockerOpen) drawLocker(realFrameTime);
-    else renderFrame(view);
+    else if (!warming) renderFrame(view);
     fader.update(hudTime);
     crashHint.show(pose.bailed);
     toast.update(hudTime);
@@ -722,6 +816,12 @@ startLoop(
     runHud.update(finished, result, result === '' ? '' : raceAgainHint, heldToTop ? 0 : holdTime);
     scoreHud.update(scoring(), score, level?.built.course.rails ?? NO_RAILS, level ? bestCombo(level.id) : 0, hudTime);
     fps.frame(realFrameTime);
+    // Auto quality judges riding frames only (it holds off after jumps, loads and menus).
+    if (quality === 'auto' && level) {
+      const judged = auto.frame(realFrameTime, !waits);
+      if (judged === 'down') applyQuality();
+      if (judged !== null) saveAutoRung();
+    }
     tuningPanel?.update(pose, skier);
   },
   gameWaits,
@@ -766,9 +866,24 @@ function byId(id: string): HTMLElement {
   return el;
 }
 
-function showFatal(message: string): void {
+/** A message instead of the game, with a button (`label`, `action`) if given. */
+function showFatal(message: string, label?: string, action?: () => void): void {
+  document.getElementById('boot')?.remove();
   const el = document.createElement('div');
   el.className = 'fatal';
-  el.textContent = message;
+  const text = document.createElement('p');
+  text.textContent = message;
+  el.appendChild(text);
+  if (label && action) {
+    el.classList.add('is-over-game');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.addEventListener('click', action);
+    el.appendChild(b);
+    hud.appendChild(el);
+    b.focus();
+    return;
+  }
   hud.appendChild(el);
 }

@@ -290,9 +290,13 @@ export interface PeakTerrainDef {
   /**
    * The hills around the mountain: the ground starts climbing `inset` m
    * inside the bounds, steepening over `ramp` m to a grade of `rise`, so
-   * riders near the edge roll back in rather than meet a wall.
+   * riders near the edge roll back in rather than meet a wall. With `ease`,
+   * the climb stops a little past the bounds (past all the ground a rider
+   * can touch) and eases back off over `ease` m, so the land carries on
+   * down its own lie into the foothills; without it, it climbs on to the
+   * map's edge.
    */
-  rim: { inset: number; ramp: number; rise: number };
+  rim: { inset: number; ramp: number; rise: number; ease?: number };
   /**
    * Ground steeper than this (degrees, measured over a few meters) is drawn
    * as rock, except gully walls and wind lips, which are always snow.
@@ -822,6 +826,14 @@ export interface MapDef {
    * CONFIG.weather derives from `colors` (which are its bluebird look).
    */
   weather?: Partial<Record<'overcast' | 'blizzard' | 'night', { sky?: string; fog?: string }>>;
+  /** Where this map's sun and moon hang, in place of CONFIG.sun's and CONFIG.lights' (both measured from the start's heading). */
+  sky?: { sun?: SkyAt; moon?: SkyAt };
+}
+
+/** A spot in the sky: degrees to the left of the map's start heading (negative: right), and up from the horizon. */
+export interface SkyAt {
+  left: number;
+  up: number;
 }
 
 /**

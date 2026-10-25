@@ -1,10 +1,11 @@
-import { type BufferAttribute, Color, Group, InstancedMesh, MeshLambertMaterial, type BufferGeometry } from 'three';
+import { Color, Group, InstancedMesh, MeshLambertMaterial, type BufferGeometry } from 'three';
 import { alongLine, DECOR_SIZE } from '../maps/decor.ts';
 import { hash2 } from '../maps/terrain.ts';
 import type { Heightfield, LineDecor, XZ } from '../maps/types.ts';
 import { MeshKit } from './meshKit.ts';
 import { FLAG_COLORS, PALETTE } from './models.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
+import { uploadFirst } from './upload.ts';
 
 // The chairlifts' moving parts: chairs running round each lift's cable
 // loop (up one side, round the top station's bullwheel, down the other and
@@ -74,6 +75,8 @@ interface Loop {
 }
 
 const material = new MeshLambertMaterial({ vertexColors: true, flatShading: true });
+/** The riders' own: their per-rider jacket colors need another shader program (one shared material would swap programs every frame). */
+const riderMaterial = new MeshLambertMaterial({ vertexColors: true, flatShading: true });
 const RIDER_COLORS = ['#c8331f', '#2f6fe0', '#33c26a', '#e0c21f', '#8a4fd6', '#ff7a1a', '#1b2430', '#f4f6fa'].map((h) => new Color(h));
 
 export class ChairliftView {
@@ -99,7 +102,7 @@ export class ChairliftView {
       for (const i of [0, line.spots.length - 1]) this.wheelAt.push({ x: line.spots[i]!.x, y: line.heights[i]! + 0.15, z: line.spots[i]!.z });
     }
     this.chairs = new InstancedMesh(chairGeometry(), material, Math.max(1, chairCount));
-    this.riders = new InstancedMesh(riderGeometry(), material, Math.max(1, riderCount));
+    this.riders = new InstancedMesh(riderGeometry(), riderMaterial, Math.max(1, riderCount));
     this.wheels = this.wheelAt.length > 0 ? new InstancedMesh(wheelGeometry(), material, this.wheelAt.length) : null;
     // Every rider slot gets a jacket color (rewritten as the near ones are packed in each frame).
     for (let k = 0; k < riderCount; k++) this.riders.setColorAt(k, riderColor(k));
@@ -171,9 +174,9 @@ export class ChairliftView {
     this.chairs.count = chairs;
     this.riders.count = riders;
     // Upload only the part in use.
-    upload(this.chairs.instanceMatrix, chairs * 16);
-    upload(this.riders.instanceMatrix, riders * 16);
-    if (this.riders.instanceColor) upload(this.riders.instanceColor, riders * 3);
+    uploadFirst(this.chairs.instanceMatrix, chairs * 16);
+    uploadFirst(this.riders.instanceMatrix, riders * 16);
+    if (this.riders.instanceColor) uploadFirst(this.riders.instanceColor, riders * 3);
     if (this.wheels) {
       // Each wheel turns at the cable's speed round its rim; only near ones are listed.
       const wm = this.wheels.instanceMatrix.array as Float32Array;
@@ -186,17 +189,9 @@ export class ChairliftView {
         writeYaw(wm, w++, p.x, p.y, p.z, Math.cos(angle), Math.sin(angle));
       }
       this.wheels.count = w;
-      upload(this.wheels.instanceMatrix, w * 16);
+      uploadFirst(this.wheels.instanceMatrix, w * 16);
     }
   }
-}
-
-/** Marks the first `count` numbers of an attribute for upload (nothing when none are used). */
-function upload(attr: BufferAttribute, count: number): void {
-  attr.clearUpdateRanges();
-  if (count <= 0) return;
-  attr.addUpdateRange(0, count);
-  attr.needsUpdate = true;
 }
 
 /** The jacket color of rider slot k. */

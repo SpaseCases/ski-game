@@ -9,6 +9,8 @@ import { readStored, writeStored } from './storage.ts';
 
 export type Quality = 'auto' | 'low' | 'medium' | 'high';
 export const QUALITIES: readonly Quality[] = ['auto', 'low', 'medium', 'high'];
+/** A fixed preset (Auto picks among them, see CONFIG.quality.auto). */
+export type Preset = Exclude<Quality, 'auto'>;
 
 /** Keys per action: a main key and an optional second one. */
 export const KEY_SLOTS = 2;
@@ -23,6 +25,8 @@ export interface Settings {
   score: boolean;
   /** After a crash, lie in the snow until the respawn key is pressed, instead of respawning by itself. */
   crashWait: boolean;
+  /** The rung of CONFIG.quality.auto.rungs that Auto settled on (0 = the best); the next visit tries one better. */
+  autoRung: number;
   bindings: Bindings;
 }
 
@@ -35,7 +39,7 @@ function isQuality(value: unknown): value is Quality {
 }
 
 export function defaultSettings(): Settings {
-  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, bindings: { ...DEFAULT_BINDINGS } };
+  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, autoRung: 0, bindings: { ...DEFAULT_BINDINGS } };
 }
 
 /** The saved settings, or the defaults for anything not saved (or unreadable). */
@@ -56,6 +60,7 @@ export function loadSettings(): Settings {
   if (typeof saved.muted === 'boolean') out.muted = saved.muted;
   if (typeof saved.score === 'boolean') out.score = saved.score;
   if (typeof saved.crashWait === 'boolean') out.crashWait = saved.crashWait;
+  if (typeof saved.autoRung === 'number' && Number.isInteger(saved.autoRung)) out.autoRung = clampRung(saved.autoRung);
   out.bindings = readBindings(saved.bindings);
   return out;
 }
@@ -159,13 +164,49 @@ export function clearSecondKey(bindings: Bindings, action: Action): Bindings {
   return { ...bindings, [action]: first ? [first] : [] };
 }
 
+/** What a quality setting draws: the preset for the view, the preset for the detail, and a pixel ratio cap. */
+export interface QualityLevel {
+  /** Distance, fog and haze. */
+  view: Preset;
+  /** Decoration and the snow effects' budget. */
+  detail: Preset;
+  /** Most pixels per CSS pixel (the screen's own ratio, capped). */
+  pixelRatio: number;
+}
+
+/** A rung of Auto's ladder, kept in range. */
+export function clampRung(rung: number): number {
+  return Math.min(CONFIG.quality.auto.rungs.length - 1, Math.max(0, Math.round(rung)));
+}
+
+/** What quality `q` draws now; Auto's depends on the rung it's on. */
+export function qualityLevel(q: Quality, autoRung: number): QualityLevel {
+  if (q === 'auto') return CONFIG.quality.auto.rungs[clampRung(autoRung)]!;
+  return { view: q, detail: q, pixelRatio: CONFIG.quality.pixelRatio[q] };
+}
+
+/** The renderer's pixel ratio for a level on this screen: the screen's own, capped by the level (Low draws exactly 1). */
+export function pixelRatioFor(level: QualityLevel): number {
+  return level.pixelRatio <= 1 ? 1 : Math.min(level.pixelRatio, Math.max(1, window.devicePixelRatio || 1));
+}
+
+/** True when two levels draw the same on this screen (a rung that only lowers the pixel ratio changes nothing at ratio 1). */
+export function sameLevel(a: QualityLevel, b: QualityLevel): boolean {
+  return a.view === b.view && a.detail === b.detail && pixelRatioFor(a) === pixelRatioFor(b);
+}
+
+/** Whether quality `q` asks for smooth edges (antialiasing). Auto never goes above Medium. */
+export function wantsAntialias(q: Quality): boolean {
+  return q !== 'auto' && CONFIG.quality.antialias[q];
+}
+
 /** How far (m) a preset draws the world, where its haze starts, and where the haze is complete. */
-export function viewRange(q: Quality): { far: number; fogStart: number; hazeEnd: number } {
+export function viewRange(q: Preset): { far: number; fogStart: number; hazeEnd: number } {
   return { far: CONFIG.quality.viewDistance[q], fogStart: CONFIG.quality.fogStart[q], hazeEnd: CONFIG.quality.hazeEnd[q] };
 }
 
 /** Share (0..1) of scenery decoration a preset draws. Solid decoration is always drawn. */
-export function decorDensity(q: Quality): number {
+export function decorDensity(q: Preset): number {
   return CONFIG.quality.decorDensity[q];
 }
 
@@ -180,7 +221,7 @@ export interface SnowBudget {
   flakes: number;
 }
 
-export function snowBudget(q: Quality): SnowBudget {
+export function snowBudget(q: Preset): SnowBudget {
   const f = CONFIG.snowFx;
   return { particles: f.particles[q], rate: f.rate[q], trackPoints: f.trackPoints[q], trackLife: f.trackLife[q], ridgeRange: f.ridgeRange[q], flakes: f.flakes[q] };
 }

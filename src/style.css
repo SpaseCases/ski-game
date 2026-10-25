@@ -79,11 +79,34 @@ body {
   position: absolute;
   inset: 0;
   display: grid;
-  place-items: center;
+  place-content: center;
+  justify-items: center;
+  gap: 16px;
   padding: 24px;
   color: #142030;
   font-size: 18px;
   text-align: center;
+}
+
+/* The graphics stopped (see main.ts): over a dimmed, frozen game. */
+.fatal.is-over-game {
+  z-index: 20;
+  background: rgb(220 232 243 / 0.92);
+}
+
+.fatal button {
+  padding: 10px 22px;
+  border: 0;
+  border-radius: 8px;
+  background: #142030;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.fatal button:focus-visible {
+  outline: 3px solid #e8762b;
+  outline-offset: 2px;
 }
 
 .fade {

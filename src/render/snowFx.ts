@@ -9,7 +9,11 @@ import {
   MeshBasicMaterial,
   MeshLambertMaterial,
   OctahedronGeometry,
+  Points,
   Quaternion,
+  ShaderMaterial,
+  UniformsLib,
+  UniformsUtils,
   Vector3,
 } from 'three';
 import { CONFIG } from '../config.ts';
@@ -23,13 +27,15 @@ import { STANCE_HALF_WIDTH } from './skierPoses.ts';
 import { shapeSurfaceAt, SURFACE } from '../maps/shapes.ts';
 import { smoothstep } from '../maps/terrain.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
+import { uploadFirst } from './upload.ts';
 
 // Snow effects: spray off the skis, ski tracks, landing puffs, crash
 // bursts, rail sparks, powder clouds and snow blowing off ridges. One pool
 // of particles in a ring buffer (the oldest gives way when it's full),
-// drawn as three instanced meshes (snow, sparks, and wisps of blowing
-// snow), and a ribbon per ski for the tracks: four draw calls at most, and
-// nothing allocated per frame. Everything is worked out from the sim's
+// drawn as two instanced meshes (chunks of snow, and sparks) and one set of
+// soft round points (wisps: blowing snow and powder clouds, which grow and
+// thin out), and a ribbon per ski for the tracks: four draw calls at most,
+// and nothing allocated per frame. Everything is worked out from the sim's
 // state as it changes (a landing resets landTime, a crash sets bailed, and
 // so on); the sim knows nothing of it.
 //
@@ -74,7 +80,47 @@ const SNOW_GLOW = new Color('#2b3139');
 const WISP_COLOR = new Color('#f7faff');
 const snowMaterial = new MeshLambertMaterial({ color: new Color('#f3f7fb'), emissive: SNOW_GLOW.clone(), transparent: true, opacity: 0.85, depthWrite: false });
 const sparkMaterial = new MeshBasicMaterial({ color: new Color('#ffd27a') });
-const wispMaterial = new MeshBasicMaterial({ color: WISP_COLOR.clone(), transparent: true, opacity: 0.55, depthWrite: false });
+/**
+ * Wisps (blowing snow, powder clouds): soft round points, each sized in
+ * meters (scale: pixels per meter at 1 m away) and faded by its own alpha,
+ * fogged like the world. Their shape is worked out per pixel, no texture.
+ */
+const wispMaterial = new ShaderMaterial({
+  uniforms: UniformsUtils.merge([UniformsLib.fog, { color: { value: WISP_COLOR.clone() }, opacity: { value: 0.75 }, scale: { value: 1 } }]),
+  vertexShader: /* glsl */ `
+    attribute float size;
+    attribute float alpha;
+    uniform float scale;
+    varying float vAlpha;
+    #include <fog_pars_vertex>
+    void main() {
+      vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+      gl_Position = projectionMatrix * mvPosition;
+      gl_PointSize = min( 256.0, size * scale / max( -mvPosition.z, 0.1 ) );
+      vAlpha = alpha;
+      #include <fog_vertex>
+    }`,
+  fragmentShader: /* glsl */ `
+    uniform vec3 color;
+    uniform float opacity;
+    varying float vAlpha;
+    #include <fog_pars_fragment>
+    void main() {
+      vec2 c = gl_PointCoord * 2.0 - 1.0;
+      float d = 1.0 - dot( c, c );
+      if ( d <= 0.0 ) discard;
+      // Lit on top, a cool shade underneath, so a cloud reads as round even against white snow.
+      vec3 shade = mix( color, color * vec3( 0.72, 0.78, 0.9 ), gl_PointCoord.y );
+      gl_FragColor = vec4( shade, opacity * vAlpha * d * d );
+      #include <fog_fragment>
+      #include <colorspace_fragment>
+    }`,
+  fog: true,
+  transparent: true,
+  depthWrite: false,
+});
+/** A wisp's point is this many times its particle's size across (the soft edge makes it look smaller than its square). */
+const WISP_SPREAD = 3.2;
 const flakeMaterial = new MeshBasicMaterial({ color: WISP_COLOR.clone(), transparent: true, opacity: 0.8, depthWrite: false });
 const trackMaterial = new MeshLambertMaterial({
   vertexColors: true,
@@ -116,7 +162,11 @@ export class SnowFx {
   private readonly kind: Uint8Array;
   private readonly snowMesh: InstancedMesh;
   private readonly sparkMesh: InstancedMesh;
-  private readonly wispMesh: InstancedMesh;
+  /** Wisps as soft points: position, size (m across) and alpha per point, the first few drawn. */
+  private readonly wisps: Points;
+  private readonly wispPos: BufferAttribute;
+  private readonly wispSize: BufferAttribute;
+  private readonly wispAlpha: BufferAttribute;
   /** TURNS rotation matrices, 9 numbers each (column-major). */
   private readonly turns = new Float32Array(TURNS * 9);
 
@@ -205,8 +255,19 @@ export class SnowFx {
     this.kind = new Uint8Array(n);
     this.snowMesh = instanced(new IcosahedronGeometry(1, 0), snowMaterial, n);
     this.sparkMesh = instanced(new OctahedronGeometry(1, 0), sparkMaterial, n);
-    this.wispMesh = instanced(new OctahedronGeometry(1, 0), wispMaterial, n);
-    this.group.add(this.snowMesh, this.sparkMesh, this.wispMesh);
+    this.wispPos = new BufferAttribute(new Float32Array(n * 3), 3);
+    this.wispSize = new BufferAttribute(new Float32Array(n), 1);
+    this.wispAlpha = new BufferAttribute(new Float32Array(n), 1);
+    const wispGeometry = new BufferGeometry();
+    wispGeometry.setAttribute('position', this.wispPos);
+    wispGeometry.setAttribute('size', this.wispSize);
+    wispGeometry.setAttribute('alpha', this.wispAlpha);
+    wispGeometry.setDrawRange(0, 0);
+    this.wisps = new Points(wispGeometry, wispMaterial);
+    this.wisps.frustumCulled = false;
+    this.wisps.matrixAutoUpdate = false;
+    this.wisps.visible = false;
+    this.group.add(this.snowMesh, this.sparkMesh, this.wisps);
     const nf = Math.max(1, budget.flakes);
     this.fx = new Float32Array(nf);
     this.fy = new Float32Array(nf);
@@ -288,9 +349,14 @@ export class SnowFx {
    * every map's effects.
    */
   static setTint(tint: Color): void {
-    wispMaterial.color.copy(WISP_COLOR).multiply(tint);
+    (wispMaterial.uniforms.color!.value as Color).copy(WISP_COLOR).multiply(tint);
     flakeMaterial.color.copy(WISP_COLOR).multiply(tint);
     snowMaterial.emissive.copy(SNOW_GLOW).multiply(tint);
+  }
+
+  /** How big the wisps draw: pixels per meter at 1 m away (the drawing buffer's height over the view's height there). */
+  static setPointScale(pxPerM: number): void {
+    wispMaterial.uniforms.scale!.value = pxPerM;
   }
 
   /** True while the skier rides powder (off-piste on Freeride), checked every few meters. */
@@ -331,8 +397,7 @@ export class SnowFx {
     this.snowMesh.dispose();
     this.sparkMesh.geometry.dispose();
     this.sparkMesh.dispose();
-    this.wispMesh.geometry.dispose();
-    this.wispMesh.dispose();
+    this.wisps.geometry.dispose();
     this.flakeMesh.geometry.dispose();
     this.flakeMesh.dispose();
     this.trackMesh.geometry.dispose();
@@ -393,7 +458,7 @@ export class SnowFx {
           (0.1 + 0.16 * k) * grow * (0.7 + 0.6 * Math.random()),
           0.35,
           2,
-          SNOW,
+          powder && Math.random() < P.puffs ? WISP : SNOW,
         );
       }
     }
@@ -415,7 +480,7 @@ export class SnowFx {
           (0.1 + 0.18 * Math.random()) * (powder ? 2.5 : 1),
           0.7,
           1.6,
-          SNOW,
+          powder && Math.random() < P.puffs ? WISP : SNOW,
         );
       }
     }
@@ -544,7 +609,9 @@ export class SnowFx {
   private spray(at: Vector3, vx: number, vy: number, vz: number, powder: boolean, scale: number): void {
     const s = CONFIG.snowFx.spray;
     const P = CONFIG.snowFx.powder;
-    const grow = powder ? P.size * scale : scale;
+    // In powder most of it is cloud; the chunks left in it are small clumps.
+    const puff = powder && Math.random() < P.puffs;
+    const grow = powder ? P.size * scale * (puff ? 1 : P.clumps) : scale;
     this.spawn(
       at,
       vx,
@@ -555,7 +622,7 @@ export class SnowFx {
       s.size1 * grow * (0.7 + 0.6 * Math.random()),
       powder ? P.gravity : s.gravity,
       powder ? P.drag : s.drag,
-      SNOW,
+      puff ? WISP : SNOW,
     );
   }
 
@@ -744,7 +811,9 @@ export class SnowFx {
   private draw(): void {
     const snow = this.snowMesh.instanceMatrix.array as Float32Array;
     const spark = this.sparkMesh.instanceMatrix.array as Float32Array;
-    const wisp = this.wispMesh.instanceMatrix.array as Float32Array;
+    const wispPos = this.wispPos.array as Float32Array;
+    const wispSize = this.wispSize.array as Float32Array;
+    const wispAlpha = this.wispAlpha.array as Float32Array;
     const turns = this.turns;
     let ns = 0;
     let nk = 0;
@@ -801,12 +870,21 @@ export class SnowFx {
         nk++;
         continue;
       }
+      if (this.kind[i] === WISP) {
+        // Grows all its life and thins out (a cloud), rather than shrinking away.
+        wispPos[nw * 3] = x;
+        wispPos[nw * 3 + 1] = y;
+        wispPos[nw * 3 + 2] = z;
+        wispSize[nw] = (this.size0[i]! + (this.size1[i]! - this.size0[i]!) * t) * WISP_SPREAD;
+        wispAlpha[nw] = Math.min(1, t * 8) * (1 - t) * Math.sqrt(1 - t);
+        nw++;
+        continue;
+      }
       // Pops in, grows, then shrinks away over the last third.
       const s = (this.size0[i]! + (this.size1[i]! - this.size0[i]!) * t) * Math.min(1, t * 12, (1 - t) * 3);
       const r = (i % TURNS) * 9;
-      const isWisp = this.kind[i] === WISP;
-      const out = isWisp ? wisp : snow;
-      const o = (isWisp ? nw++ : ns++) * 16;
+      const out = snow;
+      const o = ns++ * 16;
       out[o] = turns[r]! * s;
       out[o + 1] = turns[r + 1]! * s;
       out[o + 2] = turns[r + 2]! * s;
@@ -826,7 +904,11 @@ export class SnowFx {
     }
     commit(this.snowMesh, ns);
     commit(this.sparkMesh, nk);
-    commit(this.wispMesh, nw);
+    this.wisps.geometry.setDrawRange(0, nw);
+    this.wisps.visible = nw > 0;
+    uploadFirst(this.wispPos, nw * 3);
+    uploadFirst(this.wispSize, nw);
+    uploadFirst(this.wispAlpha, nw);
   }
 
   // ---------------------------------------------------------------- tracks
@@ -995,10 +1077,7 @@ function instanced(geometry: BufferGeometry, material: MeshLambertMaterial | Mes
 function commit(mesh: InstancedMesh, n: number): void {
   mesh.count = n;
   mesh.visible = n > 0;
-  if (n === 0) return;
-  mesh.instanceMatrix.clearUpdateRanges();
-  mesh.instanceMatrix.addUpdateRange(0, n * 16);
-  mesh.instanceMatrix.needsUpdate = true;
+  uploadFirst(mesh.instanceMatrix, n * 16);
 }
 
 /** A rotation's 3×3 matrix, column-major, at `o` in `out`. */

@@ -24,6 +24,8 @@ export interface Screen {
   canGoBack?(): boolean;
   /** First look at a key while this screen is on top; true when it was used. */
   onKey?(e: KeyboardEvent): boolean;
+  /** Builds anything enter() would build, with no other effect (for prewarm). */
+  prebuild?(): void;
 }
 
 interface Entry {
@@ -42,6 +44,9 @@ export class Menus {
   private trap: ((e: KeyboardEvent) => void) | null = null;
   /** The clip-path cutting the Locker's window, or '' for none. */
   private hole = '';
+  /** Screens never shown or laid out yet (see prewarm), and whether a step is waiting for an idle moment. */
+  private readonly unwarmed: Screen[] = [];
+  private warmQueued = false;
   private readonly onRootBack: (screen: Screen) => void;
   private readonly onGameKey: (e: KeyboardEvent) => void;
   private readonly outside: () => HTMLElement[];
@@ -74,6 +79,35 @@ export class Menus {
   add(screen: Screen): void {
     screen.el.hidden = true;
     this.root.appendChild(screen.el);
+    this.unwarmed.push(screen);
+  }
+
+  /**
+   * Lays out every screen not yet shown, one per idle moment while a menu is
+   * open (so never mid-ride), so the first time each opens it doesn't stall
+   * on working out its styles and layout (~60 ms with the CPU slowed 4×).
+   * Each is shown invisibly and hidden again within one task: nothing paints.
+   */
+  prewarm(): void {
+    if (this.warmQueued || this.unwarmed.length === 0) return;
+    this.warmQueued = true;
+    const step = (): void => {
+      this.warmQueued = false;
+      if (!this.isOpen) return; // carries on the next time a menu opens
+      const screen = this.unwarmed.shift();
+      if (!screen) return;
+      if (screen.el.hidden) {
+        screen.prebuild?.();
+        screen.el.style.visibility = 'hidden';
+        screen.el.hidden = false;
+        void screen.el.offsetHeight;
+        screen.el.hidden = true;
+        screen.el.style.visibility = '';
+      }
+      this.prewarm();
+    };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(step, { timeout: 1500 });
+    else setTimeout(step, 50);
   }
 
   get isOpen(): boolean {
@@ -158,6 +192,9 @@ export class Menus {
   private showTop(focus: HTMLElement | null): void {
     const top = this.top;
     if (!top) return;
+    const i = this.unwarmed.indexOf(top);
+    if (i >= 0) this.unwarmed.splice(i, 1);
+    this.prewarm();
     top.el.hidden = false;
     this.root.scrollTop = 0;
     const first = top.enter();

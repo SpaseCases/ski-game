@@ -25,7 +25,9 @@ Every push to `main` builds the game and deploys `dist/` to GitHub Pages through
 
 See the Status section at the bottom of `GAME_DESIGN.md`: milestones done, known issues, and tuned config values. A frame-rate readout sits in the bottom-left corner for checking performance on real hardware.
 
-`npm run dev` also shows a lil-gui panel for live-tuning the physics and camera numbers in `src/config.ts` ("Copy config as JSON" copies the tuned values), a quality switch, and "Test spots" that put the skier in front of each feature. The panel is left out of production builds; `?quality=low` in the URL picks a quality preset.
+`npm run dev` also shows a lil-gui panel for live-tuning the physics and camera numbers in `src/config.ts` ("Copy config as JSON" copies the tuned values), a quality switch, and "Test spots" that put the skier in front of each feature. In production the panel loads only when opened from the Cheats screen (its own chunk, so the first load doesn't carry it). `?quality=low` (or `auto`, `medium`, `high`) in the URL picks a quality preset for that visit, and `?weather=night` a weather.
+
+Quality: Low draws at pixel ratio 1 with no antialiasing (for Chromebooks); Medium and High see further, draw more trees and more snow effects, and on high-resolution screens draw sharper (High adds antialiasing from the next start). Auto, the default, starts on Medium and steps down while riding if the frame rate drops, and remembers where it settled.
 
 ## Maps
 

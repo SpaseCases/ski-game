@@ -24,6 +24,7 @@ import type {
   RunDef,
   RunLevel,
   ScatterKind,
+  SkyAt,
   SpokeDef,
   StartStyle,
   TerrainDef,
@@ -75,7 +76,19 @@ export function parseMap(raw: unknown): MapDef {
     peaks: map.peaks === undefined ? undefined : parsePeaks(map.peaks),
     powder: map.powder === undefined ? undefined : parsePowder(map.powder),
     weather: map.weather === undefined ? undefined : parseWeather(map.weather),
+    sky: map.sky === undefined ? undefined : parseSky(map.sky),
   };
+}
+
+/** Where the sun and moon hang (see MapDef.sky). */
+function parseSky(raw: unknown): MapDef['sky'] {
+  const o = obj(raw, 'sky');
+  const at = (key: 'sun' | 'moon'): SkyAt | undefined => {
+    if (o[key] === undefined) return undefined;
+    const n = reader(obj(o[key], `sky.${key}`), `sky.${key}`);
+    return { left: n('left'), up: n('up') };
+  };
+  return { sun: at('sun'), moon: at('moon') };
 }
 
 /** Per-weather sky and fog colors (see MapDef.weather). */
@@ -167,7 +180,7 @@ function parsePeak(t: Record<string, unknown>): PeakTerrainDef {
     relief: { amplitude: f('amplitude'), wavelength: f('wavelength') },
     elements: arr(t.elements, 'terrain.elements').map((e, i) => parseElement(e, `terrain.elements[${i}]`)),
     bounds: xzPoints(t.bounds, 'terrain.bounds', 3),
-    rim: { inset: m('inset'), ramp: m('ramp'), rise: m('rise') },
+    rim: { inset: m('inset'), ramp: m('ramp'), rise: m('rise'), ...(obj(t.rim, 'terrain.rim').ease === undefined ? {} : { ease: m('ease') }) },
     rockSlope: n('rockSlope', 50),
     noise: n('noise'),
     rockNoise: n('rockNoise', 0),

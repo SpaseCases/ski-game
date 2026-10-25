@@ -414,25 +414,56 @@ export const CONFIG = {
   quality: {
     /**
      * Share of scenery decoration (trees and rocks off the course) drawn by
-     * each preset. Solid decoration is always drawn. Auto draws Medium's.
+     * each preset. Solid decoration is always drawn.
      */
-    decorDensity: { auto: 0.7, low: 0.35, medium: 0.7, high: 1 },
+    decorDensity: { low: 0.35, medium: 0.7, high: 1 },
     /**
      * How far (m) each preset sees (the fog's end and the camera's far
      * plane), and where its fog starts. Ground past about 330 m is drawn
-     * coarser (see render/terrainMesh.ts). Auto sees as far as Medium until
-     * milestone 8's frame-rate scaling can pull it in.
+     * coarser (see render/terrainMesh.ts).
      */
-    viewDistance: { auto: 450, low: 240, medium: 450, high: 800 },
-    fogStart: { auto: 160, low: 70, medium: 160, high: 320 },
+    viewDistance: { low: 240, medium: 450, high: 800 },
+    fogStart: { low: 70, medium: 160, high: 320 },
     /**
      * Where the haze is complete (m). Past the far plane the mountain carries
      * on as a coarse lit stand-in, fading by the same haze (see
      * render/backdrop.ts); Low's haze ends at its far plane, a wall of fog.
      */
-    hazeEnd: { auto: 3200, low: 240, medium: 3200, high: 6000 },
+    hazeEnd: { low: 240, medium: 3200, high: 6000 },
     /** Trees farther than this (m) are drawn as simple stand-ins, when the view reaches that far. */
     treeDetail: 220,
+    /**
+     * Most pixels drawn per CSS pixel: the screen's own ratio, capped here
+     * (Low always draws exactly 1). On a 1366×768 Chromebook the screen's
+     * ratio is 1, so this changes nothing there.
+     */
+    pixelRatio: { low: 1, medium: 1.5, high: 2 },
+    /** Smooth edges (MSAA). It can only be chosen when the WebGL context is made, so a change takes effect from the next start. */
+    antialias: { low: false, medium: false, high: true },
+    /**
+     * Auto (render/autoQuality.ts): starts on the first rung (or one better
+     * than the rung it settled on last visit) and steps down one rung when
+     * the frames stay over budget while riding. It never steps up mid-visit.
+     * Each rung: the preset for the view (distance, fog and haze), the preset
+     * for the detail (decoration and the snow effects' budget), and a pixel
+     * ratio cap: Medium, then Medium at 1× pixels (only differs on high-DPI
+     * screens, else skipped), then a Low view, then Low.
+     */
+    auto: {
+      rungs: [
+        { view: 'medium', detail: 'medium', pixelRatio: 1.5 },
+        { view: 'medium', detail: 'medium', pixelRatio: 1 },
+        { view: 'low', detail: 'medium', pixelRatio: 1 },
+        { view: 'low', detail: 'low', pixelRatio: 1 },
+      ] as readonly { view: 'low' | 'medium' | 'high'; detail: 'low' | 'medium' | 'high'; pixelRatio: number }[],
+      /** A frame misses 60 fps when it takes longer than this (ms; a little slack over 16.7). */
+      budgetMs: 20,
+      /** Seconds of riding judged at a time, and the share of those frames that must miss for a step down. */
+      window: 3,
+      missShare: 0.5,
+      /** Seconds not judged after a step, a map load, a respawn or a menu, while things settle. */
+      settle: 2,
+    },
   },
 
   camera: {
@@ -480,9 +511,6 @@ export const CONFIG = {
   },
 
   render: {
-    /** Low preset: pixel ratio 1, no antialiasing. Quality presets come in a later milestone. */
-    pixelRatio: 1,
-    antialias: false,
     fov: 60,
     near: 0.1,
     /** Fog start and end distance in meters before a quality preset applies its own (see quality.viewDistance). The camera far plane follows fogFar. */
@@ -528,6 +556,15 @@ export const CONFIG = {
     railBlendTime: 0.1,
     /** Thickness (m) of the posts under a rail. */
     railPostWidth: 0.07,
+    /**
+     * The snow is built in chunks round the camera (render/terrainMesh.ts):
+     * at most `chunksPerFrame` a frame while riding. After a jump to a new
+     * spot (a respawn, back to the top) every chunk within `snapRange` m is
+     * built at once and the rest follow a few a frame, so the jump costs one
+     * short frame; past that range the fog (Low) or the coarse stand-in
+     * mountain (Medium and High) covers them for those few frames.
+     */
+    terrain: { chunksPerFrame: 3, snapRange: 100 },
   },
 
   /**
@@ -536,15 +573,15 @@ export const CONFIG = {
    * particles per second at full strength; sizes are radii in meters.
    */
   snowFx: {
-    /** Most particles alive at once, per preset; the oldest give way to new ones. Auto uses Medium's. */
-    particles: { auto: 700, low: 320, medium: 700, high: 1200 },
+    /** Most particles alive at once, per preset; the oldest give way to new ones. */
+    particles: { low: 320, medium: 700, high: 1200 },
     /** Share of every emission rate each preset spawns, so a small pool isn't simply overrun. */
-    rate: { auto: 0.8, low: 0.5, medium: 0.8, high: 1 },
+    rate: { low: 0.5, medium: 0.8, high: 1 },
     /** Points kept per ski track, and seconds a track takes to fade, per preset. */
-    trackPoints: { auto: 150, low: 64, medium: 150, high: 280 },
-    trackLife: { auto: 14, low: 6, medium: 14, high: 28 },
+    trackPoints: { low: 64, medium: 150, high: 280 },
+    trackLife: { low: 6, medium: 14, high: 28 },
     /** Ridge snow is blown only from emitters this close (m) to the camera. */
-    ridgeRange: { auto: 150, low: 90, medium: 150, high: 210 },
+    ridgeRange: { low: 90, medium: 150, high: 210 },
     /** Meters between track points. */
     trackSpacing: 0.6,
     /** Width (m) and opacity of a ski's track, the same in powder and on groomed snow. */
@@ -563,8 +600,11 @@ export const CONFIG = {
     /**
      * Powder (off the runs on maps with `powder`): spray grows bigger, lasts
      * longer, floats, and comes thicker; just riding fast kicks up a trail.
+     * `puffs` is the share of it (and of powder landings and crashes) drawn
+     * as soft see-through wisps that thin out, a cloud rather than clumps;
+     * the rest are chunks of snow, `clumps` times the cloud's size.
      */
-    powder: { size: 4, life: 2.2, gravity: 0.25, drag: 1.4, rate: 1.6, trailRate: 70, trailSpeed: 6 },
+    powder: { size: 4, life: 2.2, gravity: 0.25, drag: 1.4, rate: 1.6, trailRate: 70, trailSpeed: 6, puffs: 0.8, clumps: 0.4 },
     /** A puff on landings harder than impactMin m/s into the snow, full at impactFull: up to `count` particles. */
     landing: { impactMin: 3, impactFull: 12, count: 70 },
     /** A burst on a crash, and a trail while the body tumbles along the snow (per m/s of speed). */
@@ -587,7 +627,7 @@ export const CONFIG = {
      * camera moves. Flakes at full snowfall per preset; a flake's radius
      * (m), how fast it falls (m/s), and how far a gust sways it.
      */
-    flakes: { auto: 900, low: 520, medium: 900, high: 1400 },
+    flakes: { low: 520, medium: 900, high: 1400 },
     flakeBox: 30,
     flakeHeight: 16,
     flakeAhead: 9,
@@ -612,7 +652,9 @@ export const CONFIG = {
    * sky and fog toward its own `to` by `mix` (0 keeps the map's), unless the
    * map overrides them (MapDef.weather). Lights: the sun (the moon at night)
    * and the sky light's colors and strengths, `hemiSky` null meaning the
-   * map's own sky color. `skyFull`: degrees over the horizon where the
+   * map's own sky color, which `hemiShift` then mixes toward its `to`.
+   * `sunGlow`: how strongly the sun shows in the sky (see CONFIG.sun): its
+   * disc, its glow, and the haze round it (0 to 1), and their color. `skyFull`: degrees over the horizon where the
    * sky reaches its full color (from the haze's at the horizon). `haze` scales each preset's fog start and haze end (Low's
    * fog never reaches past its far plane); `view` instead pulls every
    * preset's view in to `far` m, fogged from `fogStart`. `peaks` relights
@@ -629,14 +671,19 @@ export const CONFIG = {
       sky: { to: '#1f6fd1', mix: 0.75 },
       skyFull: 9,
       fog: { to: '#b9d6f3', mix: 0.5 },
-      sun: '#fff6e8',
-      sunIntensity: 2.6,
+      // Warm golden-hour sunlight (milestone 8; was #fff6e8 × 2.6), a little
+      // stronger so the snow keeps its brightness, and the sky light bluer so
+      // the shade stays cool: lit snow reads cream, shade blue.
+      sun: '#ffe2b8',
+      sunIntensity: 2.95,
       hemiSky: null as string | null,
+      hemiShift: { to: '#8fb4ff', mix: 0.3 },
       hemiGround: '#7d8796',
       hemiIntensity: 1.9,
       haze: { fogStart: 1, hazeEnd: 1 },
       view: null as { far: number; fogStart: number } | null,
-      peaks: { light: '#ffffff', sun: '#ffffff' },
+      peaks: { light: '#ffffff', sun: '#ffe9c9' },
+      sunGlow: { disc: 1, glow: 1, haze: 1, color: '#fff0d2' },
       fx: { snowfall: 0, ridgeSnow: 1, wind: 1, gust: 0.3 },
       fxTint: '#ffffff',
       glow: 0,
@@ -650,11 +697,14 @@ export const CONFIG = {
       sun: '#eef0f3',
       sunIntensity: 0.9,
       hemiSky: '#d9dee5' as string | null,
+      hemiShift: { to: '#ffffff', mix: 0 },
       hemiGround: '#8e949d',
       hemiIntensity: 2.5,
       haze: { fogStart: 0.6, hazeEnd: 0.35 },
       view: null as { far: number; fogStart: number } | null,
       peaks: { light: '#c3c9d1', sun: '#3a3d42' },
+      // A dim pale glow behind the cloud, no disc.
+      sunGlow: { disc: 0, glow: 0.3, haze: 0.25, color: '#f3f5f8' },
       fx: { snowfall: 0, ridgeSnow: 1.4, wind: 1.4, gust: 0.4 },
       fxTint: '#e8ebef',
       glow: 0,
@@ -668,11 +718,13 @@ export const CONFIG = {
       sun: '#eef1f5',
       sunIntensity: 0.9,
       hemiSky: '#d6dbe1' as string | null,
+      hemiShift: { to: '#ffffff', mix: 0 },
       hemiGround: '#7d848e',
       hemiIntensity: 2,
       haze: { fogStart: 1, hazeEnd: 1 },
       view: { far: 115, fogStart: 12 } as { far: number; fogStart: number } | null,
       peaks: { light: '#c3c9d1', sun: '#3a3d42' },
+      sunGlow: { disc: 0, glow: 0, haze: 0, color: '#ffffff' },
       fx: { snowfall: 1, ridgeSnow: 3, wind: 2.6, gust: 0.9 },
       fxTint: '#f2f4f7',
       glow: 0,
@@ -686,17 +738,44 @@ export const CONFIG = {
       sun: '#9fb6ff',
       sunIntensity: 0.5,
       hemiSky: '#4d64a0' as string | null,
+      hemiShift: { to: '#ffffff', mix: 0 },
       hemiGround: '#0d121c',
       hemiIntensity: 0.65,
       haze: { fogStart: 0.8, hazeEnd: 0.5 },
       view: null as { far: number; fogStart: number } | null,
       peaks: { light: '#2a3657', sun: '#56699c' },
+      sunGlow: { disc: 0, glow: 0, haze: 0, color: '#ffffff' },
       fx: { snowfall: 0, ridgeSnow: 1, wind: 1, gust: 0.3 },
       fxTint: '#4a5878',
       glow: 1,
       lamps: 1,
       stars: 1,
     },
+  },
+
+  /**
+   * The sun in the bluebird sky (render/backdrop.ts; how strongly it shows
+   * in each weather is CONFIG.weather's `sunGlow`). It hangs low, where the
+   * riding camera sees it on flats, in the air and behind the pause menu:
+   * `left` degrees left of each map's start heading (negative: right) and
+   * `up` degrees over the horizon (a map can set its own, MapDef.sky). The
+   * sunlight on the snow still comes from CONFIG.light.sunFrom (high, from
+   * the left and behind), so every map's shading stays as tuned; the sun
+   * sits ahead-left so it's on the same side as the light. Its disc is
+   * `size` degrees across in `color`; a soft additive glow (in the
+   * weather's sunGlow color) reaches `glowReach` times the disc's radius,
+   * at most `glowStrength`; and the sky brightens toward that color by up
+   * to `hazeStrength` within `hazeReach` degrees of it.
+   */
+  sun: {
+    left: 40,
+    up: 10,
+    size: 2.4,
+    color: '#fffaf0',
+    glowReach: 10,
+    glowStrength: 0.6,
+    hazeReach: 45,
+    hazeStrength: 0.6,
   },
 
   /**
@@ -720,8 +799,12 @@ export const CONFIG = {
     haloSize: { floodlight: 2.4, lightPole: 2.2, streetLamp: 1.8 },
     haloStrength: 0.8,
     haloColor: '#ffe7c0',
-    /** The moon: where it hangs (from the map's middle; normalized at use), its size (degrees across) and color, and how many stars. */
-    moonAt: { x: -0.45, y: 0.3, z: -0.84 },
+    /**
+     * The moon: where it hangs (degrees left of each map's start heading and
+     * up from the horizon; a map can set its own, MapDef.sky), its size
+     * (degrees across) and color, and how many stars.
+     */
+    moonAt: { left: 28.2, up: 17.5 },
     moonSize: 3,
     moonColor: '#eef2ff',
     stars: 900,
@@ -811,6 +894,13 @@ export const CONFIG = {
     /** Where the title's stage camera stands (rad from straight in front; < 0 is the skier's right). */
     stageAngle: -0.35,
     /**
+     * From pause, the circling camera pulls in toward the skier when a wall,
+     * hut or tree stands between them: it stops `sightMargin` m short of it,
+     * but never nearer the aim than `sightMin` m.
+     */
+    sightMargin: 0.25,
+    sightMin: 0.8,
+    /**
      * On the Skis tab the camera looks down at the skis: the aim's height
      * above the feet, half the length (m) kept in view, and how steeply it
      * looks down (radians).
@@ -829,6 +919,8 @@ export const CONFIG = {
    * pick: a quiet bed, about a quarter of the carve; the blizzard about half).
    */
   audio: {
+    /** A menu click asked for while the sound is still starting is played when it can be, if within this many seconds. */
+    pendingClick: 0.5,
     /** Slider to gain: gain = slider ^ volumeCurve, so the slider sounds even along its length. */
     volumeCurve: 2,
     /** Time constant (s) the game sounds fade out with on pause (and back in on resume). */

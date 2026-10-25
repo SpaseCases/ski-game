@@ -555,26 +555,34 @@ interface LowerRing {
   bend: number;
   /** Kept out of the thighs. */
   push: boolean;
-  /** Height, radius and front-to-back depth at angle a. */
-  at: (a: number) => [number, number, number];
+  /** Height, radius and front-to-back depth at angle a (see ringAt). */
+  at: (a: number) => Float64Array;
+}
+/** Where every ring's `at` writes its answer, so fitting the jacket every pose never allocates. */
+const RING_AT = new Float64Array(3);
+function ringAt(y: number, r: number, depth: number): Float64Array {
+  RING_AT[0] = y;
+  RING_AT[1] = r;
+  RING_AT[2] = depth;
+  return RING_AT;
 }
 /** Height `f` of the way from the waist ring down to the band above the hem, where the thighs leave the jacket. */
 const waist = (a: number, f: number): number => -0.01 + (hemLow(a) + 0.042) * f;
 const LOWER_RINGS: readonly LowerRing[] = [
   // Tucked inside the upper jacket, then flush with its bottom edge
   // (TORSO_BOTTOM), so the seam neither shows a step nor flickers.
-  { bend: 1, push: false, at: () => [0.33, JACKET.waist - 0.015, JACKET.depth - 0.04] },
-  { bend: 1, push: true, at: () => [TORSO_BOTTOM - 0.004, JACKET.waist, JACKET.depth] },
-  { bend: 1, push: true, at: () => [0.25, JACKET.waist, JACKET.depth] },
-  { bend: 0.7, push: true, at: () => [0.12, 0.226, 0.69] },
-  { bend: 0.3, push: true, at: () => [-0.01, 0.227, 0.71] },
+  { bend: 1, push: false, at: () => ringAt(0.33, JACKET.waist - 0.015, JACKET.depth - 0.04) },
+  { bend: 1, push: true, at: () => ringAt(TORSO_BOTTOM - 0.004, JACKET.waist, JACKET.depth) },
+  { bend: 1, push: true, at: () => ringAt(0.25, JACKET.waist, JACKET.depth) },
+  { bend: 0.7, push: true, at: () => ringAt(0.12, 0.226, 0.69) },
+  { bend: 0.3, push: true, at: () => ringAt(-0.01, 0.227, 0.71) },
   // Close together here, so the jacket can follow a thigh swinging out under it.
   // Flaring a little toward the hem, so it hangs loose.
-  { bend: 0.1, push: true, at: (a) => [waist(a, 1 / 3), 0.232, 0.72] },
-  { bend: 0, push: true, at: (a) => [waist(a, 2 / 3), 0.238, 0.73] },
-  { bend: 0, push: true, at: (a) => [hemLow(a) + 0.032, 0.243, 0.74] },
-  { bend: 0, push: true, at: (a) => [hemLow(a), 0.245, 0.74] },
-  { bend: 0, push: true, at: (a) => [hemLow(a) + 0.008, 0.228, 0.72] },
+  { bend: 0.1, push: true, at: (a) => ringAt(waist(a, 1 / 3), 0.232, 0.72) },
+  { bend: 0, push: true, at: (a) => ringAt(waist(a, 2 / 3), 0.238, 0.73) },
+  { bend: 0, push: true, at: (a) => ringAt(hemLow(a) + 0.032, 0.243, 0.74) },
+  { bend: 0, push: true, at: (a) => ringAt(hemLow(a), 0.245, 0.74) },
+  { bend: 0, push: true, at: (a) => ringAt(hemLow(a) + 0.008, 0.228, 0.72) },
 ];
 /** Rings the zip runs between (it carries on up the upper jacket), and its half-width. */
 const ZIP_FIRST = 1;
@@ -684,7 +692,7 @@ class JacketLower {
       }
       if (ring < ZIP_FIRST || ring > ZIP_LAST) continue;
       for (let side = 0; side < 2; side++) {
-        const r = LOWER_RINGS[ring]!.at(0)[1];
+        const r = LOWER_RINGS[ring]!.at(0)[1]!;
         this.ringPoint(ring, (side === 0 ? -ZIP_HALF : ZIP_HALF) / r, 1.012);
         lowerP.toArray(pts, (this.ringPoints + (ring - ZIP_FIRST) * 2 + side) * 3);
       }
@@ -703,8 +711,9 @@ class JacketLower {
   /** One point of a ring at angle `a`, scaled out by `grow`, into lowerP (pelvis space). */
   private ringPoint(ring: number, a: number, grow: number): void {
     const def = LOWER_RINGS[ring]!;
-    const [y, r, depth] = def.at(a);
-    lowerP.set(r * grow * Math.sin(a), y, -r * grow * Math.cos(a) * depth);
+    const at = def.at(a);
+    const r = at[1]! * grow;
+    lowerP.set(r * Math.sin(a), at[0]!, -r * Math.cos(a) * at[2]!);
     if (def.bend > 0) lowerP.applyQuaternion(lowerBend[ring]!);
     if (!def.push) return;
     // Twice, so a point pushed out of one thigh into the other ends up clear of both.

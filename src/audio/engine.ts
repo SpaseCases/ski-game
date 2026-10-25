@@ -12,6 +12,8 @@ import { LOOP_IDS, noiseBuffer, renderLoop, renderShot, SHOT_IDS, type LoopId, t
 
 /** Pointer and key events that count as the player doing something (and let a page start sound). */
 const GESTURES = ['pointerdown', 'keydown', 'touchend', 'click'] as const;
+/** The menu sounds are made first, so the very first click or key press can be heard. */
+const MENU_SHOTS: readonly ShotId[] = ['click', 'tick'];
 
 export class AudioEngine {
   ctx: AudioContext | null = null;
@@ -29,6 +31,13 @@ export class AudioEngine {
   private waiting = false;
   /** One-shots playing now (capped at CONFIG.audio.maxOneShots). */
   private playing = 0;
+  /**
+   * A menu sound asked for while the sound is still starting (the first
+   * click makes the context, which then takes a moment to run and to make
+   * the click): played as soon as it can be, if that's soon enough.
+   */
+  private pendingUi: ShotId | null = null;
+  private pendingAt = 0;
   private masterVolume: number;
   private sfxVolume: number;
   private muted: boolean;
@@ -96,9 +105,13 @@ export class AudioEngine {
    */
   play(id: ShotId, strength = 1, dest: AudioNode | null = null, ui = false): void {
     const ctx = this.ctx;
-    if (!ctx || ctx.state !== 'running' || this.playing >= CONFIG.audio.maxOneShots || strength <= 0) return;
     const buffer = this.shots.get(id);
-    if (!buffer) return;
+    if (ui && ctx && (ctx.state !== 'running' || !buffer)) {
+      this.pendingUi = id;
+      this.pendingAt = performance.now();
+      return;
+    }
+    if (!ctx || ctx.state !== 'running' || this.playing >= CONFIG.audio.maxOneShots || strength <= 0 || !buffer) return;
     const c = CONFIG.audio.shots[id];
     const src = ctx.createBufferSource();
     src.buffer = buffer;
@@ -111,12 +124,21 @@ export class AudioEngine {
     src.start();
   }
 
+  /** Plays the menu sound asked for during start-up, once it can be heard, if it's still fresh. */
+  private flushPending(): void {
+    const id = this.pendingUi;
+    if (!id || !this.ctx || this.ctx.state !== 'running' || !this.shots.has(id)) return;
+    this.pendingUi = null;
+    if (performance.now() - this.pendingAt < CONFIG.audio.pendingClick * 1000) this.play(id, 1, null, true);
+  }
+
   /** The first gesture makes the context; every gesture until it runs tries to resume it. */
   private unlock(): void {
     if (!this.ctx) this.create();
     const ctx = this.ctx!;
     if (ctx.state === 'running') {
       for (const type of GESTURES) window.removeEventListener(type, this.onGesture, true);
+      this.flushPending();
     } else if (!document.hidden) {
       ctx.resume().then(
         () => this.unlock(),
@@ -150,7 +172,10 @@ export class AudioEngine {
   private async render(): Promise<void> {
     const a = CONFIG.audio;
     try {
-      for (const id of SHOT_IDS) this.shots.set(id, await renderShot(id, a.shotRate));
+      for (const id of [...MENU_SHOTS, ...SHOT_IDS.filter((s) => !MENU_SHOTS.includes(s))]) {
+        this.shots.set(id, await renderShot(id, a.shotRate));
+        this.flushPending();
+      }
       for (const id of LOOP_IDS) {
         this.loops.set(id, await renderLoop(id, a.loopRate));
         for (const fn of this.loopsMade) fn(id);

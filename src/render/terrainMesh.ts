@@ -73,10 +73,11 @@ export class TerrainView {
 
   /**
    * Builds what's missing within `range` (m, flat across the map) of
-   * (x, z), nearest first, at most `budget` chunks, and frees what's far
-   * past it. Coarser distant ground is used when the range reaches past SPLIT.
+   * (x, z), nearest first, at most `budget` chunks (except that chunks
+   * closer than `urgent` m are always built), and frees what's far past it.
+   * Coarser distant ground is used when the range reaches past SPLIT.
    */
-  update(x: number, z: number, range: number, budget: number): void {
+  update(x: number, z: number, range: number, budget: number, urgent = 0): void {
     const lod = range > SPLIT;
     if (lod !== this.lod) {
       // Skirts come and go with distant detail: start over.
@@ -130,7 +131,7 @@ export class TerrainView {
             const i = r * this.nx + c;
             const step = lod && d > DETAIL ? 2 : 1;
             if (this.near[i] && this.nearStep[i] === step) continue;
-            if (left <= 0) {
+            if (left <= 0 && d >= urgent) {
               if (!this.near[i]) complete = false;
               continue;
             }
@@ -143,7 +144,7 @@ export class TerrainView {
       } else {
         // Drawn as one coarse far chunk; its near chunks go once it's there.
         if (!this.far[g]) {
-          if (left <= 0) continue;
+          if (left <= 0 && this.orderDist[k]! >= urgent) continue;
           left--;
           this.buildFar(gc, gr);
         }

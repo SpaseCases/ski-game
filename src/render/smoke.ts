@@ -3,6 +3,7 @@ import { CONFIG } from '../config.ts';
 import { chimneySpot, framePoint, townFrame } from '../maps/town.ts';
 import type { Feature, Heightfield } from '../maps/types.ts';
 import { renderedHeightAt } from './terrainMesh.ts';
+import { uploadFirst } from './upload.ts';
 
 // Smoke curling up from the town's chimneys: a few puffs per chimney,
 // each rising, drifting downwind and swelling, then shrinking away as the
@@ -66,10 +67,6 @@ export class SmokeView {
       }
     }
     mesh.count = n;
-    if (n > 0) {
-      mesh.instanceMatrix.clearUpdateRanges();
-      mesh.instanceMatrix.addUpdateRange(0, n * 16);
-      mesh.instanceMatrix.needsUpdate = true;
-    }
+    uploadFirst(mesh.instanceMatrix, n * 16);
   }
 }

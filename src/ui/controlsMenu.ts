@@ -67,6 +67,10 @@ export class ControlsScreen implements Screen {
     return this.el.querySelector('.board-back');
   }
 
+  prebuild(): void {
+    this.build();
+  }
+
   /** Arrows and Page Up / Down scroll the tables (there's nothing to focus but Back). */
   onKey(e: KeyboardEvent): boolean {
     const step = { ArrowUp: -60, ArrowDown: 60, PageUp: -400, PageDown: 400 }[e.key];

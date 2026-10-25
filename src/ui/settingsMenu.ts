@@ -1,5 +1,5 @@
 import { DEFAULT_BINDINGS, type Action, type Bindings } from '../core/input.ts';
-import { assignKey, clearSecondKey, KEY_SLOTS, QUALITIES, type Quality, type Settings } from '../core/settings.ts';
+import { assignKey, clearSecondKey, KEY_SLOTS, QUALITIES, wantsAntialias, type Quality, type Settings } from '../core/settings.ts';
 import { CONFIG } from '../config.ts';
 import { ACTION_NAMES, keyName, mainKey } from './keyNames.ts';
 import { addBackButton, board, setHints, type Screen } from './menus.ts';
@@ -11,10 +11,10 @@ import { addBackButton, board, setHints, type Screen } from './menus.ts';
 // the menu and pause key), and a key another action has swaps the two.
 
 const QUALITY_TEXT: Record<Quality, [string, string]> = {
-  auto: ['Auto', 'The same as Medium for now.'],
+  auto: ['Auto', 'Picks for this computer: starts on Medium and steps down while riding if the frame rate drops.'],
   low: ['Low', 'Shortest view and the fewest trees. Best for Chromebooks.'],
-  medium: ['Medium', 'A longer view and more trees.'],
-  high: ['High', 'The longest view and every tree. For fast computers.'],
+  medium: ['Medium', 'A longer view and more trees, sharper on high-resolution screens.'],
+  high: ['High', 'The longest view, every tree, the sharpest picture and smooth edges. For fast computers.'],
 };
 
 const KEY_GROUPS: readonly (readonly [string, readonly Action[]])[] = [
@@ -53,6 +53,10 @@ export interface SettingsHooks {
   /** The settings as they are now. */
   get: () => Settings;
   setQuality: (q: Quality) => void;
+  /** What Auto draws now ("Medium", "Low"...). */
+  autoNow: () => string;
+  /** Whether this start's picture has smooth edges (chosen once, when the game starts). */
+  antialiased: () => boolean;
   setSound: (master: number, sfx: number, muted: boolean) => void;
   /** A slider moving: heard at once, not saved yet. */
   previewSound: (master: number, sfx: number, muted: boolean) => void;
@@ -331,7 +335,12 @@ export class SettingsScreen implements Screen {
   }
 
   private showQualityNote(q: Quality): void {
-    this.qualityNote.textContent = `${QUALITY_TEXT[q][0]}: ${QUALITY_TEXT[q][1]}`;
+    let note = `${QUALITY_TEXT[q][0]}: ${QUALITY_TEXT[q][1]}`;
+    if (q === 'auto') note += ` Now: ${this.hooks.autoNow()}.`;
+    // Smooth edges can only switch when the game starts.
+    const want = wantsAntialias(q);
+    if (want !== this.hooks.antialiased()) note += want ? ' Smooth edges come on the next time the game starts.' : ' Smooth edges stay on until the game next starts.';
+    this.qualityNote.textContent = note;
   }
 
   private syncSoundLabels(): void {

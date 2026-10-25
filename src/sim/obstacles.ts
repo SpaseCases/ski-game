@@ -125,6 +125,31 @@ function cellOf(o: Obstacles, coord: number, origin: number, size: number): numb
 }
 
 /**
+ * True when the point (x, y, z) is inside an obstacle or within `margin` m
+ * of its side (`margin` at most the rails' bodyRadius: the grid only lists
+ * obstacles that close to each cell). For the render layer's camera checks.
+ */
+export function insideObstacle(o: Obstacles, x: number, y: number, z: number, margin: number): boolean {
+  const col = Math.floor((x - o.originX) / o.cell);
+  const row = Math.floor((z - o.originZ) / o.cell);
+  if (col < 0 || row < 0 || col >= o.cols || row >= o.rows) return false;
+  const k = row * o.cols + col;
+  for (let j = o.start[k]!; j < o.start[k + 1]!; j++) {
+    const i = o.items[j]!;
+    if (y < o.bottom[i]! || y > o.top[i]!) continue;
+    const sx = o.bx[i]! - o.ax[i]!;
+    const sz = o.bz[i]! - o.az[i]!;
+    const len2 = sx * sx + sz * sz;
+    const t = len2 > 0 ? Math.min(1, Math.max(0, ((x - o.ax[i]!) * sx + (z - o.az[i]!) * sz) / len2)) : 0;
+    const dx = x - (o.ax[i]! + sx * t);
+    const dz = z - (o.az[i]! + sz * t);
+    const r = o.radius[i]! + margin;
+    if (dx * dx + dz * dz < r * r) return true;
+  }
+  return false;
+}
+
+/**
  * Keeps a body with feet at `p` out of obstacles: pushes it out sideways and
  * drops any velocity into them. Returns the fastest speed it was moving into
  * one (0 for a touch), or -1 if it touched nothing. Feet above an obstacle's

@@ -5,10 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Park Laps</title>
+    <style>
+      /* Shown until the game's script has loaded (it can take a while on a slow network); the game removes it. */
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        gap: 10px;
+        text-align: center;
+        background: linear-gradient(#9fc3e6, #dce8f3 70%, #f5f8fc);
+        color: #142030;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      }
+      #boot b {
+        font-size: 40px;
+        letter-spacing: 0.04em;
+      }
+      #boot span {
+        font-size: 16px;
+        opacity: 0.75;
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>
     <div id="hud"></div>
+    <div id="boot"><b>Park Laps</b><span>Loading…</span></div>
     <noscript>This game needs JavaScript turned on.</noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>

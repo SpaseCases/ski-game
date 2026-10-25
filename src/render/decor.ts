@@ -39,6 +39,13 @@ const SCATTER_TOP = 14;
 const SINK = 0.15;
 
 const material = litByPools(new MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+/**
+ * The same look for the instanced trees and rocks. Instanced meshes with
+ * per-instance shades need another shader program than merged meshes, and
+ * one material shared by both would swap programs every time the drawing
+ * order alternates between them, which costs a lot every frame.
+ */
+const scatterMaterial = litByPools(new MeshLambertMaterial({ vertexColors: true, flatShading: true }));
 /** Lamp faces ignore lighting, so they look lit. */
 const glowMaterial = new MeshBasicMaterial({ vertexColors: true });
 /** Lines dyed into the snow sit right on it; draw them on top. */
@@ -186,7 +193,7 @@ function scatterMesh(geometry: BufferGeometry, mine: readonly ScatterItem[], hf:
   const scale = new Vector3();
   const up = new Vector3(0, 1, 0);
   const tint = new Color();
-  const mesh = new InstancedMesh(geometry, material, mine.length);
+  const mesh = new InstancedMesh(geometry, scatterMaterial, mine.length);
   mine.forEach((t, i) => {
     pos.set(t.x, baseHeight(hf, t) - SINK * t.scale, t.z);
     q.setFromAxisAngle(up, t.yaw);

@@ -11,7 +11,9 @@ import type { Heightfield, HeightPoint, PeakTerrainDef, TerrainElement, XZ } fro
 // flanks fall in toward its middle: valleys between spurs.
 //
 // Big folds go over the faces (more where it's steep), a gentle roll over
-// everything, and past the play area the ground climbs into a rim of hills.
+// everything, and past the play area the ground climbs into a rim of hills
+// (which, with rim.ease, lets go again a little past the play area, so the
+// land carries on into the foothills).
 // Then the terrain elements, in order:
 // ridges, gullies, cliff bands, wind lips, bowls, pillows, bumps, dips and
 // flat pads. Each is an exact function of position, sampled onto the grid.
@@ -27,6 +29,13 @@ const ROLL_FADE = 80;
 const RELIEF_GRADE = 0.45;
 /** Steps per degree of the table of how far the bounds reach out from the summit. */
 const REACH_STEPS = 4;
+/**
+ * How far (m) past the bounds the rim keeps climbing before an easing rim
+ * (rim.ease) lets go: past everything a rider can touch (kept inside the
+ * bounds, the sim samples a few meters round them) and the chase camera
+ * behind them, so the riding is the same either way.
+ */
+const RIM_HOLD = 30;
 
 export function generatePeak(def: PeakTerrainDef): Heightfield {
   const cols = Math.round(def.size / def.cellSize) + 1;
@@ -301,7 +310,7 @@ class PeakSampler {
 
   /** The rim of hills: how much the ground climbs past (and just inside) the edge of the play area, at heading theta. */
   private rim(theta: number, r: number): number {
-    const { inset, ramp, rise } = this.def.rim;
+    const { inset, ramp, rise, ease } = this.def.rim;
     const steps = this.reach.length;
     const f = theta * REACH_STEPS;
     const i = Math.floor(f);
@@ -309,7 +318,11 @@ class PeakSampler {
     const out = r - (a + (this.reach[i + 1 < steps ? i + 1 : i + 1 - steps]! - a) * (f - i)) + inset;
     if (out <= 0) return 0;
     // The grade builds from 0 to `rise` over `ramp`, then holds.
-    return out < ramp ? (rise * out * out) / (2 * ramp) : rise * (out - ramp / 2);
+    const hold = inset + RIM_HOLD;
+    if (ease === undefined || out <= hold) return out < ramp ? (rise * out * out) / (2 * ramp) : rise * (out - ramp / 2);
+    // Past the play area, the climb eases back off and the ground goes on down its own lie.
+    const top = hold < ramp ? (rise * hold * hold) / (2 * ramp) : rise * (hold - ramp / 2);
+    return top * (1 - smoothstep(hold, hold + ease, out));
   }
 
   /** Gradient (drop per m) along spoke k at distance r. */

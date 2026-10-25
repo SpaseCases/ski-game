@@ -404,7 +404,8 @@ const terrain = {
   relief: { amplitude: 16, wavelength: 300 },
   elements,
   bounds: boundsPolygon(),
-  rim: { inset: 80, ramp: 90, rise: 0.4 },
+  // Past the play area the rim lets go and the land runs on into the foothills (milestone 8).
+  rim: { inset: 80, ramp: 90, rise: 0.4, ease: 350 },
   rockSlope: 56,
   noise: 0.2,
   rockNoise: 0.9,

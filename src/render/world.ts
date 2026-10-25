@@ -1,4 +1,4 @@
-import { Group, InstancedMesh, Mesh, type Material, type Object3D } from 'three';
+import { Group, InstancedMesh, Mesh, type Camera, type Material, type Object3D, type Scene, type WebGLRenderer } from 'three';
 import { CONFIG } from '../config.ts';
 import type { SnowBudget } from '../core/settings.ts';
 import type { BuiltMap } from '../maps/build.ts';
@@ -13,14 +13,12 @@ import { SnowFx } from './snowFx.ts';
 import { CheckpointView } from './checkpointMeshes.ts';
 import { DistanceCuller } from './culling.ts';
 import { createDecor } from './decor.ts';
+import { compileShaders } from './scene.ts';
 import { createFeatureMeshes } from './features.ts';
 import { SlalomView } from './slalomView.ts';
 import { StartGateView } from './startGates.ts';
 import { TerrainView } from './terrainMesh.ts';
 import type { WeatherLook } from './weather.ts';
-
-/** Terrain chunks built per frame while riding (after a jump to a new spot, everything in view is built at once). */
-const CHUNKS_PER_FRAME = 3;
 
 /**
  * Everything drawn for one map: the snow, the features on it, start gates,
@@ -99,15 +97,30 @@ export class WorldView {
 
   /**
    * Builds the snow and shows the decoration within `range` of the camera
-   * at (x, z). `all`: build every missing chunk now (after a jump to a new
-   * spot), not just a few.
+   * at (x, z). `snap`: the camera just jumped to a new spot, so every
+   * missing chunk near it is built now (the rest follow a few a frame);
+   * `all`: build every missing chunk now.
    */
-  view(x: number, z: number, range: number, all: boolean): void {
+  view(x: number, z: number, range: number, snap: boolean, all = false): void {
     this.camX = x;
     this.camZ = z;
     this.range = range;
-    this.terrain.update(x, z, range, all ? Infinity : CHUNKS_PER_FRAME);
+    const t = CONFIG.render.terrain;
+    this.terrain.update(x, z, range, all ? Infinity : t.chunksPerFrame, snap ? t.snapRange : 0);
     this.culler.update(x, z, range, CONFIG.quality.treeDetail);
+  }
+
+  /**
+   * Compiles every shader program `scene` (with this map in it) can draw,
+   * with every decoration tile attached for the moment (the next view()
+   * detaches the far ones again), hidden spray and night lights included,
+   * so none compiles mid-ride the first time something comes into view.
+   * Resolves once they're ready (with KHR_parallel_shader_compile the
+   * compiling runs alongside; without it, it's done before this returns).
+   */
+  warm(renderer: WebGLRenderer, camera: Camera, scene: Scene): Promise<unknown> {
+    this.culler.attachAll();
+    return compileShaders(renderer, scene, camera);
   }
 
   update(run: RunState, race: RaceState | null, frameTime: number): void {

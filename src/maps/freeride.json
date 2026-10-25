@@ -2450,7 +2450,8 @@
   "rim": {
    "inset": 80,
    "ramp": 90,
-   "rise": 0.4
+   "rise": 0.4,
+   "ease": 350
   },
   "rockSlope": 56,
   "noise": 0.2,
