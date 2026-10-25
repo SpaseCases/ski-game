@@ -1,9 +1,12 @@
 import { defineConfig } from 'vite';
+import { wavSink } from './tools/vite/wavSink.js';
 
 // GitHub Pages serves the site from https://<user>.github.io/ski-game/,
 // so every asset path needs the repo name as its base.
 export default defineConfig({
   base: '/ski-game/',
+  // Dev builds can save every sound as a WAV file (src/audio/wav.ts).
+  plugins: [wavSink()],
   build: {
     // Three.js alone is ~530 kB minified (~135 kB gzipped); warn only past that.
     chunkSizeWarningLimit: 700,

@@ -54,6 +54,8 @@ export interface SettingsHooks {
   get: () => Settings;
   setQuality: (q: Quality) => void;
   setSound: (master: number, sfx: number, muted: boolean) => void;
+  /** A slider moving: heard at once, not saved yet. */
+  previewSound: (master: number, sfx: number, muted: boolean) => void;
   setScore: (on: boolean) => void;
   /** After a crash: wait for the respawn key (true) or respawn by itself. */
   setCrashWait: (wait: boolean) => void;
@@ -114,7 +116,11 @@ export class SettingsScreen implements Screen {
     [this.master, this.masterValue] = slider('Master volume');
     [this.sfx, this.sfxValue] = slider('Effects volume');
     for (const input of [this.master, this.sfx]) {
-      input.addEventListener('input', () => this.syncSoundLabels());
+      // Heard at once while dragging; saved when let go.
+      input.addEventListener('input', () => {
+        this.syncSoundLabels();
+        this.hooks.previewSound(...this.soundValues());
+      });
       input.addEventListener('change', () => this.commitSound());
     }
     this.mute = document.createElement('button');
@@ -124,14 +130,10 @@ export class SettingsScreen implements Screen {
       this.mute.setAttribute('aria-pressed', String(this.mute.getAttribute('aria-pressed') !== 'true'));
       this.commitSound();
     });
-    const soonNote = document.createElement('p');
-    soonNote.className = 'setting-note';
-    soonNote.textContent = 'There are no sounds yet. These are saved for when they arrive.';
     sound.append(
       labelRow('Master volume', this.master, this.masterValue),
       labelRow('Effects volume', this.sfx, this.sfxValue),
       labelRow('Mute', this.mute),
-      soonNote,
     );
 
     // Score.
@@ -344,7 +346,12 @@ export class SettingsScreen implements Screen {
 
   private commitSound(): void {
     this.syncSoundLabels();
-    this.hooks.setSound(Number(this.master.value) / 100, Number(this.sfx.value) / 100, this.mute.getAttribute('aria-pressed') === 'true');
+    this.hooks.setSound(...this.soundValues());
+  }
+
+  /** Master volume, effects volume (0..1) and mute, as set on the screen. */
+  private soundValues(): [number, number, boolean] {
+    return [Number(this.master.value) / 100, Number(this.sfx.value) / 100, this.mute.getAttribute('aria-pressed') === 'true'];
   }
 
   private syncKeys(): void {

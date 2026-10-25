@@ -1,5 +1,6 @@
 import './style.css';
 import { Vector2, Vector3 } from 'three';
+import { GameAudio } from './audio/index.ts';
 import { createInputState, Keyboard, type Bindings } from './core/input.ts';
 import { startLoop } from './core/loop.ts';
 import { PointerOrbit } from './core/pointerOrbit.ts';
@@ -85,10 +86,19 @@ const toast = new Toast(hud);
 const cheatsTag = mountCheatsTag(hud);
 const raceHud = new RaceHud(hud);
 const runHud = new RunHud(hud, backToTop);
-const scoreHud = new ScoreHud(hud, (total, tainted) => {
-  if (tainted || !level) return 'cheats';
-  return submitCombo(level.id, total) ? 'best' : 'banked';
-});
+/** Sound (src/audio): nothing is made or heard until the first key press or click. */
+const sound = new GameAudio(settings.masterVolume, settings.sfxVolume, settings.muted);
+sound.attach(window, hud);
+sound.setWeather(weather);
+const scoreHud = new ScoreHud(
+  hud,
+  (total, tainted) => {
+    const note = tainted || !level ? 'cheats' : submitCombo(level.id, total) ? 'best' : 'banked';
+    sound.combo(note === 'best' ? 'best' : 'bank');
+    return note;
+  },
+  () => sound.combo('lost'),
+);
 const trailMap = new TrailMap(hud, closeTrailMap);
 const keyboard = new Keyboard(settings.bindings);
 keyboard.attach(window);
@@ -126,7 +136,9 @@ const settingsScreen = new SettingsScreen(
       settings.sfxVolume = sfx;
       settings.muted = muted;
       saveSettings(settings);
+      sound.setVolume(master, sfx, muted);
     },
+    previewSound: (master, sfx, muted) => sound.setVolume(master, sfx, muted),
     setScore: (on) => {
       settings.score = on;
       saveSettings(settings);
@@ -274,12 +286,14 @@ async function loadMap(entry: MapEntry): Promise<void> {
     // Free the old map before building the new one, to keep peak memory down.
     level?.world.dispose();
     level = null;
+    sound.setMap(null);
     resetScore(score);
     const built = buildMap(map);
     const world = new WorldView(built, decorDensity(quality), viewRange(quality).far, snowBudget(quality));
     scene.add(world.group);
     applyMap(view, built);
     level = { id: entry.id, built, world, run: createRun(map), race: built.race ? createRace(built.race) : null };
+    sound.setMap(built);
     if (skierView && chase) {
       skierView.hf = built.hf;
       chase.hf = built.hf;
@@ -457,6 +471,7 @@ function setWeather(w: WeatherId): void {
   weather = w;
   saveWeather(w);
   applyWeatherLook();
+  sound.setWeather(w);
 }
 
 /** The weather's look on the map being ridden: sky, fog and lights, the view range, snow, night lights and the pumpkin's glow. */
@@ -571,6 +586,14 @@ if (import.meta.env.DEV) {
         return outfit;
       },
       setOutfit,
+      /** Sound: voices() reads each continuous sound's gain; play(id) plays a one-shot; renderWavs() saves every sound into .playwright-mcp/audio/. */
+      audio: {
+        voices: () => sound.voices(),
+        play: (id: Parameters<GameAudio['play']>[0], strength?: number) => sound.play(id, strength),
+        renderWavs: async () => (await import('./audio/wav.ts')).renderWavs(),
+        engine: sound.engine,
+        game: sound,
+      },
     },
   });
 }
@@ -636,6 +659,7 @@ startLoop(
 
     copySkierState(skierPrev, skier);
     stepSkier(skier, keys, built.course, dt);
+    sound.step(skierPrev, skier, built.course.rails);
     const event = updateRun(run, built.map, skierPrev.position, skier);
     if (scoring()) stepScore(score, skierPrev, skier, built.course.rails, dt);
     if (race && built.race) {
@@ -650,7 +674,8 @@ startLoop(
   (alpha, realFrameTime) => {
     // While the game waits, everything that moves by time holds still too.
     // In slow motion it all slows with the sim; the HUD keeps real time.
-    const hudTime = gameWaits() ? 0 : realFrameTime;
+    const waits = gameWaits();
+    const hudTime = waits ? 0 : realFrameTime;
     const frameTime = hudTime * TUNING.sim.timeScale;
     if (level && skierView && chase) {
       interpolateSkier(pose, skierPrev, skier, alpha);
@@ -676,6 +701,12 @@ startLoop(
       const pxPerM = renderer.getDrawingBufferSize(bufferSize).y / (2 * Math.tan((camera.fov * Math.PI) / 360));
       const p = pose.position;
       level.world.lights.update(p.x, p.y, p.z, -Math.sin(pose.yaw), -Math.cos(pose.yaw), camera.position.x, camera.position.z, fog.near, fog.far, pxPerM);
+      // The camera's right, flat, for panning places left and right.
+      const m = camera.matrixWorld.elements;
+      const flat = Math.hypot(m[0]!, m[2]!) || 1;
+      sound.frame(waits, TUNING.sim.timeScale, skier, level.built.course.rails, m[0]! / flat, m[2]! / flat, level.world.snow.gust(), level.world.snow.inPowder);
+    } else {
+      sound.frame(true, 1, skier, NO_RAILS, 1, 0, 1, false);
     }
 
     if (lockerOpen) drawLocker(realFrameTime);

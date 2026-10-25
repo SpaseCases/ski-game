@@ -145,6 +145,22 @@ export function comboTotal(sc: ScoreState): number {
   return Math.round(sc.base * comboMult(sc));
 }
 
+/**
+ * True when the landing just made on the snow came close to the crash
+ * limits (sketchy), after `air` s in the air, from a rail if `fromRail`
+ * (then the edges are checked however short the drop, as the landing does).
+ */
+export function sketchyLanding(s: SkierState, air: number, fromRail: boolean): boolean {
+  const C = CONFIG.score;
+  const L = TUNING.landing;
+  const edges = air >= L.edgeCheckAir || fromRail;
+  return (
+    s.landPitch > C.sketchyPitch * L.pitchMax ||
+    s.landImpact > C.sketchyImpact * L.impactMax ||
+    (edges && (s.landRoll > C.sketchyRoll * L.rollMax || s.landSide > C.sketchySide * L.sideMax))
+  );
+}
+
 /** The event `seq` (0 for the first ever), while it's still kept. */
 export function scoreEvent(sc: ScoreState, seq: number): ScoreEvent | null {
   return seq >= 0 && seq < sc.seq && seq >= sc.seq - RING ? sc.events[seq % RING]! : null;
@@ -364,13 +380,7 @@ function endAir(sc: ScoreState, s: SkierState, toRail: boolean): void {
   // The landing: onto a rail is clean by catching it; on the snow, close to the limits is sketchy.
   let landing: Landing = '';
   if (!toRail) {
-    const L = TUNING.landing;
-    const edges = a.time >= L.edgeCheckAir || a.fromRail;
-    const sketchy =
-      s.landPitch > C.sketchyPitch * L.pitchMax ||
-      s.landImpact > C.sketchyImpact * L.impactMax ||
-      (edges && (s.landRoll > C.sketchyRoll * L.rollMax || s.landSide > C.sketchySide * L.sideMax));
-    landing = sketchy ? 'sketchy' : 'clean';
+    landing = sketchyLanding(s, a.time, a.fromRail) ? 'sketchy' : 'clean';
   }
   const switchOut = !toRail && isSwitch(s);
   points += C.airPoints * a.time;

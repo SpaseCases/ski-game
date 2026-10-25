@@ -293,6 +293,11 @@ export class SnowFx {
     snowMaterial.emissive.copy(SNOW_GLOW).multiply(tint);
   }
 
+  /** True while the skier rides powder (off-piste on Freeride), checked every few meters. */
+  get inPowder(): boolean {
+    return this.powder;
+  }
+
   /** The skier jumped to a new spot (start, respawn): the tracks break and nothing is taken for a landing or crash. */
   snap(sim: SkierState): void {
     this.breakTrack(0);
@@ -682,8 +687,8 @@ export class SnowFx {
     commit(this.flakeMesh, n);
   }
 
-  /** The wind's strength now, as a share of its mean: it rises and falls in gusts as gusty as the weather says. */
-  private gust(): number {
+  /** The wind's strength now, as a share of its mean: it rises and falls in gusts as gusty as the weather says (the sound's wind follows it). */
+  gust(): number {
     const t = this.time;
     return 1 + this.weather.gust * 0.6 * Math.sin(t * 0.7) * Math.sin(t * 0.23 + 1);
   }

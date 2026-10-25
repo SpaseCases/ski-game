@@ -822,6 +822,100 @@ export const CONFIG = {
     statGain: 1.4,
   },
 
+  /**
+   * Sound (src/audio): every sound is made at startup with Web Audio, no
+   * files. Gains are shares of full scale before the Settings sliders; the
+   * riding sounds lead and the ambience sits well under them (the user's
+   * pick: a quiet bed, about a quarter of the carve; the blizzard about half).
+   */
+  audio: {
+    /** Slider to gain: gain = slider ^ volumeCurve, so the slider sounds even along its length. */
+    volumeCurve: 2,
+    /** Time constant (s) the game sounds fade out with on pause (and back in on resume). */
+    pauseFade: 0.04,
+    /** Time constant (s) the continuous sounds follow their targets with. */
+    smooth: 0.06,
+    /** A continuous sound's target must move this share (or 0.001 of gain) before it's sent again. */
+    epsilon: 0.01,
+    /** Most one-shots playing at once; any more are dropped. */
+    maxOneShots: 10,
+    /** Seconds of each looped noise made at startup. */
+    noiseSeconds: 2.5,
+    /** Sample rate (Hz) the one-shots and the long ambient loops are made at (the loops have nothing high up). */
+    shotRate: 44100,
+    loopRate: 22050,
+    /** How far (0..1) a sound off to one side pans toward that ear. */
+    pan: 0.75,
+
+    /** One-shots: gain at full strength, and the random spread of pitch each time it plays (±share). */
+    shots: {
+      pop: { gain: 0.5, spread: 0.08 },
+      landSoft: { gain: 0.55, spread: 0.1 },
+      landHard: { gain: 0.8, spread: 0.08 },
+      bail: { gain: 0.75, spread: 0.06 },
+      pole: { gain: 0.18, spread: 0.12 },
+      railMetal: { gain: 0.45, spread: 0.06 },
+      railWood: { gain: 0.55, spread: 0.08 },
+      cheer: { gain: 0.33, spread: 0.05 },
+      bank: { gain: 0.22, spread: 0 },
+      best: { gain: 0.28, spread: 0 },
+      lost: { gain: 0.25, spread: 0 },
+      click: { gain: 0.22, spread: 0.06 },
+      tick: { gain: 0.05, spread: 0.04 },
+    },
+    /** The pop: strength from the crouch, at least `min` of full (an ollie or nollie pops at full). */
+    pop: { min: 0.45 },
+    /** Landings by impact (m/s into the snow): silent under `min`, soft up to `hard`, hard from there, full strength at `full`. */
+    landing: { min: 1.2, hard: 7, full: 14 },
+    /** Onto a rail or box: strength from the speed along it, full at `full` m/s. */
+    railOn: { min: 0.35, full: 10 },
+
+    /** Snow hiss: by speed (m/s) and edge (lean, rad); band-pass from freqLow to freqHigh with speed, brighter on edge. */
+    carve: { gain: 0.67, speedMin: 1.5, speedFull: 24, edgeBase: 0.4, edgeMin: 0.15, edgeFull: 0.75, freqLow: 700, freqHigh: 2300, edgeFreq: 1.3, q: 0.8, powderGain: 0.8, powderFreq: 0.55 },
+    /** Braking or a hockey stop: a gritty scrape by speed. */
+    brake: { gain: 0.7, speedMin: 1, speedFull: 12, freqLow: 650, freqHigh: 1700, q: 1.1 },
+    /** Tumbling and sliding in a crash, on the carve's voice. */
+    slide: { gain: 0.38, speedFull: 14, freq: 900 },
+    /** Rushing air by speed: quieter on the snow (under the carve), fuller and brighter in the air. */
+    wind: { speedMin: 5, speedFull: 34, ground: 0.15, air: 0.5, freqLow: 260, freqHigh: 1000, airFreq: 1.35, q: 0.55 },
+    /** Sliding a rail or box: metal rings, everything else (wood, stone, plastic) rumbles. Low-pass from freqLow to freqHigh by speed; braking adds grit. */
+    rail: {
+      speedMin: 0.5,
+      speedFull: 12,
+      brake: 0.7,
+      metal: { gain: 0.32, freqLow: 2000, freqHigh: 9000 },
+      other: { gain: 0.34, freqLow: 500, freqHigh: 2400 },
+    },
+
+    /**
+     * Weather ambience: a low bed of noise (low-passed at `freq`) and a howl
+     * (band-passed, Q `q`) that follows the snow effects' gusts: its gain
+     * moves by `gustGain` and its pitch by `gustFreq` per unit of gust.
+     */
+    weather: {
+      bluebird: { bed: 0.006, bedFreq: 380, howl: 0.008, howlFreq: 420, q: 1.2, gustGain: 1, gustFreq: 0.3 },
+      overcast: { bed: 0.033, bedFreq: 420, howl: 0.053, howlFreq: 460, q: 2, gustGain: 1.2, gustFreq: 0.35 },
+      blizzard: { bed: 0.092, bedFreq: 340, howl: 0.14, howlFreq: 520, q: 5, gustGain: 1.6, gustFreq: 0.55 },
+      night: { bed: 0.021, bedFreq: 520, howl: 0.004, howlFreq: 380, q: 1, gustGain: 0.6, gustFreq: 0.2 },
+    },
+    /** Seconds the ambience takes to cross-fade to another weather. */
+    weatherFade: 0.8,
+
+    /**
+     * Places that sound: full gain within `near` m, gone past `far`. The
+     * crowd is the spectators (`skier` props), louder the more stand near
+     * (`full` of them within `far` is full); the town is the buildings; the
+     * lift hum is loudest at the stations (`station` × near the cable).
+     */
+    crowd: { gain: 0.055, near: 12, far: 110, full: 60, cell: 15 },
+    town: { gain: 0.064, near: 25, far: 150 },
+    lift: { gain: 0.042, near: 6, far: 80, station: 1.6, stationNear: 10, stationFar: 110 },
+    /** Big air: a clean landing within `range` m of spectators, after at least `minAir` s in the air, cheers. */
+    cheer: { range: 70, minAir: 0.8 },
+    /** Menus: a soft click when something is picked; focus moving ticks (this quiet) unless the mouse just clicked. */
+    tickAfterPointer: 0.4,
+  },
+
   debug: {
     /** Seconds between frame-rate readout updates. */
     fpsInterval: 0.5,

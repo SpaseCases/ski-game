@@ -45,6 +45,7 @@ export class ScoreHud {
   private readonly best: HTMLElement;
   private readonly bestValue: HTMLElement;
   private readonly onBank: (total: number, tainted: boolean) => BankNote;
+  private readonly onLost: () => void;
   /** Events read so far. */
   private seen = 0;
   /** What the panel shows: the live combo, a combo just ended, or nothing. */
@@ -61,8 +62,9 @@ export class ScoreHud {
   /** Nothing is shown (so switching off, or a map without scoring, costs nothing per frame). */
   private blank = true;
 
-  constructor(hud: HTMLElement, onBank: (total: number, tainted: boolean) => BankNote) {
+  constructor(hud: HTMLElement, onBank: (total: number, tainted: boolean) => BankNote, onLost: () => void = () => {}) {
     this.onBank = onBank;
+    this.onLost = onLost;
     this.root = div('score-hud ride-only');
     this.root.hidden = true;
     this.tricks = div('score-tricks');
@@ -207,6 +209,7 @@ export class ScoreHud {
     this.mult.textContent = '';
     this.shownMult = -1;
     if (ev.kind === 'lost') {
+      this.onLost();
       this.panel.classList.add('is-lost');
       this.note.textContent = 'Combo lost';
       return;
