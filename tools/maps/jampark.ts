@@ -160,6 +160,36 @@ const HIP = (side: -1 | 1, size: number): Item => ({
   place: (x, d) => hip(x, d, side, size),
 });
 
+/**
+ * A wallride beside the line: a wooden wall whose foot runs straight down
+ * the hill `dx` m to one side of the line, standing outward. Swing into it at
+ * a shallow angle to ride along it; hit it harder, or pop, to air off it.
+ */
+const WALL = (dx: number, length = 18, radius = 3.4): Item => ({
+  len: length,
+  place: (x, d) => {
+    features.push({ type: 'quarter', x: r2(x + dx), z: r2(-d), yaw: 0, side: Math.sign(dx), length, radius, wallAngle: 84, deckWidth: 0.6, back: 3.5, taper: 3.5, style: 'wood' });
+  },
+});
+
+/**
+ * A quarterpipe across the line at 45°: riding straight down the line meets
+ * its wall at 45°, a quarter of the way along it, airs off it and comes back
+ * down onto the wall still ahead (a fast rider flies 30 m along it), then
+ * away along it, down and across the hill toward `toward` (1 right, -1
+ * left), into the line beside if you like.
+ */
+const QP = (toward: 1 | -1, length = 56, radius = 4.5): Item => {
+  const run = length * Math.SQRT1_2;
+  const behind = radius + 2 + 5;
+  return {
+    len: run + behind * Math.SQRT1_2 + 2,
+    place: (x, d) => {
+      features.push({ type: 'quarter', x: r2(x - (toward * run) / 4), z: r2(-d), yaw: -toward * 45, side: -toward, length, radius, wallAngle: 82, deckWidth: 2, back: 5, taper: 8 });
+    },
+  };
+};
+
 /** A rail or box straight down the hill from d: points as [m down from d, m to the right, height above the snow]. */
 function slide(kind: 'rail' | 'box', x: number, d: number, pts: Pt[], width = 0.6, follow = 0): void {
   const f: Json = { type: kind, points: pts.map(([a, b, h]) => ({ x: r2(x + b), z: r2(-(d + a)), height: r2(h) })) };
@@ -318,6 +348,7 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
     K('rail', SLIDES.fed(14)),
     PAIR([-7, 'rail', SLIDES.flatDown(15)], [7, 'box', SLIDES.flat(14), 1.0]),
     S('box', SLIDES.rainbow(10, 0.3, 0.5), 0.8),
+    WALL(6, 16),
     K('box', SLIDES.fed(13), { width: 0.8 }),
     PAIR([-7, 'rail', SLIDES.downFlatDown(17, 0.45)], [7, 'box', SLIDES.flatDown(15, 0.4), 0.8]),
     S('rail', SLIDES.flat(16, 0.45)),
@@ -332,6 +363,7 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
     K('box', SLIDES.fed(12), { width: 0.8 }),
     J({ lip: 1.8, angle: 17, gap: 7, land: 13 }),
     S('rail', SLIDES.rainbow(11, 0.35, 0.5)),
+    WALL(-5, 16),
     J({ lip: 2, angle: 18, gap: 8, land: 13 }),
   ]), lim);
 
@@ -346,14 +378,14 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
     J({ lip: 2, angle: 18, gap: 9, land: 13 }),
   ]), lim);
 
+  // Hips and quarterpipes in turn; the quarters throw riders across toward the jump line.
   sectionEnd('S1 transitions', line(X.pipe, 80, 10, [
     HIP(1, 1),
     J({ lip: 1.4, angle: 18, gap: 7, land: 13 }),
-    HIP(-1, 1),
+    QP(-1, 50, 4),
     J({ lip: 1.8, angle: 18, gap: 9, land: 13 }),
-    HIP(1, 1.1),
-    J({ lip: 2, angle: 18, gap: 8, land: 13 }),
     HIP(-1, 1.1),
+    QP(-1),
   ]), lim);
 
   sectionEnd('S1 pro', line(X.pro, 110, 11, [
@@ -378,6 +410,7 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
     PAIR([-8, 'rail', SLIDES.kinked(20, -1)], [8, 'box', SLIDES.downFlatDown(18, 0.4), 0.8]),
     K('box', SLIDES.arc(14, FED, 0.45), { width: 0.9 }),
     S('rail', SLIDES.flat(20, 0.5)),
+    WALL(-6),
     PAIR([-8, 'rail', SLIDES.kinked(20, -1)], [8, 'rail', SLIDES.rainbow(12, 0.4, 0.6)]),
     K('box', [[0, 0, FED], [7, 0, 1.0], [15, 0, 0.45]], { width: 0.8 }),
     S('rail', SLIDES.downFlatDown(22)),
@@ -389,6 +422,7 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
     S('rail', SLIDES.jog(18, 1.5)),
     J({ lip: 2, angle: 20, gap: 6, deck: false, landingHeight: 3, land: 13, width: 9 }),
     S('box', SLIDES.downFlatDown(16, 0.4), 0.9),
+    WALL(5),
     J({ lip: 2.6, angle: 20, gap: 11, land: 14, width: 9 }),
     S('box', SLIDES.rainbow(12, 0.35, 0.6), 1.0),
     J({ lip: 2.4, angle: 20, gap: 10, land: 14, width: 9 }),
@@ -439,6 +473,7 @@ const lanes: Json[] = [];
     K('box', SLIDES.fedDown(18, 0.45), { width: 0.9 }),
     PAIR([-8, 'rail', SLIDES.downFlatDown(26)], [8, 'box', SLIDES.rainbow(14, 0.4, 0.7, 10), 1.0]),
     S('rail', SLIDES.jog(26, -2)),
+    WALL(-6, 22, 4.2),
     K('rail', SLIDES.fed(20)),
     PAIR([-8, 'box', SLIDES.flatDown(22, 0.45), 0.9], [8, 'rail', SLIDES.flat(24, 0.5)]),
   ]), lim);
@@ -506,6 +541,8 @@ const lanes: Json[] = [];
     PAIR([-22, 'rail', SLIDES.kinked(18, -1)], [-7, 'box', SLIDES.flat(16), 0.6], [8, 'rail', SLIDES.downFlatDown(18)], [23, 'box', SLIDES.rainbow(11, 0.3, 0.6), 1.0]),
     PAIR([-30, 'rail', SLIDES.flatDown(16)], [0, 'box', SLIDES.flat(18, 0.4), 1.0], [30, 'rail', SLIDES.flat(16, 0.45)]),
     PAIR([-15, 'box', SLIDES.rainbow(10, 0.3, 0.6), 1.0], [15, 'rail', SLIDES.downFlatDown(20)]),
+    // Wallrides on both edges of the garden.
+    { len: 18, place: (x, d) => [WALL(-32), WALL(32)].forEach((w) => w.place(x, d)) },
     PAIR([-22, 'rail', SLIDES.flat(18, 0.45)], [-7, 'box', SLIDES.rainbow(12, 0.35, 0.6), 1.0], [8, 'rail', SLIDES.jog(18, 1.5)], [23, 'box', SLIDES.flat(16), 0.8]),
     J({ lip: 1.8, angle: 18, gap: 8, land: 13, width: 10 }),
     PAIR([-24, 'box', SLIDES.flat(14, 0.35), 1.0], [-8, 'rail', SLIDES.rainbow(12, 0.4, 0.6)], [8, 'box', SLIDES.downFlatDown(18, 0.35), 0.9], [24, 'rail', SLIDES.flat(14, 0.4)]),
@@ -518,7 +555,7 @@ const lanes: Json[] = [];
     PAIR([-6, 'box', SLIDES.flat(20, 0.4), 1.2], [6, 'rail', SLIDES.flatDown(22)]),
     J({ lip: 3, angle: 16, gap: 18, land: 17, width: 10 }),
     40,
-    HIP(1, 1.1),
+    QP(-1),
     J({ lip: 2, angle: 19, gap: 9, land: 14, width: 9 }),
     HIP(-1, 1.1),
     J({ lip: 2.2, angle: 20, gap: 10, land: 14, width: 9 }),
@@ -562,10 +599,14 @@ const sections: [number, number][] = [
   [D.s4 + 5, D.run - 10],
 ];
 /** Fence runs, and the openings between them. */
-const FENCE_RUN = 46;
-const FENCE_OPEN = 24;
-/** The fence between the combo and jump lines stops at the jib garden, which spans both. */
-const fenced = (x: number, a: number): boolean => !(x === -42 && a >= D.s4);
+const FENCE_RUN = 30;
+const FENCE_OPEN = 40;
+/**
+ * Where there's no fence: between the combo and jump lines at the jib
+ * garden, which spans both, and between the transitions and jump lines
+ * where the quarterpipes throw riders across.
+ */
+const fenced = (x: number, a: number): boolean => !(x === -42 && a >= D.s4) && !(x === 3 && (a < D.f1 || a >= D.s4));
 FENCE_X.forEach((x, i) => {
   for (const [a, b] of sections) {
     if (!fenced(x, a)) continue;
