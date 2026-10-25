@@ -1622,3 +1622,215 @@ body {
 .trail-map-legend .tm-trees {
   background: radial-gradient(circle, #22523a 0 2px, transparent 2.5px) 0 0 / 6px 6px #f4f8fc;
 }
+
+/*
+ * Combo score (GAME_DESIGN.md, Scoring): trick lines and a small trail-sign
+ * panel bottom center, under the skier; the best combo bottom left. Sized
+ * by the window's height so it stays readable at 1366×768 and small in a
+ * small embed. Only opacity and transform animate.
+ */
+.score-hud {
+  position: absolute;
+  bottom: clamp(10px, 3vh, 26px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(3px, 0.8vh, 6px);
+  width: max-content;
+  max-width: calc(100% - 24px);
+  font-size: clamp(11px, 2.1vh, 16px);
+}
+
+.score-hud[hidden],
+.score-panel[hidden],
+.score-best[hidden] {
+  display: none;
+}
+
+.score-tricks {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(2px, 0.5vh, 4px);
+}
+
+.score-trick {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  column-gap: 0.55em;
+  max-width: 100%;
+  padding: 0.25em 0.75em 0.3em;
+  border-radius: 6px;
+  background: rgb(20 32 48 / 0.72);
+  color: #fff;
+  line-height: 1.25;
+  transition: opacity 0.35s;
+}
+
+.score-trick.is-gone {
+  opacity: 0;
+}
+
+.score-trick.is-new {
+  animation: score-pop 0.22s ease-out;
+}
+
+@keyframes score-pop {
+  from {
+    transform: translateY(0.6em) scale(0.92);
+  }
+}
+
+.score-trick-name {
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.score-trick-points {
+  color: var(--flag);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-trick-tags {
+  color: var(--frost);
+  font-size: 0.8em;
+  font-weight: 700;
+}
+
+.score-trick-tags:empty {
+  display: none;
+}
+
+.score-trick.is-sketchy .score-trick-points {
+  color: #ffc58f;
+}
+
+/* The panel: an enamel sign with a white keyline, like the menus' boards. */
+.score-panel {
+  min-width: 9.5em;
+  padding: 0.35em 0.8em 0.45em;
+  border-radius: 6px;
+  background: var(--enamel);
+  box-shadow:
+    inset 0 0 0 2px var(--enamel),
+    inset 0 0 0 3.5px var(--snow);
+  color: var(--snow);
+  text-align: center;
+}
+
+.score-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.45em;
+}
+
+.score-base {
+  font-size: 1.9em;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-mult {
+  padding: 0.05em 0.4em 0.1em;
+  border-radius: 3px;
+  background: var(--flag);
+  color: var(--ink);
+  font-size: 1.15em;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-mult:empty {
+  display: none;
+}
+
+.score-timer {
+  height: clamp(4px, 0.8vh, 6px);
+  margin-top: 0.3em;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.2);
+  overflow: hidden;
+}
+
+.score-fill {
+  height: 100%;
+  background: var(--flag);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.score-panel:not(.is-live) .score-timer {
+  display: none;
+}
+
+.score-note {
+  margin-top: 0.2em;
+  font-size: 0.8em;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.score-note:empty {
+  display: none;
+}
+
+.score-panel.is-flow .score-note {
+  color: var(--frost);
+}
+
+.score-panel.is-banked .score-note,
+.score-panel.is-cheats .score-note {
+  color: var(--frost);
+}
+
+.score-panel.is-best {
+  background: var(--flag);
+  box-shadow:
+    inset 0 0 0 2px var(--flag),
+    inset 0 0 0 3.5px var(--snow);
+  color: var(--ink);
+}
+
+.score-panel.is-lost .score-base {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.score-panel.is-lost .score-note {
+  color: #ff9a8a;
+}
+
+.score-best {
+  position: absolute;
+  left: 8px;
+  bottom: 24px;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+  padding: 0.3em 0.7em;
+  border-radius: 6px;
+  background: rgb(20 32 48 / 0.72);
+  color: #fff;
+  font-size: clamp(11px, 1.8vh, 14px);
+}
+
+.score-best-label {
+  color: var(--frost);
+  font-size: 0.85em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.score-best-value {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}

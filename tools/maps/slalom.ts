@@ -274,6 +274,7 @@ for (const [x, heading, from] of [
 
 const map = {
   name: 'Slalom',
+  scoring: false,
   terrain,
   features,
   spawn,

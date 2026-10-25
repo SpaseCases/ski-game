@@ -3,6 +3,7 @@ import { Vector2, Vector3 } from 'three';
 import { createInputState, Keyboard, type Bindings } from './core/input.ts';
 import { startLoop } from './core/loop.ts';
 import { PointerOrbit } from './core/pointerOrbit.ts';
+import { bestCombo, submitCombo } from './core/bests.ts';
 import { loadOutfit, saveOutfit, type Outfit } from './core/outfit.ts';
 import { decorDensity, loadSettings, saveSettings, snowBudget, urlQuality, viewRange, type Quality } from './core/settings.ts';
 import { readStored, writeStored } from './core/storage.ts';
@@ -29,6 +30,7 @@ import {
   type RunState,
 } from './sim/checkpoints.ts';
 import { createRace, resetRace, stepRace, type CourseDef, type RaceState } from './sim/race.ts';
+import { createScore, endCombo, resetScore, stepScore, taintCombo } from './sim/score.ts';
 import { copySkierState, createSkierState, placeSkierAt, stepSkier } from './sim/skier.ts';
 import { heightAt } from './sim/terrain.ts';
 import { anyCheat, CHEATS, configChanged, rebuildTuning, setCheat, setSkiScale, TUNING } from './sim/tuning.ts';
@@ -48,6 +50,7 @@ import { SettingsScreen } from './ui/settingsMenu.ts';
 import { titleArt } from './ui/titleArt.ts';
 import { formatTime, missedText, RaceHud } from './ui/raceHud.ts';
 import { RunHud } from './ui/runHud.ts';
+import { ScoreHud } from './ui/scoreHud.ts';
 import { Toast } from './ui/toast.ts';
 import { TrailMap } from './ui/trailMap.ts';
 
@@ -81,6 +84,10 @@ const toast = new Toast(hud);
 const cheatsTag = mountCheatsTag(hud);
 const raceHud = new RaceHud(hud);
 const runHud = new RunHud(hud, backToTop);
+const scoreHud = new ScoreHud(hud, (total, tainted) => {
+  if (tainted || !level) return 'cheats';
+  return submitCombo(level.id, total) ? 'best' : 'banked';
+});
 const trailMap = new TrailMap(hud, closeTrailMap);
 const keyboard = new Keyboard(settings.bindings);
 keyboard.attach(window);
@@ -118,6 +125,11 @@ const settingsScreen = new SettingsScreen(
       settings.sfxVolume = sfx;
       settings.muted = muted;
       saveSettings(settings);
+    },
+    setScore: (on) => {
+      settings.score = on;
+      saveSettings(settings);
+      if (!on) resetScore(score);
     },
     setBindings,
     trapNextKey: (fn) => menus.trapNextKey(fn),
@@ -171,6 +183,8 @@ syncKeyLabels();
 const keys = createInputState();
 const skier = createSkierState();
 const skierPrev = createSkierState();
+/** Combo scoring (sim/score.ts), stepped after the skier on maps that score. */
+const score = createScore();
 /** Seconds R has been held; past CONFIG.checkpoints.holdToTop it goes back to the top, once per hold. */
 let holdTime = 0;
 let heldToTop = false;
@@ -208,10 +222,17 @@ function timedCourse(): CourseDef | undefined {
   return race && timedRun() ? level?.built.race?.courses[race.course] : undefined;
 }
 
+/** True when combos are scored: on in Settings, on a map that scores (not the Slalom). */
+function scoring(): boolean {
+  return settings.score && level !== null && level.built.map.scoring !== false;
+}
+
 /** Back to the latest checkpoint; on a timed run, back to that course's start house for another go. */
 function respawn(): void {
   if (!level) return;
   const { built, run, race } = level;
+  // A live combo banks if the skier is riding the snow, and is lost mid-air or on a rail.
+  if (scoring()) endCombo(score, skier);
   const start = timedCourse()?.start;
   if (race && start) {
     resetRace(race);
@@ -247,6 +268,7 @@ async function loadMap(entry: MapEntry): Promise<void> {
     // Free the old map before building the new one, to keep peak memory down.
     level?.world.dispose();
     level = null;
+    resetScore(score);
     const built = buildMap(map);
     const world = new WorldView(built, decorDensity(quality), viewRange(quality).far, snowBudget(quality));
     scene.add(world.group);
@@ -337,6 +359,8 @@ function drawLocker(realFrameTime: number): void {
 /** "Cheats on" in a corner while any cheat is on or the tuning panel has changed a number. */
 function syncCheatsTag(): void {
   cheatsTag.hidden = !(anyCheat() || configChanged());
+  // A combo ridden with any cheat on can't set a best, even if they're off again by the time it banks.
+  taintCombo(score);
 }
 
 /** Esc on the bottom screen: the pause menu resumes; the title stays (there's nothing to go back to). */
@@ -443,6 +467,7 @@ function applyWeatherLook(): void {
 const tmp = new Vector3();
 function teleport(x: number, z: number, heading: number, speed: number): void {
   if (!level) return;
+  if (scoring()) endCombo(score, skier);
   resetRun(level.run);
   if (level.race) resetRace(level.race);
   placeSkierAt(skier, x, z, heading, level.built.hf);
@@ -482,6 +507,8 @@ if (import.meta.env.DEV) {
     parkLaps: {
       skier,
       keys,
+      /** Combo scoring's live state (sim/score.ts). */
+      score,
       camera,
       scene,
       renderer,
@@ -601,6 +628,7 @@ startLoop(
     copySkierState(skierPrev, skier);
     stepSkier(skier, keys, built.course, dt);
     const event = updateRun(run, built.map, skierPrev.position, skier);
+    if (scoring()) stepScore(score, skierPrev, skier, built.course.rails, dt);
     if (race && built.race) {
       const raceEvent = stepRace(race, built.race, skierPrev.position, skier, dt);
       if (raceEvent === 'missed') toast.show('Missed gate');
@@ -651,6 +679,7 @@ startLoop(
     const finished = level?.run.finished ?? false;
     const result = finished && race?.finished ? `${course?.name ?? ''} · ${formatTime(race.time)} · ${missedText(race.missed)}` : '';
     runHud.update(finished, result, result === '' ? '' : raceAgainHint, heldToTop ? 0 : holdTime);
+    scoreHud.update(scoring(), score, level ? bestCombo(level.id) : 0, hudTime);
     fps.frame(realFrameTime);
     tuningPanel?.update(pose, skier);
   },

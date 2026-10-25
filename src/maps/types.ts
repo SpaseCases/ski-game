@@ -761,6 +761,8 @@ export interface RunDef {
 
 export interface MapDef {
   name: string;
+  /** False: no combo scoring on this map (the Slalom, which has its race timer). Default true. */
+  scoring?: boolean;
   terrain: TerrainDef;
   features: Feature[];
   spawn: SpawnDef;

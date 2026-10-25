@@ -43,6 +43,7 @@ node tools/maps/park.ts   # writes src/maps/park.json and reports the terrain la
 node tools/sim/spin720.ts                                       # airtime a clean 720 needs
 node tools/sim/jumps.ts src/maps/test-slope.json 14,18          # every jump, no pop and full pop
 node tools/sim/line.ts src/maps/park.json 102 1091 1340 tuck pop 720  # ride a line from a flag: every air, landing and crash
+node tools/sim/score.ts                                         # scripted tricks down a Park line and onto a rail: every scoring event and combo
 ```
 
 `tools/sim/harness.ts` (`loadMap`, `Rider`) is the base for new checks. In `npm run dev`, `window.parkLaps` also has `loadMap(id)`, `teleport(...)` and `lookFrom(x, y, z, tx, ty, tz)` (a fixed camera for looking over a map; call it with no arguments to go back to the chase camera).

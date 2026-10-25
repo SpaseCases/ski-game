@@ -4,7 +4,8 @@ import { ACTION_NAMES, keyName } from './keyNames.ts';
 import { addBackButton, board, setHints, type Screen } from './menus.ts';
 
 // The Settings screen: the quality preset (applied at once), sound volumes
-// and mute (saved for milestone 7's sounds), and a key for every action.
+// and mute (saved for milestone 7's sounds), combo scoring on or off, and a
+// key for every action.
 // Changing a key listens for the next key pressed: Esc is refused (it stays
 // the menu and pause key), and a key another action has swaps the two.
 
@@ -37,6 +38,7 @@ export interface SettingsHooks {
   get: () => Settings;
   setQuality: (q: Quality) => void;
   setSound: (master: number, sfx: number, muted: boolean) => void;
+  setScore: (on: boolean) => void;
   setBindings: (b: Bindings) => void;
   /** Hands the next key pressed to `fn` and nothing else (null: stop listening). */
   trapNextKey: (fn: ((e: KeyboardEvent) => void) | null) => void;
@@ -51,6 +53,7 @@ export class SettingsScreen implements Screen {
   private readonly masterValue: HTMLElement;
   private readonly sfxValue: HTMLElement;
   private readonly mute: HTMLButtonElement;
+  private readonly score: HTMLButtonElement;
   private readonly slots = new Map<string, HTMLButtonElement>();
   private readonly status: HTMLElement;
   private listening: HTMLButtonElement | null = null;
@@ -111,6 +114,22 @@ export class SettingsScreen implements Screen {
       soonNote,
     );
 
+    // Score.
+    const scoring = section('Score');
+    this.score = document.createElement('button');
+    this.score.type = 'button';
+    this.score.className = 'toggle';
+    this.score.addEventListener('click', () => {
+      const on = this.score.getAttribute('aria-pressed') !== 'true';
+      this.score.setAttribute('aria-pressed', String(on));
+      this.syncScoreLabel();
+      this.hooks.setScore(on);
+    });
+    const scoreNote = document.createElement('p');
+    scoreNote.className = 'setting-note';
+    scoreNote.textContent = 'Points for tricks, grabs and rails, chained into combos. Your best combo on each map is saved. Not on the Slalom.';
+    scoring.append(labelRow('Combo score', this.score), scoreNote);
+
     // Keys.
     const keys = section('Keys');
     keys.classList.add('keys-section');
@@ -164,7 +183,7 @@ export class SettingsScreen implements Screen {
     columns.className = 'settings-columns';
     const left = document.createElement('div');
     left.className = 'settings-column';
-    left.append(picture, sound);
+    left.append(picture, sound, scoring);
     columns.append(left, keys);
     b.body.appendChild(columns);
     setHints(b.foot, [
@@ -182,6 +201,8 @@ export class SettingsScreen implements Screen {
     this.sfx.value = String(Math.round(s.sfxVolume * 100));
     this.mute.setAttribute('aria-pressed', String(s.muted));
     this.syncSoundLabels();
+    this.score.setAttribute('aria-pressed', String(s.score));
+    this.syncScoreLabel();
     this.syncKeys();
     this.status.textContent = '';
     return this.qualityButtons.get(s.quality) ?? null;
@@ -261,6 +282,10 @@ export class SettingsScreen implements Screen {
     this.masterValue.textContent = `${this.master.value}%`;
     this.sfxValue.textContent = `${this.sfx.value}%`;
     this.mute.textContent = this.mute.getAttribute('aria-pressed') === 'true' ? 'On' : 'Off';
+  }
+
+  private syncScoreLabel(): void {
+    this.score.textContent = this.score.getAttribute('aria-pressed') === 'true' ? 'On' : 'Off';
   }
 
   private commitSound(): void {

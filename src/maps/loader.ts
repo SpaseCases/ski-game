@@ -54,6 +54,7 @@ export function parseMap(raw: unknown): MapDef {
 
   return {
     name: str(map.name, 'name'),
+    scoring: map.scoring === undefined ? undefined : bool(map.scoring, 'scoring'),
     terrain: parseTerrain(map.terrain),
     features: arr(map.features, 'features').map((f, i) => parseFeature(f, `features[${i}]`)),
     spawn: {

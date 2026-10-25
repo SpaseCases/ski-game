@@ -254,6 +254,12 @@ export function mountTuningPanel(actions: PanelActions): TuningPanel {
   bail.add(b, 'fadeTime', 0.05, 2, 0.05);
   bail.close();
 
+  // Combo scoring (sim/score.ts reads these every step). Changing one counts as tuning, so a combo then sets no best.
+  const scoring = gui.addFolder('Scoring');
+  const S = CONFIG.score as Record<string, number>;
+  for (const key of Object.keys(S)) scoring.add(S, key, 0, S[key]! * 4 || 1, 0.01);
+  scoring.close();
+
   // Each ski's multipliers (config.ts's skis block); the ski in use rides on them at once.
   const skis = gui.addFolder('Skis (multipliers)');
   for (const [id, scale] of Object.entries(CONFIG.skis)) {
