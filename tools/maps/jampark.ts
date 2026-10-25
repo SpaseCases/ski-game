@@ -535,6 +535,13 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
 }
 
 // ---------------------------------------------------------------- S3 pro zone (19°)
+/**
+ * The transfer rails where the jib and combo lines cross (see below): they
+ * start at d, run `run` m straight, then `along` m down while moving `across`
+ * m toward the other line. Heights of the low rail and the tall one, the gap
+ * in the tall one, and how much lower its second half is.
+ */
+const CROSS = { d: D.s3 + 480, run: 8, along: 64, across: 36, low: 0.3, high: 1.3, gap: 4, drop: 0.35 };
 const lanes: Json[] = [];
 {
   const lim = D.f3 - 8;
@@ -602,6 +609,27 @@ const lanes: Json[] = [];
     BIG(3.6, 24),
   ]), pipe3 - 34 - 6);
   features.push({ type: 'halfpipe', x: X.pipe, z: -pipe3, yaw: 0, length: 210, floorWidth: 17, radius: 6.5, wallAngle: 84, deckWidth: 4, outerWidth: 8, dropIn: 8, entry: 16, back: 34, exit: 16 });
+
+  // Lines cross: below the jib and combo lines two transfer rails swap them.
+  // A low rail runs from the jib line down and across to the combo line, and
+  // a tall tube from the combo line back to the jib line, with a gap where it
+  // passes over the low rail: riders on it fly the gap over the other rail
+  // onto its second half, set a little lower so it catches them at any speed
+  // from about 14 m/s. Both stop short of the other line's middle, so riders
+  // staying on their own line ride clear of them (6 m to their side).
+  {
+    const { d, run, along, across, low, high, gap, drop } = CROSS;
+    const slope = across / along;
+    // Each ends straight down the hill, so riders come off it beside the other line, heading down it.
+    const end = run + along;
+    const out = end + 6;
+    slide('rail', X.jib, d, [[0, 0, 0], [4, 0, low], [run, 0, low], [end, across, low], [out, across, low], [out + 3, across, 0]], 0, 4);
+    const cross = run + ((X.combo - X.jib) / 2) * (along / across);
+    const half = (gap / 2) * (along / Math.hypot(along, across));
+    const at = (a: number): number => -(a - run) * slope;
+    slide('rail', X.combo, d, [[0, 0, 0], [run, 0, high], [cross - half, at(cross - half), high]], 0, 4, 'tube');
+    slide('rail', X.combo, d, [[cross + half, at(cross + half), high - drop], [end, -across, high - drop], [out, -across, high - drop], [out + 4, -across, 0]], 0, 4, 'tube');
+  }
 
   // Two huge jumps, one below the other; each lane ends back level with the slope before the next starts.
   const second = D.s3 + 345;
@@ -700,11 +728,14 @@ const FENCE_OPEN = 40;
  * where the quarterpipes throw riders across.
  */
 const fenced = (x: number, a: number): boolean => !(x === -42 && a >= D.s4) && !(x === 3 && (a < D.f1 || a >= D.s4));
+/** Nor where the transfer rails cross between the jib and combo lines (from d0 to d1), down to the end of the section: riders can cut back to their own line after them. */
+const crossing = (x: number, d0: number, d1: number): boolean => x === -85 && d1 > CROSS.d - 10 && d0 < D.f3;
 FENCE_X.forEach((x, i) => {
   for (const [a, b] of sections) {
     if (!fenced(x, a)) continue;
     for (let d = a + (i % 2) * 20; d < b - 10; d += FENCE_RUN + FENCE_OPEN) {
-      decor.push({ kind: 'fence', points: [{ x, z: -d }, { x, z: -Math.min(b, d + FENCE_RUN) }] });
+      const e = Math.min(b, d + FENCE_RUN);
+      if (!crossing(x, d, e)) decor.push({ kind: 'fence', points: [{ x, z: -d }, { x, z: -e }] });
     }
   }
 });
@@ -721,7 +752,9 @@ FENCE_X.forEach((x, i) => {
   const pts: Json[] = [];
   for (const [a, b] of sections) {
     if (!fenced(x, a)) continue;
-    for (let d = a + (i % 2) * 20 + FENCE_RUN / 2 + (i % 2 ? 70 : 0); d < b - 10; d += 2 * (FENCE_RUN + FENCE_OPEN)) pts.push({ x, z: -d });
+    for (let d = a + (i % 2) * 20 + FENCE_RUN / 2 + (i % 2 ? 70 : 0); d < b - 10; d += 2 * (FENCE_RUN + FENCE_OPEN)) {
+      if (!crossing(x, d, d)) pts.push({ x, z: -d });
+    }
   }
   decor.push({ kind: 'floodlight', points: pts, heading: 0 });
 });
