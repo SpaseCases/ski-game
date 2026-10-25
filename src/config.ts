@@ -93,6 +93,24 @@ export const CONFIG = {
     curveLoad: 1,
     curveLoadMax: 60,
     curveSmoothing: 15,
+
+    /**
+     * Butters: on the snow, holding a nose grab key presses onto the ski tips
+     * and a tail grab key onto the tails, easing in over butterBlendTime (s).
+     * Pressed, ←/→ pivot the skis at butterSpinRate (rad/s, reached at
+     * butterSpinResponse rad/s²) instead of carving. The edges grip only
+     * butterGrip of usual, so the skier keeps sliding the way they were
+     * going, and sliding sideways scrapes off only butterSkid of the usual
+     * speed. Popping out of a press (an ollie off the tails, a nollie off the
+     * tips) is butterPop times as strong; the pivot carries into the air like
+     * a carving turn's (air.spinCarry).
+     */
+    butterBlendTime: 0.12,
+    butterSpinRate: 4.5,
+    butterSpinResponse: 25,
+    butterGrip: 0.08,
+    butterSkid: 0.25,
+    butterPop: 1.1,
   },
 
   air: {

@@ -200,6 +200,14 @@ export function mountTuningPanel(actions: PanelActions): TuningPanel {
   pop.add(s, 'groundTolerance', 0, 0.3, 0.005);
 
   const a = CONFIG.air;
+  const butter = gui.addFolder('Butters');
+  butter.add(s, 'butterBlendTime', 0.02, 0.5, 0.01);
+  butter.add(s, 'butterSpinRate', 0, 10, 0.1);
+  butter.add(s, 'butterSpinResponse', 1, 80, 1);
+  butter.add(s, 'butterGrip', 0, 1, 0.01);
+  butter.add(s, 'butterSkid', 0, 1, 0.01);
+  butter.add(s, 'butterPop', 1, 2, 0.01);
+
   const air = gui.addFolder('Air');
   air.add(a, 'spinRate', 0, 15, 0.1);
   air.add(a, 'flipRate', 0, 15, 0.1);

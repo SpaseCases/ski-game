@@ -51,6 +51,7 @@ interface Ride {
   lean?: number;
   brake?: number;
   polePhase?: number;
+  butter?: number;
 }
 
 const STATES: [string, PoseDef | Ride][] = [
@@ -77,6 +78,8 @@ const STATES: [string, PoseDef | Ride][] = [
   ['ride: tuck', { speed: 15, crouch: 1 }],
   ['ride: tuck carve', { speed: 15, crouch: 1, lean: 0.85 }],
   ['ride: hockey stop', { speed: 8, brake: 1 }],
+  ['ride: nose press', { speed: 6, butter: 1 }],
+  ['ride: tail press', { speed: 6, butter: -1 }],
 ];
 for (const [name, ride] of [
   ['stance', { speed: 4 }],
@@ -106,6 +109,8 @@ function rideRig(r: Ride): SkierRig {
   pose.lean = r.lean ?? 0;
   pose.brake = r.brake ?? 0;
   pose.brakeSide = 1;
+  pose.butter = r.butter ?? 0;
+  pose.butterAmount = r.butter ? 1 : 0;
   view.snap(pose);
   // A pole push is already under way: ride up to the phase so eased weights settle as in the game.
   const phase = r.polePhase ?? 1;

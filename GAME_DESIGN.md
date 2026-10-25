@@ -41,6 +41,7 @@ Style moves (hold in the air, release to let go; one of each, no left and right)
 | T | Screamin' seaman: right leg kicked out in front, left ski held up behind, chest out | 1 | Iron cross: heels up behind, ski tips crossed in an X |
 | W | Daffy: one ski forward, one back | 2 | Spread eagle: arms and legs flung out wide |
 
+- **Butters:** on the snow, a nose grab key (G/B) presses onto the ski tips and a tail grab key (F/V) onto the tails. While pressed, ←/→ pivot the skis on that end (a butter 180 or 360) instead of carving, and you keep sliding the way you were going. Releasing ↑ pops off that end (an ollie off the tails, a nollie off the tips), a bit stronger than a flat pop, and the pivot carries on as spin. Landing with a nose or tail grab still held goes straight into the press.
 - Holding a spin key and a flip key together tilts the rotation axis. That produces corks and misty flips.
 - Rotation continues while a key is held and slows after release. Letting go early is how you time the landing.
 - Grabs are poses: the hand reaches for that part of the ski. A grab can be held through rotations. Style moves are poses too, with no hand on a ski. Holding a newer grab or move key switches to it; letting go falls back to another one still held. Grabs and style moves don't change the physics.
@@ -125,7 +126,7 @@ Each map defines: name, heightfield (generated from parameters or loaded from a 
 ## Look
 - Low-poly and flat-shaded, close to Shredsauce's style but entirely original.
 - Snow uses white and blue-gray vertex-colored faces. Features use wood and metal colors. Trees are instanced low-poly cones.
-- The skier is a low-poly segmented body (helmet, torso, arms, legs) on a simple skeleton. Poses are procedural: stance, crouch, tuck, the 10 grabs and 4 style moves, and the bail tumble. Skis and poles are separate meshes.
+- The skier is a low-poly segmented body (helmet, torso, arms, legs) on a simple skeleton. Poses are procedural: stance, crouch, tuck, the 10 grabs and 4 style moves, nose and tail presses, and the bail tumble. Skis and poles are separate meshes.
 - **Outfit:** colors, headwear and skis, chosen in the Locker and saved locally (below).
 - Sky is a gradient, with matching fog per map and weather.
 
@@ -210,7 +211,7 @@ Three ski types, each with its own model, 3 to 4 top sheet graphics to pick from
 - **Trail map (M, or its HUD button):** a drawn map of the whole map, oriented like a piste map (the start's way down points down the page): shaded ground with rock, steep slopes and forests, the faces' names, every named run, flags (green once passed), finishes, the start, and you with your heading.
 
 ## Not in v1 (later ideas)
-Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ragdoll crashes, the full grab set, replays and photo mode, a level editor, gamepad support, music, multiplayer, riding a chairlift back up.
+Scoring or trick names, rail grabs, snowboard, ragdoll crashes, the full grab set, replays and photo mode, a level editor, gamepad support, music, multiplayer, riding a chairlift back up.
 
 ## Milestones
 0. **Scaffold and deploy.** Vite + TypeScript + Three.js app showing a slope and a box, deployed to GitHub Pages by GitHub Actions, with `embed-test.html` working. Test on a school Chromebook at this point.

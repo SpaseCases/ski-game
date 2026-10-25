@@ -64,6 +64,8 @@ interface RideState {
   railYaw: number;
   /** How far through a pole push (0..1); 1 is not pushing. */
   polePhase: number;
+  /** Butter: 1 on the tips, -1 on the tails. */
+  butter: number;
 }
 
 const RAIL_HEIGHT = 0.45;
@@ -95,6 +97,8 @@ const POSES: (Entry | null)[] = [
   { name: 'Tuck carve', note: 'In game: tucked in a hard left turn', ride: { speed: 15, crouch: 1, lean: 0.85 }, airborne: false },
   { name: 'Hockey stop', note: 'In game: full brake', ride: { speed: 8, brake: 1, brakeSide: 1 }, airborne: false },
   { name: 'Rail', note: 'In game: sliding a rail sideways', ride: { speed: 6, onRail: true, railYaw: Math.PI / 2 }, airborne: false },
+  { name: 'Nose press', note: 'In game: buttering on the tips (nose grab key on the snow)', ride: { speed: 6, butter: 1 }, airborne: false },
+  { name: 'Tail press', note: 'In game: buttering on the tails (tail grab key on the snow)', ride: { speed: 6, butter: -1 }, airborne: false },
 ];
 
 /** ?set=poling: a pole push from the stance, a crouch and a tuck, at five points through the stroke. */
@@ -171,7 +175,7 @@ const flat: Heightfield = {
   bounds: { minX: -4, maxX: 4, minZ: -4, maxZ: 4, polygon: new Float32Array(0) },
 };
 
-const RIDE_DEFAULTS: RideState = { speed: 0, crouch: 0, lean: 0, brake: 0, brakeSide: 1, onRail: false, railYaw: 0, polePhase: 1 };
+const RIDE_DEFAULTS: RideState = { speed: 0, crouch: 0, lean: 0, brake: 0, brakeSide: 1, onRail: false, railYaw: 0, polePhase: 1, butter: 0 };
 
 /** The interpolated state the game would hand SkierView while riding like this. */
 function ridePose(r: RideState): SkierPose {
@@ -186,6 +190,8 @@ function ridePose(r: RideState): SkierPose {
   pose.onRail = r.onRail;
   pose.yaw = r.railYaw;
   pose.polePhase = r.polePhase;
+  pose.butter = r.butter;
+  pose.butterAmount = r.butter !== 0 ? 1 : 0;
   return pose;
 }
 

@@ -108,6 +108,9 @@ export interface SkierState {
   airWall: boolean;
   /** Grab being held (index into GRAB_ACTIONS), or -1. */
   grab: number;
+  /** Butter on the snow: 1 pressing the tips, -1 the tails, 0 neither; and how far into the press (0..1). */
+  butter: number;
+  butterAmount: number;
   /** Seconds since the last landing, and how deep (0..1) its absorb crouch is. */
   landTime: number;
   landDepth: number;
@@ -167,6 +170,8 @@ export function createSkierState(): SkierState {
     trick: new Quaternion(),
     airWall: false,
     grab: -1,
+    butter: 0,
+    butterAmount: 0,
     landTime: Infinity,
     landDepth: 0,
     landPitch: 0,
@@ -212,6 +217,8 @@ export function copySkierState(dst: SkierState, src: SkierState): void {
   dst.trick.copy(src.trick);
   dst.airWall = src.airWall;
   dst.grab = src.grab;
+  dst.butter = src.butter;
+  dst.butterAmount = src.butterAmount;
   dst.landTime = src.landTime;
   dst.landDepth = src.landDepth;
   dst.landPitch = src.landPitch;
@@ -294,7 +301,8 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
   // steeper than a wall (an aerials kicker) it pushes straight up: the
   // normal there points back down the in-run.
   if (input.up.released && s.canPop && (s.grounded || s.airTime <= c.popCoyoteTime)) {
-    const pop = c.popMin + (c.popMax - c.popMin) * s.crouch;
+    // Out of a butter it's an ollie (off the tails) or a nollie (off the tips): a stronger pop.
+    const pop = (c.popMin + (c.popMax - c.popMin) * s.crouch) * (1 + (c.butterPop - 1) * s.butterAmount);
     if (onWall(s, course.hf)) s.velocity.y += pop * TUNING.air.wallPop;
     else if (s.normal.y < Math.cos(TUNING.air.wallAngle * DEG)) s.velocity.y += pop;
     else s.velocity.addScaledVector(s.normal, pop);
@@ -307,9 +315,12 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
   s.crouch = approach(s.crouch, crouchTarget, dt / (crouchTarget > s.crouch ? c.crouchTime : c.standTime));
 
   if (s.rail >= 0) {
+    endButter(s);
     slideRail(s, course, steer, dt);
     return;
   }
+  if (s.grounded) updateButter(s, input, dt);
+  else endButter(s);
   if (s.grounded) rideSnow(s, input, dt);
   else fly(s, input, steer, dt);
 
@@ -396,7 +407,10 @@ function rideSnow(s: SkierState, input: InputState, dt: number): void {
   const t = Math.min(1, speed / c.turnSpeedRef);
   const baseRate = c.turnRateSlow + (c.turnRateFast - c.turnRateSlow) * t;
   const maxRate = Math.min(baseRate, (grip * load) / Math.max(speed, 0.1));
-  s.yawRate = approach(s.yawRate, steer * maxRate, c.turnResponse * dt);
+  // In a butter the skis pivot on their tips or tails instead of carving.
+  const b = s.butterAmount;
+  const yawTarget = steer * (maxRate + (c.butterSpinRate - maxRate) * b);
+  s.yawRate = approach(s.yawRate, yawTarget, (c.turnResponse + (c.butterSpinResponse - c.turnResponse) * b) * dt);
   s.yaw = wrapAngle(s.yaw + s.yawRate * dt);
 
   // Braking: pick the hockey-stop side when the brake starts.
@@ -444,14 +458,14 @@ function rideSnow(s: SkierState, input: InputState, dt: number): void {
     // Full grip up to half of carveSlipMax, fading to none at carveSlipMax.
     const slipAngle = Math.atan2(Math.abs(w), Math.abs(u));
     const carve = clamp((c.carveSlipMax - slipAngle) / (0.5 * c.carveSlipMax), 0, 1);
-    const redirect = grip * load * carve * dt;
+    const redirect = grip * (1 - (1 - c.butterGrip) * b) * load * carve * dt;
     if (redirect > 0) {
       const wNext = Math.abs(w) <= redirect ? 0 : w - Math.sign(w) * redirect;
       u = Math.sign(u) * Math.sqrt(Math.max(0, total * total - wNext * wNext));
       u = approach(u, 0, c.carveFriction * Math.abs(w - wNext));
       w = wNext;
     }
-    w = approach(w, 0, c.skidFriction * load * (1 - carve) * dt);
+    w = approach(w, 0, c.skidFriction * (1 - (1 - c.butterSkid) * b) * load * (1 - carve) * dt);
   }
 
   // Friction and brake along the skis, then air drag on the whole speed.
@@ -466,7 +480,8 @@ function rideSnow(s: SkierState, input: InputState, dt: number): void {
   s.velocity.copy(forward).multiplyScalar(u).addScaledVector(left, w).addScaledVector(n, vn);
 
   // Lean into the turn by the angle that balances centripetal force and gravity.
-  const leanTarget = clamp(Math.atan2(s.yawRate * u, g), -c.leanMax, c.leanMax);
+  // A butter's pivot is no turn to lean into.
+  const leanTarget = clamp(Math.atan2(s.yawRate * u, g), -c.leanMax, c.leanMax) * (1 - b);
   s.lean += (leanTarget - s.lean) * (1 - Math.exp(-c.leanResponse * dt));
 }
 
@@ -527,6 +542,32 @@ function rotateAxis(s: SkierState, bit: number, w: number, input: number, rate: 
     return approach(w, input * rate, a.rotateAccel * dt);
   }
   return s.spinDriven & bit ? approach(w, 0, a.rotateStop * dt) : w;
+}
+
+/**
+ * Butters on the snow: a nose grab key held presses onto the tips, a tail
+ * grab key onto the tails (the newest pressed wins when both are held).
+ * Changing ends lets the press out before pressing the other end.
+ */
+function updateButter(s: SkierState, input: InputState, dt: number): void {
+  const nose = input.grabLeftNose.held || input.grabRightNose.held;
+  const tail = input.grabLeftTail.held || input.grabRightTail.held;
+  let want = nose ? 1 : tail ? -1 : 0;
+  if (nose && tail) {
+    if (input.grabLeftNose.pressed || input.grabRightNose.pressed) want = 1;
+    else if (input.grabLeftTail.pressed || input.grabRightTail.pressed) want = -1;
+    else want = s.butter !== 0 ? s.butter : 1;
+  }
+  if (want !== 0 && (s.butter === want || s.butterAmount === 0)) s.butter = want;
+  const pressing = want !== 0 && s.butter === want;
+  s.butterAmount = approach(s.butterAmount, pressing ? 1 : 0, dt / TUNING.skier.butterBlendTime);
+  if (s.butterAmount === 0 && !pressing) s.butter = 0;
+}
+
+/** Off the snow (in the air, on a rail) there's no butter. */
+function endButter(s: SkierState): void {
+  s.butter = 0;
+  s.butterAmount = 0;
 }
 
 /** The newest grab key pressed wins; letting it go falls back to another held grab. */

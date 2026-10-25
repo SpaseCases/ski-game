@@ -107,6 +107,44 @@ export const TUCK: PoseDef = {
   ],
 };
 
+// Butters: the skis tip up about 12.5° onto the tips or the tails, turning
+// about where that end meets the snow (0.75 m from the middle), which lifts
+// the boots ~16 cm. Over the tips the body leans forward; over the tails it
+// sits back, arms forward.
+const PRESS_TILT = 0.22;
+
+/** Nose press: up on the ski tips, tails off the snow. */
+export const NOSE_PRESS: PoseDef = {
+  pelvis: [0, 1.01, -0.05],
+  pelvisPitch: 0.3,
+  chestPitch: 0.22,
+  headPitch: -0.45,
+  feet: [
+    { ankle: [-STANCE_HALF_WIDTH, 0.324, -0.034], pitch: -PRESS_TILT },
+    { ankle: [STANCE_HALF_WIDTH, 0.324, -0.034], pitch: -PRESS_TILT },
+  ],
+  hands: [
+    { at: [-0.46, 0.98, -0.3], pole: [-0.35, -0.75, 0.55], elbow: [-0.7, -0.4, 0.5] },
+    { at: [0.46, 0.98, -0.3], pole: [0.35, -0.75, 0.55], elbow: [0.7, -0.4, 0.5] },
+  ],
+};
+
+/** Tail press: back on the ski tails, tips up off the snow. */
+export const TAIL_PRESS: PoseDef = {
+  pelvis: [0, 0.97, 0.2],
+  pelvisPitch: 0.12,
+  chestPitch: 0.12,
+  headPitch: -0.2,
+  feet: [
+    { ankle: [-STANCE_HALF_WIDTH, 0.315, 0.003], pitch: PRESS_TILT },
+    { ankle: [STANCE_HALF_WIDTH, 0.315, 0.003], pitch: PRESS_TILT },
+  ],
+  hands: [
+    { at: [-0.36, 1.1, -0.37], pole: [-0.2, -0.85, 0.5], elbow: [-0.7, -0.4, 0.5] },
+    { at: [0.36, 1.1, -0.37], pole: [0.2, -0.85, 0.5], elbow: [0.7, -0.4, 0.5] },
+  ],
+};
+
 // Shared pieces of the air poses: hips over the tucked-up skis, the free
 // hand out to the side for balance.
 const AIR_PELVIS: Vec3 = [0, 0.92, 0.05];

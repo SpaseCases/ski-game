@@ -142,6 +142,7 @@ export class ControlsScreen implements Screen {
     for (const text of [
       'Hold a spin key and a flip key together to tilt the spin: that makes corks and misty flips.',
       'Spins and flips keep going while the key is held and slow down after you let go. Let go early to time the landing.',
+      `Butter on the snow: hold a nose grab key (${mainKeys(keys, 'grabLeftNose', 'grabRightNose')}) to press onto your tips or a tail grab key (${mainKeys(keys, 'grabLeftTail', 'grabRightTail')}) onto your tails. ← → pivot the skis; releasing ${keys.up[0] ? keyName(keys.up[0]) : '↑'} pops off that end.`,
       'Land on a rail or box to slide it. There is no grind button.',
       `At the finish, ${keys.confirm[0] ? keyName(keys.confirm[0]) : 'the Back to top button'} takes you back to the top.`,
       'Drag the game view with the mouse to look around the skier.',
@@ -160,6 +161,12 @@ export class ControlsScreen implements Screen {
     };
     this.body.replaceChildren(wrap(main), wrap(grabs), wrap(style), tips);
   }
+}
+
+/** The main keys of two actions, "G / B" (or "none"). */
+function mainKeys(keys: Bindings, a: Action, b: Action): string {
+  const name = (action: Action): string => (keys[action][0] ? keyName(keys[action][0]) : 'none');
+  return `${name(a)} / ${name(b)}`;
 }
 
 function td(text: string, span = 1): HTMLTableCellElement {

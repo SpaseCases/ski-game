@@ -14,7 +14,7 @@ import { wrapAngle, type SkierState } from '../sim/skier.ts';
 import { groundAt } from '../sim/terrain.ts';
 import { TUNING } from '../sim/tuning.ts';
 import { addPoseDelta, createPoseBuffer, setPose, type PoseBuffer } from './poseBlend.ts';
-import { CROUCH, GRABS, STANCE, STANCE_HALF_WIDTH, TUCK, TUMBLE, TUMBLE_CENTER } from './skierPoses.ts';
+import { CROUCH, GRABS, NOSE_PRESS, STANCE, STANCE_HALF_WIDTH, TAIL_PRESS, TUCK, TUMBLE, TUMBLE_CENTER } from './skierPoses.ts';
 import { DEFAULT_OUTFIT, type Outfit } from '../core/outfit.ts';
 import { SkierRig } from './skierRig.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
@@ -38,6 +38,9 @@ export interface SkierPose {
   /** Rotation speed in the air (rad/s). */
   spinRate: number;
   grab: number;
+  /** Butter: 1 on the tips, -1 on the tails, 0 neither; how far into the press (0..1). */
+  butter: number;
+  butterAmount: number;
   landTime: number;
   landDepth: number;
   bailed: boolean;
@@ -62,6 +65,8 @@ export function createSkierPose(): SkierPose {
     center: new Vector3(),
     spinRate: 0,
     grab: -1,
+    butter: 0,
+    butterAmount: 0,
     landTime: Infinity,
     landDepth: 0,
     bailed: false,
@@ -92,6 +97,8 @@ export function interpolateSkier(out: SkierPose, prev: SkierState, curr: SkierSt
   out.center.lerpVectors(prev.center, curr.center, alpha);
   out.spinRate = curr.grounded ? 0 : curr.spin.length();
   out.grab = curr.grab;
+  out.butter = curr.butter !== 0 ? curr.butter : prev.butter;
+  out.butterAmount = prev.butterAmount + (curr.butterAmount - prev.butterAmount) * alpha;
   out.landTime = curr.landTime;
   out.landDepth = curr.landDepth;
   out.bailed = curr.bailed;
@@ -142,6 +149,9 @@ export class SkierView {
   private readonly grabWeights = new Float32Array(GRABS.length);
   private bailWeight = 0;
   private railWeight = 0;
+  /** Butter presses: on the tips, on the tails. */
+  private noseWeight = 0;
+  private tailWeight = 0;
   /** The snow the skier is on; swapped when another map loads. */
   hf: Heightfield;
 
@@ -184,6 +194,8 @@ export class SkierView {
     this.grabWeights.fill(0);
     this.bailWeight = pose.bailed ? 1 : 0;
     this.railWeight = pose.onRail ? 1 : 0;
+    this.noseWeight = pose.butter === 1 ? pose.butterAmount : 0;
+    this.tailWeight = pose.butter === -1 ? pose.butterAmount : 0;
   }
 
   update(state: SkierPose, frameTime: number): void {
@@ -213,6 +225,9 @@ export class SkierView {
     this.airWeight = approach(this.airWeight, state.grounded ? 0 : 1, frameTime / r.grabBlendTime);
     this.bailWeight = approach(this.bailWeight, state.bailed ? 1 : 0, frameTime / r.bailBlendTime);
     this.railWeight = approach(this.railWeight, state.onRail ? 1 : 0, frameTime / r.railBlendTime);
+    // The sim eases a press in and out on the snow but drops it at takeoff; ease that out here.
+    this.noseWeight = approach(this.noseWeight, state.butter === 1 ? state.butterAmount : 0, frameTime / r.grabBlendTime);
+    this.tailWeight = approach(this.tailWeight, state.butter === -1 ? state.butterAmount : 0, frameTime / r.grabBlendTime);
     let grabTotal = 0;
     for (let i = 0; i < GRABS.length; i++) {
       const w = approach(this.grabWeights[i] ?? 0, state.grab === i ? 1 : 0, frameTime / r.grabBlendTime);
@@ -261,6 +276,8 @@ export class SkierView {
     setPose(p, STANCE);
     addPoseDelta(p, STANCE, CROUCH, free * (groundCrouch * (1 - air) + airCrouch * air));
     addPoseDelta(p, STANCE, TUCK, free * state.crouch * tuck * (1 - air));
+    addPoseDelta(p, STANCE, NOSE_PRESS, free * this.noseWeight * (1 - air));
+    addPoseDelta(p, STANCE, TAIL_PRESS, free * this.tailWeight * (1 - air));
     for (let i = 0; i < GRABS.length; i++) {
       const w = (this.grabWeights[i] ?? 0) * grabScale;
       if (w > 0) addPoseDelta(p, STANCE, GRABS[i]!, w);
@@ -299,6 +316,8 @@ export class SkierView {
     let lift = -Infinity;
     for (let i = 0; i < SKI_POINTS.length; i++) {
       const pt = SKI_POINTS[i]!;
+      // In a butter only the pressed end touches: the other is up off the snow.
+      if ((pt[1] > 0 && this.noseWeight > 0.5) || (pt[1] < 0 && this.tailWeight > 0.5)) continue;
       skiPoint.set(pt[0], 0, pt[1]).applyQuaternion(this.swing.quaternion).applyMatrix4(this.root.matrix);
       lift = Math.max(lift, drawnHeightAt(this.hf, skiPoint.x, skiPoint.z) - skiPoint.y);
     }
