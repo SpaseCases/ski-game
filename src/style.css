@@ -1729,6 +1729,10 @@ body {
   color: var(--snow);
 }
 
+.score-slide .score-trick-points:empty {
+  display: none;
+}
+
 /* The panel: an enamel sign with a white keyline, like the menus' boards. */
 .score-panel {
   min-width: 9.5em;

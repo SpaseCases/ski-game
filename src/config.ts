@@ -305,6 +305,20 @@ export const CONFIG = {
     railPoints: 30,
     railSideways: 1.5,
     railSwitch: 1.25,
+    /**
+     * Butters (pressing the tips or tails on the snow, butterAmount past
+     * butterMin): a pivot scores butterSpinPoints per 180° turned (counted
+     * like a spin, spinShort short), plus butterPressPoints per second
+     * pressed up to butterPressMax s. A press with no pivot counts from
+     * butterPressMin s. Popping out of a press is an ollie (tails) or a
+     * nollie (tips): the air's trick is named after it and adds ollieBonus.
+     */
+    butterMin: 0.5,
+    butterSpinPoints: 75,
+    butterPressPoints: 50,
+    butterPressMax: 3,
+    butterPressMin: 0.6,
+    ollieBonus: 0.25,
     /** Landings: clean adds cleanBonus of the trick's points; sketchy scores sketchyScale of them and adds no multiplier. Taking off or landing switch adds switchBonus each. */
     cleanBonus: 0.25,
     sketchyScale: 0.5,

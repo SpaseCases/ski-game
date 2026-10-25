@@ -2,7 +2,7 @@ import { Quaternion, Vector3 } from 'three';
 import { CONFIG } from '../config.ts';
 import { GRAB_ACTIONS } from '../core/input.ts';
 import type { BoxStyle, RailShape, RailStyle } from '../maps/types.ts';
-import type { SkierState } from './skier.ts';
+import { wrapAngle, type SkierState } from './skier.ts';
 import { anyCheat, configChanged, TUNING } from './tuning.ts';
 
 // Scoring: combos of tricks with a timer (GAME_DESIGN.md, Scoring). It reads
@@ -10,7 +10,8 @@ import { anyCheat, configChanged, TUNING } from './tuning.ts';
 // the change since the step before (taking off, landing, catching a rail,
 // crashing), so the physics never knows it's being scored.
 //
-// A trick (a landed spin, flip, Lincoln loop or grab, or a rail slide) adds
+// A trick (a landed spin, flip, Lincoln loop or grab, a rail slide, or a
+// butter pivot or press on the snow) adds
 // points and multiplier and tops the combo timer up; a big air with no trick
 // scores and tops it up but adds no multiplier. Carving hard at speed and
 // small airs add a trickle of points and slow the drain, but never top it
@@ -69,6 +70,17 @@ interface AirTrack {
   grab: Float64Array;
   fromRail: boolean;
   switchTakeoff: boolean;
+  /** Popped out of a butter: 1 off the tips (a nollie), -1 off the tails (an ollie), 0 not. */
+  butter: number;
+}
+
+interface ButterTrack {
+  active: boolean;
+  /** 1 the tips, -1 the tails. */
+  end: number;
+  /** Seconds pressed, and the skis' turn on the snow while pressed (radians, signed). */
+  time: number;
+  turn: number;
 }
 
 interface RailTrack {
@@ -99,6 +111,7 @@ export interface ScoreState {
   readonly counts: Map<string, number>;
   readonly air: AirTrack;
   readonly rail: RailTrack;
+  readonly butter: ButterTrack;
 }
 
 export function createScore(): ScoreState {
@@ -116,8 +129,9 @@ export function createScore(): ScoreState {
     events,
     seq: 0,
     counts: new Map(),
-    air: { active: false, time: 0, flip: 0, spin: 0, lincoln: 0, total: 0, grab: new Float64Array(GRAB_ACTIONS.length), fromRail: false, switchTakeoff: false },
+    air: { active: false, time: 0, flip: 0, spin: 0, lincoln: 0, total: 0, grab: new Float64Array(GRAB_ACTIONS.length), fromRail: false, switchTakeoff: false, butter: 0 },
     rail: { active: false, rail: -1, meters: 0, sideMeters: 0, switchMeters: 0, points: 0 },
+    butter: { active: false, end: 0, time: 0, turn: 0 },
   };
 }
 
@@ -170,6 +184,11 @@ export function stepScore(sc: ScoreState, prev: SkierState, s: SkierState, rails
 
   // Off a rail (an end, a pop, the snow rising over it): the slide scores.
   if (prev.rail >= 0 && s.rail !== prev.rail) endRail(sc, rails);
+  // A butter: pressed on the snow; it scores when the press lets go or the skier pops out of it.
+  const pressing = s.grounded && s.rail < 0 && s.butterAmount >= C.butterMin;
+  if (pressing && sc.butter.active && s.butter !== sc.butter.end) endButter(sc);
+  if (pressing) trackButter(sc.butter, prev, s, dt);
+  else if (sc.butter.active) endButter(sc);
   const wasAir = !prev.grounded;
   const inAir = !s.grounded;
   if (inAir && !wasAir) beginAir(sc, prev);
@@ -226,6 +245,7 @@ function clearCombo(sc: ScoreState): void {
 function clearTracks(sc: ScoreState): void {
   sc.air.active = false;
   sc.rail.active = false;
+  sc.butter.active = false;
 }
 
 /** True when the skis are going backwards (switch), from the body's heading and the velocity. */
@@ -247,6 +267,7 @@ function beginAir(sc: ScoreState, prev: SkierState): void {
   a.grab.fill(0);
   a.fromRail = prev.rail >= 0;
   a.switchTakeoff = isSwitch(prev);
+  a.butter = prev.grounded && prev.rail < 0 && prev.butterAmount >= CONFIG.score.butterMin ? prev.butter : 0;
 }
 
 /** One step in the air: the trick rotation's change, in body axes, and the grab held. */
@@ -357,7 +378,10 @@ function endAir(sc: ScoreState, s: SkierState, toRail: boolean): void {
   if (switchOut) points *= 1 + C.switchBonus;
   points *= landing === 'clean' ? 1 + C.cleanBonus : landing === 'sketchy' ? C.sketchyScale : 1;
 
-  const name = !trick ? 'Air' : capitalize(`${a.switchTakeoff ? 'switch ' : ''}${rotation}`);
+  const ollie = a.butter > 0 ? 'nollie' : a.butter < 0 ? 'ollie' : '';
+  if (trick && ollie !== '') points *= 1 + C.ollieBonus;
+  const move = ollie !== '' && rotation !== '' ? `${ollie} ${rotation}` : ollie || rotation;
+  const name = !trick ? 'Air' : capitalize(`${a.switchTakeoff ? 'switch ' : ''}${move}`);
   // The repeat key: the move and its grabs, whichever order they were held in.
   let key = name;
   for (let i = 0; i < a.grab.length; i++) if (a.grab[i]! >= C.grabMin) key += `|${GRAB_ACTIONS[i]}`;
@@ -432,6 +456,48 @@ function endRail(sc: ScoreState, rails: readonly RailShape[]): void {
   ev.grabCount = 0;
   addTrick(sc, ev, name, name, r.points, true);
   ev.meters = r.meters;
+  ev.landing = '';
+  ev.switchOut = false;
+}
+
+function trackButter(b: ButterTrack, prev: SkierState, s: SkierState, dt: number): void {
+  if (!b.active) {
+    b.active = true;
+    b.end = s.butter;
+    b.time = 0;
+    b.turn = 0;
+  }
+  b.time += dt;
+  if (prev.grounded && prev.rail < 0) b.turn += wrapAngle(s.yaw - prev.yaw);
+}
+
+/** The butter's name so far: "Tail butter 180", or "Nose press" with no pivot yet, or '' too short to count. */
+function butterName(b: ButterTrack): string {
+  const C = CONFIG.score;
+  const deg = steps(Math.abs(b.turn) * DEG, 180, C.spinShort);
+  const what = b.end > 0 ? 'Nose' : 'Tail';
+  if (deg >= 180) return `${what} butter ${deg}`;
+  return b.time >= C.butterPressMin ? `${what} press` : '';
+}
+
+/** The butter in progress (for the HUD), or '' when not pressing or not counting yet. */
+export function liveButter(sc: ScoreState): string {
+  return sc.butter.active ? butterName(sc.butter) : '';
+}
+
+/** A press let go (or popped out of): a pivot of 180 or more, or a press held long enough, is a trick. */
+function endButter(sc: ScoreState): void {
+  const b = sc.butter;
+  b.active = false;
+  const C = CONFIG.score;
+  const name = butterName(b);
+  if (name === '') return;
+  const deg = steps(Math.abs(b.turn) * DEG, 180, C.spinShort);
+  const points = (deg / 180) * C.butterSpinPoints + C.butterPressPoints * Math.min(b.time, C.butterPressMax);
+  const ev = nextEvent(sc);
+  ev.grabCount = 0;
+  addTrick(sc, ev, name, name, points, true);
+  ev.meters = 0;
   ev.landing = '';
   ev.switchOut = false;
 }

@@ -1,6 +1,6 @@
 import { CONFIG } from '../config.ts';
 import type { RailShape } from '../maps/types.ts';
-import { comboMult, liveSlide, scoreEvent, type ScoreEvent, type ScoreState } from '../sim/score.ts';
+import { comboMult, liveButter, liveSlide, scoreEvent, type ScoreEvent, type ScoreState } from '../sim/score.ts';
 import { multText, pointsText, trickTags, trickText } from './scoreText.ts';
 
 /** What became of a banked combo: a new best, an ordinary bank, or one ridden with cheats (never a best). */
@@ -22,7 +22,7 @@ interface TrickLine {
 
 /**
  * The combo HUD, bottom center: the last few tricks as they land (and the
- * rail or box being slid, as it goes), and a trail-sign panel with the
+ * rail or box being slid, or the butter being pressed, as it goes), and a trail-sign panel with the
  * combo's points, its multiplier and its timer draining (it warns near the
  * end). When a combo ends the panel shows what it banked (or that it was
  * lost) for a moment. The best combo on this map sits bottom left. It reads
@@ -32,7 +32,7 @@ export class ScoreHud {
   private readonly root: HTMLElement;
   private readonly tricks: HTMLElement;
   private readonly lines: TrickLine[] = [];
-  /** The slide in progress, under the trick lines. */
+  /** The slide or butter in progress, under the trick lines. */
   private readonly slide: HTMLElement;
   private readonly slideName: HTMLElement;
   private readonly slideMeters: HTMLElement;
@@ -230,12 +230,21 @@ export class ScoreHud {
     this.shownFill = -1;
   }
 
-  /** The slide in progress, named as it goes and its meters counted; text changes only when they do. */
+  /**
+   * The slide or butter in progress, named as it goes (a slide's meters
+   * counted). The text changes only when what it shows does: a slide's whole
+   * meters, a butter's turn in 45° steps and whether its press counts yet.
+   */
   private updateSlide(sc: ScoreState, rails: readonly RailShape[]): void {
-    const meters = sc.rail.active ? Math.floor(sc.rail.meters) : -1;
-    if (meters === this.shownSlideMeters) return;
-    this.shownSlideMeters = meters;
-    const name = meters < 0 ? '' : liveSlide(sc, rails);
+    const b = sc.butter;
+    const key = sc.rail.active
+      ? Math.floor(sc.rail.meters)
+      : b.active
+        ? -2 - 2 * Math.floor((Math.abs(b.turn) * 180) / Math.PI / 45) - (b.time >= CONFIG.score.butterPressMin ? 1 : 0)
+        : -1;
+    if (key === this.shownSlideMeters) return;
+    this.shownSlideMeters = key;
+    const name = key === -1 ? '' : sc.rail.active ? liveSlide(sc, rails) : liveButter(sc);
     if (this.slide.hidden === (name !== '')) this.slide.hidden = name === '';
     if (name === '') return;
     this.blank = false;
@@ -243,7 +252,7 @@ export class ScoreHud {
       this.shownSlide = name;
       this.slideName.textContent = name;
     }
-    this.slideMeters.textContent = `${meters} m`;
+    this.slideMeters.textContent = sc.rail.active ? `${key} m` : '';
   }
 
   private clear(): void {

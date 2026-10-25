@@ -271,4 +271,53 @@ if (long && long.length > 100) {
   }
 }
 
+// ---------------------------------------------------------------- butters
+
+// On the Park's middle line near the top at 8 m/s: a tail butter 180, a nose
+// butter 360 and a tail press with no pivot, with a moment's riding between
+// each; then from the same start an ollie 180 (a tail press, crouched,
+// popped, spun in the air).
+if (sim.map.name === 'Park') {
+  console.log('butters on the Park at x=30, 8 m/s:');
+  const t0 = r.t;
+  r.place(30, -30, 0, 8);
+  r.t = t0;
+  const ride = (seconds: number, keys: Action[] = []): void => {
+    for (let i = 0; i < seconds / DT; i++) step(r, keys);
+  };
+  /** Presses `end` and pivots ← until the turn would coast to `deg`, then holds the press a moment. */
+  const pivot = (end: GrabAction, deg: number): void => {
+    ride(0.2, [end]);
+    for (let i = 0; i < 3 / DT; i++) {
+      const w = r.s.yawRate;
+      if (Math.abs(score.butter.turn) + (w * w) / (2 * TUNING.skier.butterSpinResponse) >= (deg * Math.PI) / 180) break;
+      step(r, [end, 'left']);
+    }
+    ride(0.4, [end]);
+  };
+  ride(0.5);
+  pivot('grabLeftTail', 180);
+  ride(1);
+  pivot('grabLeftNose', 360);
+  ride(1);
+  ride(1.2, ['grabLeftTail']);
+  for (let i = 0; i < 8 / DT && score.active; i++) step(r, []);
+  // A fresh start (the line runs into features further down).
+  const t1 = r.t;
+  r.place(30, -30, 0, 8);
+  r.t = t1;
+  ride(0.5);
+  // The ollie: press the tails and crouch, let go of ↑ to pop, then spin a 180 (a pop off the flat is too short for a 360).
+  ride(0.6, ['grabLeftTail', 'up']);
+  step(r, ['grabLeftTail']);
+  const trick180 = parseTrick('180');
+  let turnedAir = 0;
+  for (let i = 0; i < 3 / DT && !r.s.grounded; i++) {
+    step(r, airKeys(r, trick180, turnedAir, 0));
+    turnedAir += Math.abs(r.s.spin.y) * DT;
+  }
+  for (let i = 0; i < 8 / DT && score.active; i++) step(r, []);
+  if (r.s.bailed) console.log(`  crashed (${r.s.bailReason})`);
+}
+
 console.log(`${banked} banked, ${lost} lost; best combo ${pointsText(best)}; last state: ${score.active ? `live, ${pointsText(comboTotal(score))}` : 'no combo'}`);
