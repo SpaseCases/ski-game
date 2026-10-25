@@ -191,14 +191,14 @@ const QP = (toward: 1 | -1, length = 56, radius = 4.5): Item => {
 };
 
 /** A rail or box straight down the hill from d: points as [m down from d, m to the right, height above the snow]. */
-/** Rail looks: a park rail, or a fat tube (see RailStyle). */
-type Look = 'metal' | 'tube';
+/** How a slide looks: a park rail or box, a fat tube, or a bonk feature (see RailStyle and BoxStyle). */
+type Look = 'metal' | 'tube' | 'table' | 'barrels' | 'spool';
 
 function slide(kind: 'rail' | 'box', x: number, d: number, pts: Pt[], width = 0.6, follow = 0, look: Look = 'metal'): void {
   const f: Json = { type: kind, points: pts.map(([a, b, h]) => ({ x: r2(x + b), z: r2(-(d + a)), height: r2(h) })) };
   if (kind === 'box') f.width = width;
   if (follow > 0) f.follow = follow;
-  if (kind === 'rail' && look !== 'metal') f.style = look;
+  if (look !== 'metal') f.style = look;
   features.push(f);
 }
 
@@ -216,6 +216,14 @@ const PAIR = (...slides: [dx: number, kind: 'rail' | 'box', pts: Pt[], width?: n
   len: Math.max(...slides.map(([, , pts]) => pts[pts.length - 1]![0])),
   place: (x, d) => {
     for (const [dx, kind, pts, width, look] of slides) slide(kind, x + dx, d, pts, width ?? 0.6, 0, look);
+  },
+});
+
+/** Line items side by side across the line, each [dx, item]: as long as the longest. */
+const ROW = (...items: [dx: number, item: Item][]): Item => ({
+  len: Math.max(...items.map(([, it]) => it.len)),
+  place: (x, d) => {
+    for (const [dx, it] of items) it.place(x + dx, d);
   },
 });
 
@@ -248,6 +256,18 @@ const K = (kind: 'rail' | 'box', pts: Pt[], o: KickerOpts = {}): Item => ({
   len: (2 * (o.lip ?? 0.6)) / Math.tan((o.angle ?? 10) * DEG) + (o.gap ?? 1) + pts[pts.length - 1]![0],
   place: (x, d) => kickerTo(kind, x, d, pts, o),
 });
+
+// Bonk features: a picnic table (slide its top), a row of barrels lying
+// across the line (slide along their tops), and a cable spool standing on
+// end (slide or bonk across its top). They're short, so a rail's kicker
+// would throw a fast rider clean over them: each sits past a long, mellow
+// snow ramp whose lip is a little above its top (clear of the ramp's back,
+// which a box's height would otherwise be measured from), to roll onto.
+const BONK = (top: number, len: number, width: number, look: Look, angle = 6): Item =>
+  K('box', [[0, 0, top], [len, 0, top]], { width, look, lip: top + 0.1, angle, gap: 1.3 });
+const TABLE = (len = 3.6): Item => BONK(0.75, len, 0.8, 'table');
+const BARRELS = (n = 6): Item => BONK(0.62, n * 0.62, 0.9, 'barrels');
+const SPOOL = (): Item => BONK(1.0, 1.6, 1.6, 'spool', 7);
 
 // Slide shapes (the first point at height 0 is a ride-on from the snow).
 // "Flat" runs parallel to the snow, "down" drops toward it. Kinked rails
@@ -386,7 +406,7 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
     S('rail', SLIDES.c(15, 24, 0.4, 1)),
     12,
     TUBE(SLIDES.flat(14, 0.7)),
-    K('rail', SLIDES.fedDown(15)),
+    TABLE(),
   ]), lim);
 
   sectionEnd('S1 combo', line(X.combo, 75, 10, [
@@ -444,7 +464,7 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
     PAIR([-8, 'rail', SLIDES.kinked(20, -1)], [8, 'box', SLIDES.downFlatDown(18, 0.4), 0.8]),
     S('rail', SLIDES.c(18, 24, 0.45, 1)),
     14,
-    K('box', SLIDES.arc(14, FED, 0.45), { width: 0.9 }),
+    BARRELS(6),
     S('rail', SLIDES.flat(20, 0.5)),
     WALL(-6),
     PAIR([-8, 'rail', SLIDES.kinked(20, -1)], [8, 'rail', SLIDES.rainbow(13, 0.7, 0.6), 0, 'tube']),
@@ -459,9 +479,9 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
     J({ lip: 2, angle: 20, gap: 6, deck: false, landingHeight: 3, land: 13, width: 9 }),
     S('box', SLIDES.downFlatDown(16, 0.4), 0.9),
     WALL(5),
+    ROW([-5, TABLE()], [5, SPOOL()]),
     J({ lip: 2.6, angle: 20, gap: 11, land: 14, width: 9 }),
     S('box', SLIDES.rainbow(12, 0.35, 0.6), 1.0),
-    J({ lip: 2.4, angle: 20, gap: 10, land: 14, width: 9 }),
   ]), lim);
 
   sectionEnd('S2 jump', line(X.jump, D.s2 + 6, 11, [
@@ -581,6 +601,8 @@ const lanes: Json[] = [];
     PAIR([-22, 'rail', SLIDES.kinked(18, -1)], [-7, 'box', SLIDES.flat(16), 0.6], [8, 'rail', SLIDES.downFlatDown(18)], [23, 'box', SLIDES.rainbow(11, 0.3, 0.6), 1.0]),
     PAIR([-30, 'rail', SLIDES.flatDown(16)], [0, 'rail', SLIDES.rainbow(16, 0.7, 0.9, 10), 0, 'tube'], [30, 'rail', SLIDES.flat(16, 0.45)]),
     PAIR([-15, 'box', SLIDES.rainbow(10, 0.3, 0.6), 1.0], [15, 'rail', SLIDES.downFlatDown(20)]),
+    // A row of bonks, clear of the combo and jump lines that cross the garden (at -22 and +22 from its middle).
+    ROW([-30, TABLE()], [-11, BARRELS()], [11, SPOOL()], [30, TABLE(4)]),
     // Wallrides on both edges of the garden.
     { len: 18, place: (x, d) => [WALL(-32), WALL(32)].forEach((w) => w.place(x, d)) },
     PAIR([-22, 'rail', SLIDES.flat(18, 0.45)], [-7, 'box', SLIDES.rainbow(12, 0.35, 0.6), 1.0], [8, 'rail', SLIDES.jog(18, 1.5)], [23, 'box', SLIDES.flat(16), 0.8]),
