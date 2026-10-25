@@ -269,6 +269,8 @@ Scoring or trick names, butters and nose/tail presses, rail grabs, snowboard, ra
 - Locker: opened from pause, the circling camera can pass through a nearby wall or start house. In a small embed the Locker scrolls, and its preview gets short. The default helmet, goggle frame and jacket are the palette's Coal (#2c3037), a hair off the old #2a2d32 and #30343a.
 - Test slope: invisible walls at the berm tops; riding off a rail sideways crashes; the japan grab's ski hangs low.
 
+**Fences, netting and barriers (fixed after 6f):** each segment used to be solid up to the snow at its higher end plus its height, so on a slope a long fence was an invisible wall up to 90 m tall at its low end (Park), 147 m (Big air), 204 m (Slalom netting), which stopped riders jumping from line to line. They now stand as high as they look: `height` above the snow at the point nearest the rider (`follow` on the obstacle, `rise` in `sim/obstacles.ts`). Huts, start houses, building walls, groomers and lift stations keep their old solid tops. Flying 0.4 m over a fence's top now clears it everywhere except at the floodlight towers on the Park's fences (was stopped at 3,144 of 3,164 spots on the Park, all but a few on the others); every sim tool's output on every map is unchanged.
+
 **Tuned config values** (`src/config.ts`, start → now)
 - Riding: `gravity` 11 → 12, `skiFriction` 0.05 → 0.035, `dragCrouch` 0.003 → 0.002, `brakeDecel` 6 → 9.5, `brakeRampTime` 0.15 → 0.12.
 - Turning: `grip` 1.8 → 2.0, `turnRateSlow` 2.8 → 2.3, `turnRateFast` 1.5 → 1.25, `turnResponse` 14 → 10.

@@ -816,6 +816,12 @@ export interface ObstacleDef {
   /** World heights of its bottom and top, when they aren't the snow at its ends (a wall under a roof). */
   y0?: number;
   y1?: number;
+  /**
+   * Its top follows the snow along it (a fence, netting): `height` above the
+   * snow at whatever point along it is nearest. Otherwise the whole thing
+   * stands as high as `height` above the higher of its ends (a hut, a wall).
+   */
+  follow?: boolean;
 }
 
 /** The part of the map the skier can reach: a rectangle, cut down to a polygon when there is one. */

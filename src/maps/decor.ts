@@ -361,7 +361,7 @@ export function decorObstacles(layout: DecorLayout): ObstacleDef[] {
       for (let i = 1; i < l.points.length; i++) {
         const a = l.points[i - 1]!;
         const b = l.points[i]!;
-        out.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, radius: 0.08, height });
+        out.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, radius: 0.08, height, follow: true });
       }
     } else if (l.kind === 'chairlift') {
       const towers = alongLine(l.points, S.chairliftSpacing);
