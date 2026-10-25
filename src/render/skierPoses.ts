@@ -250,39 +250,40 @@ export const LEFT_NOSE: PoseDef = {
 // Style moves: one each, not mirrored.
 
 /**
- * Screamin' seaman, the old-school way: the right leg kicks straight out in
- * front, ski tipped up; the left thigh swings back and the knee bends so the
- * boot comes up behind, and the left ski stands up behind the back, held
- * toward its tail behind the shoulder by the left hand; chest out and back
- * arched, the right arm thrown up.
+ * Screamin' seaman: a daffy with the legs crossed. The left leg kicks out in
+ * front and across to the right, the right leg back and across to the left,
+ * both nearly straight, the skis still pointing straight ahead (the front
+ * one tip up, the back one tip down), so seen from the side the skis cross.
+ * No grab: arms out and up.
  */
 export const SEAMAN: PoseDef = {
   pelvis: AIR_PELVIS,
-  pelvisPitch: 0,
-  chestPitch: -0.2,
-  chestYaw: 0.35,
-  chestRoll: 0.1,
-  headPitch: 0.15,
-  headYaw: -0.4,
+  pelvisPitch: 0.05,
+  chestPitch: 0.05,
+  headPitch: -0.1,
   feet: [
-    { ankle: [0, 0, 0], pitch: -1.85, knee: [-0.1, -0.6, 0.8] },
-    { ankle: [0.12, 0.55, -0.75], pitch: 0.6, knee: [0.1, 0.4, -1] },
+    { ankle: [0.08, 0.6, -0.74], pitch: 0.6, knee: [0, 0.4, -1] },
+    { ankle: [-0.08, 0.3, 0.66], pitch: -0.5, knee: [0, -0.4, -1] },
   ],
   hands: [
-    { at: [-0.2, 1.316, 0.488], grab: 0, on: [-EDGE, TOP, 0.5], pole: [-0.4, -0.6, 0.7], elbow: [-0.8, 0, 0.5] },
-    { at: [0.35, 1.6, -0.15], pole: [0.4, 0.3, 0.85], elbow: [0.8, -0.3, 0.3] },
+    { at: [-0.6, 1.3, -0.1], pole: [-0.6, -0.55, 0.55], elbow: [-0.3, -0.7, 0.6] },
+    { at: [0.6, 1.3, -0.1], pole: [0.6, -0.55, 0.55], elbow: [0.3, -0.7, 0.6] },
   ],
 };
 
-/** Daffy: a running split in the air, left ski forward tip up, right ski back tip down, arms out wide. */
+/**
+ * Daffy: a split in the air. The left leg out in front, nearly straight and
+ * nearly level, ski tip up; the right leg straight back, ski tip down; arms
+ * out wide.
+ */
 export const DAFFY: PoseDef = {
   pelvis: AIR_PELVIS,
   pelvisPitch: 0.1,
-  chestPitch: 0.15,
+  chestPitch: 0.1,
   headPitch: -0.15,
   feet: [
-    { ankle: [-0.11, 0.27, -0.5], pitch: 0.35, knee: [-0.1, 0.3, -1] },
-    { ankle: [0.11, 0.35, 0.5], pitch: -0.45, knee: [0.1, -0.6, -1] },
+    { ankle: [-0.11, 0.6, -0.76], pitch: 0.63, knee: [-0.1, 0.4, -1] },
+    { ankle: [0.11, 0.3, 0.66], pitch: -0.5, knee: [0.1, -0.4, -1] },
   ],
   hands: [
     { at: [-0.6, 1.2, -0.12], pole: [-0.6, -0.6, 0.5], elbow: [-0.3, -0.7, 0.6] },
@@ -290,32 +291,41 @@ export const DAFFY: PoseDef = {
   ],
 };
 
-/** Iron cross: knees bent, heels kicked up behind, the skis turned in so their tips cross in an X in front. */
+/**
+ * Iron cross: a back-scratcher with the skis crossed. The knees hang down and
+ * the heels come up behind the seat; the skis lie flat behind the legs, tips
+ * down, tails up past the shoulders, crossing in an X just below the boots
+ * (each 40° off vertical). One boot sits a touch further back so the skis
+ * pass one over the other.
+ */
 export const IRON_CROSS: PoseDef = {
   pelvis: AIR_PELVIS,
-  pelvisPitch: 0.25,
-  chestPitch: 0.3,
-  headPitch: -0.35,
+  pelvisPitch: 0.1,
+  chestPitch: 0.15,
+  headPitch: -0.3,
   feet: [
-    // One boot a touch further back, so the skis pass one in front of the other where they cross.
-    { ankle: [-0.17, 0.62, 0.24], pitch: -0.8, yaw: -1.0, knee: [-0.15, -1, -0.4] },
-    { ankle: [0.17, 0.62, 0.32], pitch: -0.8, yaw: 1.0, knee: [0.15, -1, -0.4] },
+    { ankle: [-0.1, 0.85, 0.3], pitch: -0.871, yaw: -1.648, roll: 1.63, knee: [-0.1, -1, -0.5] },
+    { ankle: [0.1, 0.85, 0.36], pitch: -0.871, yaw: 1.648, roll: -1.63, knee: [0.1, -1, -0.5] },
   ],
   hands: [
-    { at: [-0.5, 1.05, -0.3], pole: [-0.5, -0.7, 0.5], elbow: [-0.6, -0.6, 0.4] },
-    { at: [0.5, 1.05, -0.3], pole: [0.5, -0.7, 0.5], elbow: [0.6, -0.6, 0.4] },
+    { at: [-0.55, 1.1, -0.2], pole: [-0.5, -0.7, 0.5], elbow: [-0.6, -0.6, 0.4] },
+    { at: [0.55, 1.1, -0.2], pole: [0.5, -0.7, 0.5], elbow: [0.6, -0.6, 0.4] },
   ],
 };
 
-/** Spread eagle: legs spread wide to the sides, arms flung up and out, like a star. */
+/**
+ * Spread eagle: legs spread at least 90° apart seen from the front, skis
+ * flat, parallel and pointing straight ahead, upper body upright, arms flung
+ * up and out like a star.
+ */
 export const SPREAD_EAGLE: PoseDef = {
   pelvis: AIR_PELVIS,
   pelvisPitch: 0.05,
   chestPitch: 0,
   headPitch: -0.1,
   feet: [
-    { ankle: [-0.55, 0.3, -0.02], roll: -0.5, knee: [-0.3, 0.2, -1] },
-    { ankle: [0.55, 0.3, -0.02], roll: 0.5, knee: [0.3, 0.2, -1] },
+    { ankle: [-0.62, 0.36, 0], knee: [-0.2, 0.1, -1] },
+    { ankle: [0.62, 0.36, 0], knee: [0.2, 0.1, -1] },
   ],
   hands: [
     { at: [-0.72, 1.48, -0.05], pole: [-0.75, -0.3, 0.55], elbow: [-0.2, -0.8, 0.5] },

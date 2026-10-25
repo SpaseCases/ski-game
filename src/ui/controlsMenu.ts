@@ -39,9 +39,9 @@ const GRABS: readonly (readonly [Action, string, Action, string])[] = [
 ];
 
 const STYLE: readonly (readonly [Action, string, string])[] = [
-  ['styleSeaman', "Screamin' seaman", 'Right leg kicked out in front, left ski held up behind, chest out'],
+  ['styleSeaman', "Screamin' seaman", 'A daffy with the legs crossed: one ski forward, one back, crossed over'],
   ['styleDaffy', 'Daffy', 'One ski forward, one back, like running in the air'],
-  ['styleIronCross', 'Iron cross', 'Heels up behind, ski tips crossed in an X'],
+  ['styleIronCross', 'Iron cross', 'Heels up behind, skis crossed in an X behind the legs'],
   ['styleSpreadEagle', 'Spread eagle', 'Arms and legs flung out wide'],
 ];
 
