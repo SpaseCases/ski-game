@@ -137,6 +137,13 @@ export const CONFIG = {
     wallPop: 0.4,
     /** Fastest (m/s) a wall air launches upward; about 3.4 m above the lip. Faster is lost, which keeps pipe speed in check. */
     wallLaunchMax: 9,
+    /**
+     * A wall air that comes out over snow that isn't a wall (off the end of a
+     * quarterpipe or wallride, or out over a deck) tips back toward that
+     * snow at this rate (per second), so the skier comes down upright on it
+     * instead of still leaning out at the wall's angle.
+     */
+    wallLevel: 3,
   },
 
   landing: {

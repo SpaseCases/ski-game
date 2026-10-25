@@ -258,6 +258,7 @@ const head = new Vector3();
 const railDir = new Vector3();
 const frameUp = new Vector3();
 const local = new Vector3();
+const below = new Vector3();
 const spot: RailSpot = { rail: -1, seg: 0, s: 0, top: 0, side: 0 };
 const qTilt = new Quaternion();
 const qTurn = new Quaternion();
@@ -311,7 +312,7 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
     return;
   }
   if (s.grounded) rideSnow(s, input, dt);
-  else fly(s, input, steer, dt);
+  else fly(s, input, steer, course.hf, dt);
 
   if (s.grounded) moveOnSnow(s, course, steer, dt);
   else moveInAir(s, course, dt);
@@ -470,7 +471,7 @@ function rideSnow(s: SkierState, input: InputState, dt: number): void {
   s.lean += (leanTarget - s.lean) * (1 - Math.exp(-c.leanResponse * dt));
 }
 
-function fly(s: SkierState, input: InputState, steer: number, dt: number): void {
+function fly(s: SkierState, input: InputState, steer: number, hf: Heightfield, dt: number): void {
   const c = TUNING.skier;
   const a = TUNING.air;
   s.airTime += dt;
@@ -506,6 +507,11 @@ function fly(s: SkierState, input: InputState, steer: number, dt: number): void 
     const follow = smoothstep(a.pathSpeedMin, a.pathSpeedFull, Math.abs(along));
     const pathPitch = Math.sign(along) * Math.atan2(local.y, Math.abs(along));
     s.airPitch += (pathPitch - s.airPitch) * (1 - Math.exp(-a.pathAlign * follow * dt));
+  }
+  // Out over snow that isn't a wall, a wall air's frame tips toward that snow (see CONFIG.air.wallLevel).
+  if (s.airWall && a.wallLevel > 0) {
+    groundAt(hf, s.position.x, s.position.z, below);
+    if (below.y > Math.cos(a.wallAngle * DEG)) s.airFrame.slerp(qFrame.setFromUnitVectors(UP, below), 1 - Math.exp(-a.wallLevel * dt));
   }
   airOrient(s);
 
