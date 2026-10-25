@@ -7,16 +7,18 @@ import { heightAt, type Vec3Like } from './terrain.ts';
 // seen from above: a point is "over" a segment when it projects inside it,
 // and its distance across is measured to the right of the segment's direction.
 
-/** Radius (m) of a fallen tree, unless its rail gives one. */
+/** Radius (m) of a fallen tree, and of a tube, unless its rail gives one. */
 const LOG_RADIUS = 0.3;
+const TUBE_RADIUS = 0.35;
 
 /** Builds the slide lines for every rail and box in the map, sitting on the snow (and on any shapes built on it). */
 export function buildRailShapes(features: readonly Feature[], hf: Heightfield): RailShape[] {
   const shapes: RailShape[] = [];
   for (const f of features) {
     if (f.type !== 'box' && f.type !== 'rail') continue;
-    const halfWidth = f.type === 'box' ? f.width / 2 : f.radius > 0 ? f.radius : f.style === 'log' ? LOG_RADIUS : TUNING.rails.radius;
-    // Logs, benches and stumps are wood, ledges and rocks stone; park box decks and rails are metal.
+    const halfWidth = f.type === 'box' ? f.width / 2 : f.radius > 0 ? f.radius : f.style === 'log' ? LOG_RADIUS : f.style === 'tube' ? TUBE_RADIUS : TUNING.rails.radius;
+    // Logs, benches, stumps, tables and spools are wood, ledges and rocks stone; park box decks and rails are metal
+    // (barrels are steel, but slide like any box).
     const metal = f.type === 'rail' ? f.style !== 'log' : f.style === 'wood';
     const points = f.points.map((p) => [p.x, p.z, p.height] as const);
     shapes.push(makeShape(f.type, f.style, metal, halfWidth, f.follow > 0 ? followSnow(points, f.follow) : points, hf));

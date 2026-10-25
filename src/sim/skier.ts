@@ -265,6 +265,7 @@ const head = new Vector3();
 const railDir = new Vector3();
 const frameUp = new Vector3();
 const local = new Vector3();
+const below = new Vector3();
 const spot: RailSpot = { rail: -1, seg: 0, s: 0, top: 0, side: 0 };
 const qTilt = new Quaternion();
 const qTurn = new Quaternion();
@@ -316,13 +317,13 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
 
   if (s.rail >= 0) {
     endButter(s);
-    slideRail(s, course, steer, dt);
+    slideRail(s, input, course, steer, dt);
     return;
   }
   if (s.grounded) updateButter(s, input, dt);
   else endButter(s);
   if (s.grounded) rideSnow(s, input, dt);
-  else fly(s, input, steer, dt);
+  else fly(s, input, steer, course.hf, dt);
 
   if (s.grounded) moveOnSnow(s, course, steer, dt);
   else moveInAir(s, course, dt);
@@ -330,28 +331,28 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
 
 /**
  * Sliding a rail or box: locked to its line, pulled along it by gravity and
- * slowed by friction. ←/→ turn the skis freely, to any angle. Leaves off
- * either end, onto snow that rises to meet the skis, or with a pop (see
- * stepSkier).
+ * slowed by friction, and by ↓, which drags the skis against it. ←/→ turn
+ * the skis freely, to any angle. Leaves off either end, onto snow that rises
+ * to meet the skis, or with a pop (see stepSkier).
  */
-function slideRail(s: SkierState, course: Course, steer: number, dt: number): void {
+function slideRail(s: SkierState, input: InputState, course: Course, steer: number, dt: number): void {
   const c = TUNING.skier;
   const R = TUNING.rails;
   const rail = course.rails[s.rail]!;
-  s.brake = approach(s.brake, 0, dt / c.brakeRampTime);
+  s.brake = approach(s.brake, input.down.held ? 1 : 0, dt / c.brakeRampTime);
   s.lean += (0 - s.lean) * (1 - Math.exp(-c.leanResponse * dt));
 
   // Free rotation: ←/→ turn the skis at any angle, and they stay where they're left.
   s.yawRate = approach(s.yawRate, steer * R.turnRate, R.turnAccel * dt); // carries into a spin off the rail
   s.railAngle = wrapAngle(s.railAngle + s.yawRate * dt);
 
-  // Along the rail: gravity's pull down it, friction from the load on it, air drag.
+  // Along the rail: gravity's pull down it, friction from the load on it and the brake, air drag.
   railFrame(rail, s.railS, s.position, railDir);
   const g = c.gravity;
   const load = g * Math.sqrt(Math.max(0, 1 - railDir.y * railDir.y));
   const friction = rail.kind === 'rail' && rail.metal ? R.railFriction : R.boxFriction;
   let v = s.railSpeed - g * railDir.y * dt;
-  v = approach(v, 0, friction * load * dt);
+  v = approach(v, 0, (friction * load + R.brakeDecel * s.brake) * dt);
   const drag = c.dragStand + (c.dragCrouch - c.dragStand) * s.crouch;
   v /= 1 + drag * Math.abs(v) * dt;
   s.railSpeed = v;
@@ -485,7 +486,7 @@ function rideSnow(s: SkierState, input: InputState, dt: number): void {
   s.lean += (leanTarget - s.lean) * (1 - Math.exp(-c.leanResponse * dt));
 }
 
-function fly(s: SkierState, input: InputState, steer: number, dt: number): void {
+function fly(s: SkierState, input: InputState, steer: number, hf: Heightfield, dt: number): void {
   const c = TUNING.skier;
   const a = TUNING.air;
   s.airTime += dt;
@@ -521,6 +522,11 @@ function fly(s: SkierState, input: InputState, steer: number, dt: number): void 
     const follow = smoothstep(a.pathSpeedMin, a.pathSpeedFull, Math.abs(along));
     const pathPitch = Math.sign(along) * Math.atan2(local.y, Math.abs(along));
     s.airPitch += (pathPitch - s.airPitch) * (1 - Math.exp(-a.pathAlign * follow * dt));
+  }
+  // Out over snow that isn't a wall, a wall air's frame tips toward that snow (see CONFIG.air.wallLevel).
+  if (s.airWall && a.wallLevel > 0) {
+    groundAt(hf, s.position.x, s.position.z, below);
+    if (below.y > Math.cos(a.wallAngle * DEG)) s.airFrame.slerp(qFrame.setFromUnitVectors(UP, below), 1 - Math.exp(-a.wallLevel * dt));
   }
   airOrient(s);
 

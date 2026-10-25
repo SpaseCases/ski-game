@@ -2,7 +2,7 @@
 // files are fetched only when picked. Maps still being built have no loader
 // and show as "coming soon".
 
-export type MapId = 'park' | 'freeride' | 'slalom' | 'bigair' | 'test';
+export type MapId = 'park' | 'jampark' | 'freeride' | 'slalom' | 'bigair' | 'test';
 
 export interface MapEntry {
   id: MapId;
@@ -18,6 +18,12 @@ export const MAPS: readonly MapEntry[] = [
     name: 'Park',
     blurb: 'A big terrain park: jump lines from small to huge, rails and boxes, two halfpipes and one very long rail.',
     load: () => import('./park.json').then((m) => m.default),
+  },
+  {
+    id: 'jampark',
+    name: 'Jam Park',
+    blurb: 'A denser park built for combos: rails into jumps into rails, lines you can cut across, and two huge jumps sized for the speed you arrive with.',
+    load: () => import('./jampark.json').then((m) => m.default),
   },
   {
     id: 'freeride',

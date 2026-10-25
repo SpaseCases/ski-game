@@ -3,17 +3,23 @@
 // how hard the landing was, crashes, rails caught. Works at any heading, so
 // it covers the Freeride's booters, hips, logs, roofs and plaza.
 //   node tools/sim/features.ts <map.json> [kinds] [--speeds 8,12,16,20]
-// Kinds (default all): jump, kicker, log, building, terrace.
+// Kinds (default all but jib): jump, kicker, log, building, terrace, quarter, jib.
 // - jump: a booter or park jump, ridden straight, with no pop and a full pop.
 // - kicker: one feeding a rail or box just past its lip reports whether
 //   rolling off it catches; any other is a booter or a hip (air and landing).
 // - log: ridden onto at its tip, along it; reports the slide and the landing off its end.
 // - building: up its drift (or at its uphill wall) along its length, with and without a pop at the top.
 // - terrace: across it and off its front: down the stairs, off the wall beside them, and popped onto each handrail.
+// - jib (only when named): ridden onto every ride-on rail and box (one starting at the snow) along its
+//   first stretch; reports whether it caught, how long it slid, and the landing off its end.
+// - quarter: into a quarterpipe or wallride at 25° and at 45° to it, aiming for its middle, with no pop and
+//   with a pop at the top of the wall; reports the air, how high above the coping, and where it landed.
 
 import type { Action } from '../../src/core/input.ts';
 import { stairRun, townFrame, framePoint } from '../../src/maps/town.ts';
-import type { BuildingFeature, Feature, RailFeature, TerraceFeature } from '../../src/maps/types.ts';
+import { sampleShape } from '../../src/maps/shapes.ts';
+import type { BuildingFeature, Feature, QuarterFeature, RailFeature, TerraceFeature } from '../../src/maps/types.ts';
+import { railUnder, type RailSpot } from '../../src/sim/rails.ts';
 import { terrainHeightAt } from '../../src/sim/terrain.ts';
 import { DT, loadMap, Rider } from './harness.ts';
 
@@ -26,10 +32,12 @@ const option = (name: string): string | undefined => {
 };
 const speedList = (option('--speeds') ?? '').split(',').filter(Boolean).map(Number);
 const kinds = args.slice(1).filter((a, i, all) => !a.startsWith('--') && all[i - 1] !== '--speeds');
-const want = (k: string): boolean => kinds.length === 0 || kinds.includes(k);
+const want = (k: string): boolean => (kinds.length === 0 && k !== 'jib') || kinds.includes(k);
 const sim = loadMap(file);
 const DEG = Math.PI / 180;
 let problems = 0;
+/** Scratch for finding rails near a run-up. */
+const spot: RailSpot = { rail: -1, seg: 0, s: 0, top: 0, side: 0 };
 
 interface Outcome {
   air: number;
@@ -179,8 +187,113 @@ sim.map.features.forEach((f: Feature, i) => {
     rideBuilding(f, i);
   } else if (f.type === 'terrace' && want('terrace')) {
     rideTerrace(f, i);
+  } else if (f.type === 'quarter' && want('quarter')) {
+    rideQuarter(f, i);
+  } else if ((f.type === 'rail' || f.type === 'box') && (f.type === 'box' || f.style !== 'log') && f.points[0]!.height < 0.15 && want('jib')) {
+    rideJib(f, i);
   }
 });
+
+/**
+ * Onto a ride-on rail or box along its first stretch, until 1.5 s after
+ * leaving it (or 8 s). The run-up starts 10 m back, or closer where another
+ * rail or box (a packed line's last feature) is in the way.
+ */
+function rideJib(f: Feature & { type: 'rail' | 'box' }, i: number): void {
+  const a = f.points[0]!;
+  const b = f.points[1]!;
+  const yaw = Math.atan2(-(b.x - a.x), -(b.z - a.z)) / DEG;
+  const len = f.points.reduce((sum, p, k, all) => (k === 0 ? 0 : sum + Math.hypot(p.x - all[k - 1]!.x, p.z - all[k - 1]!.z)), 0);
+  let back = 10;
+  const clearAt = (d: number): boolean => !railUnder(sim.course.rails, a.x + Math.sin(yaw * DEG) * d, a.z + Math.cos(yaw * DEG) * d, 1, spot);
+  for (let d = 1; d <= 10; d += 0.5) {
+    if (!clearAt(d)) {
+      back = Math.max(2, d - 1.5);
+      break;
+    }
+  }
+  const results: string[] = [];
+  for (const v of speeds([5, 9, 13])) {
+    const x = a.x + Math.sin(yaw * DEG) * back;
+    const z = a.z + Math.cos(yaw * DEG) * back;
+    let left = -1;
+    let sliding = false;
+    const o = ride(x, z, yaw, v, (_, r) => {
+      if (left < 0 && r.s.rail < 0 && sliding) left = r.t;
+      sliding = r.s.rail >= 0;
+      return left >= 0 && r.t > left + 1.5;
+    });
+    if (!o.caught && !o.crash) problems++;
+    results.push(`${v}: ${o.caught ? verdict(o) : o.crash ? verdict(o) : 'MISSED'}`);
+  }
+  const look = f.type === 'rail' ? (f.style === 'metal' ? 'rail' : f.style) : `${f.style} box`;
+  report(`${look} ${i} ${where(a)} ${len.toFixed(0)} m`, results);
+}
+
+/** Into a quarter at 25° and 45° to it from 6 m out, aiming for its middle; a pop is released once the wall is steeper than 60° (or on leaving it). */
+function rideQuarter(q: QuarterFeature, i: number): void {
+  for (const into of [25, 45]) rideQuarterAt(q, i, into);
+}
+
+function rideQuarterAt(q: QuarterFeature, i: number, into: number): void {
+  const out = 6;
+  const h = q.yaw * DEG;
+  const rx = Math.cos(h) * q.side;
+  const rz = -Math.sin(h) * q.side;
+  const dx = -Math.sin(h);
+  const dz = -Math.cos(h);
+  const u0 = q.length / 2 - out / Math.tan(into * DEG);
+  const x = q.x + dx * u0 - rx * out;
+  const z = q.z + dz * u0 - rz * out;
+  const heading = q.yaw - q.side * into;
+  const shape = sim.hf.shapes?.find((s) => s.kind === 'quarter' && Math.abs(s.x - q.x) < 1e-6 && Math.abs(s.z - q.z) < 1e-6);
+  const top = shape && shape.kind === 'quarter' ? shape.height : 0;
+  const sample = { height: 0, dhdx: 0, dhdz: 0 };
+  const results: string[] = [];
+  for (const v of speeds([8, 12, 16, 20])) {
+    for (const pop of [false, true]) {
+      const r = new Rider(sim);
+      r.place(x, z, heading, v);
+      let takeoff = -1;
+      let air = 0;
+      let impact = 0;
+      let above = -Infinity;
+      let crash = '';
+      let landed = '';
+      let released = false;
+      // Until a second after the first air off it lands (or 6 s): past that, a packed park's next feature is in the way.
+      let landedAt = -1;
+      while (r.t < 6 && (landedAt < 0 || r.t < landedAt + 1)) {
+        // Released once the wall is steep, or on leaving it (held on in the air, ↑ is a flip).
+        if (!r.s.grounded || r.s.normal.y < Math.cos(60 * DEG)) released = true;
+        const keys: Action[] = pop && !released ? ['up'] : [];
+        r.step(keys);
+        const p = r.s.position;
+        above = Math.max(above, p.y - terrainHeightAt(sim.hf, p.x, p.z) - top);
+        if (r.s.bailed) {
+          crash = r.s.bailReason;
+          break;
+        }
+        if (takeoff < 0 && !r.s.grounded && r.s.rail < 0) takeoff = r.t;
+        if (takeoff >= 0 && r.s.grounded) {
+          const t = r.t - takeoff - DT;
+          if (t > 0.25 && t > air) {
+            air = t;
+            impact = r.s.landImpact;
+            landed = shape && sampleShape(shape, p.x, p.z, sample) && sample.height > 0.3 ? 'back on the wall' : 'on the snow';
+            if (landedAt < 0) landedAt = r.t;
+          }
+          takeoff = -1;
+        }
+      }
+      if (crash) problems++;
+      const parts = crash ? [`CRASH (${crash})`] : air > 0 ? [`${air.toFixed(1)} s air, ${impact.toFixed(0)} m/s in, ${landed}`] : ['no air'];
+      parts.push(above > 0 ? `${above.toFixed(1)} m over the coping` : `up to ${(top + above).toFixed(1)} of ${top.toFixed(1)} m`);
+      results.push(`${v}${pop ? ' pop' : ''}: ${parts.join(', ')}`);
+    }
+  }
+  report(`${q.style === 'wood' ? 'wallride' : 'quarterpipe'} ${i} ${where(q)} ${q.length} m, ${top.toFixed(1)} m high, at ${into}°`, results);
+}
 
 function rideBuilding(b: BuildingFeature, i: number): void {
   const t = townFrame(b);

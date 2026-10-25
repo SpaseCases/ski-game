@@ -339,7 +339,7 @@ export class SnowFx {
   private skierFrame(pose: SkierPose): void {
     const n = pose.normal;
     this.qTilt.setFromUnitVectors(UP, n);
-    const swing = pose.grounded && !pose.bailed ? pose.brake * CONFIG.render.brakeTwist * pose.brakeSide : 0;
+    const swing = pose.grounded && !pose.bailed && !pose.onRail ? pose.brake * CONFIG.render.brakeTwist * pose.brakeSide : 0;
     this.fwd.set(-Math.sin(pose.yaw), 0, -Math.cos(pose.yaw)).applyQuaternion(this.qTilt);
     this.left.crossVectors(n, this.fwd);
     this.skiFwd.set(-Math.sin(pose.yaw + swing), 0, -Math.cos(pose.yaw + swing)).applyQuaternion(this.qTilt);
@@ -425,12 +425,12 @@ export class SnowFx {
       this.bailCarry = 0;
     }
 
-    // Sparks off a metal rail (never a box or a log).
+    // Sparks off a metal rail (never a box or a log), more while ↓ brakes on it.
     const rail = sim.rail >= 0 ? this.rails[sim.rail] : undefined;
     if (rail && rail.kind === 'rail' && rail.metal) {
       const s = f.sparks;
       const along = Math.abs(sim.railSpeed);
-      this.sparkCarry += s.rate * smoothstep(s.speedMin, s.speedFull, along) * rate * dt;
+      this.sparkCarry += s.rate * smoothstep(s.speedMin, s.speedFull, along) * (1 + s.brake * pose.brake) * rate * dt;
       while (this.sparkCarry >= 1) {
         this.sparkCarry -= 1;
         this.at.copy(pose.position).addScaledVector(this.skiFwd, (Math.random() - 0.5) * 0.9);

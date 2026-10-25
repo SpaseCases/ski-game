@@ -21,7 +21,7 @@ interface Row {
 const ROWS: readonly Row[] = [
   { keys: ['left', '/', 'right'], ground: 'Turn', air: 'Spin left or right', rail: 'Turn the skis (any angle)' },
   { keys: ['up'], note: 'hold, then release', ground: 'Crouch (less drag), then pop', air: 'Front flip', rail: 'Crouch, then pop off' },
-  { keys: ['down'], ground: 'Brake', air: 'Back flip', rail: '' },
+  { keys: ['down'], ground: 'Brake', air: 'Back flip', rail: 'Brake' },
   { keys: ['pole'], ground: 'Pole push', air: '', rail: '' },
   { keys: ['lincolnLeft', '/', 'lincolnRight'], ground: '', air: 'Lincoln loop left or right', rail: '' },
   { keys: ['checkpoint'], ground: 'Set your checkpoint', air: '', rail: '' },

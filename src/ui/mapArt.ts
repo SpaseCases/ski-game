@@ -46,6 +46,18 @@ const ART: Record<MapId, string> = {
     `<path d="M96 68 L136 75" stroke="${METAL}" stroke-width="2.4" stroke-linecap="round"/>` +
     `<path d="M102 69 v6 M115 71.3 v6 M128 73.6 v6" stroke="${POST}" stroke-width="1.4"/>` +
     `<path d="M8 66 h12 M142 64 h12" stroke="#ff7a1a" stroke-width="2"/>`,
+  jampark:
+    sky('jampark', '#6aa6e4', '#d4e6f7') +
+    `<path d="M0 46 L30 28 L52 38 L78 20 L104 36 L128 24 L160 40 L160 90 L0 90Z" fill="#bfd2e6"/>` +
+    `<path d="M0 54 Q80 42 160 56 L160 90 L0 90Z" fill="${SNOW}"/>` +
+    `<path d="M4 70 L34 76" stroke="${METAL}" stroke-width="2.4" stroke-linecap="round"/>` +
+    `<path d="M10 71.2 v6 M22 73.6 v6" stroke="${POST}" stroke-width="1.4"/>` +
+    `<path d="M40 84 Q60 82 70 66 L76 66 L76 86 L40 86Z" fill="#fff" stroke="${SHADE}"/>` +
+    `<path d="M70 66 L76 66" stroke="${LIP}" stroke-width="2.6"/>` +
+    rider(94, 34, 20) +
+    `<path d="M112 80 Q132 79 138 62 L160 62 L160 90 L112 90Z" fill="#fff" stroke="${SHADE}"/>` +
+    `<path d="M138 62 L144 62" stroke="${LIP}" stroke-width="2.6"/>` +
+    `<path d="M36 62 h10 M100 60 h10" stroke="#ff7a1a" stroke-width="2"/>`,
   freeride:
     sky('freeride', '#5d93d1', '#cfe1f3') +
     `<path d="M0 46 L22 22 L34 32 L56 6 L72 26 L84 16 L104 38 L124 14 L144 34 L160 26 L160 90 L0 90Z" fill="${SNOW}"/>` +

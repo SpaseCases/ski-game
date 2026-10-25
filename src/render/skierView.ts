@@ -261,8 +261,10 @@ export class SkierView {
     // skid. Only part of a lean tilts the whole body; the rest comes from the
     // knees and hips (see angulate). Folded up in a crouch or tuck the legs
     // have no room for that, so more of the lean tilts the whole body.
-    const swing = state.brake * r.brakeTwist * state.brakeSide * live;
-    const leanTotal = (state.lean + state.brake * r.brakeLean * state.brakeSide) * live;
+    // On a rail, braking only sinks: the skis stay where ←/→ left them.
+    const stop = state.brake * (1 - this.railWeight);
+    const swing = stop * r.brakeTwist * state.brakeSide * live;
+    const leanTotal = (state.lean + stop * r.brakeLean * state.brakeSide) * live;
     const onSnow = (1 - this.airWeight) * live;
     const deep = Math.min(1, groundCrouch + state.crouch * tuck);
     const legShare = (1 - r.leanBodyShare) * (1 - (1 - r.crouchAngulation) * deep);
