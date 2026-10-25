@@ -15,8 +15,9 @@
 // reports the speed passing each of those d; "v0=<m/s>" starts moving at that
 // speed instead of standing; "brake=<m/s>" brakes down to that speed before
 // each takeoff (a controlled huck). "lip=<d>" adds a takeoff with no kicker
-// (a ski jump's edge), reported against the landing hill below it. After a crash the rider
-// starts again from a standstill 15 m further down.
+// (a ski jump's edge), reported against the landing hill below it. "steer" steers back
+// onto the line on the snow, clear of lips (a kinked rail or a hip leaves the rider off
+// it, heading away). After a crash the rider starts again from a standstill 15 m further down.
 
 import type { Action } from '../../src/core/input.ts';
 import { heightAt } from '../../src/sim/terrain.ts';
@@ -31,6 +32,7 @@ const flagsArg = process.argv.slice(6);
 const tuck = flagsArg.includes('tuck');
 const pop = !flagsArg.includes('nopop');
 const spin = flagsArg.includes('720');
+const steer = flagsArg.includes('steer');
 const startArg = flagsArg.find((f) => f.startsWith('start='));
 const startX = startArg ? Number(startArg.slice(6)) : undefined;
 const speedArg = flagsArg.find((f) => f.startsWith('speed='));
@@ -133,7 +135,7 @@ let turned = 0;
 let spinning = false;
 let topSpeed = 0;
 let crashes = 0;
-console.log(`${file}: x=${x} from d=${from} to ${to}, ${tuck ? 'tucked' : 'standing'}, ${pop ? 'popping at each lip' : 'no pop'}${spin ? ', spinning 720s' : ''}${startX !== undefined ? `, starting at x=${startX}` : ''}${v0 > 0 ? `, moving at ${v0} m/s` : ''}`);
+console.log(`${file}: x=${x} from d=${from} to ${to}, ${tuck ? 'tucked' : 'standing'}, ${pop ? 'popping at each lip' : 'no pop'}${spin ? ', spinning 720s' : ''}${steer ? ', steering onto the line' : ''}${startX !== undefined ? `, starting at x=${startX}` : ''}${v0 > 0 ? `, moving at ${v0} m/s` : ''}`);
 
 while (r.t < 600) {
   const d = -r.s.position.z;
@@ -146,11 +148,12 @@ while (r.t < 600) {
     const crouchFor = r.speed * 0.4;
     if (tuck ? toLip > release : pop && toLip > release && toLip < release + crouchFor) keys.push('up');
     if (r.speed > brakeTo && toLip < 40 && toLip > release + crouchFor) keys.push('down');
-    if (startX !== undefined && r.s.grounded && d > from + 30 && toLip > 25) {
-      // Clear of the start (a tower's deck is narrow), steer onto the line: aim at a point on it 25 m ahead.
-      // Not near a lip, where carving into it would set off a spin.
+    const steering = steer ? r.s.rail < 0 && toLip > 6 : startX !== undefined && r.s.grounded && d > from + 30 && toLip > 25;
+    if (steering) {
+      // Clear of the start (a tower's deck is narrow), steer onto the line: aim at a point on it 25 m ahead
+      // (15 m with "steer"). Not near a lip, where carving into it would set off a spin.
       const off = x - r.s.position.x;
-      const err = Math.atan2(-off, 25) - r.s.yaw;
+      const err = Math.atan2(-off, steer ? 15 : 25) - r.s.yaw;
       const rate = 3 * err;
       if (rate > 0.02 && r.s.yawRate < rate) keys.push('left');
       else if (rate < -0.02 && r.s.yawRate > rate) keys.push('right');

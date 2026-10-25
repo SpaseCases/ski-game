@@ -90,6 +90,28 @@ for (const t of decor.scatter) {
             : [100, 96, 92];
   dot(t.x, t.z, t.kind === 'pine' || t.kind === 'aspen' ? 1.5 : 0.5, color);
 }
+// Fences and netting, then the features: dyed lips blue, rails dark, boxes brown, and light towers yellow.
+for (const l of decor.lines) {
+  if (l.kind !== 'fence' && l.kind !== 'netting' && l.kind !== 'barrier') continue;
+  for (let i = 1; i < l.points.length; i++) line(l.points[i - 1]!.x, l.points[i - 1]!.z, l.points[i]!.x, l.points[i]!.z, [255, 140, 40], 1);
+}
+for (const s of hf.shapes ?? []) {
+  if (s.kind !== 'ramp') continue;
+  for (const lip of s.lips) {
+    const half = s.halfWidth;
+    line(s.x + s.dirX * lip - s.rightX * half, s.z + s.dirZ * lip - s.rightZ * half, s.x + s.dirX * lip + s.rightX * half, s.z + s.dirZ * lip + s.rightZ * half, [40, 100, 230], 2);
+  }
+}
+for (const r of built.course.rails) {
+  const c: [number, number, number] = r.kind === 'box' ? [150, 95, 50] : [60, 66, 74];
+  for (let k = 1; k < r.dist.length; k++) {
+    line(r.points[(k - 1) * 3]!, r.points[(k - 1) * 3 + 2]!, r.points[k * 3]!, r.points[k * 3 + 2]!, c, r.kind === 'box' ? 2 : 1);
+  }
+}
+for (const p of decor.props) {
+  if (p.kind !== 'floodlight' && p.kind !== 'lightPole') continue;
+  for (const at of p.points) dot(at.x, at.z, 1.2, [240, 200, 30]);
+}
 const poly = hf.bounds.polygon;
 for (let i = 0; i < poly.length / 2; i++) {
   const j = (i + 1) % (poly.length / 2);
