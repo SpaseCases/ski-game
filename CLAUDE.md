@@ -52,6 +52,8 @@ src/
 
 ## Workflow
 - Build in the milestone order in `GAME_DESIGN.md`. Finish and verify each milestone before starting the next.
+- Before a milestone, read `ARCHITECTURE.md` (where everything lives and what breaks easily) and the milestone's "Read first" files instead of exploring the whole codebase.
+- When a milestone adds, moves or splits files, or finds a new fragile spot, update `ARCHITECTURE.md` in the same commit.
 - Greybox first: boxes and simple shapes until the feel is right. Polish comes after.
 - After each milestone, run `npm run build` with zero errors. Then use the Playwright MCP to open the game, drive it with key presses, take screenshots, and check the console. A milestone isn't done until that passes.
 - Also test through `embed-test.html` (a page that loads the game in an iframe) to catch embed problems.
