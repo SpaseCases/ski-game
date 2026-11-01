@@ -22,7 +22,7 @@ import {
   Vector3,
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DEFAULT_OUTFIT, type Outfit } from '../core/outfit.ts';
+import { DEFAULT_OUTFIT, GARMENTS, type Garment, type Outfit, type Pattern } from '../core/outfit.ts';
 import { skiGraphic, skiType, type Side } from '../core/skis.ts';
 import { clothMaterial } from './cloth.ts';
 import { buildSkiGeometry } from './skiModel.ts';
@@ -152,58 +152,89 @@ export class SkierRig {
       return mesh;
     };
     const c = colors(outfit);
+    const jacket = wear(outfit, 'jacket');
+    const pants = wear(outfit, 'pants');
 
     // The seat of the pants, under the jacket's hem.
-    this.pelvis = add(buildPelvis(c.pants));
-    this.torso = add(buildTorso(c.jacket));
-    this.hem = new JacketLower(c.jacket);
+    this.pelvis = add(buildPelvis(pants));
+    this.torso = add(buildTorso(jacket, outfit.headwear === 'hood'));
+    this.hem = new JacketLower(jacket);
     this.root.add(this.hem.mesh);
     this.head = add(buildHead(outfit));
     this.hat = new Mesh(new BufferGeometry(), clothMaterial);
     this.face = new Mesh(new BufferGeometry(), this.glowMaterial);
     this.head.add(this.hat, this.face);
     this.setHeadwear();
-    // Both sides share one geometry, apart from the feet (buckles on the outside).
-    const forearm = buildForearm(c.jacket, c.mittens);
-    const shin = buildShin(c.pants, c.boots);
+    // Both sides share one geometry, apart from the feet (buckles on the
+    // outside) and, with striped pants, the shins (the stripe runs down the outside).
+    const forearm = buildForearm(jacket, c.mittens);
     const pole = buildPole();
     for (const side of [-1, 1] as const) {
-      this.upperArms.push(add(buildUpperArm(c.jacket, side)));
+      this.upperArms.push(add(buildUpperArm(jacket, side)));
       this.forearms.push(add(forearm));
-      this.thighs.push(add(buildThigh(c.pants, side)));
-      this.shins.push(add(shin));
+      this.thighs.push(add(buildThigh(pants, side)));
+      this.shins.push(add(new BufferGeometry()));
       this.feet.push(add(buildFoot(side, c.boots, buildSki(outfit, side))));
       this.poles.push(add(pole));
     }
+    this.setShins(pants, c.boots);
+    this.setPoles();
   }
 
-  /** Changes colors or headwear, rebuilding only the parts that change (the old geometry is freed). */
+  /** Whether the skier carries poles (without them, the push is a skating step: see SkierView). */
+  get hasPoles(): boolean {
+    return this.outfit.poles;
+  }
+
+  /** Changes colors, patterns, headwear, skis or poles, rebuilding only the parts that change (the old geometry is freed). */
   setOutfit(next: Outfit): void {
     const prev = this.outfit;
     this.outfit = { ...next };
     const changed = (...keys: (keyof Outfit)[]): boolean => keys.some((k) => prev[k] !== next[k]);
     const c = colors(next);
-    if (changed('pants')) {
-      swap([this.pelvis], buildPelvis(c.pants));
-      this.thighs.forEach((m, i) => swap([m], buildThigh(c.pants, i === 0 ? -1 : 1)));
+    const jacket = wear(next, 'jacket');
+    const pants = wear(next, 'pants');
+    const pantsChanged = changed('pants', 'pantsPattern', 'pantsAccent');
+    const jacketChanged = changed('jacket', 'jacketPattern', 'jacketAccent');
+    const hoodChanged = (prev.headwear === 'hood') !== (next.headwear === 'hood');
+    if (pantsChanged) {
+      swap([this.pelvis], buildPelvis(pants));
+      this.thighs.forEach((m, i) => swap([m], buildThigh(pants, i === 0 ? -1 : 1)));
     }
-    if (changed('jacket')) {
-      swap([this.torso], buildTorso(c.jacket));
-      this.hem.recolor(c.jacket);
-      this.upperArms.forEach((m, i) => swap([m], buildUpperArm(c.jacket, i === 0 ? -1 : 1)));
+    if (jacketChanged || hoodChanged) swap([this.torso], buildTorso(jacket, next.headwear === 'hood'));
+    if (jacketChanged) {
+      this.hem.recolor(jacket);
+      this.upperArms.forEach((m, i) => swap([m], buildUpperArm(jacket, i === 0 ? -1 : 1)));
     }
-    if (changed('jacket', 'mittens')) swap(this.forearms, buildForearm(c.jacket, c.mittens));
-    if (changed('pants', 'boots')) swap(this.shins, buildShin(c.pants, c.boots));
+    if (jacketChanged || changed('mittens')) swap(this.forearms, buildForearm(jacket, c.mittens));
+    if (pantsChanged || changed('boots')) this.setShins(pants, c.boots);
     if (changed('boots', 'ski', 'skiGraphic')) {
       this.feet.forEach((m, i) => {
         const side = i === 0 ? -1 : 1;
         swap([m], buildFoot(side, c.boots, buildSki(next, side)));
       });
     }
-    if (changed('helmet', 'goggleFrame', 'goggleLens', 'goggleStrap', 'gaiter', 'headwear')) {
+    // The hood is the jacket's color.
+    if (changed('helmet', 'goggleFrame', 'goggleLens', 'goggleStrap', 'gaiter', 'headwear') || (next.headwear === 'hood' && changed('jacket'))) {
       swap([this.head], buildHead(next));
       this.setHeadwear();
     }
+    if (changed('poles')) this.setPoles();
+  }
+
+  /** Builds the shins: one geometry for both, or one each when the pants are striped. */
+  private setShins(pants: Wear, boot: Color): void {
+    const old = new Set(this.shins.map((m) => m.geometry));
+    if (pants.pattern === 'stripes') this.shins.forEach((m, i) => (m.geometry = buildShin(pants, boot, i === 0 ? -1 : 1)));
+    else {
+      const shared = buildShin(pants, boot, 0);
+      for (const m of this.shins) m.geometry = shared;
+    }
+    for (const g of old) g.dispose();
+  }
+
+  private setPoles(): void {
+    for (const m of this.poles) m.visible = this.outfit.poles;
   }
 
   /** How brightly the pumpkin's carved face glows: 0 by day (a dark hollow), 1 at night. */
@@ -228,12 +259,12 @@ export class SkierRig {
     this.glowMaterial.dispose();
   }
 
-  /** Builds the Santa hat or the carved face for the current headwear (or neither). */
+  /** Builds what sways (the Santa hat, the beanie's pom) and the carved face for the current headwear (or neither). */
   private setHeadwear(): void {
     const hw = this.outfit.headwear;
-    swap([this.hat], hw === 'santa' ? buildSantaHat() : new BufferGeometry());
+    swap([this.hat], hw === 'santa' ? buildSantaHat() : hw === 'beanie' ? buildPom(new Color(this.outfit.helmet)) : new BufferGeometry());
     swap([this.face], hw === 'pumpkin' ? buildCarvedFace(false) : new BufferGeometry());
-    this.hat.visible = hw === 'santa';
+    this.hat.visible = hw === 'santa' || hw === 'beanie';
     this.face.visible = hw === 'pumpkin';
   }
 
@@ -363,8 +394,107 @@ const skiOffset = new Vector3();
 const glowColor = new Color(FIXED.carvedGlow);
 
 /** The outfit's colors as Colors. */
-function colors(o: Outfit): Record<'jacket' | 'pants' | 'boots' | 'mittens', Color> {
-  return { jacket: new Color(o.jacket), pants: new Color(o.pants), boots: new Color(o.boots), mittens: new Color(o.mittens) };
+function colors(o: Outfit): Record<'boots' | 'mittens', Color> {
+  return { boots: new Color(o.boots), mittens: new Color(o.mittens) };
+}
+
+/** A garment's pattern and colors, for painting its parts. */
+interface Wear {
+  pattern: Pattern;
+  base: Color;
+  accent: Color;
+  /** Camo's darker shade of the base; plaid's darker crossing of both colors. */
+  dark: Color;
+}
+
+function wear(o: Outfit, garment: Garment): Wear {
+  const g = GARMENTS.find((x) => x.id === garment)!;
+  const pattern = o[g.pattern];
+  const base = new Color(o[garment]);
+  const accent = new Color(o[g.accent]);
+  const dark = pattern === 'plaid' ? base.clone().lerp(accent, 0.5).multiplyScalar(0.55) : shade(base, 0.62);
+  return { pattern, base, accent, dark };
+}
+
+/**
+ * Where a part of a garment takes the second color, in the part's own frame
+ * (each part decides: stripes round the chest, blocks on the shoulders...).
+ * `seed` shifts camo and plaid so parts side by side don't repeat, and
+ * `radius` turns the angle round the part into plaid's distance across.
+ */
+interface Panel {
+  stripe?: (c: Vector3) => boolean;
+  block?: (c: Vector3) => boolean;
+  seed: number;
+  radius: number;
+}
+
+/** The garment's paint for one part: a single color when plain, else per face. */
+function cloth(w: Wear, panel: Panel): Color | FaceColor {
+  const { stripe, block } = panel;
+  switch (w.pattern) {
+    case 'plain':
+      return w.base;
+    case 'stripes':
+      return stripe ? (c) => (stripe(c) ? w.accent : w.base) : w.base;
+    case 'blocks':
+      return block ? (c) => (block(c) ? w.accent : w.base) : w.base;
+    case 'camo':
+      return (c) => camo(w, c.x, c.y, c.z, panel.seed);
+    case 'plaid':
+      return (c) => plaid(w, around(c) * panel.radius, c.y, panel.seed);
+  }
+}
+
+/**
+ * How many rows a garment part of `length` m is cut into: enough faces for
+ * camo and plaid, else one. Rows are kept coarse (the skier's triangle
+ * budget): plaid's bands are a row tall.
+ */
+function rows(w: Wear, length: number): number {
+  return w.pattern === 'camo' || w.pattern === 'plaid' ? Math.max(1, Math.round(length / CAMO_ROW)) : 1;
+}
+/** Height (m) of a row of faces in camo or plaid. */
+const CAMO_ROW = 0.095;
+
+/** Angle round the vertical axis from straight ahead (-Z), as the helmet and goggles measure it. */
+function around(c: Vector3): number {
+  return Math.atan2(c.x, -c.z);
+}
+
+/** Blotches: the base, a darker shade of it, and the second color, from smooth noise. */
+function camo(w: Wear, x: number, y: number, z: number, seed: number): Color {
+  const k = 1 / 0.12;
+  const n = 0.7 * valueNoise(x * k + seed * 7.31, y * k, z * k) + 0.3 * valueNoise(x * k * 2.3, y * k * 2.3 + seed * 3.7, z * k * 2.3);
+  return n < 0.44 ? w.base : n < 0.58 ? w.dark : w.accent;
+}
+
+/** A check: bands of the second color both ways, darker where they cross. */
+function plaid(w: Wear, u: number, v: number, seed: number): Color {
+  const period = 2 * CAMO_ROW;
+  const across = ((((u + seed * 0.031) % period) + period) % period) < period / 2;
+  const down = ((((v + seed * 0.017) % period) + period) % period) < period / 2;
+  return across && down ? w.dark : across || down ? w.accent : w.base;
+}
+
+/** Smooth 3D value noise, 0..1. */
+function valueNoise(x: number, y: number, z: number): number {
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const z0 = Math.floor(z);
+  const fx = smooth01(x - x0);
+  const fy = smooth01(y - y0);
+  const fz = smooth01(z - z0);
+  const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
+  const plane = (zz: number): number =>
+    lerp(lerp(hash3(x0, y0, zz), hash3(x0 + 1, y0, zz), fx), lerp(hash3(x0, y0 + 1, zz), hash3(x0 + 1, y0 + 1, zz), fx), fy);
+  return lerp(plane(z0), plane(z0 + 1), fz);
+}
+
+function hash3(x: number, y: number, z: number): number {
+  let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 1274126177)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
 /** Gives `meshes` (which share one geometry) a new geometry, freeing the old one. */
@@ -450,9 +580,20 @@ function shade(color: Color, amount: number): Color {
   return color.clone().multiplyScalar(amount);
 }
 
-/** A tapered prism from y = 0 (radius `r0`) to y = `length` (radius `r1`). */
-function prism(r0: number, r1: number, length: number, sides: number): BufferGeometry {
-  return new CylinderGeometry(r1, r0, length, sides).translate(0, length / 2, 0);
+/**
+ * A tapered prism from y = 0 (radius `r0`) to y = `length` (radius `r1`),
+ * in `rows` rows of faces, its corners turned `turn` rad round from the default.
+ */
+function prism(r0: number, r1: number, length: number, sides: number, rows = 1, turn = 0): BufferGeometry {
+  return new CylinderGeometry(r1, r0, length, sides, rows, false, turn).translate(0, length / 2, 0);
+}
+
+/** Turns a 12-sided pant leg so a face looks straight out to each side (for a side stripe). */
+const SIDE_FACE = Math.PI / 2 - Math.PI / 12;
+
+/** Whether `c` is on the face looking out to the `side` (-1 left, 1 right; +X) of the part. */
+function onSide(c: Vector3, side: number): boolean {
+  return Math.abs(wrapAngle(around(c) - (side * Math.PI) / 2)) < 0.2;
 }
 
 type AngleFn = (a: number) => number;
@@ -505,33 +646,57 @@ const constant =
   () =>
     v;
 
-function buildPelvis(pants: Color): BufferGeometry {
-  return paint(prism(0.145, 0.165, 0.2, 12).translate(0, -0.13, 0).scale(1, 1, 0.72), pants);
+/** The seat of the pants; striped pants carry their side stripes down over the hips. */
+function buildPelvis(pants: Wear): BufferGeometry {
+  const turn = pants.pattern === 'stripes' ? SIDE_FACE : 0;
+  const paintIt = cloth(pants, { stripe: (c) => onSide(c, -1) || onSide(c, 1), seed: 1, radius: 0.155 });
+  // Mostly under the jacket, so camo and plaid don't cut it into rows.
+  return paint(prism(0.145, 0.165, 0.2, 12, 1, turn).translate(0, -0.13, 0).scale(1, 1, 0.72), paintIt);
 }
 
 /**
  * Upper jacket, from the belly up: a straight shell, a touch narrower at the
- * waist, with a high collar, the hood rolled down behind the neck, a zip and
- * a chest pocket. Below the belly the jacket is a JacketLower.
+ * waist, with a high collar, the hood rolled down behind the neck (unless
+ * it's up: see buildHood), a zip and a chest pocket. Below the belly the
+ * jacket is a JacketLower. Stripes are two bands round the chest; blocks
+ * color the shoulders.
  */
-function buildTorso(jacket: Color): BufferGeometry {
+function buildTorso(w: Wear, hoodUp: boolean): BufferGeometry {
+  const jacket = w.base;
   const dark = shade(jacket, 0.78);
+  const shell = BODY.spine - TORSO_BOTTOM;
+  // Stripes and blocks need the shell cut into rows; the bands are whole rows.
+  const shellRows = w.pattern === 'stripes' ? CHEST_ROWS : w.pattern === 'blocks' ? YOKE_ROWS : rows(w, shell);
+  const row = (c: Vector3, n: number): number => Math.floor(((c.y - TORSO_BOTTOM) / shell) * n);
+  const body = cloth(w, {
+    stripe: (c) => CHEST_STRIPES.includes(row(c, CHEST_ROWS)),
+    block: (c) => row(c, YOKE_ROWS) === YOKE_ROWS - 1,
+    // As the lower jacket's, so camo and plaid carry on across the seam at the waist.
+    seed: 4,
+    radius: JACKET.waist,
+  });
   const parts = [
     // As many sides as the lower jacket, corner for corner, so the two meet flush.
-    paint(prism(JACKET.waist, JACKET.chest, BODY.spine - TORSO_BOTTOM, LOWER_SEGMENTS).translate(0, TORSO_BOTTOM, 0).scale(1, 1, JACKET.depth), jacket),
+    paint(prism(JACKET.waist, JACKET.chest, shell, LOWER_SEGMENTS, shellRows).translate(0, TORSO_BOTTOM, 0).scale(1, 1, JACKET.depth), body),
     paint(prism(0.116, 0.106, 0.09, 12).translate(0, 0.49, 0.008).scale(1, 1, 0.95), jacket),
-    paint(new SphereGeometry(0.135, 12, 8).scale(1.25, 0.6, 0.75).translate(0, 0.53, 0.135), dark),
     paint(new BoxGeometry(0.014, 0.21, 0.012).translate(0, 0.405, -0.155), FIXED.zip),
     paint(new BoxGeometry(0.11, 0.085, 0.012).translate(-0.11, 0.38, -0.15), dark),
     // Drawcord toggles hanging from the collar.
     paint(new BoxGeometry(0.012, 0.022, 0.012).translate(-0.03, 0.47, -0.118), FIXED.zip),
     paint(new BoxGeometry(0.012, 0.022, 0.012).translate(0.03, 0.47, -0.118), FIXED.zip),
   ];
+  if (!hoodUp) parts.push(paint(new SphereGeometry(0.135, 12, 8).scale(1.25, 0.6, 0.75).translate(0, 0.53, 0.135), dark));
+  const shoulder = w.pattern === 'blocks' ? w.accent : cloth(w, { seed: 3, radius: 0.1 });
   for (const s of [-1, 1]) {
-    parts.push(paint(new IcosahedronGeometry(0.1, 1).translate(s * BODY.shoulderWidth, BODY.spine - BODY.shoulderDrop, 0), jacket));
+    parts.push(paint(new IcosahedronGeometry(0.1, 1).translate(s * BODY.shoulderWidth, BODY.spine - BODY.shoulderDrop, 0), shoulder));
   }
   return merge(parts);
 }
+
+/** The chest shell's rows for stripes, and which rows are stripes (from the waist up); blocks color the top of YOKE_ROWS. */
+const CHEST_ROWS = 5;
+const CHEST_STRIPES = [1, 3];
+const YOKE_ROWS = 3;
 
 /** Height (chest frame) where the rigid upper jacket ends and the rebuilt lower jacket takes over. */
 const TORSO_BOTTOM = 0.3;
@@ -625,7 +790,7 @@ class JacketLower {
   private readonly position: BufferAttribute;
   private readonly ringPoints = LOWER_RINGS.length * LOWER_SEGMENTS;
 
-  constructor(jacket: Color) {
+  constructor(jacket: Wear) {
     const colors: number[] = [];
     const index = this.build(jacket, colors);
     this.points = new Float32Array((this.ringPoints + (ZIP_LAST - ZIP_FIRST + 1) * 2) * 3);
@@ -639,8 +804,8 @@ class JacketLower {
     this.mesh = new Mesh(geometry, lowerMaterial);
   }
 
-  /** New jacket color: rewrites the vertex colors in place (the shape is untouched). */
-  recolor(jacket: Color): void {
+  /** New jacket colors or pattern: rewrites the vertex colors in place (the shape is untouched). */
+  recolor(jacket: Wear): void {
     const colors: number[] = [];
     this.build(jacket, colors);
     const attr = this.mesh.geometry.getAttribute('color') as BufferAttribute;
@@ -648,11 +813,17 @@ class JacketLower {
     attr.needsUpdate = true;
   }
 
-  /** The mesh's faces: fills `colors` per vertex and returns which point each vertex is. */
-  private build(jacket: Color, colors: number[]): number[] {
+  /**
+   * The mesh's faces: fills `colors` per vertex and returns which point each
+   * vertex is. Camo and plaid color each face from where it hangs at rest;
+   * stripes and blocks leave the lower jacket plain.
+   */
+  private build(w: Wear, colors: number[]): number[] {
+    const jacket = w.base;
     const band = shade(jacket, 0.78);
     const under = shade(jacket, 0.6);
     const zip = new Color(FIXED.zip);
+    const body = cloth(w, { seed: 4, radius: JACKET.waist });
     const index: number[] = [];
     const quad = (a: number, b: number, c: number, d: number, color: Color): void => {
       index.push(a, b, c, a, c, d);
@@ -660,9 +831,20 @@ class JacketLower {
     };
     const point = (ring: number, seg: number): number => ring * LOWER_SEGMENTS + (seg % LOWER_SEGMENTS);
     const last = LOWER_RINGS.length - 1;
+    const rest = new Vector3();
     for (let ring = 0; ring < last; ring++) {
-      const color = ring < last - 2 ? jacket : ring === last - 2 ? band : under;
       for (let seg = 0; seg < LOWER_SEGMENTS; seg++) {
+        let color = ring < last - 2 ? jacket : ring === last - 2 ? band : under;
+        if (ring < last - 2 && typeof body === 'function') {
+          // The middle of the face as the jacket hangs at rest.
+          const a = ((seg + 0.5) / LOWER_SEGMENTS) * Math.PI * 2;
+          const top = LOWER_RINGS[ring]!.at(a);
+          const y0 = top[0]!;
+          const r = top[1]!;
+          const depth = top[2]!;
+          const y1 = LOWER_RINGS[ring + 1]!.at(a)[0]!;
+          color = body(rest.set(r * Math.sin(a), (y0 + y1) / 2, -r * Math.cos(a) * depth), rest);
+        }
         // Wound so the outside faces out (and the turned-under band faces down).
         quad(point(ring, seg), point(ring, seg + 1), point(ring + 1, seg + 1), point(ring + 1, seg), color);
       }
@@ -820,13 +1002,30 @@ function smooth01(t: number): number {
 function buildHead(o: Outfit): BufferGeometry {
   const gaiter = new Color(o.gaiter);
   if (o.headwear === 'pumpkin') return merge([...buildGaiter(gaiter), ...buildPumpkin(), buildCarvedFace(true)]);
-  return merge([
-    // Head under everything, in case any gap shows.
-    paint(new SphereGeometry(0.105, 16, 12).scale(1, 1.08, 1.1).translate(0, 0.2, 0), gaiter),
+  const hat = new Color(o.helmet);
+  const parts = [
+    // Head under everything, in case any gap shows (and through a cap's strap gap).
+    paint(new SphereGeometry(0.105, 12, 9).scale(1, 1.08, 1.1).translate(0, 0.2, 0), gaiter),
     ...buildGaiter(gaiter),
-    ...buildHelmet(new Color(o.helmet), o.goggleStrap),
     ...buildGoggles(o.goggleFrame, new Color(o.goggleLens)),
-  ]);
+  ];
+  switch (o.headwear) {
+    case 'beanie':
+      parts.push(...buildBeanie(hat), buildStrap(o.goggleStrap, BEANIE.r + 0.001));
+      break;
+    case 'cap':
+      parts.push(...buildCap(hat, gaiter), buildStrap(o.goggleStrap, CAP.r + 0.001));
+      break;
+    case 'bucket':
+      parts.push(...buildBucket(hat), buildStrap(o.goggleStrap, BUCKET.r + 0.001));
+      break;
+    case 'hood':
+      parts.push(...buildHelmet(hat, o.goggleStrap), ...buildHood(new Color(o.jacket)));
+      break;
+    default:
+      parts.push(...buildHelmet(hat, o.goggleStrap));
+  }
+  return merge(parts);
 }
 
 /** Neck gaiter pulled up over the chin and nose, following the jaw, tucked under the goggles and helmet. */
@@ -897,19 +1096,252 @@ function buildHelmet(helmet: Color, strap: string): BufferGeometry[] {
     slot.translate(x * sink, HELMET.y + y * sink, z * sink);
     parts.push(paint(fit(slot), FIXED.vent));
   }
-  // Goggle strap round the back of the shell, from where the frame slips under the helmet's edge.
-  const strapY: AngleFn = (a) => GOGGLE_Y + 0.012 * smooth01((Math.abs(wrapAngle(a)) - STRAP_FROM) / 1.2);
-  parts.push(
-    paint(
-      fit(curvedPanel(constant(0.127), constant(0.1335), (a) => strapY(a) + 0.014, (a) => strapY(a) - 0.014, STRAP_FROM, Math.PI * 2 - STRAP_FROM, 20)),
-      strap,
-    ),
-  );
+  parts.push(buildStrap(strap, 0.127));
   return parts;
+}
+
+/** Goggle strap round the back of the head at radius `r` (before the head's stretch), from where the frame slips under the helmet's or hat's edge. */
+function buildStrap(strap: string, r: number): BufferGeometry {
+  const strapY: AngleFn = (a) => GOGGLE_Y + 0.012 * smooth01((Math.abs(wrapAngle(a)) - STRAP_FROM) / 1.2);
+  return paint(
+    fitHead(curvedPanel(constant(r), constant(r + 0.0065), (a) => strapY(a) + 0.014, (a) => strapY(a) - 0.014, STRAP_FROM, Math.PI * 2 - STRAP_FROM, 20)),
+    strap,
+  );
 }
 
 /** Angle (from straight ahead) where the strap comes out from under the helmet's edge. */
 const STRAP_FROM = 1.56;
+
+/** Stretches a round shape front to back like the head (and the helmet). */
+function fitHead(g: BufferGeometry): BufferGeometry {
+  return g.scale(1, 1, HELMET.long).translate(0, 0, HELMET.back);
+}
+
+/**
+ * A dome over the head (radius `r`, `squash` tall, centered at the goggles'
+ * height) with every vertex below `edge` lifted onto it, before fitHead.
+ */
+function hatDome(r: number, squash: number, edge: AngleFn, widthSegments: number, heightSegments: number): BufferGeometry {
+  const dome = new SphereGeometry(r, widthSegments, heightSegments, 0, Math.PI * 2, 0, Math.PI * 0.72).scale(1, squash, 1).translate(0, GOGGLE_Y, 0);
+  const p = dome.getAttribute('position');
+  for (let i = 0; i < p.count; i++) {
+    const e = edge(Math.atan2(p.getX(i), -p.getZ(i)));
+    if (p.getY(i) < e) p.setY(i, e);
+  }
+  return dome;
+}
+
+/** Horizontal radius of a hatDome at height `y`. */
+function domeRadiusAt(r: number, squash: number, y: number): number {
+  return r * Math.sqrt(Math.max(0, 1 - ((y - GOGGLE_Y) / (r * squash)) ** 2));
+}
+
+/** Knit beanie: a slouchy ribbed dome and a thick folded cuff resting on the goggles; its pom sways (buildPom). */
+const BEANIE = { r: 0.124, squash: 1.12, cuff: 0.042 };
+
+function buildBeanie(color: Color): BufferGeometry[] {
+  const { r, squash, cuff } = BEANIE;
+  const rib = shade(color, 0.9);
+  const ribs = (n: number): FaceColor => (c) => (Math.floor(((around(c) + Math.PI) / (Math.PI * 2)) * n) % 2 === 0 ? color : rib);
+  const crown = paint(fitHead(hatDome(r, squash, helmetEdge, 20, 12)), ribs(20));
+  // The cuff hugs the dome from its edge up, a little proud of it, with a lip top and bottom.
+  const SEGS = 40;
+  const pos: number[] = [];
+  const at = (a: number, y: number, out: number): Point => {
+    const rr = domeRadiusAt(r, squash, y) + out;
+    return [rr * Math.sin(a), y, -rr * Math.cos(a)];
+  };
+  for (let i = 0; i < SEGS; i++) {
+    const a0 = -Math.PI + (Math.PI * 2 * i) / SEGS;
+    const a1 = -Math.PI + (Math.PI * 2 * (i + 1)) / SEGS;
+    const e0 = helmetEdge(a0) - 0.003;
+    const e1 = helmetEdge(a1) - 0.003;
+    const b0 = at(a0, e0, 0.008);
+    const b1 = at(a1, e1, 0.008);
+    const t0 = at(a0, e0 + cuff, 0.008);
+    const t1 = at(a1, e1 + cuff, 0.008);
+    const bi0 = at(a0, e0, -0.004);
+    const bi1 = at(a1, e1, -0.004);
+    const ti0 = at(a0, e0 + cuff, -0.004);
+    const ti1 = at(a1, e1 + cuff, -0.004);
+    pos.push(...b0, ...b1, ...t1, ...b0, ...t1, ...t0); // outside
+    pos.push(...ti0, ...t0, ...t1, ...ti0, ...t1, ...ti1); // top lip
+    pos.push(...bi0, ...bi1, ...b1, ...bi0, ...b1, ...b0); // bottom lip
+  }
+  const band = new BufferGeometry();
+  band.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  band.computeVertexNormals();
+  return [crown, paint(fitHead(band), ribs(SEGS))];
+}
+
+/** The beanie's pom on top: drawn with the cloth material, so it sways a little. A lighter tone on a dark beanie, darker on a light one. */
+function buildPom(color: Color): BufferGeometry {
+  const light = color.getHSL({ h: 0, s: 0, l: 0 }).l < 0.45;
+  const pomColor = light ? color.clone().lerp(new Color('#ece8de'), 0.6) : shade(color, 0.72);
+  const top = GOGGLE_Y + BEANIE.r * BEANIE.squash;
+  const g = fitHead(
+    merge([
+      paint(prism(0.012, 0.009, 0.02, 6).translate(0, top - 0.008, 0), shade(color, 0.85)),
+      paint(new IcosahedronGeometry(0.038, 1).scale(1, 0.9, 1).translate(0, top + 0.036, 0), pomColor),
+    ]),
+  );
+  // Sway grows from the knot to the top of the pom.
+  const pos = g.getAttribute('position');
+  const sway = new Float32Array(pos.count);
+  for (let i = 0; i < pos.count; i++) sway[i] = 0.06 + 0.08 * Math.min(1, Math.max(0, (pos.getY(i) - top) / 0.07));
+  g.setAttribute('sway', new BufferAttribute(sway, 1));
+  return g;
+}
+
+/**
+ * Cap worn backwards: a shallow six-panel crown with a button on top, its
+ * flat brim out over the back of the neck, and the strap gap at the front
+ * (the balaclava shows through it) just above the goggles.
+ */
+const CAP = { r: 0.126, squash: 0.86, brim: 0.075, brimSpan: 0.95, back: 0.188 };
+const capEdge: AngleFn = (a) => {
+  const abs = Math.abs(a);
+  const front = GOGGLE_Y + goggleHalf(Math.min(abs, LENS_SPAN)) + 0.001;
+  return front + (CAP.back - front) * smooth01((abs - LENS_SPAN) / 0.45);
+};
+
+function buildCap(color: Color, gap: Color): BufferGeometry[] {
+  const { r, squash } = CAP;
+  const seam = shade(color, 0.9);
+  const GAP = 0.32;
+  const crown = paint(fitHead(hatDome(r, squash, capEdge, 24, 10)), (c) => {
+    const a = around(c);
+    // The strap gap: an arch over the forehead.
+    if (Math.abs(a) < GAP && c.y < capEdge(a) + 0.045 * Math.cos((a / GAP) * (Math.PI / 2))) return gap;
+    return Math.floor(((a + Math.PI) / (Math.PI * 2)) * 6) % 2 === 0 ? color : seam;
+  });
+  const top = GOGGLE_Y + r * squash;
+  const button = paint(fitHead(prism(0.014, 0.012, 0.008, 8).translate(0, top - 0.003, 0)), seam);
+  // The adjuster strap across the bottom of the gap.
+  const strapR = (a: number): number => domeRadiusAt(r, squash, capEdge(a) + 0.006) + 0.001;
+  const adjuster = paint(
+    fitHead(curvedPanel((a) => strapR(a) - 0.004, strapR, (a) => capEdge(a) + 0.012, (a) => capEdge(a) + 0.002, -GAP, GAP, 6)),
+    shade(color, 0.7),
+  );
+  // The brim: flat, rounded, drooping a little toward its edge.
+  const inner = domeRadiusAt(r, squash, CAP.back) - 0.004;
+  const brimOut: AngleFn = (a) => inner + CAP.brim * Math.sqrt(Math.max(0, Math.cos(((a - Math.PI) / CAP.brimSpan) * (Math.PI / 2))));
+  const brim = curvedPanel(constant(inner), brimOut, constant(CAP.back + 0.004), constant(CAP.back - 0.004), Math.PI - CAP.brimSpan, Math.PI + CAP.brimSpan, 12);
+  const p = brim.getAttribute('position');
+  for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) - 0.15 * Math.max(0, Math.hypot(p.getX(i), p.getZ(i)) - inner));
+  brim.computeVertexNormals();
+  return [crown, button, adjuster, paint(fitHead(brim), shade(color, 0.86))];
+}
+
+/**
+ * Bucket hat: a short round crown sitting just above the goggles in front
+ * and lower round the sides and back, and a soft brim sloping down all round.
+ */
+const BUCKET = { r: 0.129, brim: 0.068, drop: 0.04 };
+const bucketEdge: AngleFn = (a) => {
+  const abs = Math.abs(a);
+  const front = GOGGLE_Y + goggleHalf(Math.min(abs, LENS_SPAN)) + 0.002;
+  return front + (0.199 - front) * smooth01((abs - LENS_SPAN) / 0.4);
+};
+
+function buildBucket(color: Color): BufferGeometry[] {
+  const { r, brim: out, drop } = BUCKET;
+  // Lathe profiles (radius, height); a height of EDGE is replaced by the hat's edge at that angle.
+  const EDGE = -1;
+  const crownProfile = [
+    [r, EDGE],
+    [r - 0.002, 0.286],
+    [r - 0.011, 0.318],
+    [0.085, 0.334],
+    [0.001, 0.337],
+  ].map(([x, y]) => new Vector2(x, y));
+  const crown = new LatheGeometry(crownProfile, 20);
+  const cp = crown.getAttribute('position');
+  for (let i = 0; i < cp.count; i++) {
+    if (cp.getY(i) === EDGE) cp.setY(i, bucketEdge(Math.atan2(cp.getX(i), -cp.getZ(i))));
+  }
+  // The brim's cross-section, counterclockwise (inner bottom, outer bottom, outer top, inner top), heights from the edge.
+  const brimProfile = [
+    [r - 0.002, -0.002],
+    [r + out, -drop - 0.006],
+    [r + out, -drop],
+    [r - 0.002, 0.006],
+    [r - 0.002, -0.002],
+  ].map(([x, y]) => new Vector2(x, y));
+  const brim = new LatheGeometry(brimProfile, 24);
+  const bp = brim.getAttribute('position');
+  for (let i = 0; i < bp.count; i++) bp.setY(i, bp.getY(i) + bucketEdge(Math.atan2(bp.getX(i), -bp.getZ(i))));
+  return [paint(fitHead(crown), color), paint(fitHead(brim), shade(color, 0.88))];
+}
+
+/**
+ * Hood up over the helmet: the jacket's hood, roomy round the helmet and down
+ * to the collar, its opening framing the goggles and gaiter. Lined (a
+ * darker inside, so looking in at the opening shows cloth, not nothing),
+ * with a hemmed edge round the opening.
+ */
+const HOOD_PROFILE: readonly (readonly [number, number])[] = [
+  [0.001, 0.372],
+  [0.075, 0.362],
+  [0.118, 0.333],
+  [0.146, 0.285],
+  [0.156, 0.225],
+  [0.155, 0.16],
+  [0.157, 0.1],
+  [0.163, 0.04],
+  [0.174, -0.012],
+];
+/** Height of the hood's opening at angle a: an arch over the forehead, down to the collar at the sides. */
+const hoodEdge: AngleFn = (a) => -0.02 + 0.31 * Math.cos(Math.min(1, Math.abs(a) / 1.42) * (Math.PI / 2)) ** 0.35;
+/** The hood's radius at height y (from HOOD_PROFILE). */
+function hoodRadiusAt(y: number): number {
+  for (let i = 1; i < HOOD_PROFILE.length; i++) {
+    const [r0, y0] = HOOD_PROFILE[i - 1]!;
+    const [r1, y1] = HOOD_PROFILE[i]!;
+    if (y <= y0 && y >= y1) return r0 + ((r1 - r0) * (y0 - y)) / (y0 - y1);
+  }
+  return HOOD_PROFILE[HOOD_PROFILE.length - 1]![0];
+}
+const HOOD = { long: 1.12, back: 0.014, lining: 0.93 };
+
+function buildHood(jacket: Color): BufferGeometry[] {
+  const fit = (g: BufferGeometry): BufferGeometry => g.scale(1, 1, HOOD.long).translate(0, 0, HOOD.back);
+  const shell = (segments: number): BufferGeometry => {
+    const g = new LatheGeometry(
+      HOOD_PROFILE.map(([r, y]) => new Vector2(r, y)),
+      segments,
+    );
+    const p = g.getAttribute('position');
+    for (let i = 0; i < p.count; i++) {
+      const e = hoodEdge(Math.atan2(p.getX(i), -p.getZ(i)));
+      if (p.getY(i) < e) p.setY(i, e);
+    }
+    return g;
+  };
+  const outside = paint(fit(shell(16)), jacket);
+  // The lining: the same shell drawn smaller (and coarser: it's seen only past the hem) and turned inside out.
+  const lining = paint(fit(shell(10).scale(HOOD.lining, 1, HOOD.lining)), shade(jacket, 0.55));
+  const lp = lining.getAttribute('position');
+  for (let i = 0; i < lp.count; i += 3) {
+    const x = lp.getX(i + 1);
+    const y = lp.getY(i + 1);
+    const z = lp.getZ(i + 1);
+    lp.setXYZ(i + 1, lp.getX(i + 2), lp.getY(i + 2), lp.getZ(i + 2));
+    lp.setXYZ(i + 2, x, y, z);
+  }
+  // The hem round the opening, from the lining out to just proud of the shell.
+  const SPAN = 1.42;
+  const hem = curvedPanel(
+    (a) => hoodRadiusAt(hoodEdge(a)) * HOOD.lining - 0.002,
+    (a) => hoodRadiusAt(hoodEdge(a)) + 0.005,
+    (a) => hoodEdge(a) + 0.014,
+    (a) => hoodEdge(a) - 0.002,
+    -SPAN,
+    SPAN,
+    18,
+  );
+  return [outside, lining, paint(fit(hem), shade(jacket, 0.8))];
+}
 
 function wrapAngle(a: number): number {
   return Math.atan2(Math.sin(a), Math.cos(a));
@@ -1122,10 +1554,21 @@ function carvedPanel(top: AngleFn, bottom: AngleFn, a0: number, a1: number, segm
  * faces the elbow, out and back; the outside of the arm is between that and
  * -X (out and forward).
  */
-function buildUpperArm(jacket: Color, side: number): BufferGeometry {
+function buildUpperArm(w: Wear, side: number): BufferGeometry {
+  // The pocket takes the sleeve's color.
+  const jacket = w.pattern === 'blocks' ? w.accent : w.base;
+  const length = BODY.upperArm;
+  // Stripes: two bands round the sleeve (whole rows); blocks: the whole upper sleeve.
+  const armRows = w.pattern === 'stripes' ? ARM_ROWS : rows(w, length);
+  const sleeve = cloth(w, {
+    stripe: (c) => ARM_STRIPES.includes(Math.floor((c.y / length) * ARM_ROWS)),
+    block: () => true,
+    seed: 5 + side,
+    radius: 0.08,
+  });
   const parts = [
-    paint(prism(0.082, 0.076, BODY.upperArm, 9), jacket),
-    paint(new IcosahedronGeometry(0.077, 1).translate(0, BODY.upperArm, 0), jacket),
+    paint(prism(0.082, 0.076, length, 9, armRows), sleeve),
+    paint(new IcosahedronGeometry(0.077, 1).translate(0, length, 0), w.pattern === 'blocks' ? w.accent : cloth(w, { seed: 6 + side, radius: 0.077 })),
   ];
   if (side < 0) {
     const face = 2.13; // turns +X to point at the outside of the arm
@@ -1139,11 +1582,17 @@ function buildUpperArm(jacket: Color, side: number): BufferGeometry {
   return merge(parts);
 }
 
-/** Sleeve flaring toward the wrist, then a glove with a thumb. */
-function buildForearm(jacket: Color, mitten: Color): BufferGeometry {
+/** The upper sleeve's rows for stripes, and which rows are stripes (from the shoulder). */
+const ARM_ROWS = 5;
+const ARM_STRIPES = [1, 3];
+
+/** Sleeve flaring toward the wrist (camo or plaid, else plain), then a glove with a thumb. */
+function buildForearm(w: Wear, mitten: Color): BufferGeometry {
   const f = BODY.forearm;
+  const jacket = w.base;
   return merge([
-    paint(prism(0.076, 0.084, f, 9), jacket),
+    // Camo and plaid only by the sleeve's sides here (no rows: the triangle budget).
+    paint(prism(0.076, 0.084, f, 9), cloth(w, { seed: 8, radius: 0.08 })),
     paint(prism(0.087, 0.087, 0.025, 9).translate(0, f - 0.03, 0), shade(jacket, 0.78)),
     paint(prism(0.058, 0.056, 0.05, 10).translate(0, f - 0.01, 0), shade(mitten, 0.74)),
     // A big mitt with a clear thumb, and a darker band over the knuckles.
@@ -1158,16 +1607,21 @@ function buildForearm(jacket: Color, mitten: Color): BufferGeometry {
  * (`side` -1 left, 1 right). In the segment's frame +X is the skier's left,
  * so the outside is -side.
  */
-function buildThigh(pants: Color, side: number): BufferGeometry {
+function buildThigh(w: Wear, side: number): BufferGeometry {
   const t = BODY.thigh;
   const r = PANTS.thigh;
   const out = -side * (r - 0.006);
+  const pants = w.base;
+  const turn = w.pattern === 'stripes' ? SIDE_FACE : 0;
+  // Stripes run down the outside of the leg (past the pocket); blocks color the knee down.
+  const leg = cloth(w, { stripe: (c) => onSide(c, -side), seed: 9 + side, radius: r });
+  const pocket = w.pattern === 'stripes' ? w.accent : pants;
   return merge([
-    paint(prism(r, r + 0.002, t, 12), pants),
-    paint(new IcosahedronGeometry(PANTS.knee, 1).translate(0, t, 0), pants),
-    // The pocket, its flap above it (toward the hip), and a seam down the leg.
-    paint(new BoxGeometry(0.03, 0.13, 0.1).translate(out, t * 0.55, 0.004), shade(pants, 0.93)),
-    paint(new BoxGeometry(0.036, 0.032, 0.108).translate(out * 1.02, t * 0.55 - 0.072, 0.004), shade(pants, 0.82)),
+    paint(prism(r, r + 0.002, t, 12, rows(w, t), turn), leg),
+    paint(new IcosahedronGeometry(PANTS.knee, 1).translate(0, t, 0), w.pattern === 'blocks' ? w.accent : cloth(w, { seed: 11 + side, radius: PANTS.knee })),
+    // The pocket and its flap above it (toward the hip), on the stripe when there is one.
+    paint(new BoxGeometry(0.03, 0.13, 0.1).translate(out, t * 0.55, 0.004), shade(pocket, 0.93)),
+    paint(new BoxGeometry(0.036, 0.032, 0.108).translate(out * 1.02, t * 0.55 - 0.072, 0.004), shade(pocket, 0.82)),
   ]);
 }
 
@@ -1175,15 +1629,22 @@ function buildThigh(pants: Color, side: number): BufferGeometry {
  * Wide pant leg from the knee, flaring to a hem that falls past the ankle
  * over the boot, with a loose fold bunched above it. The boot's upper cuff
  * lives inside it (it follows the shin, so it never pokes through the
- * pants); only its bottom edge shows under the hem.
+ * pants); only its bottom edge shows under the hem. `side` (-1 left, 1
+ * right) puts a stripe down the outside; 0 for a pair that share a geometry.
  */
-function buildShin(pants: Color, boot: Color): BufferGeometry {
+function buildShin(w: Wear, boot: Color, side: number): BufferGeometry {
   const s = BODY.shin;
   const hem = PANTS.hem;
+  const pants = w.pattern === 'blocks' ? w.accent : w.base;
+  const turn = w.pattern === 'stripes' ? SIDE_FACE : 0;
+  const leg = w.pattern === 'blocks' ? pants : cloth(w, { stripe: (c) => side !== 0 && onSide(c, -side), seed: 13, radius: PANTS.knee });
+  const stripe = w.pattern === 'stripes' && side !== 0;
+  const fold = (g: BufferGeometry, k: number): BufferGeometry =>
+    paint(g, stripe ? (c) => shade(onSide(c, -side) ? w.accent : pants, k) : shade(pants, k));
   return merge([
-    paint(prism(PANTS.knee - 0.002, hem, s + 0.04, 12), pants),
-    paint(prism(hem + 0.004, hem + 0.004, 0.035, 12).translate(0, s - 0.1, 0), shade(pants, 0.92)),
-    paint(prism(hem + 0.003, hem + 0.004, 0.024, 12).translate(0, s + 0.02, 0), shade(pants, 0.8)),
+    paint(prism(PANTS.knee - 0.002, hem, s + 0.04, 12, rows(w, s + 0.04), turn), leg),
+    fold(prism(hem + 0.004, hem + 0.004, 0.035, 12, 1, turn).translate(0, s - 0.1, 0), 0.92),
+    fold(prism(hem + 0.003, hem + 0.004, 0.024, 12, 1, turn).translate(0, s + 0.02, 0), 0.8),
     paint(prism(0.078, 0.078, 0.2, 12).translate(0, s - 0.15, 0), boot),
   ]);
 }

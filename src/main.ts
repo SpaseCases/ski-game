@@ -121,6 +121,7 @@ const raceHud = new RaceHud(hud);
 const runHud = new RunHud(hud, backToTop);
 /** Sound (src/audio): nothing is made or heard until the first key press or click. */
 const sound = new GameAudio(settings.masterVolume, settings.sfxVolume, settings.muted);
+sound.setPoles(outfit.poles);
 sound.attach(window, hud);
 sound.setWeather(weather);
 const scoreHud = new ScoreHud(
@@ -423,6 +424,7 @@ function setOutfit(next: Outfit): void {
   setSkiScale(CONFIG.skis[outfit.ski]);
   skierView?.rig.setOutfit(outfit);
   lockerStage.setOutfit(outfit);
+  sound.setPoles(outfit.poles);
 }
 
 /**
@@ -802,7 +804,7 @@ startLoop(
       level.world.view(camera.position.x, camera.position.z, camera.far, snapped || rebuildView, freeCamera !== null);
       rebuildView = false;
       level.world.update(level.run, level.race, frameTime);
-      level.world.snow.update(pose, skier, frameTime, camera.position);
+      level.world.snow.update(pose, skier, frameTime, camera.position, skierView.skateSide);
       const fog = scene.fog as { near: number; far: number };
       const pxPerM = renderer.getDrawingBufferSize(bufferSize).y / (2 * Math.tan((camera.fov * Math.PI) / 360));
       SnowFx.setPointScale(pxPerM);

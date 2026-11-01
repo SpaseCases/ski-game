@@ -642,6 +642,8 @@ export const CONFIG = {
     landing: { impactMin: 3, impactFull: 12, count: 70 },
     /** A burst on a crash, and a trail while the body tumbles along the snow (per m/s of speed). */
     crash: { count: 70, trailRate: 6 },
+    /** Skating (poles off): a kick of `count` off the pushing ski as its edge bites, then `rate` a second while the push lasts. */
+    skate: { count: 16, rate: 50 },
     /** Sparks off metal rails (not boxes or logs): full at speedFull m/s along the rail, and (1 + brake) times as many at full brake. */
     sparks: { speedMin: 1.5, speedFull: 10, rate: 150, life: 0.35, brake: 2 },
     /**
@@ -977,8 +979,9 @@ export const CONFIG = {
       pop: { gain: 0.5, spread: 0.08 },
       landSoft: { gain: 0.55, spread: 0.1 },
       landHard: { gain: 0.8, spread: 0.08 },
-      bail: { gain: 0.75, spread: 0.06 },
+      bail: { gain: 0.55, spread: 0.06 },
       pole: { gain: 0.18, spread: 0.12 },
+      skate: { gain: 0.3, spread: 0.1 },
       railMetal: { gain: 0.45, spread: 0.06 },
       railWood: { gain: 0.55, spread: 0.08 },
       cheer: { gain: 0.33, spread: 0.05 },

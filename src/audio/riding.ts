@@ -7,7 +7,7 @@ import { AudioEngine, Voice } from './engine.ts';
 // The skier's sounds. Like the snow effects, they're worked out from the
 // sim's state as it changes, and the sim knows nothing of them: each sim
 // step is compared with the one before for events (a pop, a landing, a
-// crash, a pole plant, getting onto a rail), and each frame sets the
+// crash, a pole plant or a skating push, getting onto a rail), and each frame sets the
 // continuous sounds (the carve's hiss, the brake's scrape, the wind, the
 // rail under the skis) from the state as it is.
 
@@ -95,6 +95,8 @@ export class RidingSounds {
   /** Called with where a clean landing came down, or a crash happened (for the crowd and the lift riders). */
   onCleanLanding: (x: number, z: number) => void = () => {};
   onCrash: (x: number, z: number) => void = () => {};
+  /** Whether the skier carries poles: a push plants them ('pole'), or else skates ('skate'). */
+  poles = true;
 
   constructor(engine: AudioEngine, ctx: AudioContext) {
     this.engine = engine;
@@ -139,7 +141,7 @@ export class RidingSounds {
     } else if (prev.rail < 0 && s.rail >= 0) {
       this.railOn(s, rails);
     }
-    if (s.poleTime < prev.poleTime && s.grounded && s.rail < 0) e.play('pole');
+    if (s.poleTime < prev.poleTime && s.grounded && s.rail < 0) e.play(this.poles ? 'pole' : 'skate');
   }
 
   /** Sets the continuous sounds from the skier's state `s` now (at game speed `pitch`, in powder or not). */

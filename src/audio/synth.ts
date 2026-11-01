@@ -13,6 +13,7 @@ export type ShotId =
   | 'landHard'
   | 'bail'
   | 'pole'
+  | 'skate'
   | 'railMetal'
   | 'railWood'
   | 'cheer'
@@ -319,33 +320,68 @@ const SHOTS: Record<ShotId, Recipe> = {
       crunch(ctx, out, r, n, 0.01, 0.28, 0.5, 1900);
     },
   },
-  // A crash: the body and skis thumping down again and again, and the slide.
+  // A crash, played for laughs: a bone-crack click on impact, a breathy
+  // "sh—" cut off by a TV-style censor bleep (1 kHz, 0.4 s) before any
+  // word gets out, and under it all the slide's swish fading away.
   bail: {
     seconds: 1.8,
     build(ctx, out, r, n) {
-      const hits = [0, 0.2, 0.43, 0.68, 0.98];
-      hits.forEach((t, i) => {
-        const k = 1 - i * 0.16;
-        const at = t + 0.04 * r();
-        tone(ctx, out, { t: at, f0: 95 - 8 * i, f1: 40, glide: 0.12, decay: 0.07, gain: 0.9 * k });
-        burst(ctx, out, r, { noise: n.pink, t: at, decay: 0.08, gain: 0.7 * k, type: 'lowpass', freq: 1200, freq1: 450 });
-        if (i === 1 || i === 3) burst(ctx, out, r, { noise: n.white, t: at + 0.03, decay: 0.01, gain: 0.3 * k, freq: 2800, q: 3 });
-      });
-      // The slide: a swish that dies away.
+      // The crack: a dry snap, two splintering after-snaps, and a soft body thud (no boom).
+      burst(ctx, out, r, { noise: n.white, decay: 0.003, gain: 1, type: 'highpass', freq: 2000 });
+      tone(ctx, out, { type: 'triangle', f0: 2300, f1: 900, glide: 0.01, decay: 0.004, gain: 0.5 });
+      burst(ctx, out, r, { noise: n.white, t: 0.011, decay: 0.0025, gain: 0.6, freq: 3200, q: 2 });
+      burst(ctx, out, r, { noise: n.white, t: 0.019, decay: 0.002, gain: 0.35, freq: 4200, q: 2 });
+      burst(ctx, out, r, { noise: n.pink, decay: 0.05, gain: 0.22, type: 'lowpass', freq: 700 });
+
+      // "sh—": breath through the teeth, building, cut off dead where the bleep starts.
+      const { start, end } = BLEEP;
+      const sh = ctx.createBufferSource();
+      sh.buffer = n.white;
+      sh.loop = true;
+      const hiss = ctx.createBiquadFilter();
+      hiss.type = 'bandpass';
+      hiss.Q.value = 1.1;
+      hiss.frequency.setValueAtTime(2300, 0.05);
+      hiss.frequency.linearRampToValueAtTime(2900, start);
+      const sg = ctx.createGain();
+      sg.gain.setValueAtTime(0, 0);
+      sg.gain.setValueAtTime(0, 0.05);
+      sg.gain.linearRampToValueAtTime(BLEEP.sh * 0.6, 0.1);
+      sg.gain.linearRampToValueAtTime(BLEEP.sh, start - 0.004);
+      sg.gain.linearRampToValueAtTime(0, start);
+      sh.connect(hiss).connect(sg).connect(out);
+      sh.start(0.05, r());
+      sh.stop(start + 0.01);
+
+      // The bleep.
+      const beep = ctx.createOscillator();
+      beep.frequency.value = 1000;
+      const bg = ctx.createGain();
+      bg.gain.setValueAtTime(0, 0);
+      bg.gain.setValueAtTime(0, start);
+      bg.gain.linearRampToValueAtTime(BLEEP.gain, start + 0.003);
+      bg.gain.setValueAtTime(BLEEP.gain, end - 0.004);
+      bg.gain.linearRampToValueAtTime(0, end);
+      beep.connect(bg).connect(out);
+      beep.start(start);
+      beep.stop(end + 0.01);
+
+      // The slide: a swish under it all from 0.1 s, gone by 1.6 s.
       const src = ctx.createBufferSource();
       src.buffer = n.pink;
       src.loop = true;
       const f = ctx.createBiquadFilter();
       f.type = 'bandpass';
       f.Q.value = 0.9;
-      f.frequency.setValueAtTime(1500, 0);
+      f.frequency.setValueAtTime(1500, 0.1);
       f.frequency.exponentialRampToValueAtTime(600, 1.6);
       const g = ctx.createGain();
       g.gain.setValueAtTime(0, 0);
-      g.gain.linearRampToValueAtTime(0.35, 0.15);
-      g.gain.setTargetAtTime(0, 0.5, 0.35);
+      g.gain.setValueAtTime(0, 0.1);
+      g.gain.linearRampToValueAtTime(BLEEP.slide, 0.25);
+      g.gain.setTargetAtTime(0, 0.6, 0.33);
       src.connect(f).connect(g).connect(out);
-      src.start(0, r());
+      src.start(0.1, r());
       src.stop(1.8);
     },
   },
@@ -355,6 +391,34 @@ const SHOTS: Record<ShotId, Recipe> = {
     build(ctx, out, r, n) {
       burst(ctx, out, r, { noise: n.white, decay: 0.02, gain: 0.8, freq: 3200, q: 1.5 });
       tone(ctx, out, { f0: 260, f1: 160, decay: 0.012, gain: 0.3 });
+    },
+  },
+  // A skating push (no poles), from the start of the push: the edge bites
+  // with a little crunch, then scrapes out and back across the snow,
+  // swelling while the leg drives and dying as the ski lifts.
+  skate: {
+    seconds: 0.6,
+    build(ctx, out, r, n) {
+      crunch(ctx, out, r, n, 0.1, 0.07, 0.45, 2600);
+      const src = ctx.createBufferSource();
+      src.buffer = n.white;
+      src.loop = true;
+      const f = ctx.createBiquadFilter();
+      f.type = 'bandpass';
+      f.Q.value = 1.3;
+      f.frequency.setValueAtTime(1900, 0.1);
+      f.frequency.exponentialRampToValueAtTime(950, 0.5);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, 0);
+      g.gain.setValueAtTime(0, 0.1);
+      g.gain.linearRampToValueAtTime(0.5, 0.22);
+      g.gain.setTargetAtTime(0.32, 0.26, 0.06);
+      g.gain.setTargetAtTime(0, 0.4, 0.05);
+      src.connect(f).connect(g).connect(out);
+      src.start(0, r());
+      src.stop(0.6);
+      // Grit in the scrape, thinning out.
+      crunch(ctx, out, r, n, 0.16, 0.26, 0.16, 1500);
     },
   },
   // Onto a metal rail: a clank with a ring (out-of-tune partials, like a struck pipe).
@@ -553,6 +617,13 @@ const SHOTS: Record<ShotId, Recipe> = {
     },
   },
 };
+
+/**
+ * The crash's censor bleep: when it starts and ends (s), and its level,
+ * the "sh—" and the slide's, against the crack (the recipe's peak, which
+ * renderShot brings to 0.9). Set so the rendered bleep peaks near -22 dBFS.
+ */
+const BLEEP = { start: 0.2, end: 0.6, gain: 0.15, sh: 0.26, slide: 0.09 };
 
 /** Vowels for shouts: first and second formants (Hz). */
 const OO: readonly [number, number] = [440, 1020];

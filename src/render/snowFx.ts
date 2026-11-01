@@ -23,6 +23,7 @@ import type { Heightfield, MapDef, RailShape, XZ } from '../maps/types.ts';
 import { insideBounds } from '../sim/bounds.ts';
 import { inPowder, type PowderArea } from '../sim/powder.ts';
 import type { SkierState } from '../sim/skier.ts';
+import { TUNING } from '../sim/tuning.ts';
 import type { SkierPose } from './skierView.ts';
 import { STANCE_HALF_WIDTH } from './skierPoses.ts';
 import { shapeSurfaceAt, SURFACE } from '../maps/shapes.ts';
@@ -190,6 +191,9 @@ export class SnowFx {
   /** What the sim showed last frame, to see landings and crashes happen. */
   private lastLandTime = Infinity;
   private wasBailed = false;
+  /** The sim's push timer last frame, to see a skating push's edge bite. */
+  private lastPoleTime = Infinity;
+  private skateCarry = 0;
   private powder = false;
   private powderX = Infinity;
   private powderZ = Infinity;
@@ -371,19 +375,25 @@ export class SnowFx {
     this.breakTrack(1);
     this.lastLandTime = sim.landTime;
     this.wasBailed = sim.bailed;
+    this.lastPoleTime = sim.poleTime;
     this.powderX = Infinity;
   }
 
-  /** Moves everything on by `dt` s, with the skier drawn at `pose` and the sim's own state `sim`; `cam` is the camera. */
-  update(pose: SkierPose, sim: SkierState, dt: number, cam: Vector3): void {
+  /**
+   * Moves everything on by `dt` s, with the skier drawn at `pose` and the
+   * sim's own state `sim`; `cam` is the camera. `skate` is the leg a
+   * skating push (poles off) is kicking off: -1 left, 1 right, 0 none.
+   */
+  update(pose: SkierPose, sim: SkierState, dt: number, cam: Vector3, skate = 0): void {
     if (dt <= 0) return;
     this.time += dt;
     this.skierFrame(pose);
     this.checkPowder(pose.position);
-    this.emitSkier(pose, sim, dt);
+    this.emitSkier(pose, sim, dt, skate);
     this.emitRidges(dt, cam);
     this.lastLandTime = sim.landTime;
     this.wasBailed = sim.bailed;
+    this.lastPoleTime = sim.poleTime;
     this.layTracks(pose);
     this.move(dt);
     this.draw();
@@ -429,7 +439,7 @@ export class SnowFx {
     this.powder = inPowder(this.powderArea, p.x, p.z);
   }
 
-  private emitSkier(pose: SkierPose, sim: SkierState, dt: number): void {
+  private emitSkier(pose: SkierPose, sim: SkierState, dt: number, skate: number): void {
     const f = CONFIG.snowFx;
     const rate = this.budget.rate;
     const speed = this.tangent.length();
@@ -528,9 +538,39 @@ export class SnowFx {
       this.carveCarry = 0;
       this.brakeCarry = 0;
       this.trailCarry = 0;
+      this.skateCarry = 0;
       return;
     }
     const thick = rate * (powder ? P.rate : 1);
+
+    // Skating: a kick of snow off the pushing ski as its edge bites, then a little while it drives.
+    const sk = TUNING.skier;
+    const pushing = skate !== 0 && sim.poleTime >= sk.polePlantTime && sim.poleTime < sk.polePlantTime + sk.polePushTime;
+    if (pushing) {
+      if (this.lastPoleTime < sk.polePlantTime) this.skateCarry += f.skate.count * thick;
+      this.skateCarry += f.skate.rate * thick * dt;
+    } else {
+      this.skateCarry = 0;
+    }
+    while (this.skateCarry >= 1) {
+      this.skateCarry -= 1;
+      // Off the inside edge of the pushing ski, out to the side and behind the boot.
+      this.at
+        .copy(pose.position)
+        .addScaledVector(this.skiLeft, -skate * (STANCE_HALF_WIDTH + 0.2 + 0.1 * Math.random()))
+        .addScaledVector(this.skiFwd, -0.15 - 0.5 * Math.random());
+      const back = 1 + 2 * Math.random();
+      const out = (0.8 + 1.8 * Math.random()) * -skate;
+      const up = 0.6 + 1.4 * Math.random();
+      this.spray(
+        this.at,
+        this.tangent.x * 0.4 - this.skiFwd.x * back + this.skiLeft.x * out + n.x * up,
+        this.tangent.y * 0.4 - this.skiFwd.y * back + this.skiLeft.y * out + n.y * up,
+        this.tangent.z * 0.4 - this.skiFwd.z * back + this.skiLeft.z * out + n.z * up,
+        powder,
+        0.9,
+      );
+    }
 
     // Carving hard (and skidding): spray off the outside ski, thrown out of the turn.
     const c = f.carve;

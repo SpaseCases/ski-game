@@ -21,7 +21,7 @@ import { CONFIG } from './config.ts';
 import type { Heightfield } from './maps/types.ts';
 import { createSkierPose, SkierView, type SkierPose } from './render/skierView.ts';
 import { SkierRig } from './render/skierRig.ts';
-import { COLOR_PARTS, DEFAULT_OUTFIT, HEADWEAR, type Outfit } from './core/outfit.ts';
+import { COLOR_PARTS, DEFAULT_OUTFIT, GARMENTS, HEADWEAR, PATTERNS, type Outfit } from './core/outfit.ts';
 import {
   CROUCH,
   DAFFY,
@@ -51,6 +51,8 @@ interface Entry {
   pose?: PoseDef;
   ride?: Partial<RideState>;
   airborne: boolean;
+  /** Changes to the page's outfit for this view. */
+  outfit?: Partial<Outfit>;
 }
 
 /** The riding state the game turns into a pose (see SkierView). */
@@ -66,6 +68,8 @@ interface RideState {
   polePhase: number;
   /** Butter: 1 on the tips, -1 on the tails. */
   butter: number;
+  /** With the poles off, the leg a push skates off: -1 left, 1 right. */
+  skateLeg: number;
 }
 
 const RAIL_HEIGHT = 0.45;
@@ -119,7 +123,84 @@ const POLING: (Entry | null)[] = [
   ),
   null,
 ];
-const ENTRIES = new URLSearchParams(window.location.search).get('set') === 'poling' ? POLING : POSES;
+/** ?set=skating: with the poles off, a push off each leg from the stance and a crouch, at five points through it. */
+const SKATE_POINTS: readonly [number, string][] = [
+  [0.1, 'stepping out'],
+  [0.3, 'edge biting'],
+  [0.55, 'driving out'],
+  [0.8, 'tail lifting'],
+  [0.92, 'coming back'],
+];
+const SKATING: (Entry | null)[] = [
+  ...([
+    ['Right', { speed: 4, skateLeg: 1 }],
+    ['Left', { speed: 4, skateLeg: -1 }],
+    ['Crouch right', { speed: 4, crouch: 1, skateLeg: 1 }],
+  ] as const).flatMap(([name, ride]) =>
+    SKATE_POINTS.map(([phase, what]) => ({
+      name: `${name} skate push`,
+      note: `${what} (${phase})`,
+      ride: { ...ride, polePhase: phase },
+      airborne: false,
+      outfit: { poles: false },
+    })),
+  ),
+  null,
+  { name: 'Stance, no poles', note: 'Riding between pushes', ride: { speed: 4 }, airborne: false, outfit: { poles: false } },
+  { name: 'Tuck, no poles', note: 'Shift still tucks when fast', ride: { speed: 15, crouch: 1 }, airborne: false, outfit: { poles: false } },
+  { name: 'Carve, no poles', note: 'Hard left turn at speed', ride: { speed: 12, lean: 0.85 }, airborne: false, outfit: { poles: false } },
+  { name: 'Japan, no poles', note: 'A grab with empty hands', pose: LEFT_JAPAN, airborne: true, outfit: { poles: false } },
+];
+
+/** ?set=looks: every headwear, then every pattern on the jacket and the pants. */
+const HAT_COLORS: Record<string, Partial<Outfit>> = {
+  beanie: { helmet: '#2f7fe0' },
+  cap: { helmet: '#d33a3f' },
+  bucket: { helmet: '#c8b07e' },
+  hood: { jacket: '#23898a' },
+};
+const PATTERN_LOOKS: Record<string, Partial<Outfit>> = {
+  plain: {},
+  stripes: { jacket: '#22395e', jacketAccent: '#f1c93b', pants: '#2c3037', pantsAccent: '#ece8de' },
+  blocks: { jacket: '#ece8de', jacketAccent: '#d33a3f', pants: '#2f5a45', pantsAccent: '#b8e330' },
+  camo: { jacket: '#677a52', jacketAccent: '#c8b07e', pants: '#3a3f47', pantsAccent: '#98a2ad' },
+  plaid: { jacket: '#d33a3f', jacketAccent: '#2c3037', pants: '#22395e', pantsAccent: '#8cc9e0' },
+};
+const LOOKS: (Entry | null)[] = [
+  ...HEADWEAR.map(({ id, name }) => ({ name, note: 'Headwear', pose: STANCE, airborne: false, outfit: { headwear: id, ...HAT_COLORS[id] } })),
+  null,
+  ...PATTERNS.map(({ id, name }) => ({
+    name: `${name}`,
+    note: 'Jacket and pants pattern, in the stance',
+    pose: STANCE,
+    airborne: false,
+    outfit: { jacketPattern: id, pantsPattern: id, ...PATTERN_LOOKS[id] },
+  })),
+  ...PATTERNS.filter(({ id }) => id !== 'plain').map(({ id, name }) => ({
+    name: `${name}, riding`,
+    note: 'Carving, as the game draws it',
+    ride: { speed: 12, lean: 0.85 },
+    airborne: false,
+    outfit: { jacketPattern: id, pantsPattern: id, ...PATTERN_LOOKS[id] },
+  })),
+  ...(['beanie', 'cap', 'bucket', 'hood'] as const).map((id) => ({
+    name: `${HEADWEAR.find((h) => h.id === id)!.name}, tucked`,
+    note: 'Head down in a tuck',
+    ride: { speed: 15, crouch: 1 },
+    airborne: false,
+    outfit: { headwear: id, ...HAT_COLORS[id] },
+  })),
+  ...(['cap', 'hood'] as const).map((id) => ({
+    name: `${HEADWEAR.find((h) => h.id === id)!.name}, mute grab`,
+    note: 'Head turned in the air',
+    pose: LEFT_MUTE,
+    airborne: true,
+    outfit: { headwear: id, ...HAT_COLORS[id] },
+  })),
+];
+
+const SETS: Record<string, (Entry | null)[]> = { poling: POLING, skating: SKATING, looks: LOOKS };
+const ENTRIES = SETS[new URLSearchParams(window.location.search).get('set') ?? ''] ?? POSES;
 
 const COLS = 6;
 const ROWS = 5;
@@ -175,7 +256,7 @@ const flat: Heightfield = {
   bounds: { minX: -4, maxX: 4, minZ: -4, maxZ: 4, polygon: new Float32Array(0) },
 };
 
-const RIDE_DEFAULTS: RideState = { speed: 0, crouch: 0, lean: 0, brake: 0, brakeSide: 1, onRail: false, railYaw: 0, polePhase: 1, butter: 0 };
+const RIDE_DEFAULTS: RideState = { speed: 0, crouch: 0, lean: 0, brake: 0, brakeSide: 1, onRail: false, railYaw: 0, polePhase: 1, butter: 0, skateLeg: -1 };
 
 /** The interpolated state the game would hand SkierView while riding like this. */
 function ridePose(r: RideState): SkierPose {
@@ -197,8 +278,10 @@ function ridePose(r: RideState): SkierPose {
 
 const camera = new PerspectiveCamera(30, 1, 0.1, 50);
 
-// ?headwear=santa (or pumpkin) dresses every pose in it, ?jacket=23898a (any color part, hex
-// without the #) recolors that part, and ?glow=1 lights the pumpkin's face.
+// ?headwear=santa (or any headwear) dresses every pose in it, ?jacket=23898a (any color part, hex
+// without the #) recolors that part, ?jacketPattern=camo with ?jacketAccent=f1c93b (and the
+// same for pants) patterns a garment, ?poles=0 takes the poles away, and ?glow=1 lights the
+// pumpkin's face.
 const params = new URLSearchParams(window.location.search);
 const outfit: Outfit = { ...DEFAULT_OUTFIT };
 const headwear = HEADWEAR.find((h) => h.id === params.get('headwear'));
@@ -207,6 +290,13 @@ for (const { id } of COLOR_PARTS) {
   const hex = params.get(id);
   if (hex && /^[0-9a-f]{6}$/i.test(hex)) outfit[id] = `#${hex}`;
 }
+for (const g of GARMENTS) {
+  const pattern = PATTERNS.find((x) => x.id === params.get(g.pattern));
+  if (pattern) outfit[g.pattern] = pattern.id;
+  const hex = params.get(g.accent);
+  if (hex && /^[0-9a-f]{6}$/i.test(hex)) outfit[g.accent] = `#${hex}`;
+}
+if (params.get('poles') === '0') outfit.poles = false;
 const glow = Number(params.get('glow') ?? 0);
 
 interface View {
@@ -219,8 +309,9 @@ interface View {
 const views: (View | null)[] = ENTRIES.map((entry) => {
   if (!entry) return null;
   const scene = makeScene();
+  const dress: Outfit = { ...outfit, ...entry.outfit };
   if (entry.pose) {
-    const rig = new SkierRig(outfit);
+    const rig = new SkierRig(dress);
     rig.setGlow(glow);
     rig.apply(entry.pose);
     const lift = entry.airborne ? AIR_HEIGHT : 0;
@@ -232,10 +323,17 @@ const views: (View | null)[] = ENTRIES.map((entry) => {
     return { scene, rig, lift };
   }
   // Riding states go through SkierView, which adds its own shadow.
-  const view = new SkierView(scene, flat, outfit);
+  const view = new SkierView(scene, flat, dress);
   view.rig.setGlow(glow);
-  const pose = ridePose({ ...RIDE_DEFAULTS, ...entry.ride });
+  const ride = { ...RIDE_DEFAULTS, ...entry.ride };
+  const pose = ridePose(ride);
   view.snap(pose);
+  // A push already under way skates off the left leg; one that starts here, off the right.
+  if (ride.skateLeg > 0 && ride.polePhase < 1) {
+    pose.polePhase = 1;
+    view.snap(pose);
+    pose.polePhase = ride.polePhase;
+  }
   view.update(pose, 1);
   if (pose.onRail) {
     const rail = new Mesh(railGeometry, railMaterial);

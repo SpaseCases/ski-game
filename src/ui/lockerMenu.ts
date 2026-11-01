@@ -1,5 +1,18 @@
 import { CONFIG } from '../config.ts';
-import { COLOR_PARTS, colorName, HEADWEAR, PALETTE, type ColorPart, type Headwear, type Outfit } from '../core/outfit.ts';
+import {
+  COLOR_PARTS,
+  colorName,
+  contrastColor,
+  GARMENTS,
+  HEADWEAR,
+  PALETTE,
+  PATTERNS,
+  type ColorPart,
+  type Garment,
+  type Headwear,
+  type Outfit,
+  type Pattern,
+} from '../core/outfit.ts';
 import {
   drawSki,
   riseAt,
@@ -18,12 +31,14 @@ import { addBackButton, board, setHints, type Screen } from './menus.ts';
 
 // The Locker: the skier turning slowly in a window on the left (drawn by the
 // game's renderer through a hole in the menu, see LockerStage), the choices
-// on the right. Outfit: three headwear tiles, then a strip of paint chips
+// on the right. Outfit: the headwear tiles, then a strip of paint chips
 // per part, all from one palette, so arrows move across a row and up and
-// down a column. Skis: a tile per ski type (its side profile), a rack of
-// its graphics (each pair of skis drawn from the same data the 3D skis are
-// painted from, top sheets or bases), and stat bars against the park ski,
-// marked at the middle.
+// down a column; under the jacket and the pants, a row of pattern tiles
+// and (unless plain) a strip for the pattern's second color. Skis: a tile
+// per ski type (its side profile), a rack of its graphics (each pair of
+// skis drawn from the same data the 3D skis are painted from, top sheets
+// or bases), stat bars against the park ski, marked at the middle, and
+// the poles switch.
 
 export interface LockerHooks {
   get: () => Outfit;
@@ -59,6 +74,14 @@ const ICONS: Record<Headwear, string> = {
     '<path d="M6 25 C6 11 13 5 20 5 C27 5 34 11 34 25 Z" fill="#2c3037"/><rect x="7" y="19" width="26" height="7" rx="3" fill="#5a6676"/><rect x="5" y="25" width="30" height="3" rx="1.5" fill="#1b1d21"/>',
   santa:
     '<path d="M8 22 C10 10 18 4 28 7 C33 9 35 13 34 16 C29 12 25 13 30 22 Z" fill="#c3262e"/><circle cx="33" cy="17" r="3.6" fill="#f3f1ec"/><rect x="6" y="21" width="27" height="7" rx="3.5" fill="#f3f1ec"/>',
+  beanie:
+    '<circle cx="20" cy="5.5" r="4" fill="#f3f1ec"/><path d="M7 22 C7 11 13 7 20 7 C27 7 33 11 33 22 Z" fill="#2f7fe0"/><rect x="6" y="19" width="28" height="9" rx="2" fill="#22395e"/><path d="M10 19 V28 M14 19 V28 M18 19 V28 M22 19 V28 M26 19 V28 M30 19 V28" stroke="#2f7fe0" stroke-width="1.2"/>',
+  cap:
+    '<path d="M7 23 C7 12 13 7 20 7 C27 7 33 12 33 23 Z" fill="#d33a3f"/><path d="M20 7 V23" stroke="#a52a2f" stroke-width="1.2"/><path d="M31 20 C35 20 39 22 39 25 L30 25 Z" fill="#a52a2f"/><path d="M7 23 C9 18 12 17 14 18 L14 23 Z" fill="#3a3f47"/><circle cx="20" cy="7" r="1.6" fill="#a52a2f"/>',
+  bucket:
+    '<path d="M10 20 L12 9 C14 6 26 6 28 9 L30 20 Z" fill="#c8b07e"/><path d="M3 26 C6 21 10 20 20 20 C30 20 34 21 37 26 Z" fill="#a8925f"/>',
+  hood:
+    '<path d="M5 30 C4 13 11 3 20 3 C29 3 36 13 35 30 Z" fill="#23898a"/><path d="M11 30 C10 18 14 11 20 11 C26 11 30 18 29 30 Z" fill="#14555a"/><path d="M13 22 C13 15 16 13 20 13 C24 13 27 15 27 22 Z" fill="#2c3037"/><rect x="12" y="19" width="16" height="5" rx="2" fill="#5a6676"/>',
   pumpkin:
     '<ellipse cx="20" cy="19" rx="14" ry="11" fill="#e8761e"/><path d="M14 9 C12 14 12 24 14 29 M26 9 C28 14 28 24 26 29" stroke="#c95f14" stroke-width="1.6" fill="none"/><path d="M19 9 L20 3 L23 4 L21 9 Z" fill="#6e6a2c"/><path d="M12 17 L15 12 L18 17 Z M22 17 L25 12 L28 17 Z" fill="#2a1206"/><path d="M11 21 C15 26 25 26 29 21 L26 24 L23 22 L20 25 L17 22 L14 24 Z" fill="#2a1206"/>',
 };
@@ -70,7 +93,10 @@ export class LockerScreen implements Screen {
   private readonly tabs: HTMLButtonElement[] = [];
   private readonly panels: HTMLElement[] = [];
   private readonly headwear = new Map<Headwear, HTMLButtonElement>();
-  private readonly rows = new Map<ColorPart, { row: HTMLElement; name: HTMLElement; chips: Map<string, HTMLButtonElement> }>();
+  private readonly rows = new Map<ColorPart, PaintRow>();
+  /** Each garment's pattern tiles and second-color strip. */
+  private readonly patterns = new Map<Garment, { name: HTMLElement; tiles: Map<Pattern, HTMLButtonElement>; accent: PaintRow }>();
+  private readonly poleButtons: HTMLButtonElement[] = [];
   private readonly skiTiles = new Map<SkiId, HTMLButtonElement>();
   private readonly graphicButtons = new Map<string, { button: HTMLButtonElement; ski: SkiId }>();
   private readonly statBars = new Map<SkiStat, HTMLElement>();
@@ -181,36 +207,56 @@ export class LockerScreen implements Screen {
     panel.appendChild(head);
 
     for (const { id, name } of COLOR_PARTS) {
-      const row = document.createElement('div');
-      row.className = 'paint-row';
-      row.setAttribute('role', 'group');
-      row.setAttribute('aria-label', name);
-      const label = document.createElement('div');
-      label.className = 'paint-head';
-      const part = document.createElement('span');
-      part.className = 'paint-part';
-      part.textContent = name;
-      const chosen = document.createElement('span');
-      chosen.className = 'paint-name';
-      label.append(part, chosen);
-      const strip = document.createElement('div');
-      strip.className = 'paint-chips';
-      const chips = new Map<string, HTMLButtonElement>();
-      for (const color of PALETTE) {
-        const chip = document.createElement('button');
-        chip.type = 'button';
-        chip.className = 'chip';
-        chip.style.setProperty('--chip', color.hex);
-        chip.setAttribute('aria-label', `${name}: ${color.name}`);
-        chip.title = color.name;
-        chip.addEventListener('click', () => this.pick({ [id]: color.hex }));
-        strip.appendChild(chip);
-        chips.set(color.hex, chip);
-      }
-      row.append(label, strip);
-      panel.appendChild(row);
-      this.rows.set(id, { row, name: chosen, chips });
+      const row = paintRow(name, (hex) => this.pick({ [id]: hex }));
+      panel.appendChild(row.row);
+      this.rows.set(id, row);
+      const garment = GARMENTS.find((g) => g.id === id);
+      if (garment) this.buildPattern(panel, garment);
     }
+  }
+
+  /** A garment's pattern tiles, then the strip for its second color. */
+  private buildPattern(panel: HTMLElement, garment: (typeof GARMENTS)[number]): void {
+    const head = document.createElement('div');
+    head.className = 'paint-head';
+    const part = document.createElement('span');
+    part.className = 'paint-part';
+    part.textContent = `${garment.name} pattern`;
+    const chosen = document.createElement('span');
+    chosen.className = 'paint-name';
+    head.append(part, chosen);
+    const strip = document.createElement('div');
+    strip.className = 'pattern-tiles';
+    const tiles = new Map<Pattern, HTMLButtonElement>();
+    for (const { id, name } of PATTERNS) {
+      const tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = 'pattern-tile';
+      tile.setAttribute('aria-label', `${garment.name}: ${name}`);
+      const swatch = document.createElement('span');
+      swatch.className = 'pattern-swatch';
+      const label = document.createElement('span');
+      label.textContent = name;
+      tile.append(swatch, label);
+      tile.addEventListener('click', () => {
+        const o = this.hooks.get();
+        const change: Partial<Outfit> = { [garment.pattern]: id };
+        // Leaving plain: start from a color that stands out on the garment's.
+        if (o[garment.pattern] === 'plain' && id !== 'plain') change[garment.accent] = contrastColor(o[garment.id]);
+        this.pick(change);
+      });
+      strip.appendChild(tile);
+      tiles.set(id, tile);
+    }
+    const row = document.createElement('div');
+    row.className = 'paint-row pattern-row';
+    row.setAttribute('role', 'group');
+    row.setAttribute('aria-label', `${garment.name} pattern`);
+    row.append(head, strip);
+    panel.appendChild(row);
+    const accent = paintRow(`${garment.name} second color`, (hex) => this.pick({ [garment.accent]: hex }));
+    panel.appendChild(accent.row);
+    this.patterns.set(garment.id, { name: chosen, tiles, accent });
   }
 
   private buildSkis(panel: HTMLElement): void {
@@ -310,7 +356,34 @@ export class LockerScreen implements Screen {
     note.className = 'setting-note';
     note.textContent = 'The mark in each bar is the park ski.';
 
-    panel.append(types, this.skiBlurb, head, rack, stats, note);
+    // Poles: on, or off (Shift's push becomes a skating step).
+    const poles = document.createElement('div');
+    poles.className = 'poles-row';
+    const polesName = document.createElement('span');
+    polesName.className = 'stat-name';
+    polesName.textContent = 'Poles';
+    const polesSwitch = document.createElement('div');
+    polesSwitch.className = 'segmented poles-switch';
+    polesSwitch.setAttribute('role', 'group');
+    polesSwitch.setAttribute('aria-label', 'Poles');
+    for (const [on, label] of [
+      [true, 'On'],
+      [false, 'Off'],
+    ] as const) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'segment';
+      b.textContent = label;
+      b.addEventListener('click', () => this.pick({ poles: on }));
+      polesSwitch.appendChild(b);
+      this.poleButtons.push(b);
+    }
+    poles.append(polesName, polesSwitch);
+    const polesNote = document.createElement('p');
+    polesNote.className = 'setting-note';
+    polesNote.textContent = 'Without poles, Shift skates off one leg, then the other.';
+
+    panel.append(types, this.skiBlurb, head, rack, stats, note, poles, polesNote);
   }
 
   private pick(change: Partial<Outfit>): void {
@@ -340,6 +413,19 @@ export class LockerScreen implements Screen {
       r.row.classList.toggle('is-covered', hidden);
       r.name.textContent = hidden ? `${colorName(o[id])}, under the pumpkin` : colorName(o[id]);
     }
+    for (const g of GARMENTS) {
+      const p = this.patterns.get(g.id)!;
+      const pattern = o[g.pattern];
+      for (const [id, tile] of p.tiles) {
+        tile.setAttribute('aria-pressed', String(pattern === id));
+        tile.querySelector('.pattern-swatch')!.innerHTML = patternSwatch(id, o[g.id], o[g.accent]);
+      }
+      p.name.textContent = PATTERNS.find((x) => x.id === pattern)!.name;
+      p.accent.row.hidden = pattern === 'plain';
+      for (const [hex, chip] of p.accent.chips) chip.setAttribute('aria-pressed', String(o[g.accent] === hex));
+      p.accent.name.textContent = colorName(o[g.accent]);
+    }
+    this.poleButtons.forEach((b, i) => b.setAttribute('aria-pressed', String((i === 0) === o.poles)));
 
     const type = skiType(o.ski);
     const graphic = skiGraphic(o.ski, o.skiGraphic);
@@ -360,6 +446,79 @@ export class LockerScreen implements Screen {
       bar.querySelectorAll('i').forEach((seg, i) => seg.classList.toggle('on', i < steps));
     }
   }
+}
+
+interface PaintRow {
+  row: HTMLElement;
+  name: HTMLElement;
+  chips: Map<string, HTMLButtonElement>;
+}
+
+/** A labelled strip of paint chips, one per palette color, calling `onPick` with the color picked. */
+function paintRow(name: string, onPick: (hex: string) => void): PaintRow {
+  const row = document.createElement('div');
+  row.className = 'paint-row';
+  row.setAttribute('role', 'group');
+  row.setAttribute('aria-label', name);
+  const label = document.createElement('div');
+  label.className = 'paint-head';
+  const part = document.createElement('span');
+  part.className = 'paint-part';
+  part.textContent = name;
+  const chosen = document.createElement('span');
+  chosen.className = 'paint-name';
+  label.append(part, chosen);
+  const strip = document.createElement('div');
+  strip.className = 'paint-chips';
+  const chips = new Map<string, HTMLButtonElement>();
+  for (const color of PALETTE) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip';
+    chip.style.setProperty('--chip', color.hex);
+    chip.setAttribute('aria-label', `${name}: ${color.name}`);
+    chip.title = color.name;
+    chip.addEventListener('click', () => onPick(color.hex));
+    strip.appendChild(chip);
+    chips.set(color.hex, chip);
+  }
+  row.append(label, strip);
+  return { row, name: chosen, chips };
+}
+
+/** A small flat drawing of a pattern in the garment's colors, for its tile (roughly as the 3D garment paints it). */
+function patternSwatch(pattern: Pattern, base: string, accent: string): string {
+  const dark = scaleHex(base, 0.62);
+  let art = '';
+  if (pattern === 'stripes') art = `<rect y="5" width="30" height="4" fill="${accent}"/><rect y="12" width="30" height="4" fill="${accent}"/>`;
+  else if (pattern === 'blocks') art = `<rect width="30" height="7" fill="${accent}"/>`;
+  else if (pattern === 'camo') {
+    art =
+      `<path d="M2 3 C7 1 11 5 9 9 C6 12 1 9 2 3 Z M17 11 C22 8 28 12 25 17 C21 20 15 16 17 11 Z" fill="${accent}"/>` +
+      `<path d="M14 1 C19 0 21 4 18 6 C15 8 12 5 14 1 Z M4 14 C8 12 11 15 9 18 C6 20 2 18 4 14 Z M24 2 C28 2 29 6 27 8 C24 9 22 5 24 2 Z" fill="${dark}"/>`;
+  } else if (pattern === 'plaid') {
+    const cross = scaleHex(mixHex(base, accent), 0.55);
+    const bands = [0, 10, 20].map((x) => `<rect x="${x}" width="5" height="20" fill="${accent}"/>`).join('') + [0, 10].map((y) => `<rect y="${y}" width="30" height="5" fill="${accent}"/>`).join('');
+    art = bands + [0, 10, 20].flatMap((x) => [0, 10].map((y) => `<rect x="${x}" y="${y}" width="5" height="5" fill="${cross}"/>`)).join('');
+  }
+  return `<svg viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="${base}"/>${art}</svg>`;
+}
+
+/** A hex color times `k` (darker below 1), as a hex color. */
+function scaleHex(hex: string, k: number): string {
+  const v = parseInt(hex.slice(1), 16);
+  return toHex([16, 8, 0].map((s) => Math.round(((v >> s) & 255) * k)));
+}
+
+/** Halfway between two hex colors. */
+function mixHex(a: string, b: string): string {
+  const va = parseInt(a.slice(1), 16);
+  const vb = parseInt(b.slice(1), 16);
+  return toHex([16, 8, 0].map((s) => Math.round((((va >> s) & 255) + ((vb >> s) & 255)) / 2)));
+}
+
+function toHex(rgb: number[]): string {
+  return `#${rgb.map((x) => Math.min(255, x).toString(16).padStart(2, '0')).join('')}`;
 }
 
 /** Segments lit for a stat (1 is the park ski's: half the bar). */

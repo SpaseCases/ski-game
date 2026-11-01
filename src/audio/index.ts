@@ -20,6 +20,7 @@ export class GameAudio {
   private ambient: AmbientSounds | null = null;
   private built: BuiltMap | null = null;
   private weather: WeatherId = 'bluebird';
+  private poles = true;
   /** When the last pointer press and menu click were (ms), to keep a focus tick from doubling a click. */
   private lastPointer = -Infinity;
   private lastClick = -Infinity;
@@ -28,6 +29,7 @@ export class GameAudio {
     this.engine = new AudioEngine(masterVolume, sfxVolume, muted);
     this.engine.onStart((ctx) => {
       this.riding = new RidingSounds(this.engine, ctx);
+      this.riding.poles = this.poles;
       this.ambient = new AmbientSounds(this.engine, ctx);
       this.riding.onCleanLanding = (x, z) => this.ambient?.react(x, z, true);
       this.riding.onCrash = (x, z) => this.ambient?.react(x, z, false);
@@ -65,6 +67,12 @@ export class GameAudio {
   setMap(built: BuiltMap | null): void {
     this.built = built;
     this.ambient?.setMap(built);
+  }
+
+  /** Whether the skier carries poles: a push plants them, or else skates. */
+  setPoles(on: boolean): void {
+    this.poles = on;
+    if (this.riding) this.riding.poles = on;
   }
 
   setWeather(w: WeatherId): void {

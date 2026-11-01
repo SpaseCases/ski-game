@@ -915,7 +915,7 @@ body {
 
 .locker-headwear {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 4px;
 }
@@ -1003,6 +1003,58 @@ body {
 
 .paint-row.is-covered .chip {
   opacity: 0.45;
+}
+
+/* A garment's patterns: small tiles, each a swatch in the garment's own colors. */
+.pattern-tiles {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.pattern-tile {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--plank);
+  color: var(--snow);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pattern-swatch {
+  flex: none;
+  display: flex;
+}
+
+.pattern-swatch svg {
+  width: 30px;
+  height: 20px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
+}
+
+.pattern-tile:hover {
+  background: var(--plank-hover);
+}
+
+.pattern-tile[aria-pressed='true'] {
+  background: var(--snow);
+  color: var(--ink);
+  box-shadow: inset 4px 0 0 var(--flag);
+}
+
+.pattern-tile:focus {
+  outline: 3px solid var(--flag);
+  outline-offset: 2px;
 }
 
 .locker-tab:focus,
@@ -1185,6 +1237,22 @@ body {
   background: var(--flag);
 }
 
+/* Poles on or off, under the stat bars. */
+.poles-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 220px);
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  font-size: 14px;
+}
+
+.poles-switch .segment {
+  min-height: 0;
+  padding: 5px 10px;
+  font-size: 14px;
+}
+
 .ski-tile:focus,
 .ski-graphic:focus {
   outline: 3px solid var(--flag);
@@ -1205,6 +1273,12 @@ body {
 @media (max-width: 560px) {
   .paint-chips {
     grid-template-columns: repeat(10, minmax(0, 1fr));
+  }
+
+  .pattern-tile {
+    flex-direction: column;
+    padding: 4px 2px;
+    font-size: 12px;
   }
 
   .headwear-tile {

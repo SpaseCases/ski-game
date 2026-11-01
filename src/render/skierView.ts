@@ -154,6 +154,14 @@ export class SkierView {
   private tailWeight = 0;
   /** The snow the skier is on; swapped when another map loads. */
   hf: Heightfield;
+  /**
+   * Without poles, the leg the current push skates off: -1 left, 1 right,
+   * 0 when not pushing (or carrying poles). Snow effects kick spray off it.
+   */
+  skateSide = 0;
+  /** The leg the last push skated off, and the push phase last frame (a drop is a new push). */
+  private skateLeg = -1;
+  private lastPolePhase = 1;
 
   constructor(scene: Scene, hf: Heightfield, outfit: Outfit = DEFAULT_OUTFIT) {
     this.hf = hf;
@@ -196,6 +204,7 @@ export class SkierView {
     this.railWeight = pose.onRail ? 1 : 0;
     this.noseWeight = pose.butter === 1 ? pose.butterAmount : 0;
     this.tailWeight = pose.butter === -1 ? pose.butterAmount : 0;
+    this.lastPolePhase = pose.polePhase;
   }
 
   update(state: SkierPose, frameTime: number): void {
@@ -285,7 +294,14 @@ export class SkierView {
       if (w > 0) addPoseDelta(p, STANCE, GRABS[i]!, w);
     }
     addPoseDelta(p, STANCE, TUMBLE, bw);
-    if (!state.bailed) poleStroke(p, state.polePhase);
+    // Each new push (the phase starting over) skates off the other leg.
+    if (state.polePhase < this.lastPolePhase) this.skateLeg = this.skateLeg > 0 ? -1 : 1;
+    this.lastPolePhase = state.polePhase;
+    this.skateSide = !this.rig.hasPoles && !state.bailed && state.polePhase < 1 ? this.skateLeg : 0;
+    if (!state.bailed) {
+      if (this.rig.hasPoles) poleStroke(p, state.polePhase);
+      else if (this.skateSide !== 0) skateStroke(p, state.polePhase, this.skateSide, onSnow);
+    }
     // The upper body turns back against the hockey-stop swing to keep facing
     // down the hill, and a little against each turn.
     const counter = -swing * r.brakeCounter - leanTotal * r.turnCounter * onSnow * (1 - deep);
@@ -459,6 +475,79 @@ function poleStroke(p: PoseBuffer, phase: number): void {
       h.elbow[k] = bend + ((ELBOW_PUSH[k] ?? 0) * sign - bend) * elbow;
     }
   }
+}
+
+/**
+ * Skating push, with the poles off, on the pole push's timing (so the sim's
+ * push is the same either way). `side` is the pushing leg (-1 left, 1
+ * right). Its ski steps out and angles out into a V while the weight moves
+ * over the other ski, drives out and back on its inside edge while the
+ * push force acts, lifts its tail off the snow at the end, then comes back
+ * in. The arms swing against the legs. `weight` fades it out off the snow.
+ */
+function skateStroke(p: PoseBuffer, phase: number, side: number, weight: number): void {
+  if (phase >= 1 || weight <= 0) return;
+  const s = TUNING.skier;
+  const plant = s.polePlantTime / s.polePushInterval;
+  const done = Math.min(0.95, (s.polePlantTime + s.polePushTime) / s.polePushInterval);
+  SKATE_TIMES[1] = plant;
+  SKATE_TIMES[2] = (plant + done) / 2;
+  SKATE_TIMES[3] = done;
+  const k = (keys: readonly number[]): number => keyed(SKATE_TIMES, keys, phase) * weight;
+
+  const foot = p.feet[side < 0 ? 0 : 1];
+  const out = k(SKATE.out);
+  foot.ankle[0] += side * out;
+  foot.ankle[1] += k(SKATE.lift);
+  foot.ankle[2] += k(SKATE.back);
+  // Angled out: the right ski's tip turns right (yaw < 0), the left's left.
+  foot.yaw -= side * k(SKATE.yaw);
+  // On its inside edge: the right ski rolls left (roll > 0).
+  foot.roll += side * k(SKATE.edge);
+  foot.pitch += k(SKATE.tail);
+
+  // Weight over the gliding ski: hips across and down, chest leaning over it.
+  const w = k(SKATE.weight);
+  p.pelvis[0] -= side * 0.075 * w;
+  p.pelvis[1] -= 0.05 * w;
+  p.chestRoll += side * 0.1 * w;
+  p.chestYaw -= side * 0.12 * w;
+  // Arms: the pushing leg's side swings forward and up, the other back.
+  const swing = k(SKATE.swing);
+  for (let i = 0; i < 2; i++) {
+    const h = p.hands[i === 0 ? 0 : 1];
+    const front = (i === 0 ? -1 : 1) === side;
+    h.at[0] -= side * 0.06 * w;
+    h.at[1] += (front ? 0.1 : -0.06) * swing;
+    h.at[2] += (front ? -0.2 : 0.26) * swing;
+  }
+}
+
+/** When each skating key is reached, as a share of the push cycle (start, plant, mid push, push done, back): set from TUNING per call. */
+const SKATE_TIMES = [0, 0.14, 0.48, 0.82, 1];
+/** The skating push's keys (see SKATE_TIMES): meters, radians, or 0..1 weights. The tail lifts about the tip, so the tip stays on the snow. */
+const SKATE = {
+  out: [0, 0.08, 0.2, 0.3, 0],
+  back: [0, 0, 0.1, 0.22, 0],
+  lift: [0, 0, 0.01, 0.14, 0],
+  yaw: [0, 0.17, 0.33, 0.44, 0],
+  edge: [0, 0.15, 0.32, 0.18, 0],
+  tail: [0, 0, 0, -0.16, 0],
+  weight: [0, 0.6, 1, 0.9, 0],
+  swing: [0, 0.3, 0.8, 1, 0],
+} as const;
+
+/** The value of `keys` (at `times`) at `t`, eased between keys. */
+function keyed(times: readonly number[], keys: readonly number[], t: number): number {
+  for (let i = 1; i < times.length; i++) {
+    const t1 = times[i]!;
+    if (t <= t1) {
+      const t0 = times[i - 1]!;
+      const a = keys[i - 1]!;
+      return a + (keys[i]! - a) * ease((t - t0) / (t1 - t0 || 1));
+    }
+  }
+  return keys[keys.length - 1]!;
 }
 
 type PoleKey = 'riding' | 'planted' | 'pushed';

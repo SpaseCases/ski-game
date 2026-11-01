@@ -11,6 +11,11 @@
 // - elbows: through each pole push, the furthest an elbow moves in 1% of the
 //   stroke, against how far the hand moves (an elbow flipping round the arm
 //   moves far while the hand barely does).
+// Then every state again with the poles off, plus skating pushes off each
+// leg (skis: how close the pushing ski's centerline comes to the other
+// ski's, and any point of it inside the other ski), and every state in
+// each headwear (head: points of the head and hat inside the torso, an arm
+// or a thigh; the helmet's count is the baseline).
 //   node tools/model/clearance.ts            every state
 //   node tools/model/clearance.ts tuck       states whose name contains "tuck"
 // Inside means inside a part's closed surface, found by counting how many
@@ -18,11 +23,12 @@
 // ray grazing a seam can miscount). The hem is an open tube, so its rays run
 // across the tube: sideways and front to back in the hips' frame.
 
-import { DoubleSide, Mesh, Raycaster, Scene, Vector3, type Material } from 'three';
+import { DoubleSide, Mesh, Raycaster, Scene, Sphere, Vector3, type Material } from 'three';
 import { CONFIG } from '../../src/config.ts';
 import type { Heightfield } from '../../src/maps/types.ts';
 import { createSkierPose, SkierView, type SkierPose } from '../../src/render/skierView.ts';
 import { BODY, JACKET_LAYOUT, SkierRig, THIGH_RADIUS } from '../../src/render/skierRig.ts';
+import { DEFAULT_OUTFIT, HEADWEAR, type Outfit } from '../../src/core/outfit.ts';
 import {
   CROUCH,
   DAFFY,
@@ -52,6 +58,8 @@ interface Ride {
   brake?: number;
   polePhase?: number;
   butter?: number;
+  /** With the poles off, the leg a push skates off (-1 left, 1 right). */
+  skate?: number;
 }
 
 const STATES: [string, PoseDef | Ride][] = [
@@ -88,6 +96,17 @@ for (const [name, ride] of [
 ] as const) {
   for (const phase of [0.07, 0.15, 0.25, 0.4, 0.5, 0.65, 0.85]) STATES.push([`push ${name} ${phase}`, { ...ride, polePhase: phase }]);
 }
+/** Skating pushes: only with the poles off. */
+const SKATES: [string, Ride][] = [];
+for (const [name, ride] of [
+  ['stance', { speed: 4 }],
+  ['crouch', { speed: 4, crouch: 1 }],
+  ['carve', { speed: 6, lean: 0.5 }],
+] as const) {
+  for (const skate of [-1, 1]) {
+    for (const phase of [0.1, 0.2, 0.3, 0.45, 0.6, 0.75, 0.82, 0.9]) SKATES.push([`skate ${skate < 0 ? 'L' : 'R'} ${name} ${phase}`, { ...ride, skate, polePhase: phase }]);
+  }
+}
 
 const flat: Heightfield = {
   cols: 5,
@@ -100,8 +119,8 @@ const flat: Heightfield = {
 };
 
 /** A riding state posed the way the game poses it, after settling for a moment. */
-function rideRig(r: Ride): SkierRig {
-  const view = new SkierView(new Scene(), flat);
+function rideRig(r: Ride, outfit: Outfit = DEFAULT_OUTFIT): SkierRig {
+  const view = new SkierView(new Scene(), flat, outfit);
   const pose: SkierPose = createSkierPose();
   pose.center.set(0, CONFIG.air.comHeight, 0);
   pose.velocity.set(0, 0, -(r.speed ?? 0));
@@ -111,6 +130,8 @@ function rideRig(r: Ride): SkierRig {
   pose.brakeSide = 1;
   pose.butter = r.butter ?? 0;
   pose.butterAmount = r.butter ? 1 : 0;
+  // Snapped mid-push, the push skates off the left leg; from no push, the first one is off the right.
+  pose.polePhase = r.skate === -1 ? 0 : 1;
   view.snap(pose);
   // A pole push is already under way: ride up to the phase so eased weights settle as in the game.
   const phase = r.polePhase ?? 1;
@@ -142,14 +163,19 @@ const THIGH_LINE = THIGH_RADIUS - 0.006;
 
 const filter = process.argv[2]?.toLowerCase();
 let worst = 0;
-for (const [name, def] of STATES) {
-  if (filter && !name.includes(filter)) continue;
+
+/**
+ * Checks one state in `outfit`: the poles (when carried) and the jacket,
+ * and with `head`, the head and hat against the body, and with `skis`, the
+ * pushing ski against the other. Returns the report line and the head count.
+ */
+function check(name: string, def: PoseDef | Ride, outfit: Outfit, head: boolean, skis: boolean): { line: string; head: number } {
   let rig: SkierRig;
   if ('pelvis' in def) {
-    rig = new SkierRig();
+    rig = new SkierRig(outfit);
     rig.apply(def);
   } else {
-    rig = rideRig(def);
+    rig = rideRig(def, outfit);
   }
   rig.root.updateMatrixWorld(true);
   const parts = rig.parts();
@@ -174,7 +200,7 @@ for (const [name, def] of STATES) {
     ]),
   ];
   const poleReport: string[] = [];
-  for (let side = 0; side < 2; side++) {
+  for (let side = 0; side < (rig.hasPoles ? 2 : 0); side++) {
     const pole = parts.poles[side]!;
     const hits = new Map<string, number>();
     for (let t = 0.14; t <= 1.1; t += 0.02) {
@@ -238,10 +264,97 @@ for (const [name, def] of STATES) {
     }
   }
   const jacket = poke ? `jacket: ${poke}/16 thigh lines through the panel, up to ${(deepest * 100).toFixed(0)} cm above where the hem hangs` : '';
-  console.log(`${name.padEnd(22)} ${[...poleReport, armReport, jacket].filter(Boolean).join(' | ') || 'clear'}`);
+
+  // Head and hat: their points inside the torso, an arm or a thigh.
+  let headIn = 0;
+  const headParts: [string, Mesh][] = [
+    ['torso', parts.torso],
+    ...[0, 1].flatMap((i): [string, Mesh][] => [
+      [`arm${i}`, parts.upperArms[i]!],
+      [`forearm${i}`, parts.forearms[i]!],
+      [`thigh${i}`, parts.thighs[i]!],
+    ]),
+  ];
+  const headHits = new Map<string, number>();
+  if (head) {
+    for (const m of headParts) m[1].geometry.computeBoundingSphere();
+    const sphere = new Sphere();
+    const meshes = [parts.head, ...parts.head.children.filter((c): c is Mesh => c instanceof Mesh && c.visible)];
+    const seen = new Set<string>();
+    for (const mesh of meshes) {
+      const pos = mesh.geometry.getAttribute('position');
+      if (!pos) continue;
+      for (let i = 0; i < pos.count; i++) {
+        p.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+        const key = `${p.x.toFixed(3)},${p.y.toFixed(3)},${p.z.toFixed(3)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        for (const [part, m] of headParts) {
+          sphere.copy(m.geometry.boundingSphere!).applyMatrix4(m.matrixWorld);
+          if (!sphere.containsPoint(p)) continue;
+          if (inside(m, p, across) && inside(m, p, ahead)) {
+            headIn++;
+            headHits.set(part, (headHits.get(part) ?? 0) + 1);
+          }
+        }
+      }
+    }
+  }
+  const headReport = headIn ? `head: ${headIn} points inside (${[...headHits].map(([k, v]) => `${k} ${v}`).join(', ')})` : '';
+
+  // Skis: the pushing ski's centerline against the other ski.
+  let skiReport = '';
+  if (skis) {
+    const line = (foot: Mesh, t: number, out: Vector3): Vector3 =>
+      out.set(0, 0.01 - BODY.ankleHeight, -0.85 + 1.7 * t - BODY.ankleBack).applyMatrix4(foot.matrixWorld);
+    const inv = parts.feet[1]!.matrixWorld.clone().invert();
+    let near = Infinity;
+    let through = 0;
+    for (let i = 0; i <= 40; i++) {
+      line(parts.feet[0]!, i / 40, p);
+      for (let j = 0; j <= 40; j++) near = Math.min(near, p.distanceTo(line(parts.feet[1]!, j / 40, q)));
+      // In the right ski's frame: within its width, thickness and length.
+      q.copy(p).applyMatrix4(inv);
+      if (Math.abs(q.x) < 0.055 && Math.abs(q.y - (0.01 - BODY.ankleHeight)) < 0.03 && Math.abs(q.z + BODY.ankleBack) < 0.85) through++;
+    }
+    skiReport = `skis ${(near * 100).toFixed(0)} cm apart at the closest${through ? `, ${through}/41 points through the other ski` : ''}`;
+  }
   rig.dispose();
+  return { line: [...poleReport, armReport, jacket, headReport, skiReport].filter(Boolean).join(' | ') || 'clear', head: headIn };
+}
+
+for (const [name, def] of STATES) {
+  if (filter && !name.includes(filter)) continue;
+  console.log(`${name.padEnd(22)} ${check(name, def, DEFAULT_OUTFIT, false, false).line}`);
 }
 console.log(`worst pole: ${worst} cm inside the body`);
+
+console.log('\nPoles off (pole checks skipped; skating pushes added):');
+const noPoles: Outfit = { ...DEFAULT_OUTFIT, poles: false };
+let closest = Infinity;
+for (const [name, def] of [...STATES, ...SKATES]) {
+  if (filter && !name.includes(filter)) continue;
+  const skating = name.startsWith('skate');
+  const { line } = check(name, def, noPoles, false, skating);
+  const m = /skis (\d+) cm/.exec(line);
+  if (m) closest = Math.min(closest, Number(m[1]));
+  console.log(`${name.padEnd(26)} ${line}`);
+}
+if (closest < Infinity) console.log(`closest skis while skating: ${closest} cm (centerlines)`);
+
+console.log('\nHeadwear (head and hat points inside the body, every state; the helmet is the baseline):');
+for (const { id } of HEADWEAR) {
+  const outfit: Outfit = { ...DEFAULT_OUTFIT, headwear: id };
+  let total = 0;
+  const bad: string[] = [];
+  for (const [name, def] of STATES) {
+    if (filter && !name.includes(filter)) continue;
+    const r = check(name, def, outfit, true, false);
+    total += r.head;
+    if (r.head) bad.push(`${name} ${r.head}`);
+  }
+  console.log(`${id.padEnd(8)} ${total} points inside over every state${bad.length ? `: ${bad.join(', ')}` : ''}`);
+}
 
 // Elbow swing through a whole pole push, in 1% steps of the stroke.
 const elbow = [new Vector3(), new Vector3()];

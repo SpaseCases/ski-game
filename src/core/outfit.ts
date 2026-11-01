@@ -2,8 +2,9 @@ import { SKI_TYPES, skiGraphic, type SkiId } from './skis.ts';
 import { readStored, writeStored } from './storage.ts';
 
 // The skier's look, picked in the Locker: a color for each part from one
-// shared palette, the headwear, and the skis (type and graphic, see
-// core/skis.ts). Saved locally as one versioned JSON entry; anything
+// shared palette, the headwear, a pattern for the jacket and the pants (in a
+// second palette color), the skis (type and graphic, see core/skis.ts) and
+// whether the skier carries poles. Saved locally as one versioned JSON entry; anything
 // missing, unknown or unreadable falls back to the default, so a wiped or
 // blocked storage just means today's look.
 
@@ -31,17 +32,37 @@ export const PALETTE: readonly { readonly name: string; readonly hex: string }[]
   { name: 'Cherry', hex: '#d33a3f' },
 ];
 
-export type Headwear = 'helmet' | 'santa' | 'pumpkin';
+export type Headwear = 'helmet' | 'beanie' | 'cap' | 'bucket' | 'hood' | 'santa' | 'pumpkin';
 export const HEADWEAR: readonly { readonly id: Headwear; readonly name: string }[] = [
   { id: 'helmet', name: 'Helmet' },
+  { id: 'beanie', name: 'Beanie' },
+  { id: 'cap', name: 'Cap' },
+  { id: 'bucket', name: 'Bucket hat' },
+  { id: 'hood', name: 'Hood up' },
   { id: 'santa', name: 'Santa hat' },
   { id: 'pumpkin', name: "Jack-o'-lantern" },
 ];
 
+/** A garment's pattern, painted in its second color. */
+export type Pattern = 'plain' | 'stripes' | 'blocks' | 'camo' | 'plaid';
+export const PATTERNS: readonly { readonly id: Pattern; readonly name: string }[] = [
+  { id: 'plain', name: 'Plain' },
+  { id: 'stripes', name: 'Stripes' },
+  { id: 'blocks', name: 'Blocks' },
+  { id: 'camo', name: 'Camo' },
+  { id: 'plaid', name: 'Plaid' },
+];
+/** The garments that take a pattern, and the outfit keys of their pattern and second color. */
+export const GARMENTS = [
+  { id: 'jacket', name: 'Jacket', pattern: 'jacketPattern', accent: 'jacketAccent' },
+  { id: 'pants', name: 'Pants', pattern: 'pantsPattern', accent: 'pantsAccent' },
+] as const;
+export type Garment = (typeof GARMENTS)[number]['id'];
+
 /** The parts with a color, in the Locker's order. */
 export type ColorPart = 'helmet' | 'goggleFrame' | 'goggleLens' | 'goggleStrap' | 'gaiter' | 'jacket' | 'pants' | 'boots' | 'mittens';
 export const COLOR_PARTS: readonly { readonly id: ColorPart; readonly name: string }[] = [
-  { id: 'helmet', name: 'Helmet' },
+  { id: 'helmet', name: 'Helmet / hat' },
   { id: 'goggleFrame', name: 'Goggle frame' },
   { id: 'goggleLens', name: 'Goggle lens' },
   { id: 'goggleStrap', name: 'Goggle strap' },
@@ -52,9 +73,18 @@ export const COLOR_PARTS: readonly { readonly id: ColorPart; readonly name: stri
   { id: 'mittens', name: 'Mittens' },
 ];
 
-export type Outfit = Record<ColorPart, string> & { headwear: Headwear; ski: SkiId; skiGraphic: string };
+export type Outfit = Record<ColorPart, string> & {
+  headwear: Headwear;
+  jacketPattern: Pattern;
+  jacketAccent: string;
+  pantsPattern: Pattern;
+  pantsAccent: string;
+  ski: SkiId;
+  skiGraphic: string;
+  poles: boolean;
+};
 
-/** Today's look: matte black helmet, goggles and neck gaiter with a smoke lens, a charcoal shell, olive pants, gray boots and mittens, on park skis with lime tips. */
+/** Today's look: matte black helmet, goggles and neck gaiter with a smoke lens, a plain charcoal shell, plain olive pants, gray boots and mittens, on park skis with lime tips, with poles. */
 export const DEFAULT_OUTFIT: Readonly<Outfit> = {
   helmet: '#2c3037',
   goggleFrame: '#2c3037',
@@ -66,14 +96,26 @@ export const DEFAULT_OUTFIT: Readonly<Outfit> = {
   boots: '#4d525b',
   mittens: '#3a3f47',
   headwear: 'helmet',
+  jacketPattern: 'plain',
+  jacketAccent: '#ece8de',
+  pantsPattern: 'plain',
+  pantsAccent: '#ece8de',
   ski: 'park',
   skiGraphic: 'park-lime',
+  poles: true,
 };
 
 const KEY = 'outfit.v1';
 
 export function colorName(hex: string): string {
   return PALETTE.find((c) => c.hex === hex)?.name ?? hex;
+}
+
+/** A palette color that stands out on `hex`: Chalk on a dark color, Coal on a light one. */
+export function contrastColor(hex: string): string {
+  const v = parseInt(hex.slice(1), 16);
+  const lum = 0.2126 * ((v >> 16) & 255) + 0.7152 * ((v >> 8) & 255) + 0.0722 * (v & 255);
+  return lum < 128 ? '#ece8de' : '#2c3037';
 }
 
 /** The saved outfit, or the default for anything not saved (or not a palette color). */
@@ -93,6 +135,13 @@ export function loadOutfit(): Outfit {
   }
   const hw = saved.headwear;
   if (HEADWEAR.some((h) => h.id === hw)) out.headwear = hw as Headwear;
+  for (const g of GARMENTS) {
+    const pattern = saved[g.pattern];
+    if (PATTERNS.some((p) => p.id === pattern)) out[g.pattern] = pattern as Pattern;
+    const accent = saved[g.accent];
+    out[g.accent] = typeof accent === 'string' && PALETTE.some((c) => c.hex === accent) ? accent : contrastColor(out[g.id]);
+  }
+  if (typeof saved.poles === 'boolean') out.poles = saved.poles;
   const ski = SKI_TYPES.find((s) => s.id === saved.ski);
   if (ski) {
     out.ski = ski.id;
