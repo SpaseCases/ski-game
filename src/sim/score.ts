@@ -2,6 +2,7 @@ import { Quaternion, Vector3 } from 'three';
 import { CONFIG } from '../config.ts';
 import { GRAB_ACTIONS } from '../core/input.ts';
 import type { BoxStyle, RailShape, RailStyle } from '../maps/types.ts';
+import { clearsZone, crossesFence, type Gaps } from './gaps.ts';
 import { wrapAngle, type SkierState } from './skier.ts';
 import { anyCheat, configChanged, TUNING } from './tuning.ts';
 
@@ -10,8 +11,9 @@ import { anyCheat, configChanged, TUNING } from './tuning.ts';
 // the change since the step before (taking off, landing, catching a rail,
 // crashing), so the physics never knows it's being scored.
 //
-// A trick (a landed spin, flip, Lincoln loop or grab, a rail slide, or a
-// butter pivot or press on the snow) adds
+// A trick (a landed spin, flip, Lincoln loop or grab, a rail slide, a
+// butter pivot or press on the snow, or a gap: an open gap jump, a map's
+// named gap, a rail transfer or a fence hop) adds
 // points and multiplier and tops the combo timer up; a big air with no trick
 // scores and tops it up but adds no multiplier. Carving hard at speed and
 // small airs add a trickle of points and slow the drain, but never top it
@@ -22,13 +24,15 @@ import { anyCheat, configChanged, TUNING } from './tuning.ts';
 // Rotation is measured from the skier's trick quaternion, step by step in
 // the body's own axes (x flips, y spins, z Lincoln loops), so it counts what
 // the body really turned: a carve into the lip that carries spin counts, the
-// skis following the flight path doesn't.
+// skis following the flight path doesn't. Each axis keeps its rotation in
+// runs each way (see Runs), so turning back counts as a reverse, and
+// wiggling back and forth counts nothing.
 
 export type ScoreEventKind = 'trick' | 'bank' | 'lost';
 export type Landing = 'clean' | 'sketchy' | '';
 
 /** Most grabs one trick names (the longest held). */
-export const MAX_GRABS = 3;
+export const MAX_GRABS = 6;
 
 export interface ScoreEvent {
   kind: ScoreEventKind;
@@ -58,6 +62,30 @@ export interface ScoreEvent {
 /** Events kept for readers (the HUD): far more than one frame can make. */
 const RING = 16;
 
+/** Most runs one rotation keeps before the one going (more still count toward which axis led, but score nothing). */
+const MAX_RUNS = 8;
+
+/**
+ * Rotation about one axis, split into runs each way: a run ends when the
+ * rotation turns back more than CONFIG.score.reverseMin from its furthest
+ * point, and the next run starts there, going the other way. Angles are
+ * signed radians, as summed in AirTrack (or a butter's turn).
+ */
+export interface Runs {
+  /** The run going: its direction (1, -1, or 0 before it has moved), where it started and its furthest point, and the whole rotation (all axes) at each. */
+  dir: number;
+  start: number;
+  far: number;
+  startTotal: number;
+  farTotal: number;
+  /** Runs already over (at most MAX_RUNS kept): each one's signed size and the whole rotation during it. */
+  count: number;
+  readonly size: Float64Array;
+  readonly total: Float64Array;
+  /** The sizes of every run over, unsigned, summed (kept or not). */
+  path: number;
+}
+
 interface AirTrack {
   active: boolean;
   time: number;
@@ -66,9 +94,17 @@ interface AirTrack {
   spin: number;
   lincoln: number;
   total: number;
+  /** The same rotations in runs each way. */
+  readonly flipRuns: Runs;
+  readonly spinRuns: Runs;
+  readonly lincolnRuns: Runs;
   /** Seconds each grab was held. */
   grab: Float64Array;
   fromRail: boolean;
+  /** The rail taken off from (-1: the snow), and where (x, z) the air started. */
+  rail: number;
+  x0: number;
+  z0: number;
   switchTakeoff: boolean;
   /** Popped out of a butter: 1 off the tips (a nollie), -1 off the tails (an ollie), 0 not. */
   butter: number;
@@ -78,9 +114,10 @@ interface ButterTrack {
   active: boolean;
   /** 1 the tips, -1 the tails. */
   end: number;
-  /** Seconds pressed, and the skis' turn on the snow while pressed (radians, signed). */
+  /** Seconds pressed, and the skis' turn on the snow while pressed (radians, signed), also in runs each way. */
   time: number;
   turn: number;
+  readonly runs: Runs;
 }
 
 interface RailTrack {
@@ -129,10 +166,97 @@ export function createScore(): ScoreState {
     events,
     seq: 0,
     counts: new Map(),
-    air: { active: false, time: 0, flip: 0, spin: 0, lincoln: 0, total: 0, grab: new Float64Array(GRAB_ACTIONS.length), fromRail: false, switchTakeoff: false, butter: 0 },
+    air: {
+      active: false,
+      time: 0,
+      flip: 0,
+      spin: 0,
+      lincoln: 0,
+      total: 0,
+      flipRuns: createRuns(),
+      spinRuns: createRuns(),
+      lincolnRuns: createRuns(),
+      grab: new Float64Array(GRAB_ACTIONS.length),
+      fromRail: false,
+      rail: -1,
+      x0: 0,
+      z0: 0,
+      switchTakeoff: false,
+      butter: 0,
+    },
     rail: { active: false, rail: -1, meters: 0, sideMeters: 0, switchMeters: 0, points: 0 },
-    butter: { active: false, end: 0, time: 0, turn: 0 },
+    butter: { active: false, end: 0, time: 0, turn: 0, runs: createRuns() },
   };
+}
+
+function createRuns(): Runs {
+  return { dir: 0, start: 0, far: 0, startTotal: 0, farTotal: 0, count: 0, size: new Float64Array(MAX_RUNS), total: new Float64Array(MAX_RUNS), path: 0 };
+}
+
+function resetRuns(r: Runs): void {
+  r.dir = 0;
+  r.start = 0;
+  r.far = 0;
+  r.startTotal = 0;
+  r.farTotal = 0;
+  r.count = 0;
+  r.path = 0;
+}
+
+/** One step: the axis has turned to `angle` (signed), and the whole rotation to `total`. */
+function trackRuns(r: Runs, angle: number, total: number): void {
+  if (r.dir === 0) {
+    if (angle === r.start) return;
+    r.dir = Math.sign(angle - r.start);
+  } else if ((angle - r.far) * r.dir < 0) {
+    if ((r.far - angle) * r.dir <= CONFIG.score.reverseMin / DEG) return;
+    // Turned back far enough: that run is over, and the next goes back the other way from its furthest point.
+    const size = r.far - r.start;
+    r.path += Math.abs(size);
+    if (r.count < MAX_RUNS) {
+      r.size[r.count] = size;
+      r.total[r.count] = r.farTotal - r.startTotal;
+      r.count++;
+    }
+    r.start = r.far;
+    r.startTotal = r.farTotal;
+    r.dir = -r.dir;
+  }
+  r.far = angle;
+  r.farTotal = total;
+}
+
+/** How far the axis turned: every run's size summed (radians), with the run going at `angle`. */
+function runPath(r: Runs, angle: number): number {
+  return r.path + Math.abs(angle - r.start);
+}
+
+/** Set by spinRuns: the degrees it counted over all the runs. */
+let counted = 0;
+
+/**
+ * A spin's runs named and counted ("360", "360 · reverse 180"): each run
+ * counts whole `step`s of its size (or, when `whole`, of the whole rotation
+ * during it, so a cork's tipped axis counts too), from `min` degrees, with
+ * the `short` grace only on the run still going (at `angle`, the whole
+ * rotation at `total`). Leaves the degrees counted in `counted`.
+ */
+function spinRuns(r: Runs, angle: number, total: number, whole: boolean, step: number, short: number, min: number): string {
+  let text = '';
+  let lastDir = 0;
+  counted = 0;
+  for (let i = 0; i <= r.count; i++) {
+    const going = i === r.count;
+    const size = going ? angle - r.start : r.size[i]!;
+    const turn = whole ? (going ? total - r.startTotal : r.total[i]!) : Math.abs(size);
+    const deg = steps(turn * DEG, step, going ? short : 0);
+    if (deg < min) continue;
+    const dir = Math.sign(size);
+    text += text === '' ? `${deg}` : ` · ${dir !== lastDir ? 'reverse ' : ''}${deg}`;
+    lastDir = dir;
+    counted += deg;
+  }
+  return text;
 }
 
 /** The live combo's multiplier: at least 1, at most CONFIG.score.multMax. */
@@ -188,9 +312,10 @@ const SIDEWAYS = 0.7;
 
 /**
  * After each fixed step (`prev` the state before it, `s` after): tracks
- * airs and rails, scores what ended, and runs the combo timer.
+ * airs and rails, scores what ended, and runs the combo timer. `rails` and
+ * `gaps` are the map's (BuiltMap.course.rails, BuiltMap.gaps).
  */
-export function stepScore(sc: ScoreState, prev: SkierState, s: SkierState, rails: readonly RailShape[], dt: number): void {
+export function stepScore(sc: ScoreState, prev: SkierState, s: SkierState, rails: readonly RailShape[], gaps: Gaps, dt: number): void {
   const C = CONFIG.score;
   if (s.bailed) {
     if (!prev.bailed) {
@@ -213,7 +338,10 @@ export function stepScore(sc: ScoreState, prev: SkierState, s: SkierState, rails
   if (inAir && !wasAir) beginAir(sc, prev);
   if (wasAir && sc.air.active) {
     trackAir(sc.air, prev, s, inAir ? s.grab : prev.grab, dt);
-    if (!inAir) endAir(sc, s, s.rail >= 0);
+    if (!inAir) {
+      endAir(sc, s, s.rail >= 0);
+      endGaps(sc, s, gaps);
+    }
   }
   if (s.rail >= 0) {
     if (prev.rail !== s.rail) beginRail(sc, s);
@@ -283,8 +411,14 @@ function beginAir(sc: ScoreState, prev: SkierState): void {
   a.spin = 0;
   a.lincoln = 0;
   a.total = 0;
+  resetRuns(a.flipRuns);
+  resetRuns(a.spinRuns);
+  resetRuns(a.lincolnRuns);
   a.grab.fill(0);
   a.fromRail = prev.rail >= 0;
+  a.rail = prev.rail;
+  a.x0 = prev.position.x;
+  a.z0 = prev.position.z;
   a.switchTakeoff = isSwitch(prev);
   a.butter = prev.grounded && prev.rail < 0 && prev.butterAmount >= CONFIG.score.butterMin ? prev.butter : 0;
 }
@@ -303,6 +437,9 @@ function trackAir(a: AirTrack, prev: SkierState, s: SkierState, grab: number, dt
   a.spin += qDelta.y * k;
   a.lincoln += qDelta.z * k;
   a.total += angle;
+  trackRuns(a.flipRuns, a.flip, a.total);
+  trackRuns(a.spinRuns, a.spin, a.total);
+  trackRuns(a.lincolnRuns, a.lincoln, a.total);
 }
 
 /** Whole steps of `step` degrees in `deg`, counting one that falls short by up to `short`. */
@@ -312,6 +449,11 @@ function steps(deg: number, step: number, short: number): number {
 
 const MULTI = ['', '', 'double ', 'triple ', 'quad '];
 
+/** "", "double ", ... "quad ", then "5x ", "6x "... */
+function times(n: number): string {
+  return n < MULTI.length ? MULTI[n]! : `${n}x `;
+}
+
 /** The air is over (on the snow, or onto a rail): name and score its trick. */
 function endAir(sc: ScoreState, s: SkierState, toRail: boolean): void {
   const C = CONFIG.score;
@@ -319,38 +461,60 @@ function endAir(sc: ScoreState, s: SkierState, toRail: boolean): void {
   a.active = false;
 
   // Rotation. Onto or off a rail it counts in 90s (a slide lands sideways).
+  // The axis that turned furthest (every run each way summed) names it.
   const railEnd = toRail || a.fromRail;
   const step = railEnd ? 90 : 180;
   const short = railEnd ? C.spinShort / 2 : C.spinShort;
   const minSpin = railEnd ? C.railSpinMin : 180;
-  const spin = Math.abs(a.spin) * DEG;
-  const flip = Math.abs(a.flip) * DEG;
-  const lincoln = Math.abs(a.lincoln) * DEG;
+  const spin = runPath(a.spinRuns, a.spin) * DEG;
+  const flip = runPath(a.flipRuns, a.flip) * DEG;
+  const lincoln = runPath(a.lincolnRuns, a.lincoln) * DEG;
   let rotation = '';
   let points = 0;
   if (spin >= flip && spin >= lincoln) {
-    // Spinning: the whole rotation counts (a cork's axis is tipped off the spin's).
-    const deg = steps(a.total * DEG, step, short);
-    if (deg >= minSpin) {
-      const cork = Math.max(flip, lincoln) >= C.corkMin;
-      rotation = `${cork ? 'cork ' : ''}${deg}`;
-      points = (deg / 180) * C.spinPoints * (cork ? 1 + C.corkBonus : 1);
+    // Spinning: the whole rotation counts. Tipped off the spin's axis it's a
+    // cork (mostly by a flip: ↑ or ↓) or a flat spin (mostly by a Lincoln loop: Q or E).
+    const text = spinRuns(a.spinRuns, a.spin, a.total, true, step, short, minSpin);
+    if (text !== '') {
+      const tipped = Math.max(flip, lincoln) >= C.corkMin;
+      const flat = tipped && lincoln > flip;
+      rotation = `${tipped ? (flat ? 'flat ' : 'cork ') : ''}${text}`;
+      points = (counted / 180) * C.spinPoints * (1 + (tipped ? (flat ? C.flatBonus : C.corkBonus) : 0));
     }
   } else {
-    const flips = Math.floor(((flip >= lincoln ? flip : lincoln) + C.flipShort) / 360);
-    if (flips >= 1) {
-      const deg = steps(spin, step, short);
-      const spun = deg >= minSpin;
-      const times = MULTI[Math.min(flips, MULTI.length - 1)] ?? '';
-      if (flip >= lincoln) {
-        const back = a.flip > 0; // nose up
-        rotation = spun ? `${times}${back ? 'rodeo' : 'misty'} ${deg}` : `${times}${back ? 'back flip' : 'front flip'}`;
-        points = flips * C.flipPoints;
+    // Flipping or looping: each run's whole turns, the first named with the spin ("Rodeo 540").
+    const flipping = flip >= lincoln;
+    const runs = flipping ? a.flipRuns : a.lincolnRuns;
+    const angle = flipping ? a.flip : a.lincoln;
+    const spun = spinRuns(a.spinRuns, a.spin, a.total, false, step, short, minSpin);
+    const spunDeg = counted;
+    let flips = 0;
+    let lastDir = 0;
+    for (let i = 0; i <= runs.count; i++) {
+      const going = i === runs.count;
+      const size = going ? angle - runs.start : runs.size[i]!;
+      const n = Math.floor((Math.abs(size) * DEG + (going ? C.flipShort : 0)) / 360);
+      if (n < 1) continue;
+      const dir = Math.sign(size);
+      const back = size > 0; // nose up
+      if (rotation === '') {
+        const withSpin = spun !== '' ? ` ${spun}` : '';
+        rotation = flipping ? `${times(n)}${back ? (spun ? 'rodeo' : 'back flip') : spun ? 'misty' : 'front flip'}${withSpin}` : `${times(n)}Lincoln loop${withSpin}`;
       } else {
-        rotation = `${times}Lincoln loop${spun ? ` ${deg}` : ''}`;
-        points = flips * C.lincolnPoints;
+        rotation += flipping ? ` · ${times(n)}${back ? 'back flip' : 'front flip'}` : ` · ${dir !== lastDir ? 'reverse ' : ''}${times(n)}Lincoln loop`;
       }
-      if (spun) points += (deg / 180) * C.spinPoints;
+      lastDir = dir;
+      flips += n;
+    }
+    if (flips >= 1) {
+      points = flips * (flipping ? C.flipPoints : C.lincolnPoints) + (spunDeg / 180) * C.spinPoints;
+    } else if (!flipping) {
+      // Lincoln-heavy with no loop finished: a flat spin of its whole rotation.
+      const text = spinRuns(a.lincolnRuns, a.lincoln, a.total, true, step, short, minSpin);
+      if (text !== '') {
+        rotation = `flat ${text}`;
+        points = (counted / 180) * C.spinPoints * (1 + C.flatBonus);
+      }
     }
   }
   if (rotation !== '') rotation += a.fromRail ? ' off' : toRail ? ' on' : '';
@@ -479,17 +643,25 @@ function trackButter(b: ButterTrack, prev: SkierState, s: SkierState, dt: number
     b.end = s.butter;
     b.time = 0;
     b.turn = 0;
+    resetRuns(b.runs);
   }
   b.time += dt;
-  if (prev.grounded && prev.rail < 0) b.turn += wrapAngle(s.yaw - prev.yaw);
+  if (prev.grounded && prev.rail < 0) {
+    b.turn += wrapAngle(s.yaw - prev.yaw);
+    trackRuns(b.runs, b.turn, 0);
+  }
 }
 
-/** The butter's name so far: "Tail butter 180", or "Nose press" with no pivot yet, or '' too short to count. */
+/**
+ * The butter's name so far: "Tail butter 180", "Tail butter 180 · reverse
+ * 180", or "Nose press" with no pivot counted, or '' too short to count.
+ * Leaves the pivot's degrees in `counted`.
+ */
 function butterName(b: ButterTrack): string {
   const C = CONFIG.score;
-  const deg = steps(Math.abs(b.turn) * DEG, 180, C.spinShort);
+  const pivot = spinRuns(b.runs, b.turn, 0, false, 180, C.spinShort, 180);
   const what = b.end > 0 ? 'Nose' : 'Tail';
-  if (deg >= 180) return `${what} butter ${deg}`;
+  if (pivot !== '') return `${what} butter ${pivot}`;
   return b.time >= C.butterPressMin ? `${what} press` : '';
 }
 
@@ -505,13 +677,53 @@ function endButter(sc: ScoreState): void {
   const C = CONFIG.score;
   const name = butterName(b);
   if (name === '') return;
-  const deg = steps(Math.abs(b.turn) * DEG, 180, C.spinShort);
+  const deg = counted;
   const points = (deg / 180) * C.butterSpinPoints + C.butterPressPoints * Math.min(b.time, C.butterPressMax);
   const ev = nextEvent(sc);
   ev.grabCount = 0;
   addTrick(sc, ev, name, name, points, true);
   ev.meters = 0;
   ev.landing = '';
+  ev.switchOut = false;
+}
+
+/**
+ * The air just ended (endAir has scored its trick): the gaps it cleared,
+ * each a trick of its own on its own line. A map's named gap stands in for
+ * the plain "Gap" of the jump it overlaps. A sketchy landing scores half and
+ * adds no multiplier, as for any trick.
+ */
+function endGaps(sc: ScoreState, s: SkierState, gaps: Gaps): void {
+  const C = CONFIG.score;
+  const a = sc.air;
+  const toRail = s.rail >= 0;
+  const x1 = s.position.x;
+  const z1 = s.position.z;
+  const sketchy = !toRail && sketchyLanding(s, a.time, a.fromRail);
+  let named = false;
+  for (const g of gaps.zones) {
+    if (!g.named || !clearsZone(g, a.x0, a.z0, x1, z1)) continue;
+    named = true;
+    addGap(sc, g.name, g.points, sketchy);
+  }
+  if (!named) {
+    for (const g of gaps.zones) {
+      if (g.named || !clearsZone(g, a.x0, a.z0, x1, z1)) continue;
+      addGap(sc, g.name, g.points, sketchy);
+      break;
+    }
+  }
+  if (toRail && a.rail >= 0 && s.rail !== a.rail) addGap(sc, 'Transfer', C.transferPoints, false);
+  if (crossesFence(gaps, a.x0, a.z0, x1, z1)) addGap(sc, 'Fence hop', C.hopPoints, sketchy);
+}
+
+/** A gap cleared: a trick of its own, its points halved by a sketchy landing (and then no multiplier). */
+function addGap(sc: ScoreState, name: string, points: number, sketchy: boolean): void {
+  const ev = nextEvent(sc);
+  ev.grabCount = 0;
+  addTrick(sc, ev, name, name, sketchy ? points * CONFIG.score.sketchyScale : points, !sketchy);
+  ev.meters = 0;
+  ev.landing = sketchy ? 'sketchy' : '';
   ev.switchOut = false;
 }
 

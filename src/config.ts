@@ -289,10 +289,22 @@ export const CONFIG = {
     jumpAir: 1.2,
     /** Points per second of air on a trick or a jump. */
     airPoints: 50,
-    /** Points per 180° of spin; a cork (spinning with corkMin° or more off-axis) adds corkBonus of that. */
+    /**
+     * Points per 180° of spin; a cork (spinning with corkMin° or more
+     * off-axis, tipped mostly by a flip) adds corkBonus of that, and a flat
+     * spin (tipped mostly by a Lincoln loop) adds flatBonus.
+     */
     spinPoints: 150,
     corkBonus: 0.5,
+    flatBonus: 0.5,
     corkMin: 50,
+    /**
+     * Turning back this many degrees against a spin, flip, Lincoln loop or
+     * butter pivot starts a new run the other way ("360 · reverse 180"). Each
+     * run counts its own whole 180s (360s for flips); only the run still
+     * going at the landing gets the spinShort / flipShort grace.
+     */
+    reverseMin: 30,
     /** Points per full flip and per full Lincoln loop. */
     flipPoints: 400,
     lincolnPoints: 400,
@@ -331,6 +343,15 @@ export const CONFIG = {
     butterPressMax: 3,
     butterPressMin: 0.6,
     ollieBonus: 0.25,
+    /**
+     * Gaps, each a trick of its own: an open gap jump cleared from its
+     * takeoff to past its knuckle (gapPoints; a map's named gaps carry their
+     * own points), an air from one rail onto another (transferPoints) and an
+     * air over a fence (hopPoints).
+     */
+    gapPoints: 250,
+    transferPoints: 200,
+    hopPoints: 100,
     /** Landings: clean adds cleanBonus of the trick's points; sketchy scores sketchyScale of them and adds no multiplier. Taking off or landing switch adds switchBonus each. */
     cleanBonus: 0.25,
     sketchyScale: 0.5,

@@ -103,7 +103,7 @@ export function boundsDistance(b: Bounds, x: number, z: number): number {
 }
 
 /** Even-odd test against a polygon given as x, z, x, z... */
-function insidePolygon(poly: Float32Array, x: number, z: number): boolean {
+export function insidePolygon(poly: Float32Array, x: number, z: number): boolean {
   let inside = false;
   const n = poly.length / 2;
   for (let i = 0, j = n - 1; i < n; j = i++) {

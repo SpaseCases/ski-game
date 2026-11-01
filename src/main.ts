@@ -126,8 +126,9 @@ sound.setWeather(weather);
 const scoreHud = new ScoreHud(
   hud,
   (total, tainted) => {
-    const note = tainted || !level ? 'cheats' : submitCombo(level.id, total) ? 'best' : 'banked';
-    sound.combo(note === 'best' ? 'best' : 'bank');
+    // Ridden with cheats on: it can only be the map's cheats best, never its clean one.
+    const note = !level ? 'banked' : tainted ? (submitCombo(level.id, total, true) ? 'cheatsBest' : 'cheats') : submitCombo(level.id, total) ? 'best' : 'banked';
+    sound.combo(note === 'best' || note === 'cheatsBest' ? 'best' : 'bank');
     return note;
   },
   () => sound.combo('lost'),
@@ -765,7 +766,7 @@ startLoop(
     stepSkier(skier, keys, built.course, dt);
     sound.step(skierPrev, skier, built.course.rails);
     const event = updateRun(run, built.map, skierPrev.position, skier);
-    if (scoring()) stepScore(score, skierPrev, skier, built.course.rails, dt);
+    if (scoring()) stepScore(score, skierPrev, skier, built.course.rails, built.gaps, dt);
     if (race && built.race) {
       const raceEvent = stepRace(race, built.race, skierPrev.position, skier, dt);
       if (raceEvent === 'missed') toast.show('Missed gate');
@@ -826,7 +827,9 @@ startLoop(
     const finished = level?.run.finished ?? false;
     const result = finished && race?.finished ? `${course?.name ?? ''} · ${formatTime(race.time)} · ${missedText(race.missed)}` : '';
     runHud.update(finished, result, result === '' ? '' : raceAgainHint, heldToTop ? 0 : holdTime);
-    scoreHud.update(scoring(), score, level?.built.course.rails ?? NO_RAILS, level ? bestCombo(level.id) : 0, hudTime);
+    // While cheats are on (the "Cheats on" tag shows), the best shown is the map's cheats best.
+    const cheats = !cheatsTag.hidden;
+    scoreHud.update(scoring(), score, level?.built.course.rails ?? NO_RAILS, level ? bestCombo(level.id, cheats) : 0, cheats, hudTime);
     fps.frame(realFrameTime);
     // Auto quality judges riding frames only (it holds off after jumps, loads and menus).
     if (quality === 'auto' && level) {

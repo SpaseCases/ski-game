@@ -14,6 +14,13 @@ export function trickText(ev: ScoreEvent): string {
   return text;
 }
 
+/** A trick as a link in the combo panel's chain: its name without grabs ("Cork 720", "Rail slide 12 m"), or its first grab alone. */
+export function chainText(ev: ScoreEvent): string {
+  if (ev.meters > 0) return `${ev.name} ${Math.round(ev.meters)} m`;
+  if (ev.name !== '' || ev.grabCount === 0) return ev.name;
+  return ACTION_NAMES[GRAB_ACTIONS[ev.grabs[0]!]!];
+}
+
 /** The notes after a trick: how it landed, switch, repeated. */
 export function trickTags(ev: ScoreEvent): string {
   const tags: string[] = [];

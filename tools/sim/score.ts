@@ -1,7 +1,10 @@
 // Rides a bot down a Park line doing a scripted trick off each jump, then
 // over a kicker onto a rail, with scoring stepped exactly as the game steps
 // it, and prints every scoring event and the combo totals. Checks scores
-// without a browser.
+// without a browser. On the Park it then rides milestone 10's cases:
+// rotations (reversed spins, a reversed tail butter, spin + Lincoln, five
+// and six flips with Turbo spins and Low gravity) and, on Jam Park, gaps (an
+// open gap, the Cat gap, a rail transfer, a fence hop).
 //   node tools/sim/score.ts [map.json] [x] [--tricks a,b,c] [--verbose]
 // Defaults: the Park, its x = -38 line of tables. Tricks (cycled, one per
 // jump): 360, 540, 720, cork540, cork720, backflip, frontflip, rodeo, misty,
@@ -11,7 +14,7 @@
 import { GRAB_ACTIONS, type Action, type GrabAction } from '../../src/core/input.ts';
 import { comboMult, comboTotal, createScore, endCombo, scoreEvent, stepScore } from '../../src/sim/score.ts';
 import { wrapAngle } from '../../src/sim/skier.ts';
-import { TUNING } from '../../src/sim/tuning.ts';
+import { setCheat, TUNING, type CheatId } from '../../src/sim/tuning.ts';
 import { multText, pointsText, trickTags, trickText } from '../../src/ui/scoreText.ts';
 import { DT, jumpLayout, loadMap, Rider } from './harness.ts';
 
@@ -59,7 +62,7 @@ function report(r: Rider): void {
 /** Steps the rider and the scoring together, the way the game's loop does. */
 function step(r: Rider, keys: Action[]): void {
   r.step(keys);
-  stepScore(score, r.prev, r.s, sim.course.rails, DT);
+  stepScore(score, r.prev, r.s, r.sim.course.rails, r.sim.gaps, DT);
   report(r);
 }
 
@@ -318,6 +321,204 @@ if (sim.map.name === 'Park') {
   }
   for (let i = 0; i < 8 / DT && score.active; i++) step(r, []);
   if (r.s.bailed) console.log(`  crashed (${r.s.bailReason})`);
+}
+
+// ---------------------------------------------------------------- milestone 10
+
+if (sim.map.name === 'Park') {
+  /** Speed 25 m before the lip of the cases' jump: it lands on the landing, not the flat past it. */
+  const SPEED = 23;
+  type Axis = 'spin' | 'flip' | 'lincoln' | 'total';
+  /** Hold `key` until the rotation about `axis` since its phase began would coast to a stop at `deg`. */
+  type Hold = [key: Action, axis: Axis, deg: number];
+  const axisAngle = (axis: Axis): number => (axis === 'spin' ? score.air.spin : axis === 'flip' ? score.air.flip : axis === 'lincoln' ? score.air.lincoln : score.air.total);
+  const axisRate = (r: Rider, axis: Axis): number => {
+    const w = r.s.spin;
+    return axis === 'spin' ? w.y : axis === 'flip' ? w.x : axis === 'lincoln' ? w.z : w.length();
+  };
+  /** Rides on, braking, until the combo banks (or reports a crash). */
+  const settle = (r: Rider): void => {
+    for (let i = 0; i < 12 / DT && (i < 0.5 / DT || score.active || !r.s.grounded); i++) {
+      step(r, r.s.grounded ? ['down'] : []);
+      if (r.s.bailed) {
+        console.log(`  crashed (${r.s.bailReason})`);
+        endCombo(score, r.s);
+        return;
+      }
+    }
+  };
+  const withCheats = (cheats: CheatId[], ride: () => void): void => {
+    for (const c of cheats) setCheat(c, true);
+    ride();
+    for (const c of cheats) setCheat(c, false);
+  };
+  /**
+   * Off a jump on the x = -38 line, placed 25 m before its lip at `speed`
+   * (tucked, popped at the lip), flying `phases` one after another: each
+   * phase's holds run together, and the next phase waits for the rotation
+   * to stop (a reversal starts from rest).
+   */
+  const airCase = (label: string, lip: Lip, speed: number, phases: Hold[][], cheats: CheatId[] = []): void => {
+    console.log(`${label} (${lip.name}, ${speed} m/s${cheats.length ? `, ${cheats.join(' + ')}` : ''}):`);
+    withCheats(cheats, () => {
+      const r2 = new Rider(sim);
+      r2.t = r.t;
+      r2.place(lineX, -(lip.d - 25), 0, speed);
+      while (r2.s.grounded && -r2.s.position.z < lip.d + 5) step(r2, lip.d - -r2.s.position.z > 0.25 ? ['up'] : []);
+      let phase = -1;
+      let from: number[] = [];
+      let done: boolean[] = [];
+      const begin = (): void => {
+        phase++;
+        from = (phases[phase] ?? []).map(([, axis]) => axisAngle(axis));
+        done = (phases[phase] ?? []).map(() => false);
+      };
+      begin();
+      const t0 = r2.t;
+      while (!r2.s.grounded && !r2.s.bailed) {
+        const holds = phases[phase];
+        const keys: Action[] = [];
+        if (holds) {
+          holds.forEach(([key, axis, deg], i) => {
+            if (done[i]) return;
+            const w = axisRate(r2, axis);
+            if (Math.abs(axisAngle(axis) - from[i]!) + (w * w) / (2 * TUNING.air.rotateStop) < (deg * Math.PI) / 180) keys.push(key);
+            else done[i] = true;
+          });
+          if (keys.length === 0 && r2.s.spin.length() < 0.05) begin();
+        }
+        step(r2, keys);
+      }
+      const a = score.air;
+      const deg = (x: number): string => `${Math.round((x * 180) / Math.PI)}°`;
+      console.log(`  ${(r2.t - t0).toFixed(2)} s in the air; turned (net) spin ${deg(a.spin)}, flip ${deg(a.flip)}, Lincoln ${deg(a.lincoln)}, ${deg(a.total)} in all`);
+      if (r2.s.bailed) {
+        console.log(`  crashed (${r2.s.bailReason})`);
+        endCombo(score, r2.s);
+      } else settle(r2);
+      r.t = r2.t;
+    });
+  };
+  const lip = (name: string): Lip => {
+    const l = lips.find((x) => x.name === name);
+    if (!l) throw new Error(`no ${name} on the line`);
+    return l;
+  };
+
+  // A run that turns back counts only its whole 180s (no grace), so the bot turns a little past each.
+  console.log('milestone 10 rotations:');
+  const big = lip('jump 75');
+  airCase('a 180, then reverse 180', big, SPEED, [[['left', 'spin', 190]], [['right', 'spin', 180]]]);
+  airCase('a 360, then reverse 180', big, SPEED, [[['left', 'spin', 370]], [['right', 'spin', 180]]], ['lowGravity']);
+  airCase('wiggling 120 left, 120 right (no rotation counts)', big, SPEED, [[['left', 'spin', 120]], [['right', 'spin', 120]]]);
+  airCase('a back flip, then a front flip', big, SPEED, [[['down', 'flip', 370]], [['up', 'flip', 360]]], ['lowGravity']);
+  airCase('spin + Lincoln (← with Q): a flat spin', big, SPEED, [[['left', 'total', 720], ['lincolnLeft', 'total', 720]]]);
+  airCase('spin + flip (← with ↓): a cork', big, SPEED, [[['left', 'total', 720], ['down', 'total', 720]]], ['noCrashes']);
+  airCase('a Lincoln-heavy mix short of a loop: a flat spin', big, SPEED, [[['lincolnLeft', 'lincoln', 250], ['left', 'spin', 200]]], ['noCrashes']);
+  airCase('five back flips', big, SPEED, [[['down', 'flip', 1800]]], ['turboSpins', 'lowGravity']);
+  airCase('six back flips', big, SPEED, [[['down', 'flip', 2160]]], ['turboSpins', 'lowGravity']);
+  airCase('six rodeos 540 (↓ with ←)', big, SPEED, [[['down', 'flip', 2160], ['left', 'spin', 540]]], ['turboSpins', 'lowGravity', 'noCrashes']);
+
+  // A reversed tail butter: pivot ← 180 on the tails, let the turn stop, pivot → 180 back, then let go.
+  {
+    console.log('a tail butter 180, then reverse 180 (x=30, 8 m/s):');
+    const rb = new Rider(sim);
+    rb.t = r.t;
+    rb.place(30, -30, 0, 8);
+    for (let i = 0; i < 0.5 / DT; i++) step(rb, []);
+    for (let i = 0; i < 0.2 / DT; i++) step(rb, ['grabLeftTail']);
+    for (const [key, deg] of [['left', 180], ['right', 180]] as const) {
+      const from = score.butter.turn;
+      for (let i = 0; i < 3 / DT; i++) {
+        const w = rb.s.yawRate;
+        if (Math.abs(score.butter.turn - from) + (w * w) / (2 * TUNING.skier.butterSpinResponse) >= (deg * Math.PI) / 180) break;
+        step(rb, ['grabLeftTail', key]);
+      }
+      for (let i = 0; i < 3 / DT && Math.abs(rb.s.yawRate) > 0.05; i++) step(rb, ['grabLeftTail']);
+    }
+    for (let i = 0; i < 0.3 / DT; i++) step(rb, ['grabLeftTail']);
+    settle(rb);
+    r.t = rb.t;
+  }
+
+  // Gaps on Jam Park.
+  const jam = loadMap('src/maps/jampark.json');
+  console.log(`milestone 10 gaps on Jam Park (${jam.gaps.zones.length} gap zones, ${jam.gaps.fences.length / 4} fence runs):`);
+  /** Straight down the hill at a jump, placed 8 m before its takeoff at `speed`, tucked and popped at its lip, flying `keys` (by air time). */
+  const jumpCase = (label: string, f: number, speed: number, keys: (t: number) => Action[]): void => {
+    const j = jam.map.features[f];
+    if (j?.type !== 'jump') throw new Error(`feature ${f} is not a jump`);
+    const lipD = -j.z + jumpLayout(j).lip;
+    console.log(`${label} (jump ${f}, ${speed} m/s):`);
+    const rj = new Rider(jam);
+    rj.t = r.t;
+    rj.place(j.x, j.z + 8, 0, speed);
+    while (rj.s.grounded && -rj.s.position.z < lipD + 5) step(rj, lipD - -rj.s.position.z > 0.25 ? ['up'] : []);
+    const t0 = rj.t;
+    while (!rj.s.grounded && !rj.s.bailed) step(rj, keys(rj.t - t0));
+    const land = -rj.s.position.z - (-j.z + jumpLayout(j).knuckle);
+    console.log(`  ${(rj.t - t0).toFixed(2)} s in the air, landed ${land.toFixed(1)} m past the knuckle`);
+    if (rj.s.bailed) {
+      console.log(`  crashed (${rj.s.bailReason})`);
+      endCombo(score, rj.s);
+    } else settle(rj);
+    r.t = rj.t;
+  };
+  const cat = jam.gaps.zones.find((z) => z.named);
+  const openGaps = jam.map.features.flatMap((f, i) => (f.type === 'jump' && !f.deck && Math.abs(f.yaw) < 1 ? [i] : []));
+  const catJump = openGaps.find((i) => {
+    const f = jam.map.features[i]!;
+    return cat !== undefined && f.type === 'jump' && f.x > cat.box[0]! && f.x < cat.box[1]! && f.z > cat.box[2]! && f.z < cat.box[3]!;
+  });
+  const plainGap = openGaps.find((i) => i !== catJump && (jam.map.features[i] as { x: number }).x === -20);
+  if (plainGap !== undefined) jumpCase('an open gap, straight', plainGap, 18, () => []);
+  if (catJump !== undefined) jumpCase('the Cat gap, straight', catJump, 21, () => []);
+
+  // A transfer: the tall tube where the jib and combo lines cross, its gap flown onto its second half.
+  {
+    const tube = jam.course.rails.findIndex((rail) => rail.look === 'tube' && Math.abs(rail.points[0]! - -64) < 0.5);
+    const rail = jam.course.rails[tube];
+    if (rail) {
+      console.log(`a transfer: the tall tube's gap (rail ${tube}), from the snow at 16 m/s:`);
+      const rt = new Rider(jam);
+      rt.t = r.t;
+      rt.place(rail.points[0]!, rail.points[2]! + 6, 0, 16);
+      for (let i = 0; i < 15 / DT; i++) {
+        step(rt, []);
+        if (rt.s.bailed) {
+          console.log(`  crashed (${rt.s.bailReason})`);
+          endCombo(score, rt.s);
+          break;
+        }
+        if (rt.t > 3 && rt.s.grounded && rt.s.rail < 0 && !score.active) break;
+      }
+      settle(rt);
+      r.t = rt.t;
+    }
+  }
+
+  // A fence hop: across the fence between the combo and jump lines, popped from beside it.
+  {
+    const f = jam.gaps.fences;
+    let at = -1;
+    for (let i = 0; i < f.length; i += 4) if (f[i] === -42 && f[i + 1]! < -500 && f[i + 1]! > -560) at = i;
+    if (at >= 0) {
+      const z = f[at + 1]! - 5;
+      console.log(`a fence hop: the fence at x=-42 from z=${f[at + 1]} to ${f[at + 3]}, popped from 4 m beside it at 10 m/s:`);
+      const rh = new Rider(jam);
+      rh.t = r.t;
+      rh.place(-46, z, -40, 10);
+      while (rh.s.grounded && rh.s.position.x < -42 - 2.5) step(rh, ['up']);
+      while (rh.s.grounded) step(rh, []);
+      while (!rh.s.grounded && !rh.s.bailed) step(rh, []);
+      console.log(`  landed at x=${rh.s.position.x.toFixed(1)}, ${score.air.time.toFixed(2)} s in the air`);
+      if (rh.s.bailed) {
+        console.log(`  crashed (${rh.s.bailReason})`);
+        endCombo(score, rh.s);
+      } else settle(rh);
+      r.t = rh.t;
+    }
+  }
 }
 
 console.log(`${banked} banked, ${lost} lost; best combo ${pointsText(best)}; last state: ${score.active ? `live, ${pointsText(comboTotal(score))}` : 'no combo'}`);

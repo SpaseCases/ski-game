@@ -6,6 +6,7 @@ import type {
   Feature,
   FinishDef,
   FlagDef,
+  GapDef,
   GateKind,
   HeightPoint,
   LineKind,
@@ -77,6 +78,7 @@ export function parseMap(raw: unknown): MapDef {
     powder: map.powder === undefined ? undefined : parsePowder(map.powder),
     weather: map.weather === undefined ? undefined : parseWeather(map.weather),
     sky: map.sky === undefined ? undefined : parseSky(map.sky),
+    gaps: map.gaps === undefined ? undefined : arr(map.gaps, 'gaps').map((g, i) => parseGap(g, `gaps[${i}]`)),
   };
 }
 
@@ -333,6 +335,16 @@ function parseFinish(raw: unknown, path: string): FinishDef {
 function parseRun(raw: unknown, path: string): RunDef {
   const o = obj(raw, path);
   return { name: str(o.name, `${path}.name`), points: xzPoints(o.points, `${path}.points`, 2), clear: reader(o, path)('clear', 0) };
+}
+
+function parseGap(raw: unknown, path: string): GapDef {
+  const o = obj(raw, path);
+  return {
+    name: str(o.name, `${path}.name`),
+    from: xzPoints(o.from, `${path}.from`, 3),
+    to: xzPoints(o.to, `${path}.to`, 3),
+    points: reader(o, path)('points'),
+  };
 }
 
 function parseFeature(raw: unknown, path: string): Feature {

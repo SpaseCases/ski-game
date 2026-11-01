@@ -1,13 +1,16 @@
 import { CONFIG } from '../config.ts';
 import type { RailShape } from '../maps/types.ts';
 import { comboMult, liveButter, liveSlide, scoreEvent, type ScoreEvent, type ScoreState } from '../sim/score.ts';
-import { multText, pointsText, trickTags, trickText } from './scoreText.ts';
+import { chainText, multText, pointsText, trickTags, trickText } from './scoreText.ts';
 
-/** What became of a banked combo: a new best, an ordinary bank, or one ridden with cheats (never a best). */
-export type BankNote = 'best' | 'banked' | 'cheats';
+/** What became of a banked combo: a new best, an ordinary bank, or one ridden with cheats (a new cheats best, or not). */
+export type BankNote = 'best' | 'banked' | 'cheatsBest' | 'cheats';
 
 /** Trick lines kept above the combo panel, newest at the bottom. */
 const LINES = 3;
+/** A window shorter than this (px, a small embed) shows only the newest SMALL_LINKS links of the chain. */
+const SMALL_HEIGHT = 400;
+const SMALL_LINKS = 3;
 /** Flow past this lights the panel's "Carving" note. */
 const FLOW_SHOWN = 0.35;
 
@@ -22,11 +25,14 @@ interface TrickLine {
 
 /**
  * The combo HUD, bottom center: the last few tricks as they land (and the
- * rail or box being slid, or the butter being pressed, as it goes), and a trail-sign panel with the
- * combo's points, its multiplier and its timer draining (it warns near the
- * end). When a combo ends the panel shows what it banked (or that it was
- * lost) for a moment. The best combo on this map sits bottom left. It reads
- * the sim's ScoreState and its events; it never changes them.
+ * rail or box being slid, or the butter being pressed, as it goes), and a
+ * trail-sign panel with the combo's chain of tricks so far ("720 + Rail
+ * slide 12 m + Back flip", wrapping, its oldest folded into "+N more" past
+ * three lines), its points, its multiplier and its timer draining (it warns
+ * near the end). When a combo ends the panel shows what it banked (or that
+ * it was lost) for a moment. The best combo on this map (its cheats best
+ * while cheats are on) sits bottom left. It reads the sim's ScoreState and
+ * its events; it never changes them.
  */
 export class ScoreHud {
   private readonly root: HTMLElement;
@@ -37,12 +43,23 @@ export class ScoreHud {
   private readonly slideName: HTMLElement;
   private readonly slideMeters: HTMLElement;
   private readonly panel: HTMLElement;
+  /** The chain: "+N more", then a span per link shown. */
+  private readonly chainEl: HTMLElement;
+  private readonly moreEl: HTMLElement;
+  /** Every link of the combo's chain so far, oldest first, and how many of the oldest are folded into "+N more". */
+  private readonly chain: string[] = [];
+  private chainFirst = 0;
+  /** A link arrived (or the window changed size) since the chain was last laid out. */
+  private chainDirty = false;
+  /** The chain belongs to a combo still going: the next trick after a bank or a loss starts a new one. */
+  private chainLive = false;
   private readonly base: HTMLElement;
   private readonly mult: HTMLElement;
   private readonly timer: HTMLElement;
   private readonly fill: HTMLElement;
   private readonly note: HTMLElement;
   private readonly best: HTMLElement;
+  private readonly bestLabel: HTMLElement;
   private readonly bestValue: HTMLElement;
   private readonly onBank: (total: number, tainted: boolean) => BankNote;
   private readonly onLost: () => void;
@@ -57,6 +74,7 @@ export class ScoreHud {
   private shownFlow = false;
   private shownLow = false;
   private shownBest = -1;
+  private shownCheats: boolean | null = null;
   private shownSlide = '';
   private shownSlideMeters = -1;
   /** Nothing is shown (so switching off, or a map without scoring, costs nothing per frame). */
@@ -85,6 +103,8 @@ export class ScoreHud {
     this.slide.append(this.slideName, this.slideMeters);
     this.panel = div('score-panel');
     this.panel.hidden = true;
+    this.chainEl = div('score-chain');
+    this.moreEl = span('score-more');
     const row = div('score-row');
     this.base = span('score-base');
     this.mult = span('score-mult');
@@ -93,26 +113,29 @@ export class ScoreHud {
     this.fill = div('score-fill');
     this.timer.appendChild(this.fill);
     this.note = div('score-note');
-    this.panel.append(row, this.timer, this.note);
+    this.panel.append(this.chainEl, row, this.timer, this.note);
     this.root.append(this.tricks, this.slide, this.panel);
     hud.appendChild(this.root);
 
     this.best = div('score-best ride-only');
     this.best.hidden = true;
-    const label = span('score-best-label');
-    label.textContent = 'Best combo';
+    this.bestLabel = span('score-best-label');
     this.bestValue = span('score-best-value');
-    this.best.append(label, this.bestValue);
+    this.best.append(this.bestLabel, this.bestValue);
     hud.appendChild(this.best);
+    window.addEventListener('resize', () => {
+      this.chainFirst = 0;
+      this.chainDirty = true;
+    });
   }
 
   /**
    * Once per frame. `on`: scoring runs on this map (and in Settings);
    * `rails`: the map's, for naming a slide; `best`: this map's best combo
-   * (0: none); `hudTime`: real seconds since the last frame (0 while the
-   * game waits).
+   * (0: none), its cheats best when `cheats` (cheats are on); `hudTime`:
+   * real seconds since the last frame (0 while the game waits).
    */
-  update(on: boolean, sc: ScoreState, rails: readonly RailShape[], best: number, hudTime: number): void {
+  update(on: boolean, sc: ScoreState, rails: readonly RailShape[], best: number, cheats: boolean, hudTime: number): void {
     if (this.root.hidden === on) this.root.hidden = !on;
     const showBest = on && best > 0;
     if (this.best.hidden === showBest) this.best.hidden = !showBest;
@@ -173,11 +196,17 @@ export class ScoreHud {
     } else if (this.mode === 'live') {
       // Ended without an event this reader saw (reset: a new map, scoring switched off).
       this.mode = 'none';
+      this.chainLive = false;
       this.panel.hidden = true;
     }
+    if (this.chainDirty && !this.panel.hidden) this.fitChain();
     if (best !== this.shownBest) {
       this.shownBest = best;
       this.bestValue.textContent = pointsText(best);
+    }
+    if (cheats !== this.shownCheats) {
+      this.shownCheats = cheats;
+      this.bestLabel.textContent = cheats ? 'Best with cheats' : 'Best combo';
     }
   }
 
@@ -196,8 +225,17 @@ export class ScoreHud {
       line.el.classList.remove('is-gone', 'is-new');
       void line.el.offsetWidth; // restart the pop-in
       line.el.classList.add('is-new');
+      // The chain: a trick after a bank or a loss starts a new one.
+      if (!this.chainLive) {
+        this.chainLive = true;
+        this.chain.length = 0;
+        this.chainFirst = 0;
+      }
+      this.chain.push(chainText(ev));
+      this.chainDirty = true;
       return;
     }
+    this.chainLive = false;
     this.mode = 'ended';
     this.endedAge = 0;
     this.panel.hidden = false;
@@ -215,8 +253,36 @@ export class ScoreHud {
       return;
     }
     const note = this.onBank(ev.total, ev.tainted);
-    this.panel.classList.add(note === 'best' ? 'is-best' : note === 'cheats' ? 'is-cheats' : 'is-banked');
-    this.note.textContent = note === 'best' ? 'New best combo!' : note === 'cheats' ? 'Banked · cheats on, best not saved' : 'Banked';
+    this.panel.classList.add(note === 'best' || note === 'cheatsBest' ? 'is-best' : note === 'cheats' ? 'is-cheats' : 'is-banked');
+    this.note.textContent = note === 'best' ? 'New best combo!' : note === 'cheatsBest' ? 'New cheats best!' : note === 'cheats' ? 'Banked · cheats on' : 'Banked';
+  }
+
+  /**
+   * Lays out the chain: every link, or in a short window only the newest
+   * few; then, while it runs past its three lines (its CSS max-height), the
+   * oldest shown folds into "+N more" too. The chain only grows during a combo,
+   * so the fold carries on from where it was (a resize starts it over).
+   */
+  private fitChain(): void {
+    this.chainDirty = false;
+    const n = this.chain.length;
+    let first = Math.min(this.chainFirst, Math.max(0, n - 1));
+    if (window.innerHeight < SMALL_HEIGHT) first = Math.max(first, n - SMALL_LINKS);
+    this.showChain(first);
+    while (first < n - 1 && this.chainEl.scrollHeight > this.chainEl.clientHeight + 1) this.showChain(++first);
+  }
+
+  /** Shows the chain from link `first` on, the newest brightest, the older ones counted in "+N more". */
+  private showChain(first: number): void {
+    this.chainFirst = first;
+    this.moreEl.textContent = first > 0 ? `+${first} more` : '';
+    const parts: (Node | string)[] = [this.moreEl];
+    for (let i = first; i < this.chain.length; i++) {
+      const link = span(i === this.chain.length - 1 ? 'score-link is-newest' : 'score-link');
+      link.textContent = this.chain[i]!;
+      parts.push(' ', link);
+    }
+    this.chainEl.replaceChildren(...parts);
   }
 
   private showLive(): void {
@@ -236,14 +302,15 @@ export class ScoreHud {
   /**
    * The slide or butter in progress, named as it goes (a slide's meters
    * counted). The text changes only when what it shows does: a slide's whole
-   * meters, a butter's turn in 45° steps and whether its press counts yet.
+   * meters, a butter's turn (each run each way) in 45° steps and whether its press counts yet.
    */
   private updateSlide(sc: ScoreState, rails: readonly RailShape[]): void {
     const b = sc.butter;
+    // A butter: its runs each way so far, the one going in 45° steps, and whether its press counts yet.
     const key = sc.rail.active
       ? Math.floor(sc.rail.meters)
       : b.active
-        ? -2 - 2 * Math.floor((Math.abs(b.turn) * 180) / Math.PI / 45) - (b.time >= CONFIG.score.butterPressMin ? 1 : 0)
+        ? -2 - 2 * (Math.floor((Math.abs(b.turn - b.runs.start) * 180) / Math.PI / 45) + 1000 * b.runs.count) - (b.time >= CONFIG.score.butterPressMin ? 1 : 0)
         : -1;
     if (key === this.shownSlideMeters) return;
     this.shownSlideMeters = key;
@@ -262,6 +329,7 @@ export class ScoreHud {
     if (this.blank) return;
     this.blank = true;
     this.mode = 'none';
+    this.chainLive = false;
     this.panel.hidden = true;
     this.slide.hidden = true;
     this.shownSlideMeters = -1;

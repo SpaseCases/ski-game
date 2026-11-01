@@ -32,6 +32,8 @@ type Pt = [along: number, across: number, height: number];
 const features: Json[] = [];
 const flags: Json[] = [];
 const decor: Json[] = [];
+/** Named gaps for scoring (the Cat gap). */
+const gaps: Json[] = [];
 const r2 = (v: number): number => Math.round(v * 100) / 100;
 const DEG = Math.PI / 180;
 
@@ -154,12 +156,31 @@ function gapMiddle(o: JumpOpts): number {
   return (2 * o.lip) / Math.tan(o.angle * DEG) + down + (o.gap - 1.5 - down - up) / 2;
 }
 
-/** An open gap jump with something parked across the middle of its gap. */
-function OVER(gap: Item, kind: 'groomer'): Item {
+/** A rectangle across a straight line at x, from d0 to d1 down the hill, `half` m each side. */
+function across(x: number, d0: number, d1: number, half: number): Json[] {
+  return [
+    { x: r2(x - half), z: r2(-d0) },
+    { x: r2(x + half), z: r2(-d0) },
+    { x: r2(x + half), z: r2(-d1) },
+    { x: r2(x - half), z: r2(-d1) },
+  ];
+}
+
+/**
+ * An open gap jump with something parked across the middle of its gap, and
+ * a named gap for scoring: taken off its takeoff, landed past its knuckle
+ * (as src/sim/gaps.ts marks every open gap's plain "Gap", which this one
+ * stands in for).
+ */
+function OVER(gap: Item, kind: 'groomer', name: string, points: number): Item {
   const o = gap.opts!;
   return { ...gap, place: (x, d) => {
     gap.place(x, d);
-    decor.push({ kind, points: [{ x: r2(x + (o.dx ?? 0)), z: r2(-(d + gapMiddle(o))) }], heading: 90 });
+    const at = x + (o.dx ?? 0);
+    decor.push({ kind, points: [{ x: r2(at), z: r2(-(d + gapMiddle(o))) }], heading: 90 });
+    const lip = (2 * o.lip) / Math.tan(o.angle * DEG);
+    const half = (o.width ?? 8) / 2 + 2.5;
+    gaps.push({ name, from: across(at, d - 3, d + lip + 1, half), to: across(at, d + lip + o.gap, d + gap.len + 60, half), points });
   } };
 }
 
@@ -591,7 +612,7 @@ const lanes: Json[] = [];
   sectionEnd('S3 jump', line(X.jump, D.s3 + 6, 14, [
     BIG(3.2, 20),
     BIG(3.4, 22),
-    OVER(GAP(3.4, 14, 3.4), 'groomer'),
+    OVER(GAP(3.4, 14, 3.4), 'groomer', 'Cat gap', 400),
     10,
     BIG(3.6, 24),
     GAP(3.6, 14, 4.2, 18),
@@ -785,7 +806,7 @@ decor.push({ kind: 'rock', area: { x: -190, z: midZ, width: 70, length: len }, c
 decor.push({ kind: 'boulder', area: { x: 190, z: midZ, width: 60, length: len }, count: 120, seed: 9, minScale: 0.8, maxScale: 1.6 });
 decor.push({ kind: 'snag', area: { x: -185, z: midZ, width: 50, length: len }, count: 50, seed: 10, minScale: 0.8, maxScale: 1.2 });
 
-const map = { name: 'Jam Park', terrain, features, spawn, flags, finishes: [finish], decor, colors: { sky: '#8fbde9', fog: '#d9e7f3' } };
+const map = { name: 'Jam Park', terrain, features, spawn, flags, finishes: [finish], decor, colors: { sky: '#8fbde9', fog: '#d9e7f3' }, gaps };
 
 // ---------------------------------------------------------------- report
 const parsed = parseMap(map);

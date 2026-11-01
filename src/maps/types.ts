@@ -828,6 +828,20 @@ export interface MapDef {
   weather?: Partial<Record<'overcast' | 'blizzard' | 'night', { sky?: string; fog?: string }>>;
   /** Where this map's sun and moon hang, in place of CONFIG.sun's and CONFIG.lights' (both measured from the start's heading). */
   sky?: { sun?: SkyAt; moon?: SkyAt };
+  /** Named gaps for scoring (the Cat gap). Open gap jumps, rail transfers and fence hops score on their own. */
+  gaps?: GapDef[];
+}
+
+/**
+ * A named gap: an air that takes off inside `from` and lands (on the snow
+ * or a rail) inside `to` scores as a trick of its own, `points` before any
+ * repeat. It stands in for the open gap jump's plain "Gap" it overlaps.
+ */
+export interface GapDef {
+  name: string;
+  from: XZ[];
+  to: XZ[];
+  points: number;
 }
 
 /** A spot in the sky: degrees to the left of the map's start heading (negative: right), and up from the horizon. */

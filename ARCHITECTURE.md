@@ -1,11 +1,11 @@
 # Architecture
 
-A map of the code for finding things fast. `GAME_DESIGN.md` says what to build; `CLAUDE.md` gives the rules. This file says where things live and what breaks easily. Written 2026-10-29 at `4bbd1c9` (after milestone 8); updated for milestone 9. Line numbers rot, so prefer the function names.
+A map of the code for finding things fast. `GAME_DESIGN.md` says what to build; `CLAUDE.md` gives the rules. This file says where things live and what breaks easily. Written 2026-10-29 at `4bbd1c9` (after milestone 8); updated for milestones 9 and 10. Line numbers rot, so prefer the function names.
 
 ## The big picture
 
 ```
-maps/*.json ──registry (lazy import)──► parseMap ──► buildMap ──► BuiltMap { hf, course{rails,obstacles}, race, decor, starts }
+maps/*.json ──registry (lazy import)──► parseMap ──► buildMap ──► BuiltMap { hf, course{rails,obstacles}, race, decor, starts, gaps }
                                                                    │                     │
                          sim (120 Hz, no Three.js scene) ◄─────────┘                     └──► WorldView (render)
                          SkierState ──(prev, cur, alpha)──► interpolateSkier ──► SkierView / ChaseCamera / SnowFx / audio
@@ -31,7 +31,8 @@ maps/*.json ──registry (lazy import)──► parseMap ──► buildMap �
 | `powder.ts` | `inPowder`: off a map's runs and groomed patches (Freeride). `Course.powder` carries it; `land` uses it for `landing.powderImpact`, and `snowFx` for spray and the carve sound |
 | `checkpoints.ts` | `RunState`: flags, personal checkpoint, `respawnSkier`, finish zones |
 | `race.ts` | Slalom courses: wand start, gate pass or miss, the finish, and spring-damper bending gates that `knock` the skier |
-| `score.ts` | A pure observer: rotation from the `trick` quaternion delta in body axes, combos and multipliers. `sketchyLanding` is shared with audio |
+| `score.ts` | A pure observer: rotation from the `trick` quaternion delta in body axes, kept per axis as `Runs` each way (a reversal past `reverseMin` closes a run; each run counts its own whole steps, grace only on the last), combos and multipliers. `endGaps` scores gaps after `endAir`. `sketchyLanding` is shared with audio |
+| `gaps.ts` | `buildGaps` (per map, in `BuiltMap.gaps`): each open gap jump's takeoff and landing areas ("Gap"), the map's named `gaps`, and fence segments from `fence` decor. Scoring reads it only at takeoff and landing (`clearsZone`, `crossesFence`) |
 
 **Config:** `skier`, `air`, `landing` (`caseTrickMax`, `casePitchMax`, `powderImpact` since M9), `rails`, `bail`, `slalom`, `giantSlalom`, `score`, `checkpoints`, `sim`, `cheats`, `skis`.
 
@@ -43,6 +44,8 @@ maps/*.json ──registry (lazy import)──► parseMap ──► buildMap �
 - Module-level scratch vectors are shared between functions: `land` / `crash` read the `contactNormal` that `moveInAir` just set, and `railSpot` writes `head` and `railDir`. Reordering calls breaks things silently.
 - `air.wallAngle` (44°) decides what counts as a wall. That covers pops, air leveling and how every pipe, gully and lip is authored. Takeoff faces are exempt, and a pop off a lip steeper than 44° goes straight up.
 - Landing limits (`landing.*`, scaled per ski) also set "sketchy" in scoring and whether the crowd cheers. Changing a limit changes scores and audio too.
+- **Scoring reads rotation in runs (M10).** `spinRuns` and the flip loop in `endAir` iterate closed runs then the one going, and leave the degrees counted in the module-level `counted` (read right after the call; `butterName` relies on it too). A closed run gets no `spinShort`/`flipShort` grace, so a reversal only counts when the first run turned a full step. Which axis names a trick is decided by `runPath` (every run's size summed), not the net angle.
+- **Gaps (M10)** are built from map data in `sim/gaps.ts`: open gaps from `JumpFeature` geometry duplicated from `maps/shapes.ts` (`lip`, `knuckle`, the landing's end, +60 m `LANDING_PAST`), fences only from `fence` line decor (not netting or barriers), and the takeoff point is `prev.position` at `beginAir`. Jam Park's Cat gap polygons come from `tools/maps/jampark.ts OVER`, so moving that jump means rerunning the generator. Numbers outside config: `TAKEOFF_BEFORE`, `TAKEOFF_PAST`, `LANDING_PAST`, `MAX_RUNS`.
 - `race.ts` reads `CONFIG.render`'s lean numbers and hard-codes body heights to place the gate-hit body. Render tuning changes gameplay here, and it can drift from what `skierView` draws.
 - `slideRail` skips `keepInside`, `bump` and obstacles. `CHEATS.noCrashes` is checked in four places in `skier.ts`. The obstacle grid bakes `rails.bodyRadius` at build time, so a tuning-panel change to it doesn't apply.
 - Linear scans every step: all rails (with a bounding-box cull), all gates in `bendSides`, and `pipeAt` / `quarterInward` over all shapes (long on Freeride's town).
@@ -53,12 +56,12 @@ maps/*.json ──registry (lazy import)──► parseMap ──► buildMap �
 - **Pipeline:** `registry.ts` (`MapId` union + `MAPS`, one lazy chunk per JSON) → `loader.ts parseMap` (hand-written validation and defaults; **unknown keys are dropped silently**, and nothing is fetched here) → `build.ts buildMap`: `generateTerrain` → `startFrames` → `setShapes` (ramps, pipes, starts, town) → `buildRailShapes` (after the shapes, so rails sit on them) → `layoutDecor` → `buildObstacles` → `buildRace`.
 - **Terrain is a recipe, never stored heights.** `generated` (`terrain.ts`: a pitch profile, lanes solved to end level, berms, hills) or `peak` (`peak.ts`: spokes from a summit, Hermite-blended, then ordered `elements` such as ridge, gully, cliffs, lip, bowl, pillows, bumps, dip and flat, plus a rim at the bounds). A `heightfield` type is planned for M19 (Brundage, on hold).
 - **Shapes** (`shapes.ts`) are exact Hermite profiles on top of the grid in 32 m cells. The highest one wins. Cliffs are terrain elements; booters are `kicker`/`jump` with `natural: true`.
-- `types.ts` holds the whole format (`MapDef`, `Feature` union, `TerrainDef`). `decor.ts` does scatter and thinning (`thinDecor` per preset). `town.ts` builds buildings and terraces; `startGates.ts` builds the deck, tower, ridge and race house.
+- `types.ts` holds the whole format (`MapDef`, `Feature` union, `TerrainDef`, `GapDef` for named scoring gaps). `decor.ts` does scatter and thinning (`thinDecor` per preset). `town.ts` builds buildings and terraces; `startGates.ts` builds the deck, tower, ridge and race house.
 
 | Map | Generator | Notes |
 |---|---|---|
 | park | `park.ts` | 280×2150, 121 features, 2 pipes, the 1,948 m rail |
-| jampark | `jampark.ts` (began as a copy of park.ts) | 300×2030, 203 features, quarters and wallrides; on trial beside the Park |
+| jampark | `jampark.ts` (began as a copy of park.ts) | 300×2030, 203 features, quarters and wallrides, the Cat gap (`gaps`); on trial beside the Park |
 | freeride | `freeride.ts` | Peak, 6.2 km square, 3 m cells (~4.3M samples), town, 4 finishes, 16 runs, powder |
 | slalom | `slalom.ts` | Two race courses, `scoring: false`, no flags |
 | bigair | `bigair.ts` | 6 lanes (the ski jump and landings are terrain lanes) and a tower |
@@ -115,10 +118,10 @@ maps/*.json ──registry (lazy import)──► parseMap ──► buildMap �
 ## UI and core (`src/ui/`, `src/core/`)
 - `ui/menus.ts`: the screen stack and **all** menu key routing (a capture-phase `keydown` on `window`). Order: rebind trap → tuning-panel keys ignored → no menu open goes to `onGameKey` (in main.ts) → the screen's `onKey` → Esc / Tab / Enter / arrows. It also has `prewarm`, `setHole` (Locker window) and the helpers `board` and `plank`.
 - Screens: `mainMenus.ts` (title, pause with the Weather plank), `mapSelect.ts` + `weatherPicker.ts`, `settingsMenu.ts` (quality, volume, score switch, crash setting, Pop with, two key slots per action), `controlsMenu.ts` (tables follow Pop with; a plank opens the tester), `keyTester.ts` (a Chromebook-style keyboard drawing that lights held keys; its `onKey` swallows every key but Esc, and it listens for keyup on `window` only while shown), `cheatsMenu.ts`, `lockerMenu.ts`, `trailMap.ts` (its own overlay, not on the stack).
-- HUD: `scoreHud.ts` (also submits bests and fires combo sounds through callbacks), `scoreText.ts`, `runHud.ts`, `raceHud.ts`, `hints.ts`, `toast.ts`, `fade.ts`, `fps.ts` (always shown), `embed.ts` (Open in new tab, and Fullscreen only if `fullscreenEnabled`).
+- HUD: `scoreHud.ts` (also submits bests and fires combo sounds through callbacks; keeps the combo's chain from the events it reads and lays it out in `fitChain`, which measures `scrollHeight` against the CSS three-line `max-height` once per trick, never per frame), `scoreText.ts` (`chainText`), `runHud.ts`, `raceHud.ts`, `hints.ts`, `toast.ts`, `fade.ts`, `fps.ts` (always shown), `embed.ts` (Open in new tab, and Fullscreen only if `fullscreenEnabled`).
 - `tuningPanel.ts`: lil-gui, a dynamic import (its own chunk), opened from Cheats in every build and folded open in dev. It edits CONFIG in place.
 - `core/input.ts`: `ACTIONS`, `GRAB_ACTIONS`, `DEFAULT_BINDINGS` (by `KeyboardEvent.code`; `pop` is Space), `mirrorPop`, and `Keyboard` (a bubble-phase listener, disabled while any menu is open; `setPopWithUp`). `core/settings.ts`: load and save, `assignKey`, the quality helpers. `core/storage.ts`: try/catch wrappers.
-- **Storage keys** (`parkLaps.` prefix): `settings.v1`, `outfit.v1`, `bests.v1`, `weather.v1`, `map`, and the legacy `quality` (read once). **URL overrides:** `?map=`, `?quality=`, `?weather=`.
+- **Storage keys** (`parkLaps.` prefix): `settings.v1`, `outfit.v1`, `bests.v1` (`<map>` and `<map>#cheats` entries; `submitCombo` re-reads it and keeps the higher of each before writing), `weather.v1`, `map`, and the legacy `quality` (read once). The HUD's "Best with cheats" follows the "Cheats on" tag (`cheatsTag.hidden`), so it doesn't deep-compare CONFIG every frame. **URL overrides:** `?map=`, `?quality=`, `?weather=`.
 - **Fragile**
   - `Keyboard` ignores modifiers, so Ctrl+R is swallowed and respawns while riding.
   - `onGameKey` must `stopPropagation` on trail-map close, or the bubble-phase `Keyboard` reopens it.
@@ -152,7 +155,7 @@ maps/*.json ──registry (lazy import)──► parseMap ──► buildMap �
   - `course.ts`: slalom courses.
   - `features.ts <map> [kinds]`: every jump, kicker, quarter or jib, ending with a problem count.
   - `jumps.ts`, `kickers.ts`, `butter.ts`, `spin720.ts`.
-  - `score.ts`: the scoring check; its rail and butter parts assume Park coordinates.
+  - `score.ts`: the scoring check; its rail and butter parts assume Park coordinates. On the Park it also rides milestone 10's rotation cases off jump 75 (turning cheats on and off with `setCheat`) and loads Jam Park for the gap cases (feature indices found by geometry: the open gaps on x = -20, the jump inside the Cat gap's polygon, the tube at x = -64, the fence at x = -42).
 - Map tools: the five generators (write `src/maps/<id>.json`), `sinks.ts <map>` (holes a rider can't leave; expect 0), `overview.ts <map> <png> [m/px] [box]` (top-down PNG).
 - Model: `model/clearance.ts` (poses vs body), `model/skis.ts [png]` (triangle counts, graphics sheet).
 

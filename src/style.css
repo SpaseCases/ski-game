@@ -1933,6 +1933,55 @@ body {
   text-align: center;
 }
 
+/*
+ * The live combo's chain, above its points: links wrap onto at most three
+ * lines (fitChain folds the oldest into "+N more" past that), the newest
+ * brightest. Each link keeps its words together, and its "+" with it.
+ */
+.score-chain {
+  max-width: 24em;
+  max-height: calc(3 * 1.3em);
+  margin: 0 auto 0.15em;
+  overflow: hidden;
+  font-size: 0.78em;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.score-chain:empty {
+  display: none;
+}
+
+.score-link {
+  white-space: nowrap;
+  opacity: 0.66;
+}
+
+.score-link ~ .score-link::before,
+.score-more:not(:empty) ~ .score-link::before {
+  content: '+ ';
+  color: var(--flag);
+}
+
+.score-link.is-newest {
+  opacity: 1;
+}
+
+.score-more {
+  color: var(--frost);
+  white-space: nowrap;
+}
+
+.score-panel.is-best .score-link::before,
+.score-panel.is-best .score-more {
+  color: inherit;
+}
+
+.score-panel.is-lost .score-chain {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
 .score-row {
   display: flex;
   justify-content: center;
@@ -2072,5 +2121,10 @@ body {
 @media (max-height: 400px) {
   .score-tricks .score-trick:not(:last-child) {
     display: none;
+  }
+
+  /* The chain's last three names, kept narrow so the panel clears the frame-rate readout. */
+  .score-chain {
+    max-width: 14em;
   }
 }
