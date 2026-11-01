@@ -154,6 +154,7 @@ const SKATING: (Entry | null)[] = [
 
 /** ?set=looks: every headwear, then every pattern on the jacket and the pants. */
 const HAT_COLORS: Record<string, Partial<Outfit>> = {
+  fullface: { helmet: '#ece8de' },
   beanie: { helmet: '#2f7fe0' },
   cap: { helmet: '#d33a3f' },
   bucket: { helmet: '#c8b07e' },
@@ -182,14 +183,14 @@ const LOOKS: (Entry | null)[] = [
     airborne: false,
     outfit: { jacketPattern: id, pantsPattern: id, ...PATTERN_LOOKS[id] },
   })),
-  ...(['beanie', 'cap', 'bucket', 'hood'] as const).map((id) => ({
+  ...(['fullface', 'beanie', 'cap', 'bucket', 'hood', 'santa'] as const).map((id) => ({
     name: `${HEADWEAR.find((h) => h.id === id)!.name}, tucked`,
     note: 'Head down in a tuck',
     ride: { speed: 15, crouch: 1 },
     airborne: false,
     outfit: { headwear: id, ...HAT_COLORS[id] },
   })),
-  ...(['cap', 'hood'] as const).map((id) => ({
+  ...(['fullface', 'cap', 'hood'] as const).map((id) => ({
     name: `${HEADWEAR.find((h) => h.id === id)!.name}, mute grab`,
     note: 'Head turned in the air',
     pose: LEFT_MUTE,

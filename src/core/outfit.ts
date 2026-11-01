@@ -32,9 +32,10 @@ export const PALETTE: readonly { readonly name: string; readonly hex: string }[]
   { name: 'Cherry', hex: '#d33a3f' },
 ];
 
-export type Headwear = 'helmet' | 'beanie' | 'cap' | 'bucket' | 'hood' | 'santa' | 'pumpkin';
+export type Headwear = 'helmet' | 'fullface' | 'beanie' | 'cap' | 'bucket' | 'hood' | 'santa' | 'pumpkin';
 export const HEADWEAR: readonly { readonly id: Headwear; readonly name: string }[] = [
   { id: 'helmet', name: 'Helmet' },
+  { id: 'fullface', name: 'Full-face' },
   { id: 'beanie', name: 'Beanie' },
   { id: 'cap', name: 'Cap' },
   { id: 'bucket', name: 'Bucket hat' },

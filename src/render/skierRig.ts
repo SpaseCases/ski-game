@@ -40,6 +40,8 @@ import type { PoseDef, Vec3 } from './skierPoses.ts';
 
 const FIXED = {
   vent: '#0e0f12',
+  /** The full-face helmet's chin bar and side plates. */
+  plate: '#1b1d21',
   /** What a mirrored lens reflects: its top half takes a little of the sky's blue. */
   lensSky: '#9fc3e6',
   zip: '#16181c',
@@ -995,9 +997,10 @@ function smooth01(t: number): number {
 }
 
 /**
- * Head, built up from the base of the neck: gaiter, goggles, helmet (the
- * Santa hat goes over it as its own mesh). Nothing of the face shows. The
- * jack-o'-lantern replaces the helmet and goggles with a whole pumpkin.
+ * Head, built up from the base of the neck: gaiter, goggles, then the
+ * helmet or a hat (the Santa hat's cone and the beanie's pom are their own
+ * swaying mesh). Nothing of the face shows. The jack-o'-lantern replaces
+ * the helmet and goggles with a whole pumpkin.
  */
 function buildHead(o: Outfit): BufferGeometry {
   const gaiter = new Color(o.gaiter);
@@ -1009,18 +1012,25 @@ function buildHead(o: Outfit): BufferGeometry {
     ...buildGaiter(gaiter),
     ...buildGoggles(o.goggleFrame, new Color(o.goggleLens)),
   ];
+  // The cap, the bucket hat and the Santa hat go over the strap (tucked under, it shows only below their edge).
   switch (o.headwear) {
+    case 'fullface':
+      parts.push(...buildFullFace(hat), buildStrap(o.goggleStrap, fullFaceRadiusAt(GOGGLE_Y) + 0.001, FULLFACE.strapFrom));
+      break;
     case 'beanie':
-      parts.push(...buildBeanie(hat), buildStrap(o.goggleStrap, BEANIE.r + 0.001));
+      parts.push(...buildBeanie(hat), buildStrap(o.goggleStrap, BEANIE.r + BEANIE.rib + 0.002));
       break;
     case 'cap':
-      parts.push(...buildCap(hat, gaiter), buildStrap(o.goggleStrap, CAP.r + 0.001));
+      parts.push(...buildCap(hat, gaiter), buildStrap(o.goggleStrap, CAP.r - 0.016));
       break;
     case 'bucket':
-      parts.push(...buildBucket(hat), buildStrap(o.goggleStrap, BUCKET.r + 0.001));
+      parts.push(...buildBucket(hat), buildStrap(o.goggleStrap, BUCKET.r - 0.01));
       break;
     case 'hood':
-      parts.push(...buildHelmet(hat, o.goggleStrap), ...buildHood(new Color(o.jacket)));
+      parts.push(...buildHelmet(hat, o.goggleStrap, true), ...buildHood(new Color(o.jacket)));
+      break;
+    case 'santa':
+      parts.push(...buildSantaBase(), buildStrap(o.goggleStrap, SANTA.r - 0.014));
       break;
     default:
       parts.push(...buildHelmet(hat, o.goggleStrap));
@@ -1051,7 +1061,8 @@ function buildGaiter(color: Color): BufferGeometry[] {
   ];
 }
 
-function buildHelmet(helmet: Color, strap: string): BufferGeometry[] {
+/** `hooded`: under the hood, which hides the vents and the strap, so they're left out. */
+function buildHelmet(helmet: Color, strap: string, hooded = false): BufferGeometry[] {
   const fit = (g: BufferGeometry): BufferGeometry => g.scale(1, 1, HELMET.long).translate(0, 0, HELMET.back);
 
   // Dome, with every vertex below the edge line lifted onto it.
@@ -1074,6 +1085,7 @@ function buildHelmet(helmet: Color, strap: string): BufferGeometry[] {
       edgeColor,
     ),
   );
+  if (hooded) return parts;
   // Small vents set into the shell: an arc of five over the forehead and two at the back.
   const vents: [number, number][] = [
     [0, 0.7],
@@ -1100,11 +1112,15 @@ function buildHelmet(helmet: Color, strap: string): BufferGeometry[] {
   return parts;
 }
 
-/** Goggle strap round the back of the head at radius `r` (before the head's stretch), from where the frame slips under the helmet's or hat's edge. */
-function buildStrap(strap: string, r: number): BufferGeometry {
+/**
+ * Goggle strap round the back of the head at radius `r` (before the head's
+ * stretch), from `from` rad either side of straight ahead: where the frame
+ * slips under the helmet's or hat's edge.
+ */
+function buildStrap(strap: string, r: number, from = STRAP_FROM): BufferGeometry {
   const strapY: AngleFn = (a) => GOGGLE_Y + 0.012 * smooth01((Math.abs(wrapAngle(a)) - STRAP_FROM) / 1.2);
   return paint(
-    fitHead(curvedPanel(constant(r), constant(r + 0.0065), (a) => strapY(a) + 0.014, (a) => strapY(a) - 0.014, STRAP_FROM, Math.PI * 2 - STRAP_FROM, 20)),
+    fitHead(curvedPanel(constant(r), constant(r + 0.0065), (a) => strapY(a) + 0.014, (a) => strapY(a) - 0.014, from, Math.PI * 2 - from, 20)),
     strap,
   );
 }
@@ -1136,59 +1152,108 @@ function domeRadiusAt(r: number, squash: number, y: number): number {
   return r * Math.sqrt(Math.max(0, 1 - ((y - GOGGLE_Y) / (r * squash)) ** 2));
 }
 
-/** Knit beanie: a slouchy ribbed dome and a thick folded cuff resting on the goggles; its pom sways (buildPom). */
-const BEANIE = { r: 0.124, squash: 1.12, cuff: 0.042 };
+/**
+ * Knit beanie: a tall ribbed crown slouching back, a thick folded cuff
+ * resting on the goggles, and a pom (buildPom) that sways. `rib` is how far
+ * the ribs stand out of the knit, `slouch` how far back the crown sags.
+ */
+const BEANIE = { r: 0.125, squash: 1.3, cuff: 0.05, rib: 0.006, slouch: 0.05 };
+/** The beanie's crown top (before fitHead), where the pom sits. */
+const BEANIE_TOP = GOGGLE_Y + BEANIE.r * BEANIE.squash;
 
 function buildBeanie(color: Color): BufferGeometry[] {
-  const { r, squash, cuff } = BEANIE;
-  const rib = shade(color, 0.9);
-  const ribs = (n: number): FaceColor => (c) => (Math.floor(((around(c) + Math.PI) / (Math.PI * 2)) * n) % 2 === 0 ? color : rib);
-  const crown = paint(fitHead(hatDome(r, squash, helmetEdge, 20, 12)), ribs(20));
-  // The cuff hugs the dome from its edge up, a little proud of it, with a lip top and bottom.
-  const SEGS = 40;
+  const { r, squash, cuff, rib, slouch } = BEANIE;
+  const COLUMNS = 24;
+  const ribColor = shade(color, 0.78);
+  const ribs = (n: number): FaceColor => (c) => (Math.floor(((around(c) + Math.PI) / (Math.PI * 2)) * n) % 2 === 0 ? color : ribColor);
+  // The crown's ribs: every other column of the dome stands out (fading
+  // toward the top, where they gather), then the top sags back.
+  const dome = hatDome(r, squash, helmetEdge, COLUMNS, 12);
+  const p = dome.getAttribute('position');
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i);
+    const out = (i % (COLUMNS + 1)) % 2 === 0 ? rib * (1 - smooth01((y - 0.27) / 0.08)) : 0;
+    const flat = Math.hypot(p.getX(i), p.getZ(i));
+    if (flat > 1e-6) {
+      const k = (flat + out) / flat;
+      p.setX(i, p.getX(i) * k);
+      p.setZ(i, p.getZ(i) * k);
+    }
+    p.setZ(i, p.getZ(i) + slouch * smooth01((y - 0.25) / (BEANIE_TOP - 0.25)) ** 1.5);
+  }
+  const crown = paint(fitHead(dome), ribs(COLUMNS));
+  return [crown, paint(fitHead(buildCuff(r, squash, helmetEdge, cuff, rib + 0.005, rib, 40)), ribs(40))];
+}
+
+/**
+ * A folded cuff hugging a hatDome from its `edge` up `height` m, `out` m
+ * proud of the dome, with a lip top and bottom. Every other column stands
+ * out by `bump` (knit ribs, fluffy fur).
+ */
+function buildCuff(r: number, squash: number, edge: AngleFn, height: number, out: number, bump: number, segments: number): BufferGeometry {
   const pos: number[] = [];
-  const at = (a: number, y: number, out: number): Point => {
-    const rr = domeRadiusAt(r, squash, y) + out;
-    return [rr * Math.sin(a), y, -rr * Math.cos(a)];
+  const at = (a: number, y: number, o: number): Vector3 => {
+    const rr = domeRadiusAt(r, squash, y) + o;
+    return new Vector3(rr * Math.sin(a), y, -rr * Math.cos(a));
   };
-  for (let i = 0; i < SEGS; i++) {
-    const a0 = -Math.PI + (Math.PI * 2 * i) / SEGS;
-    const a1 = -Math.PI + (Math.PI * 2 * (i + 1)) / SEGS;
-    const e0 = helmetEdge(a0) - 0.003;
-    const e1 = helmetEdge(a1) - 0.003;
-    const b0 = at(a0, e0, 0.008);
-    const b1 = at(a1, e1, 0.008);
-    const t0 = at(a0, e0 + cuff, 0.008);
-    const t1 = at(a1, e1 + cuff, 0.008);
+  const quad = (p: Vector3, q: Vector3, s: Vector3, t: Vector3, facing: Vector3): void => {
+    pos.push(...outward(p, q, s, facing), ...outward(p, s, t, facing));
+  };
+  const facing = new Vector3();
+  for (let i = 0; i < segments; i++) {
+    const a0 = -Math.PI + (Math.PI * 2 * i) / segments;
+    const a1 = -Math.PI + (Math.PI * 2 * (i + 1)) / segments;
+    const o0 = out + (i % 2 === 0 ? bump : 0);
+    const o1 = out + ((i + 1) % 2 === 0 ? bump : 0);
+    const e0 = edge(a0) - 0.003;
+    const e1 = edge(a1) - 0.003;
+    const b0 = at(a0, e0, o0);
+    const b1 = at(a1, e1, o1);
+    const t0 = at(a0, e0 + height, o0);
+    const t1 = at(a1, e1 + height, o1);
     const bi0 = at(a0, e0, -0.004);
     const bi1 = at(a1, e1, -0.004);
-    const ti0 = at(a0, e0 + cuff, -0.004);
-    const ti1 = at(a1, e1 + cuff, -0.004);
-    pos.push(...b0, ...b1, ...t1, ...b0, ...t1, ...t0); // outside
-    pos.push(...ti0, ...t0, ...t1, ...ti0, ...t1, ...ti1); // top lip
-    pos.push(...bi0, ...bi1, ...b1, ...bi0, ...b1, ...b0); // bottom lip
+    const ti0 = at(a0, e0 + height, -0.004);
+    const ti1 = at(a1, e1 + height, -0.004);
+    const mid = (a0 + a1) / 2;
+    quad(b0, b1, t1, t0, facing.set(Math.sin(mid), 0, -Math.cos(mid))); // outside
+    quad(ti0, t0, t1, ti1, facing.set(0, 1, 0)); // top lip
+    quad(bi0, bi1, b1, b0, facing.set(0, -1, 0)); // bottom lip
   }
   const band = new BufferGeometry();
   band.setAttribute('position', new Float32BufferAttribute(pos, 3));
   band.computeVertexNormals();
-  return [crown, paint(fitHead(band), ribs(SEGS))];
+  return band;
 }
 
-/** The beanie's pom on top: drawn with the cloth material, so it sways a little. A lighter tone on a dark beanie, darker on a light one. */
+/**
+ * The beanie's pom on top: a shaggy ball drawn with the cloth material, so
+ * it sways a little. A lighter tone on a dark beanie, darker on a light one.
+ */
 function buildPom(color: Color): BufferGeometry {
   const light = color.getHSL({ h: 0, s: 0, l: 0 }).l < 0.45;
   const pomColor = light ? color.clone().lerp(new Color('#ece8de'), 0.6) : shade(color, 0.72);
-  const top = GOGGLE_Y + BEANIE.r * BEANIE.squash;
+  const top = BEANIE_TOP;
+  const ball = new IcosahedronGeometry(0.044, 1);
+  // Shaggy: each corner in or out by its position (so corners shared by faces move together).
+  const bp = ball.getAttribute('position');
+  for (let i = 0; i < bp.count; i++) {
+    const x = bp.getX(i);
+    const y = bp.getY(i);
+    const z = bp.getZ(i);
+    const k = 1 + 0.14 * Math.sin(x * 157 + y * 91) * Math.cos(z * 133 - x * 47);
+    bp.setXYZ(i, x * k, y * k * 0.9, z * k);
+  }
   const g = fitHead(
     merge([
-      paint(prism(0.012, 0.009, 0.02, 6).translate(0, top - 0.008, 0), shade(color, 0.85)),
-      paint(new IcosahedronGeometry(0.038, 1).scale(1, 0.9, 1).translate(0, top + 0.036, 0), pomColor),
+      paint(prism(0.013, 0.01, 0.022, 6).translate(0, top - 0.01, BEANIE.slouch), shade(color, 0.85)),
+      paint(ball.translate(0, top + 0.04, BEANIE.slouch + 0.004), pomColor),
     ]),
   );
   // Sway grows from the knot to the top of the pom.
   const pos = g.getAttribute('position');
   const sway = new Float32Array(pos.count);
-  for (let i = 0; i < pos.count; i++) sway[i] = 0.06 + 0.08 * Math.min(1, Math.max(0, (pos.getY(i) - top) / 0.07));
+  for (let i = 0; i < pos.count; i++) sway[i] = 0.06 + 0.08 * Math.min(1, Math.max(0, (pos.getY(i) - top) / 0.08));
   g.setAttribute('sway', new BufferAttribute(sway, 1));
   return g;
 }
@@ -1275,24 +1340,114 @@ function buildBucket(color: Color): BufferGeometry[] {
 }
 
 /**
- * Hood up over the helmet: the jacket's hood, roomy round the helmet and down
- * to the collar, its opening framing the goggles and gaiter. Lined (a
- * darker inside, so looking in at the opening shows cloth, not nothing),
- * with a hemmed edge round the opening.
+ * A shell round the whole head with an opening for the face (the hood, the
+ * full-face helmet): rings at `rows` heights (the lowest following `bottom`
+ * when given), `radius` out at each angle and height. Each ring runs from
+ * one side of the opening round the back to the other, `open(y)` rad either
+ * side of straight ahead (0: a closed ring), so the opening's edge is a
+ * clean line of corners.
+ */
+interface FaceShell {
+  rows: readonly number[];
+  bottom?: AngleFn;
+  radius: (a: number, y: number) => number;
+  open: (y: number) => number;
+}
+
+/** A corner of `s` at angle `a` on ring `j`, `scale` of the way out. */
+function shellPoint(s: FaceShell, a: number, j: number, scale: number): Vector3 {
+  const y = j === 0 && s.bottom ? s.bottom(a) : s.rows[j]!;
+  const r = s.radius(a, y) * scale;
+  return new Vector3(r * Math.sin(a), y, -r * Math.cos(a));
+}
+
+/** The shell's surface, `scale` of the way out, in `columns` columns; a lining (`inward`) faces in. */
+function buildFaceShell(s: FaceShell, columns: number, scale: number, inward: boolean): BufferGeometry {
+  const ring = (j: number): Vector3[] => {
+    const half = s.open(s.rows[j]!);
+    const points: Vector3[] = [];
+    for (let i = 0; i <= columns; i++) points.push(shellPoint(s, half + ((Math.PI * 2 - 2 * half) * i) / columns, j, scale));
+    return points;
+  };
+  const pos: number[] = [];
+  const out = new Vector3();
+  let lower = ring(0);
+  for (let j = 1; j < s.rows.length; j++) {
+    const upper = ring(j);
+    for (let i = 0; i < columns; i++) {
+      const a0 = lower[i]!;
+      const a1 = lower[i + 1]!;
+      const b0 = upper[i]!;
+      const b1 = upper[i + 1]!;
+      out.copy(a0).add(b1).setY(0).multiplyScalar(inward ? -1 : 1);
+      pos.push(...outward(a0, a1, b1, out), ...outward(a0, b1, b0, out));
+    }
+    lower = upper;
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+/**
+ * The rolled edge round the shell's opening, from the outside over to the
+ * lining (`lining` of the way out), bulging `bulge` m out in the middle.
+ */
+function buildFaceRim(s: FaceShell, lining: number, bulge: number): BufferGeometry {
+  const pos: number[] = [];
+  const out = new Vector3();
+  const mid = (o: Vector3, l: Vector3): Vector3 => {
+    const m = o.clone().add(l).multiplyScalar(0.5);
+    const flat = Math.hypot(m.x, m.z);
+    return m.set(m.x * (1 + bulge / flat), m.y, m.z * (1 + bulge / flat));
+  };
+  for (const side of [1, -1]) {
+    for (let j = 1; j < s.rows.length; j++) {
+      const h0 = s.open(s.rows[j - 1]!);
+      const h1 = s.open(s.rows[j]!);
+      if (h0 === 0 && h1 === 0) continue;
+      const o0 = shellPoint(s, side * h0, j - 1, 1);
+      const o1 = shellPoint(s, side * h1, j, 1);
+      const l0 = shellPoint(s, side * h0, j - 1, lining);
+      const l1 = shellPoint(s, side * h1, j, lining);
+      const m0 = mid(o0, l0);
+      const m1 = mid(o1, l1);
+      // Facing into the opening (toward straight ahead) and forward.
+      const a = side * (h0 + h1) * 0.5;
+      out.set(-side * Math.cos(a), 0, -side * Math.sin(a)).add(fc.set(Math.sin(a), 0, -Math.cos(a)));
+      pos.push(...outward(o0, o1, m1, out), ...outward(o0, m1, m0, out));
+      pos.push(...outward(m0, m1, l1, out), ...outward(m0, l1, l0, out));
+    }
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+/**
+ * Hood up over the helmet: the jacket's hood, puffy and roomy round the
+ * helmet, its oval opening framing the goggles and the gaiter down to the
+ * chin, where it closes into the collar. Lined in a darker shade (looking
+ * in at the opening shows cloth, not nothing), with a rolled hem round the
+ * opening.
  */
 const HOOD_PROFILE: readonly (readonly [number, number])[] = [
-  [0.001, 0.372],
-  [0.075, 0.362],
-  [0.118, 0.333],
-  [0.146, 0.285],
-  [0.156, 0.225],
-  [0.155, 0.16],
-  [0.157, 0.1],
-  [0.163, 0.04],
-  [0.174, -0.012],
+  [0.001, 0.368],
+  [0.062, 0.356],
+  [0.1, 0.335],
+  [0.127, 0.31],
+  [0.145, 0.285],
+  [0.155, 0.26],
+  [0.162, 0.21],
+  [0.162, 0.16],
+  [0.156, 0.11],
+  [0.15, 0.06],
+  [0.15, 0.035],
+  [0.157, 0.01],
+  [0.176, -0.025],
 ];
-/** Height of the hood's opening at angle a: an arch over the forehead, down to the collar at the sides. */
-const hoodEdge: AngleFn = (a) => -0.02 + 0.31 * Math.cos(Math.min(1, Math.abs(a) / 1.42) * (Math.PI / 2)) ** 0.35;
 /** The hood's radius at height y (from HOOD_PROFILE). */
 function hoodRadiusAt(y: number): number {
   for (let i = 1; i < HOOD_PROFILE.length; i++) {
@@ -1302,45 +1457,163 @@ function hoodRadiusAt(y: number): number {
   }
   return HOOD_PROFILE[HOOD_PROFILE.length - 1]![0];
 }
-const HOOD = { long: 1.12, back: 0.014, lining: 0.93 };
+/** `wide`: the opening's half-angle at its widest; it runs from `chin` up to `brow`. */
+const HOOD = { long: 1.12, back: 0.012, lining: 0.9, wide: 1.0, chin: 0.035, brow: 0.29, hem: 0.009 };
+const HOOD_SHELL: FaceShell = {
+  rows: [-0.025, 0.01, 0.035, 0.06, 0.085, 0.11, 0.135, 0.16, 0.185, 0.21, 0.235, 0.26, 0.285, 0.31, 0.335, 0.356, 0.368],
+  // A little roomier at the back, where a hood hangs off the head.
+  radius: (a, y) => hoodRadiusAt(y) * (1 + 0.06 * Math.max(0, -Math.cos(a))),
+  open: (y) => {
+    const t = (2 * y - HOOD.chin - HOOD.brow) / (HOOD.brow - HOOD.chin);
+    return Math.abs(t) >= 1 ? 0 : HOOD.wide * (1 - t * t) ** 0.4;
+  },
+};
 
 function buildHood(jacket: Color): BufferGeometry[] {
   const fit = (g: BufferGeometry): BufferGeometry => g.scale(1, 1, HOOD.long).translate(0, 0, HOOD.back);
+  return [
+    paint(fit(buildFaceShell(HOOD_SHELL, 12, 1, false)), jacket),
+    paint(fit(buildFaceShell(HOOD_SHELL, 6, HOOD.lining, true)), shade(jacket, 0.5)),
+    paint(fit(buildFaceRim(HOOD_SHELL, HOOD.lining, HOOD.hem)), shade(jacket, 0.84)),
+  ];
+}
+
+/**
+ * Full-face helmet, enduro style, built from parts: an oversized shell (the
+ * helmet color on top with vent slots, a darker shade round the back and
+ * bottom, black panels down the cheeks) whose edge sits just over the
+ * goggles and drops diagonally down the cheeks to the jaw; a dark lining
+ * inside; a separate angular chin guard jutting to a point well out in front
+ * of the gaiter; and a broad visor flaring from temple to temple, tilted up.
+ * The goggle strap goes round the outside from the port's edge.
+ */
+const FULLFACE_PROFILE: readonly (readonly [number, number])[] = [
+  [0.001, 0.34],
+  [0.062, 0.332],
+  [0.103, 0.311],
+  [0.131, 0.277],
+  [0.147, 0.232],
+  [0.152, 0.19],
+  [0.149, 0.148],
+  [0.142, 0.108],
+  [0.134, 0.072],
+  [0.129, 0.042],
+];
+/** The shell's radius at height y (from FULLFACE_PROFILE). */
+function fullFaceRadiusAt(y: number): number {
+  for (let i = 1; i < FULLFACE_PROFILE.length; i++) {
+    const [r0, y0] = FULLFACE_PROFILE[i - 1]!;
+    const [r1, y1] = FULLFACE_PROFILE[i]!;
+    if (y <= y0 && y >= y1) return r0 + ((r1 - r0) * (y0 - y)) / (y0 - y1);
+  }
+  return FULLFACE_PROFILE[FULLFACE_PROFILE.length - 1]![0];
+}
+/** `port`: half-angle of the eye port at the top; `brow`: its top edge, just over the goggles. */
+const FULLFACE = { port: 0.95, brow: 0.262, jaw: 0.045, lining: 0.93, strapFrom: 1.25 };
+/** Height of the shell's edge at angle a: over the goggles in front, then diagonally down the cheek to the jaw. */
+const fullFaceEdge: AngleFn = (a) => {
+  const abs = Math.abs(a);
+  return FULLFACE.brow + (FULLFACE.jaw - FULLFACE.brow) * smooth01((abs - FULLFACE.port) / 0.45) + 0.015 * smooth01((abs - 2.2) / 0.8);
+};
+
+function buildFullFace(color: Color): BufferGeometry[] {
+  const lower = shade(color, 0.58);
+  const plate = new Color(FIXED.plate);
+  const vent = new Color(FIXED.vent);
+  const SEGMENTS = 24;
   const shell = (segments: number): BufferGeometry => {
+    // Bottom to top, so the faces look out.
     const g = new LatheGeometry(
-      HOOD_PROFILE.map(([r, y]) => new Vector2(r, y)),
+      FULLFACE_PROFILE.map(([r, y]) => new Vector2(r, y)).reverse(),
       segments,
     );
     const p = g.getAttribute('position');
     for (let i = 0; i < p.count; i++) {
-      const e = hoodEdge(Math.atan2(p.getX(i), -p.getZ(i)));
+      const e = fullFaceEdge(Math.atan2(p.getX(i), -p.getZ(i)));
       if (p.getY(i) < e) p.setY(i, e);
     }
     return g;
   };
-  const outside = paint(fit(shell(16)), jacket);
-  // The lining: the same shell drawn smaller (and coarser: it's seen only past the hem) and turned inside out.
-  const lining = paint(fit(shell(10).scale(HOOD.lining, 1, HOOD.lining)), shade(jacket, 0.55));
-  const lp = lining.getAttribute('position');
-  for (let i = 0; i < lp.count; i += 3) {
-    const x = lp.getX(i + 1);
-    const y = lp.getY(i + 1);
-    const z = lp.getZ(i + 1);
-    lp.setXYZ(i + 1, lp.getX(i + 2), lp.getY(i + 2), lp.getZ(i + 2));
-    lp.setXYZ(i + 2, x, y, z);
-  }
-  // The hem round the opening, from the lining out to just proud of the shell.
-  const SPAN = 1.42;
-  const hem = curvedPanel(
-    (a) => hoodRadiusAt(hoodEdge(a)) * HOOD.lining - 0.002,
-    (a) => hoodRadiusAt(hoodEdge(a)) + 0.005,
-    (a) => hoodEdge(a) + 0.014,
-    (a) => hoodEdge(a) - 0.002,
-    -SPAN,
-    SPAN,
+  const shellColor: FaceColor = (c) => {
+    const a = Math.abs(around(c));
+    const y = c.y;
+    // Boundaries fall on the shell's rows and columns, so every face is one color.
+    const column = Math.floor(a / ((Math.PI * 2) / SEGMENTS));
+    // A row of vent slots over the top.
+    if (y > 0.277 && y < 0.311 && column < 9 && column % 3 === 1) return vent;
+    // Black cheek panels from the port's edge back past the ear, and the darker lower shell.
+    if (y < 0.19 && column < 7) return plate;
+    return y < (column >= 8 ? 0.232 : 0.19) ? lower : color;
+  };
+  const lining = shell(12).scale(FULLFACE.lining, 1, FULLFACE.lining);
+  flipWinding(lining);
+  // A rubber trim round the port, from the lining out to just proud of the shell.
+  const trimSpan = FULLFACE.port + 0.6;
+  const trim = curvedPanel(
+    (a) => fullFaceRadiusAt(fullFaceEdge(a)) * FULLFACE.lining,
+    (a) => fullFaceRadiusAt(fullFaceEdge(a)) + 0.003,
+    (a) => fullFaceEdge(a) + 0.006,
+    (a) => fullFaceEdge(a) - 0.002,
+    -trimSpan,
+    trimSpan,
     18,
   );
-  return [outside, lining, paint(fit(hem), shade(jacket, 0.8))];
+  const parts = [paint(fitHead(shell(SEGMENTS)), shellColor), paint(fitHead(lining), FIXED.vent), paint(fitHead(trim), plate)];
+
+  // Chin guard: a thick band from cheek to cheek, held off the face and
+  // drawn out to a point in front; lower in the middle, rising to meet the cheeks.
+  const CHIN = 1.6;
+  const chinIn: AngleFn = (a) => 0.124 + 0.02 * Math.cos(a) ** 2;
+  const chinOut: AngleFn = (a) => chinIn(a) + 0.02 + 0.035 * Math.max(0, 1 - Math.abs(a) / CHIN) ** 2;
+  const chinTop: AngleFn = (a) => 0.13 + 0.06 * smooth01((Math.abs(a) - 0.5) / 1.0);
+  const chinBottom: AngleFn = (a) => 0.03 + 0.03 * smooth01((Math.abs(a) - 0.4) / 1.0);
+  parts.push(paint(fitHead(curvedPanel(chinIn, chinOut, chinTop, chinBottom, -CHIN, CHIN, 16)), plate));
+  // Accent chevrons and breathing slots across the guard's point.
+  for (const a of [-0.42, -0.18, 0.18, 0.42]) {
+    const r = chinOut(a) - 0.002;
+    const slot = new BoxGeometry(0.009, 0.032, 0.008).rotateZ(-Math.sign(a) * 0.55).rotateY(-a);
+    parts.push(paint(fitHead(slot.translate(r * Math.sin(a), 0.085, -r * Math.cos(a))), Math.abs(a) < 0.3 ? FIXED.vent : lower));
+  }
+
+  // Visor: rooted on the shell just over the port, long in the middle and
+  // flaring out past the temples, tilted up as it goes out.
+  const SPAN = 1.45;
+  const rootY = 0.29;
+  const visorIn: AngleFn = () => fullFaceRadiusAt(rootY) - 0.005;
+  const visorOut: AngleFn = (a) => visorIn(a) + 0.016 + 0.07 * Math.cos((a / SPAN) * (Math.PI / 2)) ** 0.5;
+  const visorY: AngleFn = (a) => rootY - 0.04 * (a / SPAN) ** 2;
+  // Thicker down the middle, like a ridge.
+  const visorHalf: AngleFn = (a) => 0.005 + 0.005 * Math.cos((a / SPAN) * (Math.PI / 2));
+  const visor = curvedPanel(visorIn, visorOut, (a) => visorY(a) + visorHalf(a), (a) => visorY(a) - visorHalf(a), -SPAN, SPAN, 16);
+  const vp = visor.getAttribute('position');
+  for (let i = 0; i < vp.count; i++) {
+    const out = Math.hypot(vp.getX(i), vp.getZ(i)) - visorIn(0);
+    vp.setY(i, vp.getY(i) + 0.26 * Math.max(0, out));
+  }
+  visor.computeVertexNormals();
+  parts.push(paint(fitHead(visor), (_c, n) => (n.y < -0.3 ? shade(color, 0.72) : color)));
+  return parts;
+}
+
+/** Turns every triangle of a geometry inside out (a lining seen from within). */
+function flipWinding(g: BufferGeometry): void {
+  const index = g.index;
+  if (index) {
+    for (let i = 0; i < index.count; i += 3) {
+      const b = index.getX(i + 1);
+      index.setX(i + 1, index.getX(i + 2));
+      index.setX(i + 2, b);
+    }
+    return;
+  }
+  const p = g.getAttribute('position');
+  for (let i = 0; i < p.count; i += 3) {
+    const x = p.getX(i + 1);
+    const y = p.getY(i + 1);
+    const z = p.getZ(i + 1);
+    p.setXYZ(i + 1, p.getX(i + 2), p.getY(i + 2), p.getZ(i + 2));
+    p.setXYZ(i + 2, x, y, z);
+  }
 }
 
 function wrapAngle(a: number): number {
@@ -1374,23 +1647,37 @@ function buildGoggles(frame: string, lens: Color): BufferGeometry[] {
 }
 
 /**
- * Santa hat over the helmet: a white fur band resting on the helmet's edge
- * just above the goggles (a touch lower at the back), a red cone that flops
- * back and to one side, and a pom-pom at its tip. Drawn with the cloth
- * material: its `sway` weight is 0 on the band and grows toward the tip, so
- * the tip and pom-pom sway like the banners.
+ * Santa hat in place of the helmet: a red dome pulled down to the goggles,
+ * a fluffy white fur cuff round its edge (buildSantaBase, part of the
+ * head), then a red cone from the dome's top that flops back and to one
+ * side with a pom-pom at its tip (buildSantaHat). The cone is drawn with
+ * the cloth material: its `sway` weight is 0 at its base and grows toward
+ * the tip, so the tip and pom-pom sway like the banners. The dome is cut
+ * flat at `base`, inside the cone's first ring.
  */
-function buildSantaHat(): BufferGeometry {
-  const fit = (g: BufferGeometry): BufferGeometry => g.scale(1, 1, HELMET.long).translate(0, 0, HELMET.back);
-  const bandY: AngleFn = (a) => 0.262 - 0.022 * (1 - Math.cos(a)) * 0.5;
-  const bandIn = helmetRadiusAt(0.255) - 0.004;
-  const band = curvedPanel(constant(bandIn), constant(bandIn + 0.026), (a) => bandY(a) + 0.024, (a) => bandY(a) - 0.01, -Math.PI, Math.PI, 24);
+const SANTA = { r: 0.128, squash: 1, fur: 0.046, base: 0.255, furOut: 0.016 };
+/** The Santa hat's edge: the helmet's across the goggles, then level round the back (a fur brim sits level). */
+const santaEdge: AngleFn = (a) => Math.max(helmetEdge(a), 0.172);
 
-  // Cone: rings along a path from the band's top to the tip.
+function buildSantaBase(): BufferGeometry[] {
+  const { r, squash, fur, base } = SANTA;
+  const dome = hatDome(r, squash, santaEdge, 20, 10);
+  const p = dome.getAttribute('position');
+  for (let i = 0; i < p.count; i++) p.setY(i, Math.min(p.getY(i), base + 0.007));
+  const furColor = new Color(FIXED.hatFur);
+  const furShade = shade(furColor, 0.9);
+  const tufts: FaceColor = (c) => (Math.floor(((around(c) + Math.PI) / (Math.PI * 2)) * 32) % 2 === 0 ? furColor : furShade);
+  return [paint(fitHead(dome), FIXED.hatRed), paint(fitHead(buildCuff(r, squash, santaEdge, fur, SANTA.furOut - 0.004, 0.004, 32)), tufts)];
+}
+
+function buildSantaHat(): BufferGeometry {
+  // Cone: rings along a path from the dome's top to the tip.
   const RINGS = 7;
   const SIDES = 12;
-  const path = (t: number, out: Vector3): Vector3 => out.set(0.035 * t * t, 0.27 + 0.13 * t - 0.035 * t * t * t, 0.006 + 0.012 * t + 0.1 * t * t);
-  const radius = (t: number): number => (bandIn + 0.02) * (1 - t) ** 1.1 + 0.008;
+  const path = (t: number, out: Vector3): Vector3 => out.set(0.035 * t * t, SANTA.base + 0.15 * t - 0.035 * t * t * t, 0.006 + 0.012 * t + 0.1 * t * t);
+  // Wide enough at its base to cover the dome's flat top, staying full a while before it narrows.
+  const base = domeRadiusAt(SANTA.r, SANTA.squash, SANTA.base) + 0.002;
+  const radius = (t: number): number => base * (1 - t ** 1.4) + 0.008 * t;
   const rings: Vector3[][] = [];
   const c = new Vector3();
   const ahead = new Vector3();
@@ -1399,7 +1686,6 @@ function buildSantaHat(): BufferGeometry {
   const fore = new Vector3();
   for (let k = 0; k <= RINGS; k++) {
     const t = k / RINGS;
-    path(t, c);
     tangent.subVectors(path(Math.min(1, t + 0.01), ahead), path(Math.max(0, t - 0.01), fore)).normalize();
     path(t, c);
     across.set(1, 0, 0).addScaledVector(tangent, -tangent.x).normalize();
@@ -1413,7 +1699,6 @@ function buildSantaHat(): BufferGeometry {
     rings.push(ring);
   }
   const tip = new Vector3();
-  path(1, tip);
   const cone: number[] = [];
   for (let k = 0; k < RINGS; k++) {
     for (let j = 0; j < SIDES; j++) {
@@ -1430,13 +1715,13 @@ function buildSantaHat(): BufferGeometry {
   path(1, tip);
   const pom = new IcosahedronGeometry(0.03, 1).translate(tip.x, tip.y, tip.z);
 
-  const g = fit(merge([paint(band, FIXED.hatFur), paint(coneGeometry, FIXED.hatRed), paint(pom, FIXED.hatFur)]));
-  // Sway grows with height above the band; the pom-pom moves as one with the tip.
+  const g = fitHead(merge([paint(coneGeometry, FIXED.hatRed), paint(pom, FIXED.hatFur)]));
+  // Sway grows with height above the dome; the pom-pom moves as one with the tip.
   const pos = g.getAttribute('position');
   const sway = new Float32Array(pos.count);
-  const tipY = tip.y;
+  const from = SANTA.base + 0.02;
   for (let i = 0; i < pos.count; i++) {
-    const t = Math.min(1, Math.max(0, (pos.getY(i) - 0.29) / (tipY - 0.29)));
+    const t = Math.min(1, Math.max(0, (pos.getY(i) - from) / (tip.y - from)));
     sway[i] = 0.24 * t * t;
   }
   g.setAttribute('sway', new BufferAttribute(sway, 1));
