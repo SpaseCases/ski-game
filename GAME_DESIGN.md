@@ -190,6 +190,7 @@ Three ski types, each with its own model, 3 to 4 top sheet graphics to pick from
 
 - The Locker shows stat bars for each ski: Spins, Landings, Top speed, Grip. They come from the multipliers.
 - **Graphics:** original art painted as vertex colors on a grid of small faces across the top sheet, so it shows on Low without textures. Park graphics are bold and graphic (stripes, blocks, checks). Big mountain graphics are colorful hand-drawn art in the spirit of artist-series skis (painted mountains, sunsets, swirls, critters). Some graphics also paint the base, and some are pairs: one picture across both skis, so the two go together (all the big mountain graphics are). Carving graphics are race style (speed stripes, gradients). No real brands, logos, text or copied artwork.
+- **Custom graphics (milestone 12):** three Custom slots per ski under the rack, each with Edit, which opens the ski editor on its own screen: the ski's top-sheet grid with square cells, a true-shape strip, Start from (Blank or a stock graphic, copied cell for cell; a pair gives its left ski's half), a 32-color palette (the Locker's 20 plus 12 shades the stock art uses), pencil, fill, Mirror ends and Mirror sides switches (every stroke also paints its mirrors), clear, undo, and Base (the base and sidewalls in the picked color), with the 3D skis turning beside the tools. Both skis get the same picture. Every stroke saves.
 - Poles are the same for every ski.
 
 ## Cheats

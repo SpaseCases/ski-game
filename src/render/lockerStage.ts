@@ -77,6 +77,11 @@ export class LockerStage {
     this.rig?.setOutfit(outfit);
   }
 
+  /** Rebuilds the skis (a custom graphic was painted). */
+  repaintSkis(): void {
+    this.rig?.repaintSkis();
+  }
+
   /** Frames the skis (true) or the whole skier. */
   showSkis(on: boolean): void {
     this.skis = on;

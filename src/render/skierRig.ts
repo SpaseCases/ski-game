@@ -222,6 +222,15 @@ export class SkierRig {
     if (changed('poles')) this.setPoles();
   }
 
+  /** Rebuilds the skis from their graphic as it is now (a custom graphic changes in the editor but keeps its id). */
+  repaintSkis(): void {
+    const boots = colors(this.outfit).boots;
+    this.feet.forEach((m, i) => {
+      const side = i === 0 ? -1 : 1;
+      swap([m], buildFoot(side, boots, buildSki(this.outfit, side)));
+    });
+  }
+
   /** Builds the shins: one geometry for both, or one each when the pants are striped. */
   private setShins(pants: Wear, boot: Color): void {
     const old = new Set(this.shins.map((m) => m.geometry));

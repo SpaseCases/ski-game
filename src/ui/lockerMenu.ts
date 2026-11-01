@@ -13,8 +13,9 @@ import {
   type Outfit,
   type Pattern,
 } from '../core/outfit.ts';
+import { customGraphic, customId } from '../core/customSkis.ts';
 import {
-  drawSki,
+  CUSTOM_SLOTS,
   riseAt,
   SKI_STATS,
   SKI_TYPES,
@@ -28,6 +29,7 @@ import {
 } from '../core/skis.ts';
 import type { Rect } from '../render/lockerStage.ts';
 import { addBackButton, board, setHints, type Screen } from './menus.ts';
+import { paintSkis } from './skiThumb.ts';
 
 // The Locker: the skier turning slowly in a window on the left (drawn by the
 // game's renderer through a hole in the menu, see LockerStage), the choices
@@ -47,6 +49,8 @@ export interface LockerHooks {
   shown: (open: boolean) => void;
   /** The Skis tab is showing (the preview looks at the skis) or not. */
   skisShown: (skis: boolean) => void;
+  /** Opens the ski editor on that ski's custom slot. */
+  edit: (ski: SkiId, slot: number) => void;
 }
 
 /** Segments in a stat bar; the park ski fills half. */
@@ -54,6 +58,8 @@ const STAT_STEPS = 10;
 /** Thumbnails' scale: the longest ski fills this many CSS pixels. */
 const RACK_WIDTH = 300;
 const RACK_PX_PER_M = RACK_WIDTH / Math.max(...SKI_TYPES.map((t) => t.model.length));
+/** A custom slot never painted: the ski's outline in the plank's hover blue. */
+const EMPTY_SLOT: SkiGraphic = { id: 'empty', name: 'Empty', base: '#2b5582', layers: [{ fill: '#2b5582' }] };
 
 const OUTFIT_HINTS = [
   [['←', '→'], 'Choose a color'],
@@ -110,6 +116,9 @@ export class LockerScreen implements Screen {
   private showBases = false;
   private readonly faceButtons: HTMLButtonElement[] = [];
   private readonly thumbs: { canvas: HTMLCanvasElement; base: boolean }[] = [];
+  /** Each ski's row of custom slots, and each slot's pick button, name and thumbnails. */
+  private readonly customRows = new Map<SkiId, HTMLElement>();
+  private readonly customs: { ski: SkiId; slot: number; button: HTMLButtonElement; note: HTMLElement; thumbs: { canvas: HTMLCanvasElement; base: boolean }[] }[] = [];
   private readonly foot: HTMLElement;
   private readonly rect: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
@@ -165,6 +174,7 @@ export class LockerScreen implements Screen {
   }
 
   enter(): HTMLElement | null {
+    this.paintCustoms();
     this.sync();
     this.hooks.shown(true);
     const o = this.hooks.get();
@@ -338,6 +348,50 @@ export class LockerScreen implements Screen {
       }
     }
 
+    // The player's own graphics: a row of custom slots per ski, each with Edit.
+    const customBox = document.createElement('div');
+    for (const type of SKI_TYPES) {
+      const row = document.createElement('div');
+      row.className = 'ski-customs';
+      row.setAttribute('role', 'group');
+      row.setAttribute('aria-label', `${type.name}: your graphics`);
+      for (let slot = 0; slot < CUSTOM_SLOTS; slot++) {
+        const cell = document.createElement('div');
+        cell.className = 'ski-custom';
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'ski-graphic ski-custom-pick';
+        const thumbs = [false, true].map((base) => {
+          const canvas = document.createElement('canvas');
+          canvas.className = 'ski-thumb';
+          button.appendChild(canvas);
+          return { canvas, base };
+        });
+        const label = document.createElement('span');
+        label.className = 'ski-custom-name';
+        label.textContent = `Custom ${slot + 1}`;
+        const note = document.createElement('span');
+        note.className = 'ski-custom-note';
+        label.appendChild(note);
+        button.appendChild(label);
+        button.addEventListener('click', () => {
+          if (customGraphic(type.id, slot)) this.pick({ ski: type.id, skiGraphic: customId(type.id, slot) });
+          else this.hooks.edit(type.id, slot);
+        });
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'ski-edit';
+        edit.textContent = 'Edit';
+        edit.setAttribute('aria-label', `Edit ${type.name} custom ${slot + 1}`);
+        edit.addEventListener('click', () => this.hooks.edit(type.id, slot));
+        cell.append(button, edit);
+        row.appendChild(cell);
+        this.customs.push({ ski: type.id, slot, button, note, thumbs });
+      }
+      customBox.appendChild(row);
+      this.customRows.set(type.id, row);
+    }
+
     const stats = document.createElement('div');
     stats.className = 'ski-stats';
     for (const { id, name } of SKI_STATS) {
@@ -385,7 +439,17 @@ export class LockerScreen implements Screen {
     polesNote.className = 'setting-note';
     polesNote.textContent = 'Without poles, Shift skates off one leg, then the other.';
 
-    panel.append(types, this.skiBlurb, head, rack, stats, note, poles, polesNote);
+    panel.append(types, this.skiBlurb, head, rack, customBox, stats, note, poles, polesNote);
+  }
+
+  /** Redraws the custom slots' thumbnails (they change in the editor). */
+  private paintCustoms(): void {
+    for (const c of this.customs) {
+      const g = customGraphic(c.ski, c.slot);
+      for (const { canvas, base } of c.thumbs) paintSkis(canvas, skiType(c.ski), g ?? EMPTY_SLOT, base, RACK_PX_PER_M);
+      c.note.textContent = g ? '' : 'Empty: paint one';
+      c.button.setAttribute('aria-label', `${skiType(c.ski).name}: Custom ${c.slot + 1}${g ? '' : ', empty'}`);
+    }
   }
 
   private pick(change: Partial<Outfit>): void {
@@ -441,6 +505,11 @@ export class LockerScreen implements Screen {
     this.skiGraphicName.textContent = graphic.name;
     this.faceButtons.forEach((b, i) => b.setAttribute('aria-pressed', String((i === 1) === this.showBases)));
     for (const { canvas, base } of this.thumbs) canvas.hidden = base !== this.showBases;
+    for (const [ski, row] of this.customRows) row.hidden = ski !== o.ski;
+    for (const c of this.customs) {
+      c.button.setAttribute('aria-pressed', String(c.ski === o.ski && customId(c.ski, c.slot) === graphic.id));
+      for (const { canvas, base } of c.thumbs) canvas.hidden = base !== this.showBases;
+    }
     const stats = skiStats(o.ski);
     for (const [id, bar] of this.statBars) {
       const steps = statSteps(stats[id]);
@@ -546,31 +615,8 @@ function profilePath(type: SkiType): string {
 
 /** A canvas of the pair of skis seen from above (or their bases), tip to the right, the left ski on top, painted cell by cell like the 3D skis. */
 function skiThumb(type: SkiType, g: SkiGraphic, base: boolean): HTMLCanvasElement {
-  const w = Math.round(type.model.length * RACK_PX_PER_M);
-  const maxHalf = Math.max(...SKI_TYPES.flatMap((t) => t.model.width.map(([, hw]) => hw)));
-  const skiH = Math.ceil(2 * maxHalf * RACK_PX_PER_M) + 1;
-  const gap = 3;
-  const h = skiH * 2 + gap;
   const canvas = document.createElement('canvas');
   canvas.className = 'ski-thumb';
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return canvas;
-  const img = ctx.createImageData(w, h);
-  for (const [row, side] of [
-    [0, -1],
-    [1, 1],
-  ] as const) {
-    drawSki(type, g, side, base, RACK_PX_PER_M, row * (skiH + gap) + skiH / 2, (x, y, hex) => {
-      if (x >= w || y < 0 || y >= h) return;
-      const i = (y * w + x) * 4;
-      img.data[i] = parseInt(hex.slice(1, 3), 16);
-      img.data[i + 1] = parseInt(hex.slice(3, 5), 16);
-      img.data[i + 2] = parseInt(hex.slice(5, 7), 16);
-      img.data[i + 3] = 255;
-    });
-  }
-  ctx.putImageData(img, 0, 0);
+  paintSkis(canvas, type, g, base, RACK_PX_PER_M);
   return canvas;
 }

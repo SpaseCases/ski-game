@@ -1,3 +1,4 @@
+import { loadCustomSkis } from './customSkis.ts';
 import { SKI_TYPES, skiGraphic, type SkiId } from './skis.ts';
 import { readStored, writeStored } from './storage.ts';
 
@@ -120,6 +121,8 @@ export function contrastColor(hex: string): string {
 
 /** The saved outfit, or the default for anything not saved (or not a palette color). */
 export function loadOutfit(): Outfit {
+  // A saved custom graphic is found only once the slots are read.
+  loadCustomSkis();
   const out: Outfit = { ...DEFAULT_OUTFIT };
   let saved: Record<string, unknown> = {};
   try {

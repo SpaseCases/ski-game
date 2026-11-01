@@ -30,7 +30,7 @@ import type { RailShape } from './maps/types.ts';
 import { CONFIG } from './config.ts';
 import { ChaseCamera, type OrbitDrag } from './render/chaseCamera.ts';
 import { clothTime } from './render/cloth.ts';
-import { LockerStage } from './render/lockerStage.ts';
+import { LockerStage, type Rect } from './render/lockerStage.ts';
 import { AutoQuality } from './render/autoQuality.ts';
 import { applyMap, applyWeather, compileShaders, createView, renderFrame, setPixelRatio, setViewRange, type View } from './render/scene.ts';
 import { createSkierPose, interpolateSkier, SkierView } from './render/skierView.ts';
@@ -61,6 +61,7 @@ import { ControlsScreen } from './ui/controlsMenu.ts';
 import { KeyTesterScreen } from './ui/keyTester.ts';
 import { mainKey } from './ui/keyNames.ts';
 import { LockerScreen } from './ui/lockerMenu.ts';
+import { SkiEditorScreen } from './ui/skiEditor.ts';
 import { PauseScreen, TitleScreen } from './ui/mainMenus.ts';
 import { MapSelect } from './ui/mapSelect.ts';
 import { Menus, type Screen } from './ui/menus.ts';
@@ -218,24 +219,46 @@ const cheatsScreen = new CheatsScreen(
   },
   () => menus.back(),
 );
-// The Locker: its preview draws through a hole in the menu while it's open (see drawLocker).
+// The Locker and the ski editor: the preview draws through a hole in the menu while either is open (see drawLocker).
 const lockerStage = new LockerStage(outfit);
-let lockerOpen = false;
+/** The screen whose window shows the preview, or null. */
+let stageScreen: { viewRect(): Rect } | null = null;
+/** A custom ski was painted: rebuild the skis on the next preview frame. */
+let skisDirty = false;
+function showStage(screen: { viewRect(): Rect } | null): void {
+  stageScreen = screen;
+  // The painted mountain fills round the window, from the title and from pause.
+  menus.setScenery(screen !== null || !level);
+  if (!screen) {
+    menus.setHole(null);
+    repaintSkis();
+  }
+}
 const lockerScreen = new LockerScreen(
   {
     get: () => outfit,
     set: setOutfit,
     skisShown: (on) => lockerStage.showSkis(on),
-    shown: (open) => {
-      lockerOpen = open;
-      // The painted mountain fills round the window, from the title and from pause.
-      menus.setScenery(open || !level);
-      if (!open) menus.setHole(null);
+    shown: (open) => showStage(open ? lockerScreen : null),
+    edit: (ski, slot) => {
+      skiEditor.open(ski, slot);
+      menus.push(skiEditor);
     },
   },
   () => menus.back(),
 );
-for (const screen of [titleScreen, pauseScreen, mapSelect, settingsScreen, controlsScreen, keyTester, cheatsScreen, lockerScreen]) menus.add(screen);
+const skiEditor = new SkiEditorScreen(
+  {
+    wear: (ski, graphic) => setOutfit({ ...outfit, ski, skiGraphic: graphic }),
+    repaint: () => (skisDirty = true),
+    shown: (open) => {
+      if (open) lockerStage.showSkis(true);
+      showStage(open ? skiEditor : null);
+    },
+  },
+  () => menus.back(),
+);
+for (const screen of [titleScreen, pauseScreen, mapSelect, settingsScreen, controlsScreen, keyTester, cheatsScreen, lockerScreen, skiEditor]) menus.add(screen);
 
 // HUD buttons for the mouse, beside the window buttons; hidden while a menu is open.
 /** Under a finished timed run's result: the respawn key races the course again. */
@@ -432,14 +455,23 @@ function setOutfit(next: Outfit): void {
  * the rest): the paused world round the skier, or the stage before any map.
  * It turns, and the Santa hat's pom-pom sways, in real time.
  */
-function drawLocker(realFrameTime: number): void {
-  const rect = lockerScreen.viewRect();
+function drawLocker(screen: { viewRect(): Rect }, realFrameTime: number): void {
+  repaintSkis();
+  const rect = screen.viewRect();
   menus.setHole(rect);
   if (rect.width <= 0 || rect.height <= 0) return;
   lockerStage.turn(realFrameTime);
   clothTime.value += realFrameTime;
   if (level && skierView) lockerStage.renderWorld(view, rect, pose.center, level.built.hf, level.built.course.obstacles);
   else lockerStage.renderStage(renderer, rect);
+}
+
+/** Rebuilds the skier's and the preview's skis if a custom ski was painted since. */
+function repaintSkis(): void {
+  if (!skisDirty) return;
+  skisDirty = false;
+  skierView?.rig.repaintSkis();
+  lockerStage.repaintSkis();
 }
 
 /** "Cheats on" in a corner while any cheat is on or the tuning panel has changed a number. */
@@ -818,7 +850,7 @@ startLoop(
       sound.frame(true, 1, skier, NO_RAILS, 1, 0, 1, false);
     }
 
-    if (lockerOpen) drawLocker(realFrameTime);
+    if (stageScreen) drawLocker(stageScreen, realFrameTime);
     else if (!warming) renderFrame(view);
     fader.update(hudTime);
     crashHint.show(pose.bailed);

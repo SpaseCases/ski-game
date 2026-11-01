@@ -1290,6 +1290,323 @@ body {
   }
 }
 
+/*
+ * The Locker's custom slots: three cells under the rack, each a pick button
+ * (its thumbnail, or the bare outline while empty) with Edit beside it.
+ */
+.ski-customs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.ski-customs[hidden] {
+  display: none;
+}
+
+.ski-custom {
+  display: flex;
+  min-width: 0;
+}
+
+.ski-custom .ski-graphic {
+  flex: 1;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 3px 0 0 3px;
+}
+
+.ski-custom .ski-thumb {
+  width: 100%;
+}
+
+.ski-custom-name {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  font-size: 13px;
+}
+
+.ski-custom-note {
+  color: var(--frost);
+  font-weight: 400;
+}
+
+.ski-custom-note:empty {
+  display: none;
+}
+
+.ski-edit {
+  flex: none;
+  padding: 0 10px;
+  border: 0;
+  border-left: 2px solid var(--enamel);
+  border-radius: 0 3px 3px 0;
+  background: var(--plank);
+  color: var(--snow);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ski-edit:hover {
+  background: var(--plank-hover);
+}
+
+.ski-edit:focus {
+  outline: 3px solid var(--flag);
+  outline-offset: 2px;
+}
+
+/*
+ * The ski editor. The grid lies on a bench (the darker enamel) with a ruler
+ * under it like a tape: the ends named, and the boots' place marked in the
+ * flag orange, since that middle stretch hides under the bindings. Below,
+ * the ski at its true shape and the graphics to start from, then the
+ * palette, the tools (each with its key) and the turning 3D skis.
+ */
+.editor-screen {
+  width: min(1240px, 100%);
+}
+
+.editor-screen .board-sub {
+  max-width: none;
+}
+
+.editor-bench {
+  padding: 12px 12px 6px;
+  border-radius: 4px;
+  background: var(--enamel-deep);
+}
+
+.editor-grid {
+  display: block;
+  margin: 0 auto;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.18);
+  cursor: crosshair;
+  touch-action: none;
+  image-rendering: pixelated;
+}
+
+.editor-grid:focus {
+  outline: 3px solid var(--flag);
+  outline-offset: 3px;
+}
+
+.editor-ruler {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 2px solid rgb(244 248 252 / 0.35);
+  color: var(--frost);
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.editor-boots {
+  position: absolute;
+  top: -2px;
+  height: 2px;
+  background: var(--flag);
+  color: var(--flag);
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  padding-top: 5px;
+}
+
+.editor-boots::before {
+  content: '';
+  position: absolute;
+  inset: -4px 0 auto;
+  height: 6px;
+  border: solid var(--flag);
+  border-width: 0 2px;
+}
+
+.editor-status {
+  margin-right: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.editor-mid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+  align-items: start;
+  margin-top: 14px;
+}
+
+.editor-label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+
+.editor-shape-ski {
+  display: block;
+  max-width: 100%;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 2px 0 rgb(0 0 0 / 0.35));
+}
+
+.editor-starts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.editor-start-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px 9px 5px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--plank);
+  color: var(--snow);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.editor-start-tile:hover {
+  background: var(--plank-hover);
+}
+
+.editor-start-ski {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.editor-blank {
+  display: block;
+  width: 84px;
+  height: 7px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.25);
+}
+
+.editor-lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.95fr) minmax(200px, 0.8fr);
+  gap: 18px;
+  align-items: stretch;
+  margin-top: 14px;
+}
+
+.editor-picked {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.editor-swatch {
+  display: inline-block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.3);
+  vertical-align: -3px;
+}
+
+.editor-chips {
+  display: grid;
+  grid-template-columns: repeat(16, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.editor-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 4px;
+}
+
+.editor-tool {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  min-height: 32px;
+  padding: 4px 6px 4px 10px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--plank);
+  color: var(--snow);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.editor-tool-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.editor-tool:hover {
+  background: var(--plank-hover);
+}
+
+.editor-tool[aria-pressed='true'] {
+  background: var(--snow);
+  color: var(--ink);
+  box-shadow: inset 4px 0 0 var(--flag);
+}
+
+.editor-tool:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.editor-tool:focus,
+.editor-start-tile:focus {
+  outline: 3px solid var(--flag);
+  outline-offset: 2px;
+}
+
+.locker-frame.editor-frame {
+  min-height: 130px;
+}
+
+@media (max-width: 900px) {
+  .editor-mid,
+  .editor-lower {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .locker-frame.editor-frame {
+    height: 160px;
+  }
+
+  .editor-status {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .editor-chips {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}
+
 /* The HUD's reminder that the physics aren't the usual ones. */
 .cheats-tag {
   position: absolute;

@@ -53,7 +53,16 @@ export type Layer = (
   | { poly: readonly UV[]; color: string }
   /** An Archimedean spiral out to radius r, `turns` times round, its arm `width` (0..1) of the gap between turns. */
   | { spiral: UV; r: number; turns: number; width: number; color: string }
+  /** Painted cell by cell (the player's own graphics, see core/customSkis.ts): `pixels` holds an index into `colors` per cell of a `rows` x `cols` grid, a row at a time from the tail, each from the left edge. */
+  | { pixels: PixelArt }
 ) & { mirror?: boolean };
+
+export interface PixelArt {
+  rows: number;
+  cols: number;
+  cells: Uint8Array;
+  colors: readonly string[];
+}
 
 export interface SkiGraphic {
   id: string;
@@ -469,14 +478,28 @@ const CARVING: SkiType = {
 
 export const SKI_TYPES: readonly SkiType[] = [PARK, BIG, CARVING];
 
+/** Custom slots per ski type. */
+export const CUSTOM_SLOTS = 3;
+
+/**
+ * The player's own graphics on each ski, CUSTOM_SLOTS each, null until a
+ * slot is first painted. core/customSkis.ts fills them (from storage and the
+ * editor); they are found by id like the stock graphics.
+ */
+export const CUSTOM: Record<SkiId, (SkiGraphic | null)[]> = {
+  park: Array<SkiGraphic | null>(CUSTOM_SLOTS).fill(null),
+  big: Array<SkiGraphic | null>(CUSTOM_SLOTS).fill(null),
+  carving: Array<SkiGraphic | null>(CUSTOM_SLOTS).fill(null),
+};
+
 export function skiType(id: SkiId): SkiType {
   return SKI_TYPES.find((s) => s.id === id) ?? PARK;
 }
 
-/** The graphic with this id on that ski, or the ski's first. */
+/** The graphic with this id on that ski (a stock one or a painted custom slot), or the ski's first. */
 export function skiGraphic(id: SkiId, graphic: string): SkiGraphic {
   const type = skiType(id);
-  return type.graphics.find((g) => g.id === graphic) ?? type.graphics[0]!;
+  return type.graphics.find((g) => g.id === graphic) ?? CUSTOM[type.id].find((g) => g?.id === graphic) ?? type.graphics[0]!;
 }
 
 // ------------------------------------------------------------- the model
@@ -595,6 +618,12 @@ function layerColor(L: Layer, u: number, v: number, k: number): string | null {
     return null;
   }
   if ('poly' in L) return insidePoly(L.poly, u, v) ? L.color : null;
+  if ('pixels' in L) {
+    const { rows, cols, cells, colors } = L.pixels;
+    const row = Math.min(rows - 1, Math.max(0, Math.floor(((u + 1) / 2) * rows)));
+    const col = Math.min(cols - 1, Math.max(0, Math.floor(((v + 1) / 2) * cols)));
+    return colors[cells[row * cols + col]!] ?? null;
+  }
   // A spiral: inside its radius, on the arm when the distance out, in turns,
   // is just past the angle round, in turns.
   const dx = (u - L.spiral[0]) * k;
