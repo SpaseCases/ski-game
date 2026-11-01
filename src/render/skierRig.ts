@@ -40,8 +40,6 @@ import type { PoseDef, Vec3 } from './skierPoses.ts';
 
 const FIXED = {
   vent: '#0e0f12',
-  /** The full-face helmet's chin bar and side plates. */
-  plate: '#1b1d21',
   /** What a mirrored lens reflects: its top half takes a little of the sky's blue. */
   lensSky: '#9fc3e6',
   zip: '#16181c',
@@ -1479,13 +1477,12 @@ function buildHood(jacket: Color): BufferGeometry[] {
 }
 
 /**
- * Full-face helmet, enduro style, built from parts: an oversized shell (the
- * helmet color on top with vent slots, a darker shade round the back and
- * bottom, black panels down the cheeks) whose edge sits just over the
- * goggles and drops diagonally down the cheeks to the jaw; a dark lining
- * inside; a separate angular chin guard jutting to a point well out in front
- * of the gaiter; and a broad visor flaring from temple to temple, tilted up.
- * The goggle strap goes round the outside from the port's edge.
+ * Full-face helmet, enduro style, built from parts, all in the helmet
+ * color: an oversized shell whose edge sits just over the goggles and drops
+ * diagonally down the cheeks to the jaw, with a trim round the port; a dark
+ * lining inside; a separate angular chin guard jutting to a point well out
+ * in front of the gaiter; and a broad visor flaring from temple to temple,
+ * tilted up. The goggle strap goes round the outside from the port's edge.
  */
 const FULLFACE_PROFILE: readonly (readonly [number, number])[] = [
   [0.001, 0.34],
@@ -1517,9 +1514,6 @@ const fullFaceEdge: AngleFn = (a) => {
 };
 
 function buildFullFace(color: Color): BufferGeometry[] {
-  const lower = shade(color, 0.58);
-  const plate = new Color(FIXED.plate);
-  const vent = new Color(FIXED.vent);
   const SEGMENTS = 24;
   const shell = (segments: number): BufferGeometry => {
     // Bottom to top, so the faces look out.
@@ -1534,17 +1528,6 @@ function buildFullFace(color: Color): BufferGeometry[] {
     }
     return g;
   };
-  const shellColor: FaceColor = (c) => {
-    const a = Math.abs(around(c));
-    const y = c.y;
-    // Boundaries fall on the shell's rows and columns, so every face is one color.
-    const column = Math.floor(a / ((Math.PI * 2) / SEGMENTS));
-    // A row of vent slots over the top.
-    if (y > 0.277 && y < 0.311 && column < 9 && column % 3 === 1) return vent;
-    // Black cheek panels from the port's edge back past the ear, and the darker lower shell.
-    if (y < 0.19 && column < 7) return plate;
-    return y < (column >= 8 ? 0.232 : 0.19) ? lower : color;
-  };
   const lining = shell(12).scale(FULLFACE.lining, 1, FULLFACE.lining);
   flipWinding(lining);
   // A rubber trim round the port, from the lining out to just proud of the shell.
@@ -1558,7 +1541,7 @@ function buildFullFace(color: Color): BufferGeometry[] {
     trimSpan,
     18,
   );
-  const parts = [paint(fitHead(shell(SEGMENTS)), shellColor), paint(fitHead(lining), FIXED.vent), paint(fitHead(trim), plate)];
+  const parts = [paint(fitHead(shell(SEGMENTS)), color), paint(fitHead(lining), FIXED.vent), paint(fitHead(trim), color)];
 
   // Chin guard: a thick band from cheek to cheek, held off the face and
   // drawn out to a point in front; lower in the middle, rising to meet the cheeks.
@@ -1567,13 +1550,7 @@ function buildFullFace(color: Color): BufferGeometry[] {
   const chinOut: AngleFn = (a) => chinIn(a) + 0.02 + 0.035 * Math.max(0, 1 - Math.abs(a) / CHIN) ** 2;
   const chinTop: AngleFn = (a) => 0.13 + 0.06 * smooth01((Math.abs(a) - 0.5) / 1.0);
   const chinBottom: AngleFn = (a) => 0.03 + 0.03 * smooth01((Math.abs(a) - 0.4) / 1.0);
-  parts.push(paint(fitHead(curvedPanel(chinIn, chinOut, chinTop, chinBottom, -CHIN, CHIN, 16)), plate));
-  // Accent chevrons and breathing slots across the guard's point.
-  for (const a of [-0.42, -0.18, 0.18, 0.42]) {
-    const r = chinOut(a) - 0.002;
-    const slot = new BoxGeometry(0.009, 0.032, 0.008).rotateZ(-Math.sign(a) * 0.55).rotateY(-a);
-    parts.push(paint(fitHead(slot.translate(r * Math.sin(a), 0.085, -r * Math.cos(a))), Math.abs(a) < 0.3 ? FIXED.vent : lower));
-  }
+  parts.push(paint(fitHead(curvedPanel(chinIn, chinOut, chinTop, chinBottom, -CHIN, CHIN, 16)), color));
 
   // Visor: rooted on the shell just over the port, long in the middle and
   // flaring out past the temples, tilted up as it goes out.
@@ -1591,7 +1568,7 @@ function buildFullFace(color: Color): BufferGeometry[] {
     vp.setY(i, vp.getY(i) + 0.26 * Math.max(0, out));
   }
   visor.computeVertexNormals();
-  parts.push(paint(fitHead(visor), (_c, n) => (n.y < -0.3 ? shade(color, 0.72) : color)));
+  parts.push(paint(fitHead(visor), color));
   return parts;
 }
 

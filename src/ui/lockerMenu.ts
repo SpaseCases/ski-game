@@ -73,7 +73,7 @@ const ICONS: Record<Headwear, string> = {
   helmet:
     '<path d="M6 25 C6 11 13 5 20 5 C27 5 34 11 34 25 Z" fill="#2c3037"/><rect x="7" y="19" width="26" height="7" rx="3" fill="#5a6676"/><rect x="5" y="25" width="30" height="3" rx="1.5" fill="#1b1d21"/>',
   fullface:
-    '<path d="M7 24 C6 11 13 6 20 6 C27 6 34 11 33 24 L28 33 H12 Z" fill="#dcd8ce"/><path d="M7 21 L12 33 H28 L33 21 L30 26 H10 Z" fill="#1b1d21"/><path d="M10 15 H30 L31 23 H9 Z" fill="#0e0f12"/><rect x="11" y="16.5" width="18" height="5.5" rx="2.5" fill="#5a6676"/><path d="M14 27 L20 35 L26 27 Z" fill="#1b1d21"/><path d="M3 13 C9 8 31 8 37 13 L35 15 C29 11 11 11 5 15 Z" fill="#f3f1ec"/><path d="M16 8 V10 M20 7 V10 M24 8 V10" stroke="#0e0f12" stroke-width="1.6"/>',
+    '<path d="M7 24 C6 11 13 6 20 6 C27 6 34 11 33 24 L28 33 H12 Z" fill="#2c3037"/><path d="M14 27 L20 35 L26 27 Z" fill="#2c3037"/><path d="M10 15 H30 L31 23 H9 Z" fill="#0e0f12"/><rect x="11" y="16.5" width="18" height="5.5" rx="2.5" fill="#5a6676"/><path d="M3 13 C9 8 31 8 37 13 L35 15 C29 11 11 11 5 15 Z" fill="#3a3f47"/>',
   santa:
     '<path d="M8 22 C10 10 18 4 28 7 C33 9 35 13 34 16 C29 12 25 13 30 22 Z" fill="#c3262e"/><circle cx="33" cy="17" r="3.6" fill="#f3f1ec"/><rect x="6" y="21" width="27" height="7" rx="3.5" fill="#f3f1ec"/>',
   beanie:
