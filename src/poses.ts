@@ -163,7 +163,6 @@ const PATTERN_LOOKS: Record<string, Partial<Outfit>> = {
   plain: {},
   stripes: { jacket: '#22395e', jacketAccent: '#f1c93b', pants: '#2c3037', pantsAccent: '#ece8de' },
   blocks: { jacket: '#ece8de', jacketAccent: '#d33a3f', pants: '#2f5a45', pantsAccent: '#b8e330' },
-  camo: { jacket: '#677a52', jacketAccent: '#c8b07e', pants: '#3a3f47', pantsAccent: '#98a2ad' },
   plaid: { jacket: '#d33a3f', jacketAccent: '#2c3037', pants: '#22395e', pantsAccent: '#8cc9e0' },
 };
 const LOOKS: (Entry | null)[] = [
@@ -279,7 +278,7 @@ function ridePose(r: RideState): SkierPose {
 const camera = new PerspectiveCamera(30, 1, 0.1, 50);
 
 // ?headwear=santa (or any headwear) dresses every pose in it, ?jacket=23898a (any color part, hex
-// without the #) recolors that part, ?jacketPattern=camo with ?jacketAccent=f1c93b (and the
+// without the #) recolors that part, ?jacketPattern=plaid with ?jacketAccent=f1c93b (and the
 // same for pants) patterns a garment, ?poles=0 takes the poles away, and ?glow=1 lights the
 // pumpkin's face.
 const params = new URLSearchParams(window.location.search);

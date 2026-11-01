@@ -44,12 +44,11 @@ export const HEADWEAR: readonly { readonly id: Headwear; readonly name: string }
 ];
 
 /** A garment's pattern, painted in its second color. */
-export type Pattern = 'plain' | 'stripes' | 'blocks' | 'camo' | 'plaid';
+export type Pattern = 'plain' | 'stripes' | 'blocks' | 'plaid';
 export const PATTERNS: readonly { readonly id: Pattern; readonly name: string }[] = [
   { id: 'plain', name: 'Plain' },
   { id: 'stripes', name: 'Stripes' },
   { id: 'blocks', name: 'Blocks' },
-  { id: 'camo', name: 'Camo' },
   { id: 'plaid', name: 'Plaid' },
 ];
 /** The garments that take a pattern, and the outfit keys of their pattern and second color. */

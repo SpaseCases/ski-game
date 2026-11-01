@@ -403,7 +403,7 @@ interface Wear {
   pattern: Pattern;
   base: Color;
   accent: Color;
-  /** Camo's darker shade of the base; plaid's darker crossing of both colors. */
+  /** Plaid's darker crossing of both colors. */
   dark: Color;
 }
 
@@ -412,21 +412,34 @@ function wear(o: Outfit, garment: Garment): Wear {
   const pattern = o[g.pattern];
   const base = new Color(o[garment]);
   const accent = new Color(o[g.accent]);
-  const dark = pattern === 'plaid' ? base.clone().lerp(accent, 0.5).multiplyScalar(0.55) : shade(base, 0.62);
+  const dark = base.clone().lerp(accent, 0.5).multiplyScalar(0.55);
   return { pattern, base, accent, dark };
 }
 
 /**
  * Where a part of a garment takes the second color, in the part's own frame
  * (each part decides: stripes round the chest, blocks on the shoulders...).
- * `seed` shifts camo and plaid so parts side by side don't repeat, and
- * `radius` turns the angle round the part into plaid's distance across.
+ * `grid` is the part's prism of faces, so plaid's bands are whole columns
+ * and rows of it; parts without one (the round joints) get plaid's bands by
+ * distance instead, `radius` turning the angle round them into meters.
  */
 interface Panel {
   stripe?: (c: Vector3) => boolean;
   block?: (c: Vector3) => boolean;
-  seed: number;
-  radius: number;
+  grid?: Grid;
+  radius?: number;
+}
+
+/**
+ * A prism's faces: `sides` columns (even, so the check meets itself round
+ * the back), rows `row` m tall from height `y0`, its depth squashed by
+ * `depth` (undone to find the column).
+ */
+interface Grid {
+  sides: number;
+  y0: number;
+  row: number;
+  depth?: number;
 }
 
 /** The garment's paint for one part: a single color when plain, else per face. */
@@ -439,62 +452,48 @@ function cloth(w: Wear, panel: Panel): Color | FaceColor {
       return stripe ? (c) => (stripe(c) ? w.accent : w.base) : w.base;
     case 'blocks':
       return block ? (c) => (block(c) ? w.accent : w.base) : w.base;
-    case 'camo':
-      return (c) => camo(w, c.x, c.y, c.z, panel.seed);
-    case 'plaid':
-      return (c) => plaid(w, around(c) * panel.radius, c.y, panel.seed);
+    case 'plaid': {
+      const g = panel.grid;
+      if (g) return (c) => plaidCell(w, gridColumn(c, g), Math.floor((c.y - g.y0) / g.row + 1e-6));
+      const r = panel.radius ?? 0.08;
+      return (c) => plaidCell(w, Math.floor((around(c) * r) / PLAID_BAND), Math.floor(c.y / PLAID_ROW));
+    }
   }
 }
 
 /**
- * How many rows a garment part of `length` m is cut into: enough faces for
- * camo and plaid, else one. Rows are kept coarse (the skier's triangle
- * budget): plaid's bands are a row tall.
+ * How many rows a garment part of `length` m is cut into: plaid's bands are
+ * a row tall (kept coarse: the skier's triangle budget), else one.
  */
 function rows(w: Wear, length: number): number {
-  return w.pattern === 'camo' || w.pattern === 'plaid' ? Math.max(1, Math.round(length / CAMO_ROW)) : 1;
+  return w.pattern === 'plaid' ? Math.max(1, Math.round(length / PLAID_ROW)) : 1;
 }
-/** Height (m) of a row of faces in camo or plaid. */
-const CAMO_ROW = 0.095;
+/** About how tall (m) a row of plaid is; the round joints use it, and PLAID_BAND across. */
+const PLAID_ROW = 0.095;
+const PLAID_BAND = 0.065;
+
+/** Sides for a prism of `n` sides: plaid needs an even count, so its check meets itself round the back. */
+function sidesFor(w: Wear, n: number): number {
+  return w.pattern === 'plaid' && n % 2 === 1 ? n + 1 : n;
+}
+
+/** Which column of `g`'s faces `c` lies in (CylinderGeometry's corners, unturned). */
+function gridColumn(c: Vector3, g: Grid): number {
+  const a = Math.atan2(c.x, -c.z / (g.depth ?? 1));
+  return Math.floor((((a % TAU) + TAU) % TAU) / (TAU / g.sides) + 1e-6);
+}
+const TAU = Math.PI * 2;
 
 /** Angle round the vertical axis from straight ahead (-Z), as the helmet and goggles measure it. */
 function around(c: Vector3): number {
   return Math.atan2(c.x, -c.z);
 }
 
-/** Blotches: the base, a darker shade of it, and the second color, from smooth noise. */
-function camo(w: Wear, x: number, y: number, z: number, seed: number): Color {
-  const k = 1 / 0.12;
-  const n = 0.7 * valueNoise(x * k + seed * 7.31, y * k, z * k) + 0.3 * valueNoise(x * k * 2.3, y * k * 2.3 + seed * 3.7, z * k * 2.3);
-  return n < 0.44 ? w.base : n < 0.58 ? w.dark : w.accent;
-}
-
-/** A check: bands of the second color both ways, darker where they cross. */
-function plaid(w: Wear, u: number, v: number, seed: number): Color {
-  const period = 2 * CAMO_ROW;
-  const across = ((((u + seed * 0.031) % period) + period) % period) < period / 2;
-  const down = ((((v + seed * 0.017) % period) + period) % period) < period / 2;
+/** A check: every other column and every other row a band of the second color, darker where they cross. */
+function plaidCell(w: Wear, column: number, row: number): Color {
+  const across = (((column % 2) + 2) % 2) === 0;
+  const down = (((row % 2) + 2) % 2) === 0;
   return across && down ? w.dark : across || down ? w.accent : w.base;
-}
-
-/** Smooth 3D value noise, 0..1. */
-function valueNoise(x: number, y: number, z: number): number {
-  const x0 = Math.floor(x);
-  const y0 = Math.floor(y);
-  const z0 = Math.floor(z);
-  const fx = smooth01(x - x0);
-  const fy = smooth01(y - y0);
-  const fz = smooth01(z - z0);
-  const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
-  const plane = (zz: number): number =>
-    lerp(lerp(hash3(x0, y0, zz), hash3(x0 + 1, y0, zz), fx), lerp(hash3(x0, y0 + 1, zz), hash3(x0 + 1, y0 + 1, zz), fx), fy);
-  return lerp(plane(z0), plane(z0 + 1), fz);
-}
-
-function hash3(x: number, y: number, z: number): number {
-  let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 1274126177)) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
 /** Gives `meshes` (which share one geometry) a new geometry, freeing the old one. */
@@ -649,9 +648,9 @@ const constant =
 /** The seat of the pants; striped pants carry their side stripes down over the hips. */
 function buildPelvis(pants: Wear): BufferGeometry {
   const turn = pants.pattern === 'stripes' ? SIDE_FACE : 0;
-  const paintIt = cloth(pants, { stripe: (c) => onSide(c, -1) || onSide(c, 1), seed: 1, radius: 0.155 });
-  // Mostly under the jacket, so camo and plaid don't cut it into rows.
-  return paint(prism(0.145, 0.165, 0.2, 12, 1, turn).translate(0, -0.13, 0).scale(1, 1, 0.72), paintIt);
+  const n = rows(pants, 0.2);
+  const paintIt = cloth(pants, { stripe: (c) => onSide(c, -1) || onSide(c, 1), grid: { sides: 12, y0: -0.13, row: 0.2 / n, depth: 0.72 } });
+  return paint(prism(0.145, 0.165, 0.2, 12, n, turn).translate(0, -0.13, 0).scale(1, 1, 0.72), paintIt);
 }
 
 /**
@@ -671,9 +670,8 @@ function buildTorso(w: Wear, hoodUp: boolean): BufferGeometry {
   const body = cloth(w, {
     stripe: (c) => CHEST_STRIPES.includes(row(c, CHEST_ROWS)),
     block: (c) => row(c, YOKE_ROWS) === YOKE_ROWS - 1,
-    // As the lower jacket's, so camo and plaid carry on across the seam at the waist.
-    seed: 4,
-    radius: JACKET.waist,
+    // Rows from the waist seam, as the lower jacket's, so plaid carries on across it.
+    grid: { sides: LOWER_SEGMENTS, y0: TORSO_BOTTOM, row: shell / shellRows, depth: JACKET.depth },
   });
   const parts = [
     // As many sides as the lower jacket, corner for corner, so the two meet flush.
@@ -686,7 +684,7 @@ function buildTorso(w: Wear, hoodUp: boolean): BufferGeometry {
     paint(new BoxGeometry(0.012, 0.022, 0.012).translate(0.03, 0.47, -0.118), FIXED.zip),
   ];
   if (!hoodUp) parts.push(paint(new SphereGeometry(0.135, 12, 8).scale(1.25, 0.6, 0.75).translate(0, 0.53, 0.135), dark));
-  const shoulder = w.pattern === 'blocks' ? w.accent : cloth(w, { seed: 3, radius: 0.1 });
+  const shoulder = w.pattern === 'blocks' ? w.accent : cloth(w, { radius: 0.1 });
   for (const s of [-1, 1]) {
     parts.push(paint(new IcosahedronGeometry(0.1, 1).translate(s * BODY.shoulderWidth, BODY.spine - BODY.shoulderDrop, 0), shoulder));
   }
@@ -815,7 +813,8 @@ class JacketLower {
 
   /**
    * The mesh's faces: fills `colors` per vertex and returns which point each
-   * vertex is. Camo and plaid color each face from where it hangs at rest;
+   * vertex is. Plaid colors each face by its column (as the upper jacket's)
+   * and by its height at rest, in the upper jacket's rows carried on down;
    * stripes and blocks leave the lower jacket plain.
    */
   private build(w: Wear, colors: number[]): number[] {
@@ -823,7 +822,8 @@ class JacketLower {
     const band = shade(jacket, 0.78);
     const under = shade(jacket, 0.6);
     const zip = new Color(FIXED.zip);
-    const body = cloth(w, { seed: 4, radius: JACKET.waist });
+    const shell = BODY.spine - TORSO_BOTTOM;
+    const body = cloth(w, { grid: { sides: LOWER_SEGMENTS, y0: TORSO_BOTTOM, row: shell / rows(w, shell) } });
     const index: number[] = [];
     const quad = (a: number, b: number, c: number, d: number, color: Color): void => {
       index.push(a, b, c, a, c, d);
@@ -841,9 +841,9 @@ class JacketLower {
           const top = LOWER_RINGS[ring]!.at(a);
           const y0 = top[0]!;
           const r = top[1]!;
-          const depth = top[2]!;
           const y1 = LOWER_RINGS[ring + 1]!.at(a)[0]!;
-          color = body(rest.set(r * Math.sin(a), (y0 + y1) / 2, -r * Math.cos(a) * depth), rest);
+          // Round, not squashed front to back, so the angle finds its column.
+          color = body(rest.set(r * Math.sin(a), (y0 + y1) / 2, -r * Math.cos(a)), rest);
         }
         // Wound so the outside faces out (and the turned-under band faces down).
         quad(point(ring, seg), point(ring, seg + 1), point(ring + 1, seg + 1), point(ring + 1, seg), color);
@@ -1560,15 +1560,15 @@ function buildUpperArm(w: Wear, side: number): BufferGeometry {
   const length = BODY.upperArm;
   // Stripes: two bands round the sleeve (whole rows); blocks: the whole upper sleeve.
   const armRows = w.pattern === 'stripes' ? ARM_ROWS : rows(w, length);
+  const sides = sidesFor(w, 9);
   const sleeve = cloth(w, {
     stripe: (c) => ARM_STRIPES.includes(Math.floor((c.y / length) * ARM_ROWS)),
     block: () => true,
-    seed: 5 + side,
-    radius: 0.08,
+    grid: { sides, y0: 0, row: length / armRows },
   });
   const parts = [
-    paint(prism(0.082, 0.076, length, 9, armRows), sleeve),
-    paint(new IcosahedronGeometry(0.077, 1).translate(0, length, 0), w.pattern === 'blocks' ? w.accent : cloth(w, { seed: 6 + side, radius: 0.077 })),
+    paint(prism(0.082, 0.076, length, sides, armRows), sleeve),
+    paint(new IcosahedronGeometry(0.077, 1).translate(0, length, 0), w.pattern === 'blocks' ? w.accent : cloth(w, { radius: 0.077 })),
   ];
   if (side < 0) {
     const face = 2.13; // turns +X to point at the outside of the arm
@@ -1586,13 +1586,12 @@ function buildUpperArm(w: Wear, side: number): BufferGeometry {
 const ARM_ROWS = 5;
 const ARM_STRIPES = [1, 3];
 
-/** Sleeve flaring toward the wrist (camo or plaid, else plain), then a glove with a thumb. */
+/** Sleeve flaring toward the wrist (plaid, else plain), then a glove with a thumb. */
 function buildForearm(w: Wear, mitten: Color): BufferGeometry {
   const f = BODY.forearm;
   const jacket = w.base;
   return merge([
-    // Camo and plaid only by the sleeve's sides here (no rows: the triangle budget).
-    paint(prism(0.076, 0.084, f, 9), cloth(w, { seed: 8, radius: 0.08 })),
+    paint(prism(0.076, 0.084, f, sidesFor(w, 9), rows(w, f)), cloth(w, { grid: { sides: sidesFor(w, 9), y0: 0, row: f / rows(w, f) } })),
     paint(prism(0.087, 0.087, 0.025, 9).translate(0, f - 0.03, 0), shade(jacket, 0.78)),
     paint(prism(0.058, 0.056, 0.05, 10).translate(0, f - 0.01, 0), shade(mitten, 0.74)),
     // A big mitt with a clear thumb, and a darker band over the knuckles.
@@ -1614,11 +1613,12 @@ function buildThigh(w: Wear, side: number): BufferGeometry {
   const pants = w.base;
   const turn = w.pattern === 'stripes' ? SIDE_FACE : 0;
   // Stripes run down the outside of the leg (past the pocket); blocks color the knee down.
-  const leg = cloth(w, { stripe: (c) => onSide(c, -side), seed: 9 + side, radius: r });
+  const legRows = rows(w, t);
+  const leg = cloth(w, { stripe: (c) => onSide(c, -side), grid: { sides: 12, y0: 0, row: t / legRows } });
   const pocket = w.pattern === 'stripes' ? w.accent : pants;
   return merge([
-    paint(prism(r, r + 0.002, t, 12, rows(w, t), turn), leg),
-    paint(new IcosahedronGeometry(PANTS.knee, 1).translate(0, t, 0), w.pattern === 'blocks' ? w.accent : cloth(w, { seed: 11 + side, radius: PANTS.knee })),
+    paint(prism(r, r + 0.002, t, 12, legRows, turn), leg),
+    paint(new IcosahedronGeometry(PANTS.knee, 1).translate(0, t, 0), w.pattern === 'blocks' ? w.accent : cloth(w, { radius: PANTS.knee })),
     // The pocket and its flap above it (toward the hip), on the stripe when there is one.
     paint(new BoxGeometry(0.03, 0.13, 0.1).translate(out, t * 0.55, 0.004), shade(pocket, 0.93)),
     paint(new BoxGeometry(0.036, 0.032, 0.108).translate(out * 1.02, t * 0.55 - 0.072, 0.004), shade(pocket, 0.82)),
@@ -1637,12 +1637,13 @@ function buildShin(w: Wear, boot: Color, side: number): BufferGeometry {
   const hem = PANTS.hem;
   const pants = w.pattern === 'blocks' ? w.accent : w.base;
   const turn = w.pattern === 'stripes' ? SIDE_FACE : 0;
-  const leg = w.pattern === 'blocks' ? pants : cloth(w, { stripe: (c) => side !== 0 && onSide(c, -side), seed: 13, radius: PANTS.knee });
+  const shinRows = rows(w, s + 0.04);
+  const leg = w.pattern === 'blocks' ? pants : cloth(w, { stripe: (c) => side !== 0 && onSide(c, -side), grid: { sides: 12, y0: 0, row: (s + 0.04) / shinRows } });
   const stripe = w.pattern === 'stripes' && side !== 0;
   const fold = (g: BufferGeometry, k: number): BufferGeometry =>
     paint(g, stripe ? (c) => shade(onSide(c, -side) ? w.accent : pants, k) : shade(pants, k));
   return merge([
-    paint(prism(PANTS.knee - 0.002, hem, s + 0.04, 12, rows(w, s + 0.04), turn), leg),
+    paint(prism(PANTS.knee - 0.002, hem, s + 0.04, 12, shinRows, turn), leg),
     fold(prism(hem + 0.004, hem + 0.004, 0.035, 12, 1, turn).translate(0, s - 0.1, 0), 0.92),
     fold(prism(hem + 0.003, hem + 0.004, 0.024, 12, 1, turn).translate(0, s + 0.02, 0), 0.8),
     paint(prism(0.078, 0.078, 0.2, 12).translate(0, s - 0.15, 0), boot),

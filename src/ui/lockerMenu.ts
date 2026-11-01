@@ -488,15 +488,10 @@ function paintRow(name: string, onPick: (hex: string) => void): PaintRow {
 
 /** A small flat drawing of a pattern in the garment's colors, for its tile (roughly as the 3D garment paints it). */
 function patternSwatch(pattern: Pattern, base: string, accent: string): string {
-  const dark = scaleHex(base, 0.62);
   let art = '';
   if (pattern === 'stripes') art = `<rect y="5" width="30" height="4" fill="${accent}"/><rect y="12" width="30" height="4" fill="${accent}"/>`;
   else if (pattern === 'blocks') art = `<rect width="30" height="7" fill="${accent}"/>`;
-  else if (pattern === 'camo') {
-    art =
-      `<path d="M2 3 C7 1 11 5 9 9 C6 12 1 9 2 3 Z M17 11 C22 8 28 12 25 17 C21 20 15 16 17 11 Z" fill="${accent}"/>` +
-      `<path d="M14 1 C19 0 21 4 18 6 C15 8 12 5 14 1 Z M4 14 C8 12 11 15 9 18 C6 20 2 18 4 14 Z M24 2 C28 2 29 6 27 8 C24 9 22 5 24 2 Z" fill="${dark}"/>`;
-  } else if (pattern === 'plaid') {
+  else if (pattern === 'plaid') {
     const cross = scaleHex(mixHex(base, accent), 0.55);
     const bands = [0, 10, 20].map((x) => `<rect x="${x}" width="5" height="20" fill="${accent}"/>`).join('') + [0, 10].map((y) => `<rect y="${y}" width="30" height="5" fill="${accent}"/>`).join('');
     art = bands + [0, 10, 20].flatMap((x) => [0, 10].map((y) => `<rect x="${x}" y="${y}" width="5" height="5" fill="${cross}"/>`)).join('');
