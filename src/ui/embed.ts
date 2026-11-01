@@ -24,6 +24,8 @@ export function mountWindowButtons(hud: HTMLElement): HTMLElement {
     link.target = '_blank';
     link.rel = 'noopener';
     link.textContent = 'Open in new tab';
+    // Focus left on it would keep Enter and Space for it (see Keyboard), not the game.
+    link.addEventListener('click', () => link.blur());
     bar.appendChild(link);
   }
 
@@ -35,6 +37,7 @@ export function mountWindowButtons(hud: HTMLElement): HTMLElement {
       button.textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
     };
     button.addEventListener('click', () => {
+      button.blur();
       const request = document.fullscreenElement
         ? document.exitFullscreen()
         : document.documentElement.requestFullscreen();

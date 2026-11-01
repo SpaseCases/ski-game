@@ -8,7 +8,7 @@
 import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
 import { CONFIG } from '../../src/config.ts';
-import { ACTIONS, createInputState, type Action } from '../../src/core/input.ts';
+import { ACTIONS, createInputState, mirrorPop, type Action } from '../../src/core/input.ts';
 import { buildMap, type BuiltMap } from '../../src/maps/build.ts';
 import { parseMap } from '../../src/maps/loader.ts';
 import type { JumpFeature } from '../../src/maps/types.ts';
@@ -48,6 +48,12 @@ export class Rider {
   readonly race: RaceState | null;
   /** Seconds since the last place(). */
   t = 0;
+  /**
+   * The game's "Pop with: ↑": ↑ crouches and pops as well as front-flipping,
+   * as every tool's scripts expect. False rides "Pop with: Space": hold
+   * 'pop' to crouch and pop, and ↑ only flips.
+   */
+  popWithUp = true;
   private held = new Set<Action>();
 
   constructor(sim: Sim) {
@@ -74,6 +80,7 @@ export class Rider {
       b.held = now.has(a);
     }
     this.held = now;
+    if (this.popWithUp) mirrorPop(this.keys);
     copySkierState(this.prev, this.s);
     stepSkier(this.s, this.keys, this.sim.course, DT);
     updateRun(this.run, this.sim.map, this.prev.position, this.s);

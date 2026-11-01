@@ -1,9 +1,11 @@
 import type { Action, Bindings } from '../core/input.ts';
+import type { Settings } from '../core/settings.ts';
 import { keycap, keyName } from './keyNames.ts';
 import { addBackButton, board, setHints, type Screen } from './menus.ts';
 
 // The Controls screen: GAME_DESIGN.md's key tables, built from the current
-// bindings each time it opens, so rebound keys show as they are.
+// bindings and the Pop with setting each time it opens, so rebound keys show
+// as they are. A plank at the top opens the key tester.
 
 /** A key cell: the action keys as keycaps, joined by `/` for a pair like left / right. */
 type Keys = readonly (Action | 'Esc' | '/')[];
@@ -18,11 +20,20 @@ interface Row {
   rail?: string;
 }
 
-const ROWS: readonly Row[] = [
-  { keys: ['left', '/', 'right'], ground: 'Turn', air: 'Spin left or right', rail: 'Turn the skis (any angle)' },
-  { keys: ['up'], note: 'hold, then release', ground: 'Crouch (less drag), then pop (↓ while crouching: no pop)', air: 'Front flip', rail: 'Crouch, then pop off' },
-  { keys: ['down'], ground: 'Brake', air: 'Back flip', rail: 'Brake' },
-  { keys: ['pole'], ground: 'Pole push; tuck once fast (↑ from a tuck pops at full strength)', air: '', rail: '' },
+/** The riding rows; `popKey` is the key that pops now (the pop key, or ↑ with "Pop with: ↑"). */
+function rows(popWithUp: boolean, popKey: string): Row[] {
+  const pop: Row = { keys: ['pop'], note: 'hold, then release', ground: 'Crouch (less drag), then pop (↓ while crouching: no pop)', air: '', rail: 'Crouch, then pop off' };
+  return [
+    { keys: ['left', '/', 'right'], ground: 'Turn', air: 'Spin left or right', rail: 'Turn the skis (any angle)' },
+    ...(popWithUp ? [] : [pop]),
+    popWithUp ? { ...pop, keys: ['up'], air: 'Front flip' } : { keys: ['up'], ground: '', air: 'Front flip (hold it off the lip)', rail: '' },
+    { keys: ['down'], ground: 'Brake', air: 'Back flip', rail: 'Brake' },
+    { keys: ['pole'], ground: `Pole push; tuck once fast (${popKey} from a tuck pops at full strength)`, air: '', rail: '' },
+    ...OTHER_ROWS,
+  ];
+}
+
+const OTHER_ROWS: readonly Row[] = [
   { keys: ['lincolnLeft', '/', 'lincolnRight'], ground: '', air: 'Lincoln loop left or right', rail: '' },
   { keys: ['checkpoint'], ground: 'Set your checkpoint', air: '', rail: '' },
   { keys: ['respawn'], ground: 'Back to your last checkpoint (hold 1 s: back to the top)' },
@@ -48,14 +59,27 @@ const STYLE: readonly (readonly [Action, string, string])[] = [
 export class ControlsScreen implements Screen {
   readonly el: HTMLElement;
   private readonly body: HTMLElement;
-  private readonly bindings: () => Bindings;
+  private readonly tester: HTMLElement;
+  private readonly settings: () => Settings;
 
-  constructor(bindings: () => Bindings, onBack: () => void) {
-    this.bindings = bindings;
+  constructor(settings: () => Settings, onTester: () => void, onBack: () => void) {
+    this.settings = settings;
     const b = board('Controls', 'controls-screen');
     this.el = b.el;
     this.body = b.body;
     addBackButton(b.head, onBack);
+    // The key tester: laptop keyboards can't report some keys held together.
+    this.tester = document.createElement('div');
+    this.tester.className = 'tester-intro';
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'plank plank-small';
+    open.textContent = 'Key tester';
+    open.addEventListener('click', onTester);
+    const about = document.createElement('p');
+    about.className = 'setting-note';
+    about.textContent = 'Some keyboards can’t tell when certain keys are held together. Hold your usual combos in the tester to see which ones yours drops.';
+    this.tester.append(open, about);
     setHints(b.foot, [
       [['↑', '↓'], 'Scroll'],
       [['Esc'], 'Back'],
@@ -64,7 +88,7 @@ export class ControlsScreen implements Screen {
 
   enter(): HTMLElement | null {
     this.build();
-    return this.el.querySelector('.board-back');
+    return this.tester.querySelector('button');
   }
 
   prebuild(): void {
@@ -81,7 +105,10 @@ export class ControlsScreen implements Screen {
   }
 
   private build(): void {
-    const keys = this.bindings();
+    const settings = this.settings();
+    const keys = settings.bindings;
+    const popWithUp = settings.popWith === 'up';
+    const popKey = mainKeyName(keys, popWithUp ? 'up' : 'pop');
     const cell = (k: Keys): HTMLElement => {
       const td = document.createElement('th');
       td.scope = 'row';
@@ -105,7 +132,7 @@ export class ControlsScreen implements Screen {
     main.className = 'controls-table';
     main.innerHTML = '<caption>Riding</caption><thead><tr><th scope="col">Key</th><th scope="col">On the snow</th><th scope="col">In the air</th><th scope="col">On a rail or box</th></tr></thead>';
     const tbody = document.createElement('tbody');
-    for (const row of ROWS) {
+    for (const row of rows(popWithUp, popKey)) {
       const tr = document.createElement('tr');
       const k = cell(row.keys);
       if (row.note) k.append(document.createTextNode(` ${row.note}`));
@@ -146,11 +173,11 @@ export class ControlsScreen implements Screen {
     for (const text of [
       'Hold a spin key and a flip key together to tilt the spin: that makes corks and misty flips.',
       'Spins and flips keep going while the key is held and slow down after you let go. Let go early to time the landing.',
-      `Butter on the snow: hold a nose grab key (${mainKeys(keys, 'grabLeftNose', 'grabRightNose')}) to press onto your tips or a tail grab key (${mainKeys(keys, 'grabLeftTail', 'grabRightTail')}) onto your tails. ← → pivot the skis; releasing ${keys.up[0] ? keyName(keys.up[0]) : '↑'} pops off that end.`,
+      `Butter on the snow: hold a nose grab key (${mainKeys(keys, 'grabLeftNose', 'grabRightNose')}) to press onto your tips or a tail grab key (${mainKeys(keys, 'grabLeftTail', 'grabRightTail')}) onto your tails. ← → pivot the skis; releasing ${popKey} pops off that end.`,
       'Land on a rail or box to slide it. There is no grind button.',
       `At the finish, ${keys.confirm[0] ? keyName(keys.confirm[0]) : 'the Back to top button'} takes you back to the top.`,
       'Drag the game view with the mouse to look around the skier.',
-      'Change any key in Settings.',
+      'Change any key, and whether Space or ↑ pops, in Settings.',
     ]) {
       const li = document.createElement('li');
       li.textContent = text;
@@ -163,14 +190,18 @@ export class ControlsScreen implements Screen {
       div.appendChild(t);
       return div;
     };
-    this.body.replaceChildren(wrap(main), wrap(grabs), wrap(style), tips);
+    this.body.replaceChildren(this.tester, wrap(main), wrap(grabs), wrap(style), tips);
   }
+}
+
+/** The main key of an action ("none" when it has none). */
+function mainKeyName(keys: Bindings, action: Action): string {
+  return keys[action][0] ? keyName(keys[action][0]) : 'none';
 }
 
 /** The main keys of two actions, "G / B" (or "none"). */
 function mainKeys(keys: Bindings, a: Action, b: Action): string {
-  const name = (action: Action): string => (keys[action][0] ? keyName(keys[action][0]) : 'none');
-  return `${name(a)} / ${name(b)}`;
+  return `${mainKeyName(keys, a)} / ${mainKeyName(keys, b)}`;
 }
 
 function td(text: string, span = 1): HTMLTableCellElement {

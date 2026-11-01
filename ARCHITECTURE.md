@@ -1,6 +1,6 @@
 # Architecture
 
-A map of the code for finding things fast. `GAME_DESIGN.md` says what to build; `CLAUDE.md` gives the rules. This file says where things live and what breaks easily. Written 2026-10-29 at `4bbd1c9` (after milestone 8). Line numbers rot, so prefer the function names.
+A map of the code for finding things fast. `GAME_DESIGN.md` says what to build; `CLAUDE.md` gives the rules. This file says where things live and what breaks easily. Written 2026-10-29 at `4bbd1c9` (after milestone 8); updated for milestone 9. Line numbers rot, so prefer the function names.
 
 ## The big picture
 
@@ -28,14 +28,17 @@ maps/*.json ──registry (lazy import)──► parseMap ──► buildMap �
 | `rails.ts` | `buildRailShapes` (polylines into typed arrays), `railUnder` (snap), `railFrame`, `collideRails` |
 | `obstacles.ts` | Capsules (trees, rocks, fences, walls) in an 8 m grid; `collideObstacles` and `insideObstacle`. Fences stand only as high as they look (`follow`, `rise`) |
 | `bounds.ts` | `keepInside`: map rectangle plus the optional polygon |
+| `powder.ts` | `inPowder`: off a map's runs and groomed patches (Freeride). `Course.powder` carries it; `land` uses it for `landing.powderImpact`, and `snowFx` for spray and the carve sound |
 | `checkpoints.ts` | `RunState`: flags, personal checkpoint, `respawnSkier`, finish zones |
 | `race.ts` | Slalom courses: wand start, gate pass or miss, the finish, and spring-damper bending gates that `knock` the skier |
 | `score.ts` | A pure observer: rotation from the `trick` quaternion delta in body axes, combos and multipliers. `sketchyLanding` is shared with audio |
 
-**Config:** `skier`, `air`, `landing`, `rails`, `bail`, `slalom`, `giantSlalom`, `score`, `checkpoints`, `sim`, `cheats`, `skis`.
+**Config:** `skier`, `air`, `landing` (`caseTrickMax`, `casePitchMax`, `powderImpact` since M9), `rails`, `bail`, `slalom`, `giantSlalom`, `score`, `checkpoints`, `sim`, `cheats`, `skis`.
 
 **Fragile**
-- Adding a `SkierState` field means editing `createSkierState`, `copySkierState` and `interpolateSkier` (`render/skierView.ts`) together. Nothing catches a miss.
+- Adding a `SkierState` field means editing `createSkierState`, `copySkierState` and `interpolateSkier` (`render/skierView.ts`) together. Nothing catches a miss. (`interpolateSkier` copies only what rendering reads; `landPowder` and `trickTurn` are sim-only.)
+- **Pop vs ↑ (M9):** the sim crouches and pops on `input.pop` and front-flips on `input.up`, except while a pop is still possible with `pop` held. "Pop with: ↑" is `mirrorPop` (`core/input.ts`) copying `up` into `pop` after each sample, in `Keyboard.sample` and in the harness (`Rider.popWithUp`, default true), which is what keeps every tool byte-identical. Anything new that reads ↑ on the snow must read `pop` instead.
+- **Case landings (M9):** `land` allows `casePitchMax` while `trickTurn` (rotation summed over the air, reset in `takeOff`) is under `caseTrickMax`. Not the `trick` quaternion's angle: a full flip returns it to identity. `sketchyLanding` uses the powder impact limit when `landPowder`.
 - `yaw` is frozen at its takeoff value in the air; `land` re-derives it from the body. `interpolateSkier` special-cases this (the switch-landing snap was fixed there), and `race.ts placeBody`, the headlamp and the camera all see the stale yaw mid-air.
 - Module-level scratch vectors are shared between functions: `land` / `crash` read the `contactNormal` that `moveInAir` just set, and `railSpot` writes `head` and `railDir`. Reordering calls breaks things silently.
 - `air.wallAngle` (44°) decides what counts as a wall. That covers pops, air leveling and how every pipe, gully and lip is authored. Takeoff faces are exempt, and a pop off a lip steeper than 44° goes straight up.
@@ -111,15 +114,15 @@ maps/*.json ──registry (lazy import)──► parseMap ──► buildMap �
 
 ## UI and core (`src/ui/`, `src/core/`)
 - `ui/menus.ts`: the screen stack and **all** menu key routing (a capture-phase `keydown` on `window`). Order: rebind trap → tuning-panel keys ignored → no menu open goes to `onGameKey` (in main.ts) → the screen's `onKey` → Esc / Tab / Enter / arrows. It also has `prewarm`, `setHole` (Locker window) and the helpers `board` and `plank`.
-- Screens: `mainMenus.ts` (title, pause with the Weather plank), `mapSelect.ts` + `weatherPicker.ts`, `settingsMenu.ts` (quality, volume, score switch, crash setting, two key slots per action), `controlsMenu.ts`, `cheatsMenu.ts`, `lockerMenu.ts`, `trailMap.ts` (its own overlay, not on the stack).
+- Screens: `mainMenus.ts` (title, pause with the Weather plank), `mapSelect.ts` + `weatherPicker.ts`, `settingsMenu.ts` (quality, volume, score switch, crash setting, Pop with, two key slots per action), `controlsMenu.ts` (tables follow Pop with; a plank opens the tester), `keyTester.ts` (a Chromebook-style keyboard drawing that lights held keys; its `onKey` swallows every key but Esc, and it listens for keyup on `window` only while shown), `cheatsMenu.ts`, `lockerMenu.ts`, `trailMap.ts` (its own overlay, not on the stack).
 - HUD: `scoreHud.ts` (also submits bests and fires combo sounds through callbacks), `scoreText.ts`, `runHud.ts`, `raceHud.ts`, `hints.ts`, `toast.ts`, `fade.ts`, `fps.ts` (always shown), `embed.ts` (Open in new tab, and Fullscreen only if `fullscreenEnabled`).
 - `tuningPanel.ts`: lil-gui, a dynamic import (its own chunk), opened from Cheats in every build and folded open in dev. It edits CONFIG in place.
-- `core/input.ts`: `ACTIONS`, `GRAB_ACTIONS`, `DEFAULT_BINDINGS` (by `KeyboardEvent.code`), and `Keyboard` (a bubble-phase listener, disabled while any menu is open). `core/settings.ts`: load and save, `assignKey`, the quality helpers. `core/storage.ts`: try/catch wrappers.
+- `core/input.ts`: `ACTIONS`, `GRAB_ACTIONS`, `DEFAULT_BINDINGS` (by `KeyboardEvent.code`; `pop` is Space), `mirrorPop`, and `Keyboard` (a bubble-phase listener, disabled while any menu is open; `setPopWithUp`). `core/settings.ts`: load and save, `assignKey`, the quality helpers. `core/storage.ts`: try/catch wrappers.
 - **Storage keys** (`parkLaps.` prefix): `settings.v1`, `outfit.v1`, `bests.v1`, `weather.v1`, `map`, and the legacy `quality` (read once). **URL overrides:** `?map=`, `?quality=`, `?weather=`.
 - **Fragile**
   - `Keyboard` ignores modifiers, so Ctrl+R is swallowed and respawns while riding.
   - `onGameKey` must `stopPropagation` on trail-map close, or the bubble-phase `Keyboard` reopens it.
-  - `embed.ts` buttons keep focus after a click, so Enter toggles fullscreen instead of Back to top.
+  - `Keyboard` ignores Enter and Space on a focused button or link, so every HUD button must `blur()` on click (`hudButton`, `embed.ts` and `runHud.ts` do), or Space pops nothing.
   - `loadMap` has no in-flight guard. A failed load after `level = null` leaves no level.
   - A saved bindings set with a conflict resets every key to its default.
   - The trail map has no focus trap. The window-button row may overflow a narrow embed.
@@ -143,6 +146,7 @@ maps/*.json ──registry (lazy import)──► parseMap ──► buildMap �
 - **Not type-checked:** `tsconfig` includes only `src` and `vite.config.ts`, so `npm run build` never checks `tools/`. Drift shows up only at runtime.
 - `sim/harness.ts`: `loadMap(file)` runs the real `parseMap` + `buildMap`. `Rider` steps the real `stepSkier`, `updateRun` and `stepRace` with scripted keys. `--ski park|big|carving` works on every tool. `jumpLayout` duplicates `maps/shapes.ts` geometry by hand.
 - Checkers (stdout only):
+  - `flips.ts [map] [jump] [speed] [--tricks back,front,spin]`: the landing windows for letting go of a trick key (default the Park's jump 48 at 16 m/s); its front flip rides "Pop with: Space".
   - `line.ts <map> <x> <fromD> <toD> [stand|tuck] [pop|nopop] [720] [steer] …`: rides Park-style lines.
   - `face.ts <map> [runs] | --fall N`: Freeride runs and fall lines.
   - `course.ts`: slalom courses.

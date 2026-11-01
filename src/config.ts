@@ -168,7 +168,15 @@ export const CONFIG = {
 
   landing: {
     /** Biggest nose-up or nose-down angle (radians) between the skis and the snow that still lands. */
-    pitchMax: 0.6,
+    pitchMax: 0.75,
+    /**
+     * Casing a deck or a knuckle: landing along your own flight path, with
+     * the trick rotation (the body turned from where the flight carries it)
+     * under caseTrickMax radians, lands up to casePitchMax radians nose down
+     * or up, as a rough landing (the usual roughImpact speed loss).
+     */
+    caseTrickMax: 0.35,
+    casePitchMax: 1,
     /** Biggest roll onto an edge (radians) that still lands; past it the edge catches. */
     rollMax: 1.15,
     /** Biggest angle (radians) between the skis and the direction of travel (or its reverse) that still lands. */
@@ -179,6 +187,8 @@ export const CONFIG = {
     edgeCheckAir: 0.3,
     /** Speed (m/s) into the snow that is too hard to absorb. */
     impactMax: 15,
+    /** Powder (off the runs, on a map with `powder`) absorbs this many times harder a landing. */
+    powderImpact: 1.4,
     /** Speed into the snow (m/s) that gives a full-depth absorb crouch, and how long it lasts (s). */
     squashImpact: 9,
     squashTime: 0.35,

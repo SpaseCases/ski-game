@@ -19,8 +19,9 @@ import {
 import { CONFIG } from '../config.ts';
 import type { SnowBudget } from '../core/settings.ts';
 import type { BuiltMap } from '../maps/build.ts';
-import type { GroomedPatch, Heightfield, MapDef, RailShape, XZ } from '../maps/types.ts';
+import type { Heightfield, MapDef, RailShape, XZ } from '../maps/types.ts';
 import { insideBounds } from '../sim/bounds.ts';
+import { inPowder, type PowderArea } from '../sim/powder.ts';
 import type { SkierState } from '../sim/skier.ts';
 import type { SkierPose } from './skierView.ts';
 import { STANCE_HALF_WIDTH } from './skierPoses.ts';
@@ -138,7 +139,7 @@ const UP = new Vector3(0, 1, 0);
 export class SnowFx {
   readonly group = new Group();
   private readonly hf: Heightfield;
-  private readonly map: MapDef;
+  private readonly powderArea: PowderArea | null;
   private readonly rails: readonly RailShape[];
   private readonly budget: SnowBudget;
   private weather: SnowWeather = { ...CLEAR_WEATHER };
@@ -233,7 +234,7 @@ export class SnowFx {
 
   constructor(built: BuiltMap, budget: SnowBudget) {
     this.hf = built.hf;
-    this.map = built.map;
+    this.powderArea = built.course.powder;
     this.rails = built.course.rails;
     this.budget = budget;
     this.group.matrixAutoUpdate = false;
@@ -425,7 +426,7 @@ export class SnowFx {
     if ((p.x - this.powderX) ** 2 + (p.z - this.powderZ) ** 2 < POWDER_STEP * POWDER_STEP) return;
     this.powderX = p.x;
     this.powderZ = p.z;
-    this.powder = inPowder(this.map, p.x, p.z);
+    this.powder = inPowder(this.powderArea, p.x, p.z);
   }
 
   private emitSkier(pose: SkierPose, sim: SkierState, dt: number): void {
@@ -1100,38 +1101,6 @@ function randomUnit(out: Vector3): Vector3 {
   const r = Math.sqrt(1 - y * y);
   const a = Math.random() * Math.PI * 2;
   return out.set(Math.cos(a) * r, y, Math.sin(a) * r);
-}
-
-/** Whether the snow at (x, z) is powder: on a map with `powder`, off its named runs and groomed patches. */
-export function inPowder(map: MapDef, x: number, z: number): boolean {
-  if (!map.powder) return false;
-  const groomed = map.powder.groomed;
-  for (let i = 0; i < groomed.length; i++) if (inPatch(groomed[i]!, x, z)) return false;
-  for (let r = 0; r < map.runs.length; r++) {
-    const run = map.runs[r]!;
-    const pts = run.points;
-    const c2 = run.clear * run.clear;
-    for (let i = 1; i < pts.length; i++) if (segmentDistance2(pts[i - 1]!, pts[i]!, x, z) <= c2) return false;
-  }
-  return true;
-}
-
-function inPatch(g: GroomedPatch, x: number, z: number): boolean {
-  const h = (g.heading * Math.PI) / 180;
-  const dx = x - g.x;
-  const dz = z - g.z;
-  // Along the heading (0 runs toward -Z), and across it.
-  const along = -dx * Math.sin(h) - dz * Math.cos(h);
-  const across = dx * Math.cos(h) - dz * Math.sin(h);
-  return Math.abs(along) <= g.length / 2 && Math.abs(across) <= g.width / 2;
-}
-
-function segmentDistance2(a: XZ, b: XZ, x: number, z: number): number {
-  const ux = b.x - a.x;
-  const uz = b.z - a.z;
-  const l2 = ux * ux + uz * uz;
-  const t = l2 > 0 ? Math.min(1, Math.max(0, ((x - a.x) * ux + (z - a.z) * uz) / l2)) : 0;
-  return (a.x + ux * t - x) ** 2 + (a.z + uz * t - z) ** 2;
 }
 
 interface Emitter {

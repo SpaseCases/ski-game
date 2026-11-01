@@ -1,5 +1,6 @@
 import { TUNING } from './tuning.ts';
 import type { Heightfield, ObstacleDef, RailShape } from '../maps/types.ts';
+import type { PowderArea } from './powder.ts';
 import { heightAt, type Vec3Like } from './terrain.ts';
 
 // Solid things on the course that aren't snow or rails: trees, rocks,
@@ -38,6 +39,8 @@ export interface Course {
   hf: Heightfield;
   rails: readonly RailShape[];
   obstacles: Obstacles;
+  /** Where landings are softer (null: the whole map is groomed). */
+  powder: PowderArea | null;
 }
 
 const CELL = 8;

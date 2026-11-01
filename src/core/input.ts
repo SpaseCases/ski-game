@@ -6,6 +6,7 @@ export type Action =
   | 'right'
   | 'up'
   | 'down'
+  | 'pop'
   | 'pole'
   | 'lincolnLeft'
   | 'lincolnRight'
@@ -45,6 +46,7 @@ export const ACTIONS: readonly Action[] = [
   'right',
   'up',
   'down',
+  'pop',
   'pole',
   'lincolnLeft',
   'lincolnRight',
@@ -63,6 +65,8 @@ export const DEFAULT_BINDINGS: Bindings = {
   right: ['ArrowRight'],
   up: ['ArrowUp'],
   down: ['ArrowDown'],
+  // Pops only with Settings' "Pop with: Space"; with "Pop with: ↑" the up key pops (see Keyboard.setPopWithUp).
+  pop: ['Space'],
   pole: ['ShiftLeft', 'ShiftRight'],
   lincolnLeft: ['KeyQ'],
   lincolnRight: ['KeyE'],
@@ -116,6 +120,8 @@ export class Keyboard {
   private releasedLatch = new Set<Action>();
   /** Off while a menu is open: keys go to the page as usual (Tab moves focus, arrows scroll). */
   private enabled = true;
+  /** "Pop with: ↑": the up key crouches and pops too, and the pop key does nothing. */
+  private popWithUp = false;
 
   constructor(bindings: Bindings) {
     this.setBindings(bindings);
@@ -146,6 +152,12 @@ export class Keyboard {
     this.releaseAll();
   }
 
+  /** "Pop with: ↑" (true) or with the pop key (false). */
+  setPopWithUp(on: boolean): void {
+    this.popWithUp = on;
+    this.releaseAll();
+  }
+
   /** True when the key with this code is bound to `action` (whether or not game keys are on). */
   isBound(action: Action, code: string): boolean {
     return this.actionsByCode.get(code)?.includes(action) ?? false;
@@ -159,6 +171,7 @@ export class Keyboard {
       button.pressed = this.pressedLatch.has(action);
       button.released = this.releasedLatch.has(action);
     }
+    if (this.popWithUp) mirrorPop(out);
     this.pressedLatch.clear();
     this.releasedLatch.clear();
   }
@@ -195,6 +208,19 @@ export class Keyboard {
     this.pressedLatch.clear();
     this.releasedLatch.clear();
   }
+}
+
+/**
+ * "Pop with: ↑": the sim crouches and pops on `pop` and front-flips on `up`
+ * (once a pop is no longer possible, see stepSkier), so pop copying up gives
+ * ↑ both jobs, exactly as before the pop action existed.
+ */
+export function mirrorPop(input: InputState): void {
+  const up = input.up;
+  const pop = input.pop;
+  pop.held = up.held;
+  pop.pressed = up.pressed;
+  pop.released = up.released;
 }
 
 /** True for a key pressed in the tuning panel (lil-gui): it's typing or using the panel, never riding. */

@@ -1,4 +1,5 @@
 import { buildObstacles, type Course } from '../sim/obstacles.ts';
+import { powderArea } from '../sim/powder.ts';
 import { buildRace, type RaceDef } from '../sim/race.ts';
 import { buildRailShapes } from '../sim/rails.ts';
 import { decorObstacles, layoutDecor, type DecorLayout } from './decor.ts';
@@ -33,7 +34,7 @@ export function buildMap(map: MapDef): BuiltMap {
   const rails = buildRailShapes([...map.features, ...townRails(map.features)], hf);
   const decor = layoutDecor(map, hf);
   const obstacles = buildObstacles([...startObstacles(starts), ...townObstacles(map.features, hf), ...decorObstacles(decor)], hf);
-  return { map, hf, starts, course: { hf, rails, obstacles }, race: buildRace(map.features, map.finishes, hf), decor };
+  return { map, hf, starts, course: { hf, rails, obstacles, powder: powderArea(map) }, race: buildRace(map.features, map.finishes, hf), decor };
 }
 
 /** The heightfield for a map's terrain: a slope, or a mountain. */

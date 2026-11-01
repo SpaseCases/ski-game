@@ -1,12 +1,12 @@
 import { DEFAULT_BINDINGS, type Action, type Bindings } from '../core/input.ts';
-import { assignKey, clearSecondKey, KEY_SLOTS, QUALITIES, wantsAntialias, type Quality, type Settings } from '../core/settings.ts';
+import { assignKey, clearSecondKey, KEY_SLOTS, QUALITIES, wantsAntialias, type PopWith, type Quality, type Settings } from '../core/settings.ts';
 import { CONFIG } from '../config.ts';
 import { ACTION_NAMES, keyName, mainKey } from './keyNames.ts';
 import { addBackButton, board, setHints, type Screen } from './menus.ts';
 
 // The Settings screen: the quality preset (applied at once), sound volumes
-// and mute (saved for milestone 7's sounds), combo scoring on or off, and a
-// key for every action.
+// and mute, combo scoring on or off, which key pops, and a key for every
+// action.
 // Changing a key listens for the next key pressed: Esc is refused (it stays
 // the menu and pause key), and a key another action has swaps the two.
 
@@ -18,7 +18,7 @@ const QUALITY_TEXT: Record<Quality, [string, string]> = {
 };
 
 const KEY_GROUPS: readonly (readonly [string, readonly Action[]])[] = [
-  ['Riding', ['left', 'right', 'up', 'down', 'pole']],
+  ['Riding', ['left', 'right', 'pop', 'up', 'down', 'pole']],
   ['Tricks', ['lincolnLeft', 'lincolnRight']],
   [
     'Grabs',
@@ -63,6 +63,8 @@ export interface SettingsHooks {
   setScore: (on: boolean) => void;
   /** After a crash: wait for the respawn key (true) or respawn by itself. */
   setCrashWait: (wait: boolean) => void;
+  /** Pop with the pop key or with ↑. */
+  setPopWith: (key: PopWith) => void;
   setBindings: (b: Bindings) => void;
   /** Hands the next key pressed to `fn` and nothing else (null: stop listening). */
   trapNextKey: (fn: ((e: KeyboardEvent) => void) | null) => void;
@@ -80,6 +82,8 @@ export class SettingsScreen implements Screen {
   private readonly score: HTMLButtonElement;
   private readonly crashButtons = new Map<boolean, HTMLButtonElement>();
   private readonly crashNote: HTMLElement;
+  private readonly popButtons = new Map<PopWith, HTMLButtonElement>();
+  private readonly popNote: HTMLElement;
   private readonly slots = new Map<string, HTMLButtonElement>();
   private readonly status: HTMLElement;
   private listening: HTMLButtonElement | null = null;
@@ -181,9 +185,28 @@ export class SettingsScreen implements Screen {
     this.crashNote.className = 'setting-note';
     crashes.append(labelRow('After a crash', crashGroup), this.crashNote);
 
-    // Keys.
+    // Keys: which one pops first, then a key for every action.
     const keys = section('Keys');
     keys.classList.add('keys-section');
+    const popGroup = document.createElement('div');
+    popGroup.className = 'segmented';
+    popGroup.setAttribute('role', 'group');
+    popGroup.setAttribute('aria-label', 'Pop with');
+    for (const key of ['pop', 'up'] as const) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'segment';
+      btn.addEventListener('click', () => {
+        this.stopListening();
+        this.hooks.setPopWith(key);
+        this.syncKeys();
+      });
+      popGroup.appendChild(btn);
+      this.popButtons.set(key, btn);
+    }
+    this.popNote = document.createElement('p');
+    this.popNote.className = 'setting-note';
+    keys.append(labelRow('Pop with', popGroup), this.popNote);
     const table = document.createElement('table');
     table.className = 'keys-table';
     table.innerHTML = '<thead><tr><th scope="col">Action</th><th scope="col">Key</th><th scope="col">Second key</th></tr></thead>';
@@ -319,6 +342,21 @@ export class SettingsScreen implements Screen {
     this.syncKeys();
   }
 
+  /** The Pop with switch, named by the keys bound now, and what it means. */
+  private syncPop(): void {
+    const s = this.hooks.get();
+    const pop = mainKey(s.bindings, 'pop');
+    const up = mainKey(s.bindings, 'up');
+    for (const [key, btn] of this.popButtons) {
+      btn.textContent = key === 'pop' ? pop : up;
+      btn.setAttribute('aria-pressed', String(key === s.popWith));
+    }
+    this.popNote.textContent =
+      s.popWith === 'pop'
+        ? `Hold ${pop} to crouch and let go to pop, on the snow and on rails. ${up} only front-flips, so you can hold it off the lip.`
+        : `${up} crouches and pops on the snow and on rails, and front-flips once you're in the air. ${pop} does nothing.`;
+  }
+
   private syncCrash(): void {
     const s = this.hooks.get();
     for (const [wait, btn] of this.crashButtons) btn.setAttribute('aria-pressed', String(wait === s.crashWait));
@@ -365,12 +403,23 @@ export class SettingsScreen implements Screen {
 
   private syncKeys(): void {
     this.syncCrash();
-    const b = this.hooks.get().bindings;
+    this.syncPop();
+    const s = this.hooks.get();
+    const b = s.bindings;
     for (const btn of this.slots.values()) {
       const action = btn.dataset.action as Action;
       const slot = Number(btn.dataset.slot);
       const code = b[action][slot];
       btn.classList.remove('is-listening');
+      // Popping with ↑, the pop key does nothing, so it isn't offered.
+      const idle = action === 'pop' && s.popWith === 'up';
+      btn.disabled = idle;
+      if (idle) {
+        btn.classList.remove('is-empty');
+        btn.textContent = slot === 0 ? `Uses ${mainKey(b, 'up')}` : '';
+        btn.setAttribute('aria-label', `${ACTION_NAMES[action]}: uses ${mainKey(b, 'up')}, set by Pop with.`);
+        continue;
+      }
       btn.classList.toggle('is-empty', !code);
       btn.textContent = code ? keyName(code) : slot === 0 ? 'none' : 'Add';
       btn.setAttribute('aria-label', `${ACTION_NAMES[action]}, ${slot === 0 ? 'key' : 'second key'}: ${code ? keyName(code) : 'none'}. Press Enter to change.`);

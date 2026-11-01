@@ -235,11 +235,14 @@ export function mountTuningPanel(actions: PanelActions): TuningPanel {
   const L = CONFIG.landing;
   const land = gui.addFolder('Landing');
   land.add(L, 'pitchMax', 0.05, 1.6, 0.01);
+  land.add(L, 'caseTrickMax', 0, 1.5, 0.01);
+  land.add(L, 'casePitchMax', 0.05, 1.6, 0.01);
   land.add(L, 'rollMax', 0.05, 1.6, 0.01);
   land.add(L, 'edgeCheckAir', 0, 1, 0.01);
   land.add(L, 'sideMax', 0.05, 1.6, 0.01);
   land.add(L, 'sideSpeed', 0, 20, 0.5);
   land.add(L, 'impactMax', 1, 40, 0.5);
+  land.add(L, 'powderImpact', 1, 3, 0.05);
   land.add(L, 'squashImpact', 1.5, 30, 0.5);
   land.add(L, 'squashTime', 0.05, 1, 0.01);
   land.close();

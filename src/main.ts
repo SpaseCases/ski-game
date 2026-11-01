@@ -58,6 +58,7 @@ import { Fader } from './ui/fade.ts';
 import { mountFpsMeter } from './ui/fps.ts';
 import { mountCrashHint, mountFocusHint } from './ui/hints.ts';
 import { ControlsScreen } from './ui/controlsMenu.ts';
+import { KeyTesterScreen } from './ui/keyTester.ts';
 import { mainKey } from './ui/keyNames.ts';
 import { LockerScreen } from './ui/lockerMenu.ts';
 import { PauseScreen, TitleScreen } from './ui/mainMenus.ts';
@@ -133,6 +134,7 @@ const scoreHud = new ScoreHud(
 );
 const trailMap = new TrailMap(hud, closeTrailMap);
 const keyboard = new Keyboard(settings.bindings);
+keyboard.setPopWithUp(settings.popWith === 'up');
 keyboard.attach(window);
 
 // The menus: the title before any map is loaded, the pause menu while riding,
@@ -183,12 +185,22 @@ const settingsScreen = new SettingsScreen(
       saveSettings(settings);
       syncKeyLabels();
     },
+    setPopWith: (key) => {
+      settings.popWith = key;
+      keyboard.setPopWithUp(key === 'up');
+      saveSettings(settings);
+    },
     setBindings,
     trapNextKey: (fn) => menus.trapNextKey(fn),
   },
   () => menus.back(),
 );
-const controlsScreen = new ControlsScreen(() => settings.bindings, () => menus.back());
+const keyTester = new KeyTesterScreen(() => settings.bindings, () => menus.back());
+const controlsScreen = new ControlsScreen(
+  () => settings,
+  () => menus.push(keyTester),
+  () => menus.back(),
+);
 const cheatsScreen = new CheatsScreen(
   {
     isOn: (id) => CHEATS[id],
@@ -221,7 +233,7 @@ const lockerScreen = new LockerScreen(
   },
   () => menus.back(),
 );
-for (const screen of [titleScreen, pauseScreen, mapSelect, settingsScreen, controlsScreen, cheatsScreen, lockerScreen]) menus.add(screen);
+for (const screen of [titleScreen, pauseScreen, mapSelect, settingsScreen, controlsScreen, keyTester, cheatsScreen, lockerScreen]) menus.add(screen);
 
 // HUD buttons for the mouse, beside the window buttons; hidden while a menu is open.
 /** Under a finished timed run's result: the respawn key races the course again. */

@@ -149,14 +149,17 @@ export function comboTotal(sc: ScoreState): number {
  * True when the landing just made on the snow came close to the crash
  * limits (sketchy), after `air` s in the air, from a rail if `fromRail`
  * (then the edges are checked however short the drop, as the landing does).
+ * In powder the impact limit is powder's; a cased landing (see
+ * CONFIG.landing.casePitchMax) is past pitchMax's share, so sketchy.
  */
 export function sketchyLanding(s: SkierState, air: number, fromRail: boolean): boolean {
   const C = CONFIG.score;
   const L = TUNING.landing;
   const edges = air >= L.edgeCheckAir || fromRail;
+  const impactMax = s.landPowder ? L.impactMax * L.powderImpact : L.impactMax;
   return (
     s.landPitch > C.sketchyPitch * L.pitchMax ||
-    s.landImpact > C.sketchyImpact * L.impactMax ||
+    s.landImpact > C.sketchyImpact * impactMax ||
     (edges && (s.landRoll > C.sketchyRoll * L.rollMax || s.landSide > C.sketchySide * L.sideMax))
   );
 }

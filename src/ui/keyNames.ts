@@ -54,8 +54,9 @@ export function keyName(code: string): string {
 export const ACTION_NAMES: Record<Action, string> = {
   left: 'Turn or spin left',
   right: 'Turn or spin right',
-  up: 'Crouch and pop, front flip',
+  up: 'Front flip',
   down: 'Brake, back flip',
+  pop: 'Crouch and pop',
   pole: 'Pole push / tuck',
   lincolnLeft: 'Lincoln loop left',
   lincolnRight: 'Lincoln loop right',

@@ -12,6 +12,9 @@ export const QUALITIES: readonly Quality[] = ['auto', 'low', 'medium', 'high'];
 /** A fixed preset (Auto picks among them, see CONFIG.quality.auto). */
 export type Preset = Exclude<Quality, 'auto'>;
 
+/** "Pop with": the pop action's own key, or the up key. */
+export type PopWith = 'pop' | 'up';
+
 /** Keys per action: a main key and an optional second one. */
 export const KEY_SLOTS = 2;
 
@@ -25,6 +28,8 @@ export interface Settings {
   score: boolean;
   /** After a crash, lie in the snow until the respawn key is pressed, instead of respawning by itself. */
   crashWait: boolean;
+  /** Which key crouches and pops: the pop action's key (Space), or ↑, which then also front-flips (see Keyboard.setPopWithUp). */
+  popWith: PopWith;
   /** The rung of CONFIG.quality.auto.rungs that Auto settled on (0 = the best); the next visit tries one better. */
   autoRung: number;
   bindings: Bindings;
@@ -39,7 +44,7 @@ function isQuality(value: unknown): value is Quality {
 }
 
 export function defaultSettings(): Settings {
-  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, autoRung: 0, bindings: { ...DEFAULT_BINDINGS } };
+  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, popWith: 'pop', autoRung: 0, bindings: { ...DEFAULT_BINDINGS } };
 }
 
 /** The saved settings, or the defaults for anything not saved (or unreadable). */
@@ -60,6 +65,7 @@ export function loadSettings(): Settings {
   if (typeof saved.muted === 'boolean') out.muted = saved.muted;
   if (typeof saved.score === 'boolean') out.score = saved.score;
   if (typeof saved.crashWait === 'boolean') out.crashWait = saved.crashWait;
+  if (saved.popWith === 'pop' || saved.popWith === 'up') out.popWith = saved.popWith;
   if (typeof saved.autoRung === 'number' && Number.isInteger(saved.autoRung)) out.autoRung = clampRung(saved.autoRung);
   out.bindings = readBindings(saved.bindings);
   return out;

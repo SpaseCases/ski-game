@@ -5,6 +5,7 @@ import { onPipeWall, onTakeoff, pipeInward } from '../maps/shapes.ts';
 import type { Heightfield, RailShape, SpawnDef } from '../maps/types.ts';
 import { keepInside } from './bounds.ts';
 import { collideObstacles, type Course } from './obstacles.ts';
+import { inPowder } from './powder.ts';
 import { collideRails, railFrame, railUnder, type RailSpot } from './rails.ts';
 import { groundAt, heightAt } from './terrain.ts';
 
@@ -106,6 +107,8 @@ export interface SkierState {
   airHeading: number;
   airPitch: number;
   trick: Quaternion;
+  /** Radians turned by tricks this air, every axis summed: small means the body still points along the flight path. */
+  trickTurn: number;
   /** Took off up a wall (see CONFIG.air.wallAngle): the heading follows the path along the wall. */
   airWall: boolean;
   /** Grab being held (index into GRAB_ACTIONS), or -1. */
@@ -125,6 +128,8 @@ export interface SkierState {
   landRoll: number;
   landSide: number;
   landImpact: number;
+  /** The last landing was in powder, where the impact limit is higher (CONFIG.landing.powderImpact). */
+  landPowder: boolean;
   bailed: boolean;
   /** Seconds since the crash. */
   bailTime: number;
@@ -171,6 +176,7 @@ export function createSkierState(): SkierState {
     airHeading: 0,
     airPitch: 0,
     trick: new Quaternion(),
+    trickTurn: 0,
     airWall: false,
     grab: -1,
     butter: 0,
@@ -181,6 +187,7 @@ export function createSkierState(): SkierState {
     landRoll: 0,
     landSide: 0,
     landImpact: 0,
+    landPowder: false,
     bailed: false,
     bailTime: 0,
     bailReason: '',
@@ -219,6 +226,7 @@ export function copySkierState(dst: SkierState, src: SkierState): void {
   dst.airHeading = src.airHeading;
   dst.airPitch = src.airPitch;
   dst.trick.copy(src.trick);
+  dst.trickTurn = src.trickTurn;
   dst.airWall = src.airWall;
   dst.grab = src.grab;
   dst.butter = src.butter;
@@ -229,6 +237,7 @@ export function copySkierState(dst: SkierState, src: SkierState): void {
   dst.landRoll = src.landRoll;
   dst.landSide = src.landSide;
   dst.landImpact = src.landImpact;
+  dst.landPowder = src.landPowder;
   dst.bailed = src.bailed;
   dst.bailTime = src.bailTime;
   dst.bailReason = src.bailReason;
@@ -304,10 +313,11 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
   // normal there would throw the skier out across the pipe. Off a takeoff
   // steeper than a wall (an aerials kicker) it pushes straight up: the
   // normal there points back down the in-run.
-  // ↓ while ↑ is loading a pop on the snow or a rail cancels it: stand up without popping.
-  if (input.up.pressed) s.popArmed = true;
-  if (input.down.pressed && input.up.held && (s.grounded || s.rail >= 0)) s.popArmed = false;
-  if (input.up.released && s.canPop && s.popArmed && (s.grounded || s.airTime <= c.popCoyoteTime)) {
+  // The pop key (Space, or ↑ with "Pop with: ↑", see mirrorPop) loads it.
+  // ↓ while it's loading a pop on the snow or a rail cancels it: stand up without popping.
+  if (input.pop.pressed) s.popArmed = true;
+  if (input.down.pressed && input.pop.held && (s.grounded || s.rail >= 0)) s.popArmed = false;
+  if (input.pop.released && s.canPop && s.popArmed && (s.grounded || s.airTime <= c.popCoyoteTime)) {
     // Out of a butter it's an ollie (off the tails) or a nollie (off the tips): a stronger pop.
     const pop = (c.popMin + (c.popMax - c.popMin) * s.crouch) * (1 + (c.butterPop - 1) * s.butterAmount);
     if (onWall(s, course.hf)) s.velocity.y += pop * TUNING.air.wallPop;
@@ -317,11 +327,11 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
     s.canPop = false;
     s.crouch = 0;
   }
-  // ↑ crouches while a pop is still possible; after that, in the air, it
-  // flips. The pole key tucks on the snow once past tuckSpeed (below it, it
-  // poles): as low as a full crouch, so ↑ from a tuck pops at full strength.
+  // The pop key crouches while a pop is still possible. The pole key tucks
+  // on the snow once past tuckSpeed (below it, it poles): as low as a full
+  // crouch, so a pop from a tuck is at full strength.
   const tuck = input.pole.held && s.grounded && s.rail < 0 && s.velocity.lengthSq() >= c.tuckSpeed * c.tuckSpeed;
-  const crouchTarget = (input.up.held && s.canPop && s.popArmed) || tuck ? 1 : 0;
+  const crouchTarget = (input.pop.held && s.canPop && s.popArmed) || tuck ? 1 : 0;
   s.crouch = approach(s.crouch, crouchTarget, dt / (crouchTarget > s.crouch ? c.crouchTime : c.standTime));
 
   if (s.rail >= 0) {
@@ -503,9 +513,11 @@ function fly(s: SkierState, input: InputState, steer: number, hf: Heightfield, d
   s.lean += (0 - s.lean) * (1 - Math.exp(-c.leanResponse * dt));
   if (s.airTime > c.popCoyoteTime) s.canPop = false;
 
-  // Tricks: ↓ back flip, ↑ front flip (once it no longer means crouch),
-  // ←/→ spin, Q/E Lincoln loop. Rotation lives in the body's own axes.
-  const flip = (input.down.held ? 1 : 0) - (input.up.held && !s.canPop ? 1 : 0);
+  // Tricks: ↓ back flip, ↑ front flip, ←/→ spin, Q/E Lincoln loop. ↑
+  // doesn't flip while the pop key is held with a pop still possible: with
+  // "Pop with: ↑" they're one key, and it's still crouching just off the lip.
+  // Rotation lives in the body's own axes.
+  const flip = (input.down.held ? 1 : 0) - (input.up.held && !(s.canPop && input.pop.held) ? 1 : 0);
   const lincoln = (input.lincolnLeft.held ? 1 : 0) - (input.lincolnRight.held ? 1 : 0);
   s.spin.x = rotateAxis(s, 1, s.spin.x, flip, a.flipRate, dt);
   s.spin.y = rotateAxis(s, 2, s.spin.y, steer, a.spinRate, dt);
@@ -514,6 +526,7 @@ function fly(s: SkierState, input: InputState, steer: number, hf: Heightfield, d
   if (rate > 1e-6) {
     axis.copy(s.spin).divideScalar(rate);
     s.trick.multiply(qStep.setFromAxisAngle(axis, rate * dt)).normalize();
+    s.trickTurn += rate * dt;
   }
 
   // The skis follow the flight path like an arrow, once there's enough speed
@@ -660,6 +673,7 @@ function takeOff(s: SkierState, steer: number, hf: Heightfield): void {
   qTurn.setFromAxisAngle(UP, s.airHeading);
   qPitch.setFromAxisAngle(SIDE, s.airPitch);
   s.trick.copy(s.airFrame).multiply(qTurn).multiply(qPitch).invert().multiply(s.orient);
+  s.trickTurn = 0;
   const carry = s.railExit ? TUNING.rails.spinCarry : a.spinCarry;
   s.spin.set(0, s.yawRate * carry + steer * a.spinPreload, 0);
   s.spinDriven = 0;
@@ -731,7 +745,7 @@ function moveInAir(s: SkierState, course: Course, dt: number): void {
   const h = groundAt(hf, p.x, p.z, contactNormal);
   if (p.y <= h) {
     toSurface(hf, p);
-    land(s);
+    land(s, course);
     return;
   }
   head.copy(p).addScaledVector(bodyUp, a.headHeight);
@@ -742,13 +756,14 @@ function moveInAir(s: SkierState, course: Course, dt: number): void {
     p.z = s.center.z;
     p.y = groundAt(hf, p.x, p.z, contactNormal);
     if (CHEATS.noCrashes) {
-      land(s);
+      land(s, course);
       return;
     }
     s.landPitch = Math.acos(clamp(bodyUp.dot(contactNormal), -1, 1));
     s.landRoll = 0;
     s.landSide = 0;
     s.landImpact = Math.max(0, -s.velocity.dot(contactNormal));
+    s.landPowder = false;
     crash(s, 'head');
   }
 }
@@ -775,6 +790,7 @@ function catchRail(s: SkierState, rails: readonly RailShape[]): boolean {
   s.landRoll = 0;
   s.landSide = off;
   s.landImpact = into;
+  s.landPowder = false;
   if (fit.tilt > R.tiltMax || off > R.angleMax) {
     slipOff(s, rail.halfWidth, railYaw);
     return false;
@@ -889,12 +905,13 @@ function bump(s: SkierState, course: Course): boolean {
   s.landRoll = 0;
   s.landSide = 0;
   s.landImpact = hit;
+  s.landPowder = false;
   crash(s, 'obstacle');
   return true;
 }
 
 /** The skis touch down: ride away if the body is close to the snow's angle, otherwise crash. */
-function land(s: SkierState): void {
+function land(s: SkierState, course: Course): void {
   const L = TUNING.landing;
   const n = contactNormal;
   bodyUp.set(0, 1, 0).applyQuaternion(s.orient);
@@ -923,6 +940,12 @@ function land(s: SkierState): void {
   s.landRoll = roll;
   s.landSide = side;
   s.landImpact = impact;
+  s.landPowder = inPowder(course.powder, s.position.x, s.position.z);
+  // Casing a deck or a knuckle: the body still points along the flight path
+  // (little trick rotation), so a steeper pitch is a rough landing, not a crash.
+  const cased = s.trickTurn < L.caseTrickMax;
+  const pitchMax = cased ? Math.max(L.pitchMax, L.casePitchMax) : L.pitchMax;
+  const impactMax = s.landPowder ? L.impactMax * L.powderImpact : L.impactMax;
 
   // Short hops (skidding over a bump) never catch an edge or land sideways,
   // but dropping off a rail still has to land lined up.
@@ -930,13 +953,13 @@ function land(s: SkierState): void {
   s.railExit = false;
   s.normal.copy(n);
   const reason: BailReason =
-    pitch > L.pitchMax || upN <= 0
+    pitch > pitchMax || upN <= 0
       ? 'pitch'
       : edgeChecks && roll > L.rollMax
         ? 'edge'
         : edgeChecks && side > L.sideMax
           ? 'sideways'
-          : impact > L.impactMax
+          : impact > impactMax
             ? 'impact'
             : '';
   if (reason !== '') {
