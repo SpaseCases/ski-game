@@ -53,13 +53,16 @@ export type Layer = (
   | { poly: readonly UV[]; color: string }
   /** An Archimedean spiral out to radius r, `turns` times round, its arm `width` (0..1) of the gap between turns. */
   | { spiral: UV; r: number; turns: number; width: number; color: string }
-  /** Painted cell by cell (the player's own graphics, see core/customSkis.ts): `pixels` holds an index into `colors` per cell of a `rows` x `cols` grid, a row at a time from the tail, each from the left edge. */
+  /** Painted cell by cell (the player's own graphics, see core/customSkis.ts). */
   | { pixels: PixelArt }
 ) & { mirror?: boolean };
 
+/** An index into `colors` per cell of a `rows` x `cols` grid, a row at a time from the tail, each row from the left edge. */
 export interface PixelArt {
   rows: number;
   cols: number;
+  /** Each row runs across both skis of a pair graphic (v from -2 to 2), the left ski's columns first. */
+  pair?: boolean;
   cells: Uint8Array;
   colors: readonly string[];
 }
@@ -619,9 +622,9 @@ function layerColor(L: Layer, u: number, v: number, k: number): string | null {
   }
   if ('poly' in L) return insidePoly(L.poly, u, v) ? L.color : null;
   if ('pixels' in L) {
-    const { rows, cols, cells, colors } = L.pixels;
+    const { rows, cols, cells, colors, pair } = L.pixels;
     const row = Math.min(rows - 1, Math.max(0, Math.floor(((u + 1) / 2) * rows)));
-    const col = Math.min(cols - 1, Math.max(0, Math.floor(((v + 1) / 2) * cols)));
+    const col = Math.min(cols - 1, Math.max(0, Math.floor((pair ? (v + 2) / 4 : (v + 1) / 2) * cols)));
     return colors[cells[row * cols + col]!] ?? null;
   }
   // A spiral: inside its radius, on the arm when the distance out, in turns,

@@ -1,18 +1,31 @@
-import { copyStock, customArt, customBase, customId, EDIT_PALETTE, saveCustomSkis, setCustomBase } from '../core/customSkis.ts';
+import {
+  copyStock,
+  customFace,
+  customId,
+  customLinked,
+  customSidewall,
+  EDIT_PALETTE,
+  saveCustomSkis,
+  setCustomLinked,
+  setCustomSidewall,
+  type Face,
+} from '../core/customSkis.ts';
 import { skiGraphic, skiType, type PixelArt, type SkiGraphic, type SkiId, type SkiType } from '../core/skis.ts';
 import type { Rect } from '../render/lockerStage.ts';
 import { keycap } from './keyNames.ts';
 import { board, setHints, type Screen } from './menus.ts';
 import { paintSkis } from './skiThumb.ts';
 
-// The ski editor, opened from a custom slot's Edit in the Locker: that
-// ski's top-sheet grid laid out long (tail on the left, tip on the right,
-// the left edge on top, as in the rack), painted a cell at a time from the
-// editor palette. The arrows move a cursor and Space or Enter paints (held,
-// it paints as the cursor moves); the mouse paints by dragging. Pencil or
-// fill; the mirror switches paint every stroke tip to tail and edge to edge
-// too. Every stroke is saved at once (core/customSkis.ts) and shows on the
-// 3D skis turning in the window beside the tools.
+// The ski editor, opened from a custom slot's Edit in the Locker: one ski's
+// top sheet or base (the base seen from above, through the ski, as in the
+// rack) laid out long, tail on the left, tip on the right, the left edge on
+// top, painted a cell at a time from the editor palette. While "Same on both
+// skis" is on, every stroke paints both skis; off, Left or Right picks the
+// one painted. The arrows move a cursor and Space or Enter paints (held, it
+// paints as the cursor moves); the mouse paints by dragging. Pencil (a square
+// brush 1 to 4 cells across) or fill; the mirror switches paint every stroke
+// tip to tail and edge to edge too. Every stroke is saved at once
+// (core/customSkis.ts) and shows on the 3D skis turning beside the tools.
 
 export interface SkiEditorHooks {
   /** Put that slot's graphic on the skier. */
@@ -25,8 +38,10 @@ export interface SkiEditorHooks {
 
 type Tool = 'pencil' | 'fill';
 interface Snapshot {
-  cells: Uint8Array;
-  base: number;
+  top: Uint8Array;
+  base: Uint8Array;
+  sidewall: number;
+  linked: boolean;
 }
 
 /** Undo steps kept. */
@@ -34,10 +49,18 @@ const UNDO_MAX = 60;
 /** Grid cell size in CSS pixels: as big as fits, within these. */
 const CELL_MAX = 16;
 const CELL_MIN = 4;
+/** Brush sizes: squares this many cells across. */
+const BRUSHES = [1, 2, 3, 4] as const;
 /** How far Shift + an arrow jumps. */
 const JUMP = 4;
 /** The boots stand on about this much of the ski (m), for the ruler. */
 const BOOT_LENGTH = 0.32;
+
+const BOTH = [0, 1] as const;
+const LEFT = [0] as const;
+const RIGHT = [1] as const;
+const LEFT_SKI = [-1] as const;
+const RIGHT_SKI = [1] as const;
 
 /** Arrow keys: cells along, cells across. */
 const MOVES: Partial<Record<string, readonly [number, number]>> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
@@ -46,7 +69,9 @@ const HINTS = [
   [['←', '→', '↑', '↓'], 'Move'],
   [['Space'], 'Paint'],
   [['[', ']'], 'Color'],
+  [['1', '4'], 'Brush size'],
   [['I'], 'Take the color under the cursor'],
+  [['B'], 'Top or base'],
   [['Tab'], 'Palette and tools'],
   [['Esc'], 'Done'],
 ] as const;
@@ -65,10 +90,14 @@ export class SkiEditorScreen implements Screen {
   private readonly chips: HTMLButtonElement[] = [];
   private readonly colorName: HTMLElement;
   private readonly colorSwatch: HTMLElement;
-  private readonly baseSwatch: HTMLElement;
+  private readonly wallSwatch: HTMLElement;
+  private readonly sideButtons: HTMLButtonElement[] = [];
+  private readonly linkButton: HTMLButtonElement;
+  private readonly faceButtons: HTMLButtonElement[] = [];
   private readonly toolButtons = new Map<Tool, HTMLButtonElement>();
   private readonly mirrorEndsButton: HTMLButtonElement;
   private readonly mirrorSidesButton: HTMLButtonElement;
+  private readonly brushButtons: HTMLButtonElement[] = [];
   private readonly undoButton: HTMLButtonElement;
   private readonly blankSwatches: HTMLElement[] = [];
   private readonly view: HTMLElement;
@@ -77,8 +106,12 @@ export class SkiEditorScreen implements Screen {
   private ski: SkiId = 'park';
   private slot = 0;
   private type: SkiType = skiType('park');
+  /** The face being painted, and its grid (a pair: both skis' columns in each row). */
+  private face: Face = 'top';
   private art!: PixelArt;
-  /** Cursor: `along` from the tail (the grid's rows), `across` from the left edge (its columns). */
+  /** The ski shown and painted when the slot isn't linked: 0 left, 1 right. */
+  private side = 0;
+  /** Cursor: `along` from the tail (the ski's rows), `across` from the ski's left edge (its columns). */
   private along = 0;
   private across = 0;
   /** The mouse's cell, or along < 0 when it's off the grid. */
@@ -88,6 +121,8 @@ export class SkiEditorScreen implements Screen {
   private tool: Tool = 'pencil';
   private mirrorEnds = false;
   private mirrorSides = false;
+  /** The pencil's square, this many cells across. */
+  private brush = 1;
   private undo: Snapshot[] = [];
   /** A stroke being painted: by the mouse (its last cell) or by a held Space or Enter. */
   private dragging = false;
@@ -116,6 +151,36 @@ export class SkiEditorScreen implements Screen {
     b.head.appendChild(done);
     this.sub = b.sub;
     this.sub.hidden = false;
+
+    // Which ski and which face: a row of switches over the bench.
+    const switches = document.createElement('div');
+    switches.className = 'editor-switches';
+    const skiGroup = document.createElement('div');
+    skiGroup.className = 'segmented editor-segments';
+    skiGroup.setAttribute('role', 'group');
+    skiGroup.setAttribute('aria-label', 'Ski');
+    for (const [side, name, key] of [
+      [0, 'Left ski', 'L'],
+      [1, 'Right ski', 'R'],
+    ] as const) {
+      const b = segment(name, key, () => this.setSide(side));
+      skiGroup.appendChild(b);
+      this.sideButtons.push(b);
+    }
+    this.linkButton = segment('Same on both', 'K', () => this.setLinked(!customLinked(this.ski, this.slot)));
+    this.linkButton.classList.add('editor-link');
+    skiGroup.appendChild(this.linkButton);
+    const faceGroup = document.createElement('div');
+    faceGroup.className = 'segmented editor-segments';
+    faceGroup.setAttribute('role', 'group');
+    faceGroup.setAttribute('aria-label', 'Face');
+    for (const face of ['top', 'base'] as const) {
+      const b = segment(face === 'top' ? 'Top' : 'Base', '', () => this.setFace(face));
+      faceGroup.appendChild(b);
+      this.faceButtons.push(b);
+    }
+    faceGroup.appendChild(keycap('B'));
+    switches.append(skiGroup, faceGroup);
 
     // The bench: the grid, and a ruler under it marking the ends and where the boots stand.
     this.bench = document.createElement('div');
@@ -215,13 +280,33 @@ export class SkiEditorScreen implements Screen {
     this.mirrorSidesButton = toolButton('Mirror sides', 'S', () => this.toggleMirror('sides'));
     this.undoButton = toolButton('Undo', 'Z', () => this.stepBack());
     const clear = toolButton('Clear', '', () => this.fillAll());
-    clear.title = 'Paint the whole ski in the picked color';
-    const base = toolButton('Base', 'B', () => this.setBase());
-    base.title = 'The base and sidewalls take the picked color';
-    this.baseSwatch = document.createElement('span');
-    this.baseSwatch.className = 'editor-swatch';
-    base.querySelector('.editor-tool-name')!.prepend(this.baseSwatch);
-    tools.append(this.mirrorEndsButton, this.mirrorSidesButton, this.undoButton, clear, base);
+    clear.title = 'Paint the whole top or base in the picked color';
+    const walls = toolButton('Sidewalls', 'W', () => this.setSidewall());
+    walls.title = 'The sidewalls and ends take the picked color';
+    this.wallSwatch = document.createElement('span');
+    this.wallSwatch.className = 'editor-swatch';
+    walls.querySelector('.editor-tool-name')!.prepend(this.wallSwatch);
+    tools.append(this.mirrorEndsButton, this.mirrorSidesButton, this.undoButton, clear, walls);
+    // Brush size: a square of 1 to 4 cells, drawn to scale on each button.
+    const brushes = document.createElement('div');
+    brushes.className = 'editor-brushes';
+    brushes.setAttribute('role', 'group');
+    brushes.setAttribute('aria-label', 'Brush size');
+    brushes.append(label('Brush'));
+    for (const size of BRUSHES) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'editor-tool editor-brush';
+      b.setAttribute('aria-label', `Brush ${size} by ${size}`);
+      const dot = document.createElement('span');
+      dot.className = 'editor-brush-dot';
+      dot.style.setProperty('--size', String(size));
+      b.append(dot, keycap(String(size)));
+      b.addEventListener('click', () => this.setBrush(size));
+      brushes.appendChild(b);
+      this.brushButtons.push(b);
+    }
+    tools.appendChild(brushes);
 
     const frame = document.createElement('div');
     frame.className = 'locker-frame editor-frame';
@@ -232,7 +317,7 @@ export class SkiEditorScreen implements Screen {
     frame.appendChild(this.view);
 
     lower.append(palette, tools, frame);
-    b.body.append(this.bench, mid, lower);
+    b.body.append(switches, this.bench, mid, lower);
     setHints(b.foot, HINTS);
   }
 
@@ -241,16 +326,17 @@ export class SkiEditorScreen implements Screen {
     this.ski = ski;
     this.slot = slot;
     this.type = skiType(ski);
-    this.art = customArt(ski, slot);
-    this.along = Math.floor(this.art.rows / 2);
-    this.across = Math.floor(this.art.cols / 2);
+    this.face = 'top';
+    this.side = 0;
+    this.art = customFace(ski, slot, 'top');
+    this.along = Math.floor(this.rows / 2);
+    this.across = Math.floor(this.cols / 2);
     this.undo = [];
-    this.sub.textContent = `Custom ${slot + 1} on the ${this.type.name} ski. Both skis get the same picture, and it saves as you paint.`;
+    this.sub.textContent = `Custom ${slot + 1} on the ${this.type.name} ski. Paint the top sheets and the bases, both skis alike or each its own; it saves as you paint.`;
     const m = this.type.model;
     const boot = (m.length / 2 - m.mount) / m.length;
     this.boots.style.left = `${((boot - BOOT_LENGTH / 2 / m.length) * 100).toFixed(1)}%`;
     this.boots.style.width = `${((BOOT_LENGTH / m.length) * 100).toFixed(1)}%`;
-    this.grid.setAttribute('aria-label', `Top sheet, ${m.rows} cells long and ${m.cols} across. Arrows move, Space paints.`);
     this.buildStarts();
     saveCustomSkis();
     this.hooks.wear(ski, customId(ski, slot));
@@ -316,6 +402,11 @@ export class SkiEditorScreen implements Screen {
         return true;
     }
     if (e.repeat) return false;
+    const size = BRUSHES.find((n) => String(n) === key);
+    if (size) {
+      this.setBrush(size);
+      return true;
+    }
     switch (key) {
       case 'p':
         this.setTool('pencil');
@@ -333,7 +424,19 @@ export class SkiEditorScreen implements Screen {
         this.setColor(this.art.cells[this.index(this.along, this.across)]!);
         return true;
       case 'b':
-        this.setBase();
+        this.setFace(this.face === 'top' ? 'base' : 'top');
+        return true;
+      case 'l':
+        this.setSide(0);
+        return true;
+      case 'r':
+        this.setSide(1);
+        return true;
+      case 'k':
+        this.setLinked(!customLinked(this.ski, this.slot));
+        return true;
+      case 'w':
+        this.setSidewall();
         return true;
     }
     return false;
@@ -341,15 +444,59 @@ export class SkiEditorScreen implements Screen {
 
   // ------------------------------------------------------------- painting
 
-  private index(along: number, across: number): number {
-    return along * this.art.cols + across;
+  /** The ski's cells along and across (each face's rows hold both skis' columns). */
+  private get rows(): number {
+    return this.type.model.rows;
   }
 
-  /** The cells a stroke at (along, across) paints: it, and its mirrors while the switches are on. */
+  private get cols(): number {
+    return this.type.model.cols;
+  }
+
+  /** A cell of the face being painted, on `side`'s ski. */
+  private index(along: number, across: number, side = this.side): number {
+    return along * this.art.cols + side * this.cols + across;
+  }
+
+  /** The skis a stroke paints: both while linked. */
+  private sides(): readonly number[] {
+    return customLinked(this.ski, this.slot) ? BOTH : this.side === 0 ? LEFT : RIGHT;
+  }
+
+  /**
+   * The brush's square at (along, across), cut to the grid, and its mirrors
+   * while the switches are on, each as [along0, across0, along1, across1]
+   * (inclusive). An even brush reaches one more cell right and down.
+   */
+  private squares(along: number, across: number): [number, number, number, number][] {
+    const { rows, cols } = this;
+    const lo = -Math.floor((this.brush - 1) / 2);
+    const a0 = Math.max(0, along + lo);
+    const a1 = Math.min(rows - 1, along + lo + this.brush - 1);
+    const c0 = Math.max(0, across + lo);
+    const c1 = Math.min(cols - 1, across + lo + this.brush - 1);
+    const out: [number, number, number, number][] = [[a0, c0, a1, c1]];
+    const [fa0, fa1, fc0, fc1] = [rows - 1 - a1, rows - 1 - a0, cols - 1 - c1, cols - 1 - c0];
+    if (this.mirrorEnds) out.push([fa0, c0, fa1, c1]);
+    if (this.mirrorSides) out.push([a0, fc0, a1, fc1]);
+    if (this.mirrorEnds && this.mirrorSides) out.push([fa0, fc0, fa1, fc1]);
+    return out;
+  }
+
+  /** Paints the brush at (along, across), and its mirrors. */
+  private stamp(along: number, across: number): void {
+    for (const side of this.sides()) {
+      for (const [a0, c0, a1, c1] of this.squares(along, across)) {
+        for (let a = a0; a <= a1; a++) for (let c = c0; c <= c1; c++) this.art.cells[this.index(a, c, side)] = this.color;
+      }
+    }
+  }
+
+  /** The cells a fill at (along, across) starts from: it, and its mirrors while the switches are on. */
   private targets(along: number, across: number): [number, number][] {
     const out: [number, number][] = [[along, across]];
-    const fa = this.art.rows - 1 - along;
-    const fc = this.art.cols - 1 - across;
+    const fa = this.rows - 1 - along;
+    const fc = this.cols - 1 - across;
     if (this.mirrorEnds) out.push([fa, across]);
     if (this.mirrorSides) out.push([along, fc]);
     if (this.mirrorEnds && this.mirrorSides) out.push([fa, fc]);
@@ -357,7 +504,7 @@ export class SkiEditorScreen implements Screen {
   }
 
   private paintCell(along: number, across: number): void {
-    for (const [a, c] of this.targets(along, across)) this.art.cells[this.index(a, c)] = this.color;
+    this.stamp(along, across);
     this.changed();
   }
 
@@ -371,7 +518,7 @@ export class SkiEditorScreen implements Screen {
     const sc = across > c ? 1 : -1;
     let err = da - dc;
     for (;;) {
-      for (const [ta, tc] of this.targets(a, c)) this.art.cells[this.index(ta, tc)] = this.color;
+      this.stamp(a, c);
       if (a === along && c === across) break;
       const e2 = 2 * err;
       if (e2 > -dc) {
@@ -388,29 +535,30 @@ export class SkiEditorScreen implements Screen {
     this.changed();
   }
 
-  /** Fills the patch of one color round (along, across), four ways, and its mirrors. */
+  /** Fills the patch of one color round (along, across), four ways within the ski, and its mirrors (on both skis while linked). */
   private floodFill(along: number, across: number): void {
-    const { rows, cols, cells } = this.art;
-    for (const [sa, sc] of this.targets(along, across)) {
-      const from = cells[this.index(sa, sc)]!;
-      if (from === this.color) continue;
-      const stack = [this.index(sa, sc)];
-      cells[stack[0]!] = this.color;
-      while (stack.length > 0) {
-        const i = stack.pop()!;
-        const a = Math.floor(i / cols);
-        const c = i % cols;
-        for (const [na, nc] of [
-          [a - 1, c],
-          [a + 1, c],
-          [a, c - 1],
-          [a, c + 1],
-        ] as const) {
-          if (na < 0 || na >= rows || nc < 0 || nc >= cols) continue;
-          const j = this.index(na, nc);
-          if (cells[j] !== from) continue;
-          cells[j] = this.color;
-          stack.push(j);
+    const { rows, cols } = this;
+    const cells = this.art.cells;
+    for (const side of this.sides()) {
+      for (const [sa, sc] of this.targets(along, across)) {
+        const from = cells[this.index(sa, sc, side)]!;
+        if (from === this.color) continue;
+        cells[this.index(sa, sc, side)] = this.color;
+        const stack: [number, number][] = [[sa, sc]];
+        while (stack.length > 0) {
+          const [a, c] = stack.pop()!;
+          for (const [na, nc] of [
+            [a - 1, c],
+            [a + 1, c],
+            [a, c - 1],
+            [a, c + 1],
+          ] as const) {
+            if (na < 0 || na >= rows || nc < 0 || nc >= cols) continue;
+            const j = this.index(na, nc, side);
+            if (cells[j] !== from) continue;
+            cells[j] = this.color;
+            stack.push([na, nc]);
+          }
         }
       }
     }
@@ -437,15 +585,18 @@ export class SkiEditorScreen implements Screen {
   }
 
   private moveCursor(da: number, dc: number): void {
-    this.along = Math.min(this.art.rows - 1, Math.max(0, this.along + da));
-    this.across = Math.min(this.art.cols - 1, Math.max(0, this.across + dc));
+    this.along = Math.min(this.rows - 1, Math.max(0, this.along + da));
+    this.across = Math.min(this.cols - 1, Math.max(0, this.across + dc));
     if (this.penDown) this.paintLine(this.along, this.across);
     else this.queueDraw();
   }
 
+  /** The whole face (of both skis while linked) in the picked color. */
   private fillAll(): void {
     this.remember();
-    this.art.cells.fill(this.color);
+    for (const side of this.sides()) {
+      for (let a = 0; a < this.rows; a++) this.art.cells.fill(this.color, this.index(a, 0, side), this.index(a, this.cols, side));
+    }
     this.changed();
     saveCustomSkis();
   }
@@ -460,18 +611,62 @@ export class SkiEditorScreen implements Screen {
     } else this.fillAll();
   }
 
-  private setBase(): void {
-    if (customBase(this.ski, this.slot) === this.color) return;
+  private setSidewall(): void {
+    if (customSidewall(this.ski, this.slot) === this.color) return;
     this.remember();
-    setCustomBase(this.ski, this.slot, this.color);
+    setCustomSidewall(this.ski, this.slot, this.color);
     this.changed();
     saveCustomSkis();
     this.sync();
   }
 
+  /** Paints the top sheet (seen from above) or the base (seen from above, through the ski). */
+  private setFace(face: Face): void {
+    this.liftPen();
+    this.endDrag();
+    this.face = face;
+    this.art = customFace(this.ski, this.slot, face);
+    this.sync();
+    this.queueDraw(true);
+  }
+
+  /** Shows and paints one ski: picking one while linked unlinks them. */
+  private setSide(side: number): void {
+    this.liftPen();
+    this.endDrag();
+    this.side = side;
+    if (customLinked(this.ski, this.slot)) this.setLinked(false);
+    this.sync();
+    this.queueDraw(true);
+  }
+
+  /** Linking copies the ski being shown, top and base, onto the other (Undo brings the other back). */
+  private setLinked(linked: boolean): void {
+    this.liftPen();
+    this.endDrag();
+    if (linked) {
+      this.remember();
+      const other = 1 - this.side;
+      for (const face of ['top', 'base'] as const) {
+        const { cells, cols } = customFace(this.ski, this.slot, face);
+        for (let a = 0; a < this.rows; a++) cells.copyWithin(a * cols + other * this.cols, a * cols + this.side * this.cols, a * cols + (this.side + 1) * this.cols);
+      }
+      this.hooks.repaint();
+    }
+    setCustomLinked(this.ski, this.slot, linked);
+    saveCustomSkis();
+    this.sync();
+    this.queueDraw(true);
+  }
+
   /** Keeps the slot as it is now, for Undo (before a stroke or an action). */
   private remember(): void {
-    this.undo.push({ cells: this.art.cells.slice(), base: customBase(this.ski, this.slot) });
+    this.undo.push({
+      top: customFace(this.ski, this.slot, 'top').cells.slice(),
+      base: customFace(this.ski, this.slot, 'base').cells.slice(),
+      sidewall: customSidewall(this.ski, this.slot),
+      linked: customLinked(this.ski, this.slot),
+    });
     if (this.undo.length > UNDO_MAX) this.undo.shift();
     this.undoButton.disabled = false;
   }
@@ -480,8 +675,10 @@ export class SkiEditorScreen implements Screen {
     if (this.penDown || this.dragging) return;
     const last = this.undo.pop();
     if (!last) return;
-    this.art.cells.set(last.cells);
-    setCustomBase(this.ski, this.slot, last.base);
+    customFace(this.ski, this.slot, 'top').cells.set(last.top);
+    customFace(this.ski, this.slot, 'base').cells.set(last.base);
+    setCustomSidewall(this.ski, this.slot, last.sidewall);
+    setCustomLinked(this.ski, this.slot, last.linked);
     this.changed();
     saveCustomSkis();
     this.sync();
@@ -496,6 +693,13 @@ export class SkiEditorScreen implements Screen {
   private setTool(tool: Tool): void {
     this.tool = tool;
     this.sync();
+    this.queueDraw();
+  }
+
+  private setBrush(size: number): void {
+    this.brush = size;
+    this.sync();
+    this.queueDraw();
   }
 
   private toggleMirror(which: 'ends' | 'sides'): void {
@@ -572,11 +776,11 @@ export class SkiEditorScreen implements Screen {
   private cellAt(e: PointerEvent): [number, number] {
     const r = this.grid.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) return [-1, 0];
-    const a = Math.floor(((e.clientX - r.left) / r.width) * this.art.rows);
-    const c = Math.floor(((e.clientY - r.top) / r.height) * this.art.cols);
-    const inside = a >= 0 && a < this.art.rows && c >= 0 && c < this.art.cols;
+    const a = Math.floor(((e.clientX - r.left) / r.width) * this.rows);
+    const c = Math.floor(((e.clientY - r.top) / r.height) * this.cols);
+    const inside = a >= 0 && a < this.rows && c >= 0 && c < this.cols;
     if (!inside && !this.dragging) return [-1, 0];
-    return [Math.min(this.art.rows - 1, Math.max(0, a)), Math.min(this.art.cols - 1, Math.max(0, c))];
+    return [Math.min(this.rows - 1, Math.max(0, a)), Math.min(this.cols - 1, Math.max(0, c))];
   }
 
   // -------------------------------------------------------------- drawing
@@ -585,9 +789,9 @@ export class SkiEditorScreen implements Screen {
   private layout(): void {
     if (!this.shown) return;
     const width = this.bench.clientWidth;
-    this.cell = Math.max(CELL_MIN, Math.min(CELL_MAX, Math.floor(width / this.art.rows)));
-    this.grid.style.width = `${this.cell * this.art.rows}px`;
-    this.grid.style.height = `${this.cell * this.art.cols}px`;
+    this.cell = Math.max(CELL_MIN, Math.min(CELL_MAX, Math.floor(width / this.rows)));
+    this.grid.style.width = `${this.cell * this.rows}px`;
+    this.grid.style.height = `${this.cell * this.cols}px`;
     this.queueDraw(true);
   }
 
@@ -604,7 +808,8 @@ export class SkiEditorScreen implements Screen {
   }
 
   private drawGrid(): void {
-    const { rows, cols, cells, colors } = this.art;
+    const { rows, cols } = this;
+    const { cells, colors } = this.art;
     const s = this.cell;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = Math.round(rows * s * dpr);
@@ -632,32 +837,42 @@ export class SkiEditorScreen implements Screen {
     for (let a = 8; a < rows; a += 8) ctx.fillRect(a * s - 0.5, 0, 1, cols * s);
     ctx.fillRect(0, (cols / 2) * s - 0.5, rows * s, 1);
 
-    // The mouse's cell (and its mirrors) in the picked color.
+    // Where the pencil would paint under the mouse (the brush and its mirrors) in the picked color; for a fill, its starting cells.
     if (this.hoverAlong >= 0 && !this.dragging) {
       ctx.fillStyle = colors[this.color]!;
-      for (const [a, c] of this.targets(this.hoverAlong, this.hoverAcross)) {
-        ctx.fillRect(a * s + 1, c * s + 1, s - 2, s - 2);
-        box(ctx, a * s, c * s, s, 'rgb(255 255 255 / 0.8)', 1);
+      for (const [a0, c0, a1, c1] of this.marks(this.hoverAlong, this.hoverAcross)) {
+        const [w, h] = [(a1 - a0 + 1) * s, (c1 - c0 + 1) * s];
+        ctx.fillRect(a0 * s + 1, c0 * s + 1, w - 2, h - 2);
+        box(ctx, a0 * s, c0 * s, w, h, 'rgb(255 255 255 / 0.8)', 1);
       }
     }
-    // The keyboard cursor: a white box with a dark keyline; its mirrors dashed.
+    // The keyboard cursor round the brush: a white box with a dark keyline; its mirrors dashed.
     if (document.activeElement === this.grid) {
-      this.targets(this.along, this.across).forEach(([a, c], i) => {
+      this.marks(this.along, this.across).forEach(([a0, c0, a1, c1], i) => {
+        const [x, y, w, h] = [a0 * s - 1, c0 * s - 1, (a1 - a0 + 1) * s + 2, (c1 - c0 + 1) * s + 2];
         if (i > 0) ctx.setLineDash([2, 2]);
-        box(ctx, a * s - 1, c * s - 1, s + 2, '#142030', 4);
-        box(ctx, a * s - 1, c * s - 1, s + 2, '#f4f8fc', 2);
+        box(ctx, x, y, w, h, '#142030', 4);
+        box(ctx, x, y, w, h, '#f4f8fc', 2);
         ctx.setLineDash([]);
       });
     }
     const name = EDIT_PALETTE[cells[this.index(this.along, this.across)]!]!.name;
-    this.status.textContent = `${this.along + 1} of ${rows} along, ${this.across + 1} of ${cols} across: ${name}`;
+    const where = `${customLinked(this.ski, this.slot) ? 'Both skis' : this.side === 0 ? 'Left ski' : 'Right ski'}, ${this.face}`;
+    this.status.textContent = `${where}: ${this.along + 1} of ${rows} along, ${this.across + 1} of ${cols} across, ${name}`;
   }
 
-  /** One ski as it really is: the grid stretched along to its outline. */
+  /** What the tool would paint at (along, across), as squares: the pencil's brush, or a fill's starting cells. */
+  private marks(along: number, across: number): (readonly [number, number, number, number])[] {
+    if (this.tool === 'pencil') return this.squares(along, across);
+    return this.targets(along, across).map(([a, c]) => [a, c, a, c] as const);
+  }
+
+  /** The ski being painted as it really is (the grid stretched along to its outline), top or base. */
   private drawShape(): void {
     const width = this.shapeBox.clientWidth;
     if (width <= 0) return;
-    paintSkis(this.shape, this.type, skiGraphic(this.ski, customId(this.ski, this.slot)), false, Math.floor(width / this.type.model.length), false);
+    const g = skiGraphic(this.ski, customId(this.ski, this.slot));
+    paintSkis(this.shape, this.type, g, this.face === 'base', Math.floor(width / this.type.model.length), this.side === 0 ? LEFT_SKI : RIGHT_SKI);
   }
 
   /** The Start from tiles: Blank (the picked color everywhere), then the ski's stock graphics. */
@@ -670,7 +885,7 @@ export class SkiEditorScreen implements Screen {
     swatch.className = 'editor-blank';
     this.blankSwatches.push(swatch);
     blank.append(swatch, text('Blank'));
-    blank.title = 'The whole ski in the picked color';
+    blank.title = 'The whole top or base in the picked color';
     blank.addEventListener('click', () => this.startFrom(null));
     const tiles = [blank];
     for (const g of this.type.graphics) {
@@ -680,7 +895,7 @@ export class SkiEditorScreen implements Screen {
       tile.setAttribute('aria-label', `Start from ${g.name}`);
       const canvas = document.createElement('canvas');
       canvas.className = 'editor-start-ski';
-      paintSkis(canvas, this.type, g, false, 48, false);
+      paintSkis(canvas, this.type, g, false, 48);
       tile.append(canvas, text(g.name));
       tile.addEventListener('click', () => this.startFrom(g));
       tiles.push(tile);
@@ -695,10 +910,18 @@ export class SkiEditorScreen implements Screen {
     this.colorName.textContent = EDIT_PALETTE[this.color]!.name;
     this.colorSwatch.style.background = hex;
     for (const s of this.blankSwatches) s.style.background = hex;
-    this.baseSwatch.style.background = EDIT_PALETTE[customBase(this.ski, this.slot)]!.hex;
+    this.wallSwatch.style.background = EDIT_PALETTE[customSidewall(this.ski, this.slot)]!.hex;
+    const linked = customLinked(this.ski, this.slot);
+    this.sideButtons.forEach((b, i) => b.setAttribute('aria-pressed', String(!linked && i === this.side)));
+    this.linkButton.setAttribute('aria-pressed', String(linked));
+    this.faceButtons.forEach((b, i) => b.setAttribute('aria-pressed', String((i === 1) === (this.face === 'base'))));
+    this.bench.classList.toggle('is-base', this.face === 'base');
+    const m = this.type.model;
+    this.grid.setAttribute('aria-label', `${linked ? 'Both skis' : this.side === 0 ? 'Left ski' : 'Right ski'}, ${this.face === 'base' ? 'base' : 'top sheet'}: ${m.rows} cells long and ${m.cols} across. Arrows move, Space paints.`);
     for (const [tool, b] of this.toolButtons) b.setAttribute('aria-pressed', String(tool === this.tool));
     this.mirrorEndsButton.setAttribute('aria-pressed', String(this.mirrorEnds));
     this.mirrorSidesButton.setAttribute('aria-pressed', String(this.mirrorSides));
+    this.brushButtons.forEach((b, i) => b.setAttribute('aria-pressed', String(BRUSHES[i] === this.brush)));
     this.undoButton.disabled = this.undo.length === 0;
   }
 }
@@ -716,6 +939,17 @@ function text(t: string): HTMLElement {
   return el;
 }
 
+/** A switch in a segmented row, with its key as a keycap (if any). */
+function segment(name: string, key: string, onPick: () => void): HTMLButtonElement {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'segment';
+  b.append(text(name));
+  if (key) b.appendChild(keycap(key));
+  b.addEventListener('click', onPick);
+  return b;
+}
+
 /** A tool's button: its name, and its key as a keycap. */
 function toolButton(name: string, key: string, onPick: () => void): HTMLButtonElement {
   const b = document.createElement('button');
@@ -730,8 +964,8 @@ function toolButton(name: string, key: string, onPick: () => void): HTMLButtonEl
   return b;
 }
 
-function box(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string, width: number): void {
+function box(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string, width: number): void {
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
-  ctx.strokeRect(x, y, size, size);
+  ctx.strokeRect(x, y, w, h);
 }
