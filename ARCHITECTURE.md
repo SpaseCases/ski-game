@@ -65,12 +65,15 @@ maps/*.json ──registry (lazy import)──► parseMap ──► buildMap �
 | freeride | `freeride.ts` | Peak, 6.2 km square, 3 m cells (~4.3M samples), town, 4 finishes, 16 runs, powder |
 | slalom | `slalom.ts` | Two race courses, `scoring: false`, no flags |
 | bigair | `bigair.ts` | 6 lanes (the ski jump and landings are terrain lanes) and a tower |
-| test | none: `test-slope.json` is hand-written | Every feature in 4 lanes |
+| test | `test-slope.ts` (took over the hand-written JSON unchanged in M14) | Every feature in 4 lanes, plus M14's rail lane at x 2 and its close-out and 3D rails below the rail lane |
 
 **Adding a map** means touching `registry.ts` (`MapId` and `MAPS`), `ui/mapArt.ts` (`ART`), and a generator.
 
+**Rail kit (M14):** `tools/maps/railKit.ts` holds the rail shapes and set-ups the Park, Jam Park and Test slope scripts share: `SHAPES` (wave, A-frame, double kink, flat-down-flat-down, each ridden on from the snow), `poleJam`, `wallrideCloseOut` (a rail at 35° ending at a wooden wall's foot), `gapRail` (a rail stopping in the air short of a `landing` feature, plus its named "Rail gap"), `deckRail` / `knuckleRail` (to one side of a table: along its deck, or from the knuckle down the face, `follow: 1`), and the 3D `loop` and `corkscrew`.
+
 **Fragile**
-- Never hand-edit generated JSON: edit the script and rerun (`node tools/maps/x.ts`). Generators bake in terrain-derived numbers (Freeride's booter yaws and log heights, finish widths), so a change to `peak.ts` or `terrain.ts` means rerunning them. Nothing checks for drift.
+- Never hand-edit generated JSON: edit the script and rerun (`node tools/maps/x.ts`).
+- **Feature order is identity for the tools:** `features.ts` reports rails by index and the sim's rails follow feature order. New features go after the older ones (the parks collect their table rails in `deckTables` / `knuckleTables` and lay them at the end), and new rails sit where riders coming off older ones don't run onto them (in the jib lines, 4 m either side of the middle), so older rails' outputs stay byte-identical. Generators bake in terrain-derived numbers (Freeride's booter yaws and log heights, finish widths), so a change to `peak.ts` or `terrain.ts` means rerunning them. Nothing checks for drift.
 - Tree seeds count the decor before them (`seed: 100 + decor.length` in slalom and bigair): add new decor **after** the trees. Big air's shared `rand()` is consumed by spectators first. Changing a scatter's `count` or `area` re-places the whole set.
 - `peak.ts` element order matters: a `flat` pad samples the elements before it. Bounds must be star-shaped from the summit.
 - Authoring errors throw at build time (gap ≤ 1.5 m, pipe sections too long, a lane that can't get back level).

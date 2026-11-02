@@ -26,6 +26,7 @@ import { writeFileSync } from 'node:fs';
 import { parseMap } from '../../src/maps/loader.ts';
 import { generateSlope, solveLanes } from '../../src/maps/terrain.ts';
 import { heightAt } from '../../src/sim/terrain.ts';
+import { deckRail, gapRail, knuckleRail, poleJam, SHAPES, slideJson, wallrideCloseOut, type TableOpts } from './railKit.ts';
 
 type Json = Record<string, unknown>;
 type Pt = [along: number, across: number, height: number];
@@ -359,6 +360,25 @@ const SLIDES = {
 /** Kicker-fed rails start at about the lip's height, so a slow rider can't hit the front and a fast one still comes down onto it. */
 const FED = 0.65;
 
+/** A table that gets a rail (milestone 14): where its takeoff starts, and its size. */
+interface Table {
+  x: number;
+  d: number;
+  o: TableOpts;
+}
+/** Tables that get a rail along the deck, and from the knuckle down the landing (laid after everything else). */
+const deckTables: Table[] = [];
+const knuckleTables: Table[] = [];
+/** A table jump that also gets a rail: noted in `list` as it's placed. */
+const RAILED = (list: Table[], it: Item): Item => ({
+  ...it,
+  place: (x, d) => {
+    it.place(x, d);
+    const o = it.opts!;
+    list.push({ x: x + (o.dx ?? 0), d, o: { ...o, width: o.width ?? 8 } });
+  },
+});
+
 // The pro line's huge jumps are mostly terrain, in a lane of their own. A
 // rise on the flat above checks the speed of anyone coming down from the
 // section before, then a level spot to start from (the flag), then the
@@ -461,14 +481,14 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
   ]), lim);
 
   sectionEnd('S1 jump', line(X.jump, 50, 10, [
-    J({ lip: 1, angle: 15, gap: 4, land: 13, knuckle: 2, transition: 4, width: 7 }),
-    J({ lip: 1.3, angle: 16, gap: 5, land: 13, width: 7 }),
-    J({ lip: 1.6, angle: 17, gap: 7, land: 13 }),
-    J({ lip: 1.8, angle: 18, gap: 8, land: 13 }),
+    RAILED(deckTables, J({ lip: 1, angle: 15, gap: 4, land: 13, knuckle: 2, transition: 4, width: 7 })),
+    RAILED(deckTables, J({ lip: 1.3, angle: 16, gap: 5, land: 13, width: 7 })),
+    RAILED(deckTables, J({ lip: 1.6, angle: 17, gap: 7, land: 13 })),
+    RAILED(deckTables, J({ lip: 1.8, angle: 18, gap: 8, land: 13 })),
     J({ lip: 2, angle: 18, gap: 6, deck: false, landingHeight: 2.6, land: 13 }),
-    J({ lip: 2, angle: 19, gap: 9, land: 13 }),
+    RAILED(deckTables, J({ lip: 2, angle: 19, gap: 9, land: 13 })),
     J({ lip: 2.2, angle: 19, gap: 6, deck: false, landingHeight: 1.6, land: 12 }),
-    J({ lip: 2, angle: 18, gap: 9, land: 13 }),
+    RAILED(deckTables, J({ lip: 2, angle: 18, gap: 9, land: 13 })),
   ]), lim);
 
   // Hips and quarterpipes in turn; the quarters throw riders across toward the jump line.
@@ -527,15 +547,15 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
   // nothing to land on short, sized for the 14 to 20 m/s riders carry here
   // (like the tables, popped faster than ~21 m/s they fly onto the next takeoff).
   sectionEnd('S2 jump', line(X.jump, D.s2 + 6, 11, [
-    J({ lip: 2.2, angle: 20, gap: 9, land: 14, width: 9 }),
-    J({ lip: 2.4, angle: 20, gap: 10, land: 14, width: 9 }),
-    J({ lip: 2.6, angle: 21, gap: 11, land: 14, width: 9 }),
+    RAILED(knuckleTables, J({ lip: 2.2, angle: 20, gap: 9, land: 14, width: 9 })),
+    RAILED(knuckleTables, J({ lip: 2.4, angle: 20, gap: 10, land: 14, width: 9 })),
+    RAILED(knuckleTables, J({ lip: 2.6, angle: 21, gap: 11, land: 14, width: 9 })),
     J({ lip: 2.6, angle: 24, gap: 12, deck: false, landingHeight: 2.6, land: 15, width: 10 }),
     J({ lip: 2.4, angle: 24, gap: 8, deck: false, landingHeight: 3.6, land: 14, width: 10 }),
     J({ lip: 3, angle: 22, gap: 9, deck: false, landingHeight: 1.8, land: 13, width: 10 }),
     // The step-down's short landing would throw a fast pop onto the next takeoff.
     16,
-    J({ lip: 2.4, angle: 20, gap: 10, land: 14, width: 9 }),
+    RAILED(knuckleTables, J({ lip: 2.4, angle: 20, gap: 10, land: 14, width: 9 })),
   ]), lim);
 
   // Hips and a table into the small halfpipe, which ends on the flat: its fast exit has nothing to land on.
@@ -713,6 +733,31 @@ const lanes: Json[] = [];
     J({ lip: 2.4, angle: 20, gap: 11, land: 14, width: 10 }),
     J({ lip: 1.8, angle: 18, gap: 8, land: 13, width: 10 }),
   ]), lim);
+}
+
+// ---------------------------------------------------------------- milestone 14: new rails
+// Laid after everything else, so the older rails keep their numbers (tools/sim reports them by index).
+{
+  // Rails on tables, to one side of the middle: along the deck on the
+  // warm-up's tables, from the knuckle down the landing on the main jam's.
+  deckTables.forEach((t, i) => features.push(deckRail(t.x, t.d, t.o, i % 2 === 0 ? 1 : -1)));
+  knuckleTables.forEach((t, i) => features.push(knuckleRail(t.x, t.d, t.o, i % 2 === 0 ? -1 : 1)));
+
+  // The jib line's new rails and close-outs, in the room at the end of its
+  // sections: 4 m either side of its middle (where no older rail sits, so
+  // riders coming off those don't run onto these), or further out. The
+  // wallride close-out goes at the end of the combo line's main jam, right
+  // of its middle, with its wall toward the fence.
+  const j = X.jib;
+  features.push(slideJson('rail', j - 4, 376, SHAPES.wave(16)));
+  features.push(poleJam(j + 4, 378));
+  features.push(slideJson('rail', j - 4, 752, SHAPES.doubleKink(20)));
+  features.push(slideJson('rail', j + 4, 752, SHAPES.aFrame(14)));
+  features.push(...wallrideCloseOut(X.combo + 4, 752, 1, { length: 11 }));
+  features.push(slideJson('rail', j - 4, 1750, SHAPES.flatDownFlatDown(22)));
+  const g = gapRail(j + 10, 1750);
+  features.push(...g.features);
+  gaps.push(g.gap);
 }
 
 const finish = { x: 0, z: -(D.run + 20), heading: 0, width: WIDTH - 10, length: 90 };

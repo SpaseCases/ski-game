@@ -20,12 +20,15 @@ import { writeFileSync } from 'node:fs';
 import { parseMap } from '../../src/maps/loader.ts';
 import { generateSlope, solveLanes } from '../../src/maps/terrain.ts';
 import { heightAt } from '../../src/sim/terrain.ts';
+import { deckRail, gapRail, knuckleRail, poleJam, SHAPES, slideJson, wallrideCloseOut, type TableOpts } from './railKit.ts';
 
 type Json = Record<string, unknown>;
 type Pt = [along: number, across: number, height: number];
 const features: Json[] = [];
 const flags: Json[] = [];
 const decor: Json[] = [];
+/** Named gaps for scoring (the Rail gap). */
+const gaps: Json[] = [];
 const r2 = (v: number): number => Math.round(v * 100) / 100;
 
 // ---------------------------------------------------------------- sections
@@ -138,8 +141,15 @@ interface JumpOpts {
   transition?: number;
 }
 
+/** A table that gets a rail (milestone 14): where its takeoff starts, and its size. */
+interface Table {
+  x: number;
+  d: number;
+  o: TableOpts;
+}
+
 /** A park jump whose takeoff starts at (x, d), straight down the hill. */
-function jump(x: number, d: number, o: JumpOpts): void {
+function jump(x: number, d: number, o: JumpOpts): Table {
   const f: Json = {
     type: 'jump',
     x,
@@ -156,6 +166,7 @@ function jump(x: number, d: number, o: JumpOpts): void {
   };
   if (o.deck === false) f.landingHeight = o.landingHeight ?? o.lip;
   features.push(f);
+  return { x, d, o };
 }
 
 /**
@@ -209,6 +220,9 @@ const SLIDES = {
 };
 /** Kicker-fed rails start at about the lip's height, so a slow rider can't hit the front and a fast one still comes down onto it. */
 const FED = 0.65;
+/** Tables that get a rail along the deck, and from the knuckle down the landing (laid after everything else). */
+const deckTables: Table[] = [];
+const knuckleTables: Table[] = [];
 
 // ---------------------------------------------------------------- start
 features.push({ type: 'start', style: 'deck', x: -70, z: -14, heading: 0, height: 0.6 });
@@ -235,12 +249,12 @@ slide('rail', X.longRail, 45, [[0, 0, 0], [5, 0, 0.5], [D.run - 55, 0, 0.5], [D.
   slide('rail', j - 8, d0 + 308, SLIDES.downFlatDown(18, 0.45));
   slide('box', j + 8, d0 + 308, SLIDES.flatDown(16, 0.4), 0.8);
 
-  jump(X.jump, d0 + 35, { lip: 1, angle: 15, gap: 4, land: 13, knuckle: 2, transition: 4, width: 6 });
-  jump(X.jump, d0 + 91, { lip: 1.3, angle: 16, gap: 6, land: 13, width: 6 });
-  jump(X.jump, d0 + 154, { lip: 1.6, angle: 17, gap: 7, land: 13 });
-  jump(X.jump, d0 + 217, { lip: 1.8, angle: 18, gap: 8, land: 13 });
-  jump(X.jump, d0 + 273, { lip: 1.6, angle: 18, gap: 8, land: 13 });
-  jump(X.jump, d0 + 322, { lip: 1.8, angle: 19, gap: 8, land: 13 });
+  deckTables.push(jump(X.jump, d0 + 35, { lip: 1, angle: 15, gap: 4, land: 13, knuckle: 2, transition: 4, width: 6 }));
+  deckTables.push(jump(X.jump, d0 + 91, { lip: 1.3, angle: 16, gap: 6, land: 13, width: 6 }));
+  deckTables.push(jump(X.jump, d0 + 154, { lip: 1.6, angle: 17, gap: 7, land: 13 }));
+  deckTables.push(jump(X.jump, d0 + 217, { lip: 1.8, angle: 18, gap: 8, land: 13 }));
+  deckTables.push(jump(X.jump, d0 + 273, { lip: 1.6, angle: 18, gap: 8, land: 13 }));
+  deckTables.push(jump(X.jump, d0 + 322, { lip: 1.8, angle: 19, gap: 8, land: 13 }));
 
   hip(X.mid, d0 + 42, 1, 1);
   jump(X.mid, d0 + 105, { lip: 1.4, angle: 18, gap: 7, land: 13 });
@@ -340,12 +354,12 @@ const lanes: Json[] = [];
   slide('box', j + 8, d0 + 320, SLIDES.flat(16), 0.9);
   slide('rail', j, d0 + 381, SLIDES.rainbow(12, 0.4, 0.6));
 
-  jump(X.jump, d0 + 41, { lip: 2, angle: 19, gap: 9, land: 14, width: 8 });
+  knuckleTables.push(jump(X.jump, d0 + 41, { lip: 2, angle: 19, gap: 9, land: 14, width: 8 }));
   jump(X.jump, d0 + 116, { lip: 2.2, angle: 22, gap: 6, deck: false, landingHeight: 3.0, land: 13, width: 8 });
-  jump(X.jump, d0 + 190, { lip: 2.4, angle: 20, gap: 10, land: 14, width: 8 });
+  knuckleTables.push(jump(X.jump, d0 + 190, { lip: 2.4, angle: 20, gap: 10, land: 14, width: 8 }));
   hip(X.jump, d0 + 258, 1, 1.1);
-  jump(X.jump, d0 + 326, { lip: 2, angle: 19, gap: 9, land: 14, width: 8 });
-  jump(X.jump, d0 + 388, { lip: 1.6, angle: 18, gap: 7, land: 13, width: 8 });
+  knuckleTables.push(jump(X.jump, d0 + 326, { lip: 2, angle: 19, gap: 9, land: 14, width: 8 }));
+  knuckleTables.push(jump(X.jump, d0 + 388, { lip: 1.6, angle: 18, gap: 7, land: 13, width: 8 }));
 
   // Middle: a jib garden, everything ride-on and side by side.
   const m = X.mid;
@@ -369,6 +383,29 @@ const lanes: Json[] = [];
   jump(X.pro, d0 + 279, { lip: 1.8, angle: 18, gap: 8, land: 13, width: 9 });
   jump(X.pro, d0 + 347, { lip: 2.2, angle: 20, gap: 10, land: 14, width: 9 });
   jump(X.pro, d0 + 401, { lip: 1.6, angle: 18, gap: 7, land: 13, width: 9 });
+}
+
+// ---------------------------------------------------------------- milestone 14: new rails
+// Laid after everything else, so the older rails keep their numbers (tools/sim reports them by index).
+{
+  // Rails on tables, to one side of the middle: along the deck on the
+  // warm-up's small tables, from the knuckle down the landing on the cruise's.
+  deckTables.forEach((t, i) => features.push(deckRail(t.x, t.d, t.o, i % 2 === 0 ? 1 : -1)));
+  knuckleTables.forEach((t, i) => features.push(knuckleRail(t.x, t.d, t.o, i % 2 === 0 ? -1 : 1)));
+
+  // The jib line's new rails and close-outs, in the room at the end of its
+  // sections: 4 m either side of its middle (where no older rail sits, so
+  // riders coming off those don't run onto these), or out by the fence.
+  const j = X.jib;
+  features.push(slideJson('rail', j - 4, D.s1 + 332, SHAPES.wave(16)));
+  features.push(poleJam(j + 4, D.s1 + 336));
+  features.push(slideJson('rail', j - 4, D.s2 + 282, SHAPES.doubleKink(20)));
+  features.push(slideJson('rail', j + 4, D.s2 + 282, SHAPES.aFrame(14)));
+  features.push(...wallrideCloseOut(j + 10, D.s2 + 304, 1, { length: 11 }));
+  features.push(slideJson('rail', j - 4, D.s5 + 400, SHAPES.flatDownFlatDown(22)));
+  const g = gapRail(j + 10, D.s5 + 400);
+  features.push(...g.features);
+  gaps.push(g.gap);
 }
 
 const finish = { x: 0, z: -(D.run + 20), heading: 0, width: 270, length: 90 };
@@ -437,7 +474,7 @@ decor.push({ kind: 'rock', area: { x: -180, z: midZ, width: 70, length: len }, c
 decor.push({ kind: 'boulder', area: { x: 180, z: midZ, width: 60, length: len }, count: 140, seed: 9, minScale: 0.8, maxScale: 1.6 });
 decor.push({ kind: 'snag', area: { x: -175, z: midZ, width: 50, length: len }, count: 60, seed: 10, minScale: 0.8, maxScale: 1.2 });
 
-const map = { name: 'Park', terrain, features, spawn, flags, finishes: [finish], decor, colors: { sky: '#8fbde9', fog: '#d9e7f3' } };
+const map = { name: 'Park', terrain, features, spawn, flags, finishes: [finish], decor, ...(gaps.length ? { gaps } : {}), colors: { sky: '#8fbde9', fog: '#d9e7f3' } };
 
 // ---------------------------------------------------------------- report
 const parsed = parseMap(map);
