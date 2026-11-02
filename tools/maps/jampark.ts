@@ -26,7 +26,7 @@ import { writeFileSync } from 'node:fs';
 import { parseMap } from '../../src/maps/loader.ts';
 import { generateSlope, solveLanes } from '../../src/maps/terrain.ts';
 import { heightAt } from '../../src/sim/terrain.ts';
-import { deckRail, gapRail, knuckleRail, poleJam, SHAPES, slideJson, wallrideCloseOut, type TableOpts } from './railKit.ts';
+import { corkscrew, deckRail, gapRail, knuckleRail, loop, poleJam, SHAPES, slideJson, wallrideCloseOut, type TableOpts } from './railKit.ts';
 
 type Json = Record<string, unknown>;
 type Pt = [along: number, across: number, height: number];
@@ -852,6 +852,18 @@ decor.push({ kind: 'boulder', area: { x: 190, z: midZ, width: 60, length: len },
 decor.push({ kind: 'snag', area: { x: -185, z: midZ, width: 50, length: len }, count: 50, seed: 10, minScale: 0.8, maxScale: 1.2 });
 
 const map = { name: 'Jam Park', terrain, features, spawn, flags, finishes: [finish], decor, colors: { sky: '#8fbde9', fog: '#d9e7f3' }, gaps };
+
+// ---------------------------------------------------------------- milestone 14: 3D rails
+// At the end of the jib garden, between the combo and jump lines that cross
+// it, laid on the snow's own heights: a loop 10 m left of the jump line, and
+// beside it a corkscrew from 8 m right of the combo line, carrying riders
+// across the hill to the right.
+{
+  const hf = generateSlope(parseMap(map).terrain);
+  const ground = (x: number, z: number): number => heightAt(hf, x, z);
+  features.push(loop(X.jump - 10, 1782, ground));
+  features.push(corkscrew(X.combo + 8, 1800, ground, { side: 1 }));
+}
 
 // ---------------------------------------------------------------- report
 const parsed = parseMap(map);

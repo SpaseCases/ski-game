@@ -2,7 +2,7 @@ import { BufferAttribute, BufferGeometry, Color, Group, Mesh, MeshLambertMateria
 import { CONFIG } from '../config.ts';
 import { hash2 } from '../maps/terrain.ts';
 import type { Heightfield, RailShape } from '../maps/types.ts';
-import { railFrame } from '../sim/rails.ts';
+import { railFrame, railUp } from '../sim/rails.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
 import { TriBuilder } from './triBuilder.ts';
 import { litByPools } from './lightPools.ts';
@@ -12,7 +12,8 @@ import { litByPools } from './lightPools.ts';
 // per 64 m tile, so a long rail drops out of view past the fog. Each has its
 // look: park rails and handrails on posts, fat tubes on saddles, fallen logs
 // lying on the snow, park boxes, concrete ledges, benches, flat-topped rocks
-// and stumps, and bonk features: picnic tables, rows of barrels and cable spools.
+// and stumps, bonk features (picnic tables, rows of barrels and cable
+// spools), and 3D rails (loops and corkscrews) on posts and frames.
 
 const BOX_DECK = new Color('#9aa4ad');
 const BOX_SIDE = new Color('#8a5a32');
@@ -82,6 +83,10 @@ export function createRailMesh(rails: readonly RailShape[], hf: Heightfield): Gr
         break;
       case 'handrail':
         addRail(near, r, hf, HANDRAIL, HANDRAIL_POST);
+        break;
+      case 'loop':
+      case 'corkscrew':
+        addRail3d(near, r, hf);
         break;
       case 'tube':
         addTube(near, r, hf);
@@ -223,6 +228,112 @@ function addRail(near: Near, r: RailShape, hf: Heightfield, tube: Color, postCol
       const at = (o: Vector3, y: number): Vector3 => new Vector3(pos.x + o.x, y, pos.z + o.z);
       b.quad(at(c0, top), at(c1, top), at(c1, bottom), at(c0, bottom), postColor, c0.clone().add(c1));
     }
+  }
+}
+
+/**
+ * A 3D rail (a loop or a corkscrew): a round tube on the side of its top
+ * line away from its up, each ring square to the rail and turned with its
+ * up, so the tube twists along a corkscrew. Posts hold its upright
+ * stretches from below; each stretch where it turns upside down hangs from
+ * a beam on two posts standing clear of the whole rail either side.
+ */
+function addRail3d(near: Near, r: RailShape, hf: Heightfield): void {
+  const ups = r.ups!;
+  const n = r.dist.length;
+  const radius = r.halfWidth;
+  const centers: Vector3[] = [];
+  const rings: Vector3[][] = [];
+  const dirs: Vector3[] = [];
+  for (let k = 0; k < n; k++) {
+    // Square to the rail's direction across this point (between its two segments), so the joints close.
+    const dir = point(r, Math.min(n - 1, k + 1)).sub(point(r, Math.max(0, k - 1))).normalize();
+    const up = new Vector3(ups[k * 3], ups[k * 3 + 1], ups[k * 3 + 2]);
+    up.addScaledVector(dir, -up.dot(dir)).normalize();
+    const side = new Vector3().crossVectors(dir, up).normalize();
+    centers.push(point(r, k).addScaledVector(up, -radius));
+    dirs.push(dir);
+    const ring: Vector3[] = [];
+    for (let i = 0; i < RAIL_SIDES; i++) {
+      const t = (i / RAIL_SIDES) * Math.PI * 2;
+      ring.push(side.clone().multiplyScalar(Math.cos(t) * radius).addScaledVector(up, Math.sin(t) * radius));
+    }
+    rings.push(ring);
+  }
+  for (let k = 0; k < n - 1; k++) {
+    const a = centers[k]!;
+    const e = centers[k + 1]!;
+    const b = near(a.x, a.z);
+    for (let i = 0; i < RAIL_SIDES; i++) {
+      const j = (i + 1) % RAIL_SIDES;
+      const a0 = rings[k]![i]!;
+      const a1 = rings[k]![j]!;
+      b.quad(a.clone().add(a0), a.clone().add(a1), e.clone().add(rings[k + 1]![j]!), e.clone().add(rings[k + 1]![i]!), RAIL, a0.clone().add(a1));
+    }
+  }
+  cap(near(centers[0]!.x, centers[0]!.z), centers[0]!, rings[0]!, dirs[0]!.clone().negate(), RAIL);
+  cap(near(centers[n - 1]!.x, centers[n - 1]!.z), centers[n - 1]!, rings[n - 1]!, dirs[n - 1]!, RAIL);
+
+  // Posts under the upright stretches, evenly spaced, from under the tube down into the snow.
+  const upright = CONFIG.rails.uprightCos;
+  const half = CONFIG.render.railPostWidth / 2;
+  const pos = new Vector3();
+  const dir = new Vector3();
+  const up = new Vector3();
+  const count = Math.max(2, Math.ceil(r.length / POST_SPACING) + 1);
+  for (let i = 0; i < count; i++) {
+    const s = POST_INSET + ((r.length - 2 * POST_INSET) * i) / (count - 1);
+    railUp(r, s, railFrame(r, s, pos, dir), up, dir);
+    if (up.y < upright) continue;
+    const top = pos.y - 2 * radius;
+    const bottom = drawnHeightAt(hf, pos.x, pos.z) - BURY;
+    if (top - bottom < 0.05) continue;
+    const foot = new Vector3(pos.x, bottom, pos.z);
+    beam(near(pos.x, pos.z), foot, new Vector3(pos.x, top, pos.z), half * 2, POST);
+  }
+
+  // A frame over each upside-down stretch, at its most upside-down point.
+  const clear = CONFIG.render.railFrameClearance;
+  const width = CONFIG.render.railFrameWidth;
+  for (let k = 0; k < n; k++) {
+    const y = ups[k * 3 + 1] ?? 0;
+    if (y >= -0.5) continue;
+    let low = k;
+    while (k + 1 < n && (ups[(k + 1) * 3 + 1] ?? 0) < -0.5) {
+      k++;
+      if ((ups[k * 3 + 1] ?? 0) < (ups[low * 3 + 1] ?? 0)) low = k;
+    }
+    const top = point(r, low);
+    const tangent = dirs[low]!;
+    // Across: level and square to the rail there.
+    const across = new Vector3(-tangent.z, 0, tangent.x);
+    if (across.lengthSq() < 1e-6) across.set(1, 0, 0);
+    across.normalize();
+    // Each post as close in as it can stand while staying `clear` from every point of the rail, seen from above.
+    const beamY = top.y + 2 * radius + width / 2;
+    const feet: Vector3[] = [];
+    for (const sign of [-1, 1]) {
+      let out = clear;
+      const at = new Vector3();
+      for (; out < 12; out += 0.25) {
+        at.copy(top).addScaledVector(across, sign * out);
+        let ok = true;
+        for (let m = 0; m < n && ok; m++) {
+          const x = r.points[m * 3]! - at.x;
+          const z = r.points[m * 3 + 2]! - at.z;
+          if (x * x + z * z < clear * clear) ok = false;
+        }
+        if (ok) break;
+      }
+      feet.push(at.clone());
+    }
+    const [f0, f1] = feet as [Vector3, Vector3];
+    const b = near(top.x, top.z);
+    for (const f of feet) beam(b, new Vector3(f.x, drawnHeightAt(hf, f.x, f.z) - BURY, f.z), new Vector3(f.x, beamY + width / 2, f.z), width, POST);
+    beam(b, new Vector3(f0.x, beamY, f0.z), new Vector3(f1.x, beamY, f1.z), width, POST);
+    // A short hanger from the beam down to the tube.
+    const tube = top.clone().addScaledVector(new Vector3(ups[low * 3], ups[low * 3 + 1], ups[low * 3 + 2]), -2 * radius);
+    if (beamY - tube.y > 0.02) beam(b, new Vector3(tube.x, beamY, tube.z), tube, width * 0.5, POST);
   }
 }
 

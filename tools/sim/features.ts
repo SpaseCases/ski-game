@@ -11,7 +11,8 @@
 // - building: up its drift (or at its uphill wall) along its length, with and without a pop at the top.
 // - terrace: across it and off its front: down the stairs, off the wall beside them, and popped onto each handrail.
 // - jib (only when named): ridden onto every ride-on rail and box (one starting at the snow) along its
-//   first stretch; reports whether it caught, how long it slid, and the landing off its end.
+//   first stretch; reports whether it caught, how long it slid, and the landing off its end. Loops and
+//   corkscrews need more speed than these runs carry: tools/sim/loop.ts rides them.
 // - quarter: into a quarterpipe or wallride at 25° and at 45° to it, aiming for its middle, with no pop and
 //   with a pop at the top of the wall; reports the air, how high above the coping, and where it landed.
 
@@ -189,7 +190,7 @@ sim.map.features.forEach((f: Feature, i) => {
     rideTerrace(f, i);
   } else if (f.type === 'quarter' && want('quarter')) {
     rideQuarter(f, i);
-  } else if ((f.type === 'rail' || f.type === 'box') && (f.type === 'box' || f.style !== 'log') && f.points[0]!.height < 0.15 && want('jib')) {
+  } else if ((f.type === 'rail' || f.type === 'box') && (f.type === 'box' || (f.style !== 'log' && f.ups.length === 0)) && f.points[0]!.height < 0.15 && want('jib')) {
     rideJib(f, i);
   }
 });

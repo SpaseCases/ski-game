@@ -127,6 +127,8 @@ interface RailTrack {
   sideMeters: number;
   switchMeters: number;
   points: number;
+  /** Radians a 3D rail's up has turned under the skis so far (a loop or a corkscrew goes all the way round). */
+  turn: number;
 }
 
 export interface ScoreState {
@@ -184,7 +186,7 @@ export function createScore(): ScoreState {
       switchTakeoff: false,
       butter: 0,
     },
-    rail: { active: false, rail: -1, meters: 0, sideMeters: 0, switchMeters: 0, points: 0 },
+    rail: { active: false, rail: -1, meters: 0, sideMeters: 0, switchMeters: 0, points: 0, turn: 0 },
     butter: { active: false, end: 0, time: 0, turn: 0, runs: createRuns() },
   };
 }
@@ -346,6 +348,8 @@ export function stepScore(sc: ScoreState, prev: SkierState, s: SkierState, rails
   if (s.rail >= 0) {
     if (prev.rail !== s.rail) beginRail(sc, s);
     trackRail(sc.rail, s, dt);
+    // Round a 3D rail: how far its up turns under the skis.
+    if (s.rail3d && prev.rail === s.rail) sc.rail.turn += Math.acos(Math.min(1, prev.normal.dot(s.normal)));
   }
 
   sc.flow = 0;
@@ -576,6 +580,7 @@ function beginRail(sc: ScoreState, s: SkierState): void {
   r.sideMeters = 0;
   r.switchMeters = 0;
   r.points = 0;
+  r.turn = 0;
 }
 
 function trackRail(r: RailTrack, s: SkierState, dt: number): void {
@@ -620,6 +625,8 @@ const LOOK_NAMES: Record<RailStyle | BoxStyle, string> = {
   table: 'table',
   barrels: 'barrel',
   spool: 'spool',
+  loop: 'rail',
+  corkscrew: 'rail',
 };
 
 function endRail(sc: ScoreState, rails: readonly RailShape[]): void {
@@ -635,6 +642,12 @@ function endRail(sc: ScoreState, rails: readonly RailShape[]): void {
   ev.meters = r.meters;
   ev.landing = '';
   ev.switchOut = false;
+  // All the way round a loop or a corkscrew: a trick of its own, like a gap.
+  const shape = rails[r.rail];
+  if (shape?.ups && r.turn * DEG >= C.loopTurn) {
+    if (shape.look === 'corkscrew') addGap(sc, 'Corkscrew', C.corkscrewPoints, false);
+    else addGap(sc, 'Loop', C.loopPoints, false);
+  }
 }
 
 function trackButter(b: ButterTrack, prev: SkierState, s: SkierState, dt: number): void {

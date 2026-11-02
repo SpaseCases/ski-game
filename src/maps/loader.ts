@@ -38,7 +38,7 @@ const SCATTER_KINDS: readonly ScatterKind[] = ['pine', 'aspen', 'snag', 'rock', 
 const LINE_KINDS: readonly LineKind[] = ['fence', 'netting', 'barrier', 'dyeLine', 'bunting', 'chairlift'];
 const PROP_KINDS: readonly PropKind[] = ['lightPole', 'floodlight', 'banner', 'flag', 'groomer', 'streetLamp', 'hut', 'snowmobile', 'skier', 'skiRack'];
 const START_STYLES: readonly StartStyle[] = ['deck', 'tower', 'ridge', 'race'];
-const RAIL_STYLES: readonly RailStyle[] = ['metal', 'handrail', 'log', 'tube'];
+const RAIL_STYLES: readonly RailStyle[] = ['metal', 'handrail', 'log', 'tube', 'loop', 'corkscrew'];
 const BOX_STYLES: readonly BoxStyle[] = ['wood', 'ledge', 'bench', 'rock', 'stump', 'table', 'barrels', 'spool'];
 const QUARTER_STYLES: readonly QuarterStyle[] = ['snow', 'wood'];
 const ROOF_STYLES: readonly RoofStyle[] = ['gable', 'shed', 'flat'];
@@ -366,6 +366,7 @@ function parseFeature(raw: unknown, path: string): Feature {
         follow: n('follow', 0),
         style: f.style === undefined ? 'metal' : oneOf(f.style, RAIL_STYLES, `${path}.style`),
         radius: n('radius', 0),
+        ups: railUps(f.points, `${path}.points`),
       };
     case 'building':
       return {
@@ -527,6 +528,22 @@ function railPoints(raw: unknown, path: string): RailPoint[] {
   return points.map((p, i) => {
     const m = reader(obj(p, `${path}[${i}]`), `${path}[${i}]`);
     return { x: m('x'), z: m('z'), height: m('height') };
+  });
+}
+
+/** A 3D rail's ups: an `up: [x, y, z]` on every point, or on none (an ordinary rail). */
+function railUps(raw: unknown, path: string): [number, number, number][] {
+  const points = arr(raw, path).map((p, i) => obj(p, `${path}[${i}]`));
+  const given = points.filter((p) => p.up !== undefined).length;
+  if (given === 0) return [];
+  if (given !== points.length) throw new Error(`Map: ${path} gives an up on some points but not all`);
+  return points.map((p, i) => {
+    const list = arr(p.up, `${path}[${i}].up`);
+    if (list.length !== 3) throw new Error(`Map: ${path}[${i}].up must be [x, y, z]`);
+    const [x, y, z] = list.map((v, k) => num(v, `${path}[${i}].up[${k}]`)) as [number, number, number];
+    const len = Math.hypot(x, y, z);
+    if (!(len > 1e-6)) throw new Error(`Map: ${path}[${i}].up has no length`);
+    return [x / len, y / len, z / len];
   });
 }
 

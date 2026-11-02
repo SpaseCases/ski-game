@@ -325,10 +325,12 @@ export interface RailPoint {
 
 /**
  * What a rail is: a park rail (metal, on posts), a handrail (metal, on
- * posts down stairs), a fallen tree (a log lying on the snow; wood), or a
- * tube (a fat painted metal pipe on low saddles).
+ * posts down stairs), a fallen tree (a log lying on the snow; wood), a
+ * tube (a fat painted metal pipe on low saddles), or a 3D rail that turns
+ * the skier all the way round: a loop-de-loop or a corkscrew (a metal rail
+ * on posts and frames; scored "Loop" and "Corkscrew").
  */
-export type RailStyle = 'metal' | 'handrail' | 'log' | 'tube';
+export type RailStyle = 'metal' | 'handrail' | 'log' | 'tube' | 'loop' | 'corkscrew';
 
 /**
  * A rail: a polyline the rider slides along. Flat, down, flat-down, kinked
@@ -347,6 +349,13 @@ export interface RailFeature {
   style: RailStyle;
   /** Radius (m) of the tube or log; 0 uses the style's own (CONFIG.rails.radius, or a log's or a tube's). */
   radius: number;
+  /**
+   * A 3D rail (a loop or a corkscrew): each point's up, the way the body
+   * points sliding it there (in the map, `up: [x, y, z]` on every point),
+   * which can turn all the way round. Empty for an ordinary rail, whose up
+   * is the world's, tipped square to the rail. A 3D rail ignores `follow`.
+   */
+  ups: [number, number, number][];
 }
 
 /**
@@ -1049,6 +1058,14 @@ export interface RailShape {
   length: number;
   /** Half the width of the top: the rail's radius, or half the box's width. */
   halfWidth: number;
+  /** A 3D rail's up at each point (x y z, unit length), or null for an ordinary rail. */
+  ups: Float32Array | null;
+  /**
+   * A 3D rail's bend at each point (1/m): how sharply it curves toward its
+   * up there (the curvature measured along the up; negative curving away).
+   * Speed squared times this is what holds the skis on it. Null for an ordinary rail.
+   */
+  bend: Float32Array | null;
   /** Bounding box of the line seen from above, for skipping rails far from the rider. */
   minX: number;
   maxX: number;

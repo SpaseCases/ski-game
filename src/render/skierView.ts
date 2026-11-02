@@ -47,6 +47,8 @@ export interface SkierPose {
   bailTime: number;
   /** Sliding a rail or box. */
   onRail: boolean;
+  /** Sliding a 3D rail (a loop or a corkscrew): `normal` is its up, which can point any way, and the body follows `orient`. */
+  rail3d: boolean;
 }
 
 export function createSkierPose(): SkierPose {
@@ -72,6 +74,7 @@ export function createSkierPose(): SkierPose {
     bailed: false,
     bailTime: 0,
     onRail: false,
+    rail3d: false,
   };
 }
 
@@ -104,6 +107,7 @@ export function interpolateSkier(out: SkierPose, prev: SkierState, curr: SkierSt
   out.bailed = curr.bailed;
   out.bailTime = curr.bailTime;
   out.onRail = curr.rail >= 0;
+  out.rail3d = curr.rail3d;
 }
 
 const UP = new Vector3(0, 1, 0);
@@ -216,9 +220,11 @@ export class SkierView {
 
     // Orientation: on the snow, tilted to the slope (the sim's normal is
     // already smooth, so the skis follow it with no lag) and turned to the
-    // heading; in the air and in a crash, straight from the sim.
+    // heading; in the air, in a crash and round a 3D rail (whose heading is
+    // in its own frame, which can flip from one step to the next upside
+    // down), straight from the sim.
     const mode = state.bailed ? 2 : state.grounded ? 0 : 1;
-    if (mode === 0) {
+    if (mode === 0 && !state.rail3d) {
       this.tilt.setFromUnitVectors(UP, state.normal);
       this.turn.setFromAxisAngle(UP, state.yaw);
       this.target.multiplyQuaternions(this.tilt, this.turn);

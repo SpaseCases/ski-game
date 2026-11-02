@@ -193,6 +193,7 @@ export function townRails(features: readonly Feature[]): RailFeature[] {
         style: 'handrail',
         radius: 0,
         follow: 0,
+        ups: [],
         points: [at(f.length - HANDRAIL.top), at(f.length), at(f.length + run), at(f.length + run + HANDRAIL.bottom)],
       });
     }

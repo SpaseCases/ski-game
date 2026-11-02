@@ -241,6 +241,14 @@ export const CONFIG = {
     mountAlign: 0.75,
     /** Snow this far (m) above a rail's top takes the skis off it; a top this far below the skis can't be ridden onto. */
     sinkDepth: 0.03,
+    /**
+     * 3D rails (a loop or a corkscrew, milestone 14): the skis can land on,
+     * ride onto and bump into one only where its up is within about 25° of
+     * straight up (this cosine). Round the rest of it they stay on while
+     * what holds them round its bend (speed squared times its bend) is at
+     * least gravity's pull off it, and let go into the air below that.
+     */
+    uprightCos: 0.9,
   },
 
   bail: {
@@ -352,6 +360,14 @@ export const CONFIG = {
     gapPoints: 250,
     transferPoints: 200,
     hopPoints: 100,
+    /**
+     * Going all the way round a 3D rail (milestone 14): its up turned at
+     * least loopTurn degrees while sliding it scores "Loop" or "Corkscrew",
+     * a trick of its own on top of the slide (like a gap).
+     */
+    loopPoints: 500,
+    corkscrewPoints: 600,
+    loopTurn: 330,
     /** Landings: clean adds cleanBonus of the trick's points; sketchy scores sketchyScale of them and adds no multiplier. Taking off or landing switch adds switchBonus each. */
     cleanBonus: 0.25,
     sketchyScale: 0.5,
@@ -541,6 +557,14 @@ export const CONFIG = {
     orbitHoldSpeed: 2,
     orbitReturnDelay: 1,
     orbitReturnRate: 2,
+    /**
+     * On a 3D rail (a loop or a corkscrew) the camera rolls with it: it sits
+     * behind along the travel with its up following the rail's, turning at
+     * rollRate per second. It eases into that view, and back out to the
+     * level chase view after leaving the rail, over rollBlend seconds.
+     */
+    rollRate: 9,
+    rollBlend: 0.5,
   },
 
   render: {
@@ -589,6 +613,14 @@ export const CONFIG = {
     railBlendTime: 0.1,
     /** Thickness (m) of the posts under a rail. */
     railPostWidth: 0.07,
+    /**
+     * A 3D rail's frames (milestone 14): where it turns upside down it hangs
+     * from a beam on two posts, this far (m) out beside the widest part of
+     * the rail near there, so the rider passes between them; the frame's
+     * beams and posts are this thick.
+     */
+    railFrameClearance: 1.2,
+    railFrameWidth: 0.16,
     /**
      * The snow is built in chunks round the camera (render/terrainMesh.ts):
      * at most `chunksPerFrame` a frame while riding. After a jump to a new

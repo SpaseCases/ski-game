@@ -226,6 +226,8 @@ function place3d(x: number, d: number, span: number, ground: Ground, local: Loca
   const N = [0, Math.cos(p), -Math.sin(p)];
   const at = (a: number, c: number, n: number, i: number): number => a * A[i]! + c * C[i]! + n * N[i]!;
   const r3 = (v: number): number => Math.round(v * 1000) / 1000;
+  /** Radius (m) of a 3D rail's tube: a little fatter than a park rail. */
+  const TUBE = 0.06;
   const points = local.map(([a, c, n, up]) => {
     const px = x + at(a, c, n, 0);
     const py = y0 + at(a, c, n, 1);
@@ -234,7 +236,7 @@ function place3d(x: number, d: number, span: number, ground: Ground, local: Loca
     const len = Math.hypot(u[0]!, u[1]!, u[2]!);
     return { x: r3(px), z: r3(pz), height: r3(py - ground(px, pz)), up: u.map((v) => r3(v / len)) };
   });
-  return { type: 'rail', style, points };
+  return { type: 'rail', style, radius: TUBE, points };
 }
 
 /** Straight in from the snow over `lead` m to `h` above it (a ride-on), along +a, ending at a = 0. */
@@ -274,9 +276,9 @@ export function loop(x: number, d: number, ground: Ground, o: { radius?: number;
  * A corkscrew down the hill from (x, d): ridden on from the snow, one turn
  * of a helix of radius `radius` round an axis `h` + `radius` above the
  * snow, `length` m along it, ridden on the inside (up points at the axis),
- * then straight out and back down to the snow. The axis is turned across
- * the hill (toward `side`, 1 right, -1 left) so the helix starts and ends
- * heading straight down the hill.
+ * then straight out and back down to the snow. Its axis runs across the
+ * hill toward `side` (1 right, -1 left), turned so the helix starts and
+ * ends heading straight down the hill: it first curves the other way.
  */
 export function corkscrew(x: number, d: number, ground: Ground, o: { radius?: number; length?: number; h?: number; lead?: number; side?: 1 | -1; steps?: number } = {}): Json {
   const R = o.radius ?? 3;
@@ -286,16 +288,18 @@ export function corkscrew(x: number, d: number, ground: Ground, o: { radius?: nu
   const side = o.side ?? 1;
   const n = o.steps ?? 48;
   const pitch = L / (2 * Math.PI);
-  // The helix's tangent at its start points this far off its axis (toward
-  // `side`): turn everything back by that much, so the start heads along +a.
-  const phi = Math.atan2(side * R, pitch);
+  // The helix first curves away from `side`, its tangent at the start this
+  // far off its axis: turn everything back by that much, so the start heads
+  // along +a and the axis leans toward `side`.
+  const bend = -side;
+  const phi = Math.atan2(bend * R, pitch);
   const turn = (u: number, v: number): [number, number] => [u * Math.cos(phi) + v * Math.sin(phi), -u * Math.sin(phi) + v * Math.cos(phi)];
   const helix: Local[] = [];
   for (let k = 0; k <= n; k++) {
     const t = (2 * Math.PI * k) / n;
-    const [a, c] = turn(pitch * t, side * R * Math.sin(t));
+    const [a, c] = turn(pitch * t, bend * R * Math.sin(t));
     // Up points at the axis.
-    const [ua, uc] = turn(0, -side * Math.sin(t));
+    const [ua, uc] = turn(0, -bend * Math.sin(t));
     helix.push([a, c, h + R * (1 - Math.cos(t)), [ua, uc, Math.cos(t)]]);
   }
   const end = helix[helix.length - 1]!;

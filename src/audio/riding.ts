@@ -76,12 +76,12 @@ export function railTarget(speed: number, brake: number, metal: boolean, out: Ta
 }
 
 /**
- * True for a rail that sounds like metal: a metal rail or handrail. Boxes
- * (even with metal decks: `metal` is for how they slide), logs, tubes and
- * bonk jibs sound like the other jibs.
+ * True for a rail that sounds like metal: a metal rail or handrail, or a
+ * loop or corkscrew. Boxes (even with metal decks: `metal` is for how they
+ * slide), logs, tubes and bonk jibs sound like the other jibs.
  */
 export function ringsMetal(rail: RailShape): boolean {
-  return rail.kind === 'rail' && (rail.look === 'metal' || rail.look === 'handrail');
+  return rail.kind === 'rail' && (rail.look === 'metal' || rail.look === 'handrail' || rail.look === 'loop' || rail.look === 'corkscrew');
 }
 
 export class RidingSounds {

@@ -6,7 +6,7 @@ import type { Heightfield, RailShape, SpawnDef } from '../maps/types.ts';
 import { keepInside } from './bounds.ts';
 import { collideObstacles, type Course } from './obstacles.ts';
 import { inPowder } from './powder.ts';
-import { collideRails, railFrame, railUnder, type RailSpot } from './rails.ts';
+import { collideRails, railFrame, railUnder, railUp, type RailSpot } from './rails.ts';
 import { groundAt, heightAt } from './terrain.ts';
 
 // Skier physics. On the snow, velocity is split into the part along the skis
@@ -39,7 +39,9 @@ import { groundAt, heightAt } from './terrain.ts';
 // lined up straight or sideways, lock on and slide along it. Otherwise they
 // slip off to the side. Riding onto one that starts at the snow locks on the
 // same way. Running into a rail or box below its top, or into a tree, rock
-// or fence, bumps, or crashes if hard enough.
+// or fence, bumps, or crashes if hard enough. A 3D rail (a loop or a
+// corkscrew) turns the body with its own up, even upside down, and holds the
+// skis on round its bends only while they're fast enough.
 
 /** Why the last landing was a crash ('' if it was clean). */
 export type BailReason = '' | 'pitch' | 'edge' | 'sideways' | 'impact' | 'head' | 'obstacle';
@@ -146,6 +148,12 @@ export interface SkierState {
   railAngle: number;
   /** In the air after leaving a rail or box; the landing then checks edges and sideways however short the drop. */
   railExit: boolean;
+  /**
+   * On a 3D rail (a loop or a corkscrew): `normal` is its own up, which can
+   * point any way, even down, and `yaw` is the heading in its frame (see
+   * groundOrient), so only `orient` says which way the body points.
+   */
+  rail3d: boolean;
 }
 
 export function createSkierState(): SkierState {
@@ -196,6 +204,7 @@ export function createSkierState(): SkierState {
     railSpeed: 0,
     railAngle: 0,
     railExit: false,
+    rail3d: false,
   };
 }
 
@@ -246,6 +255,7 @@ export function copySkierState(dst: SkierState, src: SkierState): void {
   dst.railSpeed = src.railSpeed;
   dst.railAngle = src.railAngle;
   dst.railExit = src.railExit;
+  dst.rail3d = src.rail3d;
 }
 
 /** Puts the skier at a spawn point, standing still on the snow. */
@@ -276,6 +286,8 @@ const skiSide = new Vector3();
 const axis = new Vector3();
 const head = new Vector3();
 const railDir = new Vector3();
+const railNormal = new Vector3();
+const railAlong = new Vector3();
 const frameUp = new Vector3();
 const local = new Vector3();
 const below = new Vector3();
@@ -320,7 +332,9 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
   if (input.pop.released && s.canPop && s.popArmed && (s.grounded || s.airTime <= c.popCoyoteTime)) {
     // Out of a butter it's an ollie (off the tails) or a nollie (off the tips): a stronger pop.
     const pop = (c.popMin + (c.popMax - c.popMin) * s.crouch) * (1 + (c.butterPop - 1) * s.butterAmount);
-    if (onWall(s, course.hf)) s.velocity.y += pop * TUNING.air.wallPop;
+    // Off a 3D rail: away from it, whichever way its up points.
+    if (s.rail3d) s.velocity.addScaledVector(s.normal, pop);
+    else if (onWall(s, course.hf)) s.velocity.y += pop * TUNING.air.wallPop;
     else if (s.normal.y < Math.cos(TUNING.air.wallAngle * DEG)) s.velocity.y += pop;
     else s.velocity.addScaledVector(s.normal, pop);
     if (s.grounded) takeOff(s, steer, course.hf);
@@ -366,9 +380,26 @@ function slideRail(s: SkierState, input: InputState, course: Course, steer: numb
   s.railAngle = wrapAngle(s.railAngle + s.yawRate * dt);
 
   // Along the rail: gravity's pull down it, friction from the load on it and the brake, air drag.
-  railFrame(rail, s.railS, s.position, railDir);
+  let k = railFrame(rail, s.railS, s.position, railDir);
   const g = c.gravity;
-  const load = g * Math.sqrt(Math.max(0, 1 - railDir.y * railDir.y));
+  let load: number;
+  if (rail.ups) {
+    // A 3D rail presses the skis with what holds them round its bend, less
+    // gravity's pull off it. Below zero, once it has turned past upright
+    // (upside down and too slow), they let go; on its upright stretches they
+    // stay on over a kink like on any rail.
+    load = s.railSpeed * s.railSpeed * railUp(rail, s.railS, k, railNormal, railAlong) + g * railNormal.y;
+    if (load < 0 && railNormal.y < R.uprightCos) {
+      s.velocity.copy(railDir).multiplyScalar(s.railSpeed);
+      s.normal.copy(railNormal);
+      headingOn3d(s, railAlong);
+      takeOff(s, steer, course.hf);
+      return;
+    }
+    load = Math.max(0, load);
+  } else {
+    load = g * Math.sqrt(Math.max(0, 1 - railDir.y * railDir.y));
+  }
   const friction = rail.kind === 'rail' && rail.metal ? R.railFriction : R.boxFriction;
   let v = s.railSpeed - g * railDir.y * dt;
   v = approach(v, 0, (friction * load + R.brakeDecel * s.brake) * dt);
@@ -378,16 +409,22 @@ function slideRail(s: SkierState, input: InputState, course: Course, steer: numb
   s.railS += v * dt;
 
   const off = s.railS < 0 || s.railS > rail.length;
-  railFrame(rail, s.railS, s.position, railDir);
+  k = railFrame(rail, s.railS, s.position, railDir);
   s.velocity.copy(railDir).multiplyScalar(v);
   if (off) {
     // Past an end: carry on from the end point.
     const over = s.railS < 0 ? s.railS : s.railS - rail.length;
     s.position.addScaledVector(railDir, over);
   }
-  // The rail's up: world up, tipped to stay square to a sloping rail.
-  s.normal.set(0, 1, 0).addScaledVector(railDir, -railDir.y).normalize();
-  s.yaw = wrapAngle(Math.atan2(-railDir.x, -railDir.z) + s.railAngle);
+  if (rail.ups) {
+    // A 3D rail's own up, and the heading in its frame.
+    railUp(rail, clamp(s.railS, 0, rail.length), k, s.normal, railAlong);
+    headingOn3d(s, railAlong);
+  } else {
+    // The rail's up: world up, tipped to stay square to a sloping rail.
+    s.normal.set(0, 1, 0).addScaledVector(railDir, -railDir.y).normalize();
+    s.yaw = wrapAngle(Math.atan2(-railDir.x, -railDir.z) + s.railAngle);
+  }
 
   if (off) {
     takeOff(s, steer, course.hf);
@@ -398,6 +435,7 @@ function slideRail(s: SkierState, input: InputState, course: Course, steer: numb
     // The snow came up over the rail: ride on it.
     s.position.y = h;
     s.rail = -1;
+    s.rail3d = false;
     s.normal.copy(contactNormal);
     s.yawRate = 0;
   }
@@ -611,6 +649,19 @@ function updateGrab(s: SkierState, input: InputState): void {
   }
 }
 
+/**
+ * On a 3D rail (normal set to its up): the heading in the rail's own frame,
+ * as groundOrient reads it, so the body faces along `dir` (the rail's
+ * direction, square to the up) turned railAngle about its up (positive
+ * turns left).
+ */
+function headingOn3d(s: SkierState, dir: Vector3): void {
+  skiSide.crossVectors(s.normal, dir);
+  bodyForward.copy(dir).multiplyScalar(Math.cos(s.railAngle)).addScaledVector(skiSide, Math.sin(s.railAngle));
+  local.copy(bodyForward).applyQuaternion(qTilt.setFromUnitVectors(UP, s.normal).invert());
+  s.yaw = Math.atan2(-local.x, -local.z);
+}
+
 /** Orientation on the snow: tilted to the slope, turned to the ski heading. */
 function groundOrient(s: SkierState): void {
   qTilt.setFromUnitVectors(UP, s.normal);
@@ -643,6 +694,7 @@ function takeOff(s: SkierState, steer: number, hf: Heightfield): void {
   s.airTime = 0;
   s.railExit = s.rail >= 0;
   s.rail = -1;
+  s.rail3d = false;
   s.press = 0;
   groundOrient(s);
 
@@ -802,7 +854,7 @@ function catchRail(s: SkierState, rails: readonly RailShape[]): boolean {
     crash(s, 'impact');
     return true;
   }
-  lockOn(s, railYaw, into);
+  lockOn(s, rail, railYaw, into);
   return true;
 }
 
@@ -816,20 +868,25 @@ function mountRail(s: SkierState, rails: readonly RailShape[]): boolean {
   const p = s.position;
   if (!railUnder(rails, p.x, p.z, R.snapDistance, spot)) return false;
   if (spot.top > p.y + R.stepTolerance || spot.top < p.y - R.sinkDepth) return false;
-  const n = railSpot(rails[spot.rail]!);
+  const rail = rails[spot.rail]!;
+  const n = railSpot(rail);
   const speed = s.velocity.length();
   if (speed < 0.5 || Math.abs(s.velocity.dot(railDir)) < R.mountAlign * speed) return false;
   const railYaw = Math.atan2(-railDir.x, -railDir.z);
   if (railFit(s, n, railYaw) > R.angleMax || fit.tilt > R.tiltMax) return false;
   p.copy(head);
   s.normal.copy(n);
-  lockOn(s, railYaw, 0);
+  lockOn(s, rail, railYaw, 0);
   return true;
 }
 
 /** Loads the point on a rail's top at `spot` into `head` and its direction into `railDir`; returns the rail's up. */
 function railSpot(rail: RailShape): Vector3 {
-  railFrame(rail, spot.s, head, railDir);
+  const k = railFrame(rail, spot.s, head, railDir);
+  if (rail.ups) {
+    railUp(rail, spot.s, k, contactNormal, railAlong);
+    return contactNormal;
+  }
   // World up, tipped to stay square to a sloping rail.
   return contactNormal.set(0, 1, 0).addScaledVector(railDir, -railDir.y).normalize();
 }
@@ -849,15 +906,17 @@ function railFit(s: SkierState, n: Vector3, railYaw: number): number {
   return Math.abs(fit.angle - Math.round(fit.angle / (Math.PI / 2)) * (Math.PI / 2));
 }
 
-/** Locks onto the rail at `spot` (feet already on it, normal set), keeping the skis' angle from railFit. */
-function lockOn(s: SkierState, railYaw: number, into: number): void {
+/** Locks onto `rail` at `spot` (feet already on it, normal set), keeping the skis' angle from railFit. */
+function lockOn(s: SkierState, rail: RailShape, railYaw: number, into: number): void {
   s.rail = spot.rail;
+  s.rail3d = rail.ups !== null;
   s.railExit = false;
   s.railS = spot.s;
   s.railSpeed = s.velocity.dot(railDir);
   s.railAngle = fit.angle;
   s.velocity.copy(railDir).multiplyScalar(s.railSpeed);
-  s.yaw = wrapAngle(railYaw + fit.angle);
+  if (s.rail3d) headingOn3d(s, railAlong);
+  else s.yaw = wrapAngle(railYaw + fit.angle);
   s.yawRate = 0;
   s.grounded = true;
   s.airTime = 0;
@@ -1026,6 +1085,7 @@ function crash(s: SkierState, reason: BailReason): void {
   s.poleTime = Infinity;
   s.polePhase = 1;
   s.rail = -1;
+  s.rail3d = false;
   s.railExit = false;
   s.press = 0;
   s.center.copy(s.position).addScaledVector(n, b.centerHeight);

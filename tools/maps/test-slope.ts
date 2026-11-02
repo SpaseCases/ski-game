@@ -17,7 +17,9 @@
 
 import { writeFileSync } from 'node:fs';
 import { parseMap } from '../../src/maps/loader.ts';
-import { deckRail, gapRail, knuckleRail, poleJam, SHAPES, slideJson, wallrideCloseOut, type Json } from './railKit.ts';
+import { generateSlope } from '../../src/maps/terrain.ts';
+import { heightAt } from '../../src/sim/terrain.ts';
+import { corkscrew, deckRail, gapRail, knuckleRail, loop, poleJam, SHAPES, slideJson, wallrideCloseOut, type Json } from './railKit.ts';
 
 const terrain = {
   type: 'generated',
@@ -152,14 +154,25 @@ features.push(poleJam(A, 168));
   features.push(...g.features);
   gaps.push(g.gap);
 }
-// Below the jumps' lane end, a rail into a wallride.
-features.push(...wallrideCloseOut(-4, 255, 1));
+// Below the big jump, between its landing and the rail lane (clear of both run-outs), a rail into a wallride.
+features.push(...wallrideCloseOut(-14, 255, 1));
 
 // A deck rail and a knuckle-down rail on two of the jumps.
 features.push(deckRail(-20, 84, { lip: 2, angle: 16, gap: 8, land: 12, width: 6 }, 1));
 features.push(knuckleRail(-20, 243, { lip: 4, angle: 18, gap: 8, land: 10, width: 9, transition: 6 }, -1));
 
 const map = { name: 'Test Slope', terrain, features, spawn, flags, finishes, decor, ...(gaps.length ? { gaps } : {}), colors: { sky: '#9fc3e6', fog: '#dce8f3' } };
+
+// 3D rails below the rail lane, laid on the snow's own heights: a loop
+// right below it (riders off its last rail come down beside its way in) and a
+// corkscrew past the wallride, turning across the hill to the right.
+{
+  const hf = generateSlope(parseMap(map).terrain);
+  const ground = (x: number, z: number): number => heightAt(hf, x, z);
+  flags.push({ x: 22, z: -244, heading: 0, width: 14 });
+  features.push(loop(22, 250, ground));
+  features.push(corkscrew(8, 285, ground, { side: 1 }));
+}
 parseMap(map);
 console.log(`${features.length} features, ${flags.length} flags, ${gaps.length} named gaps`);
 writeFileSync('src/maps/test-slope.json', JSON.stringify(map, null, 1) + '\n');
