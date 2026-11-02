@@ -153,7 +153,6 @@ const titleScreen = new TitleScreen({
   play: openMapSelect,
   locker: openLocker,
   settings: openSettings,
-  controls: openControls,
   cheats: openCheats,
   leaderboards: () => openBoards((mapEntry(readStored('map'))?.id ?? MAPS[0]!.id) as MapId),
   name: () => settings.name,
@@ -176,8 +175,8 @@ const pauseScreen = new PauseScreen({
   maps: openMapSelect,
   locker: openLocker,
   settings: openSettings,
-  controls: openControls,
   cheats: openCheats,
+  mainMenu: toMainMenu,
   leaderboards: () => {
     if (level) openBoards(level.id, level.race && level.race.course >= 0 ? level.race.course : -1);
   },
@@ -215,6 +214,7 @@ const settingsScreen = new SettingsScreen(
       saveSettings(settings);
     },
     setBindings,
+    openControls,
     trapNextKey: (fn) => menus.trapNextKey(fn),
   },
   () => menus.back(),
@@ -599,6 +599,19 @@ async function loadMap(entry: MapEntry): Promise<void> {
     console.error(err);
     mapSelect.setError(`Couldn't load ${entry.name}. Try again, or pick another map.`);
   }
+}
+
+/** From pause: leaves the map for the title (bests, settings and the look are already saved; a combo on the snow banks). */
+function toMainMenu(): void {
+  if (!level) return;
+  if (scoring()) endCombo(score, skier);
+  trailMap.close();
+  online?.finish.hide();
+  level.world.dispose();
+  level = null;
+  sound.setMap(null);
+  resetScore(score);
+  openTitle();
 }
 
 /** The title, over the painted mountain: where the game starts. */

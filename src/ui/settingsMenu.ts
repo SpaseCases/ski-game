@@ -66,6 +66,8 @@ export interface SettingsHooks {
   /** Pop with the pop key or with ↑. */
   setPopWith: (key: PopWith) => void;
   setBindings: (b: Bindings) => void;
+  /** The Controls screen (what every key does, and the key tester). */
+  openControls: () => void;
   /** Hands the next key pressed to `fn` and nothing else (null: stop listening). */
   trapNextKey: (fn: ((e: KeyboardEvent) => void) | null) => void;
 }
@@ -185,9 +187,18 @@ export class SettingsScreen implements Screen {
     this.crashNote.className = 'setting-note';
     crashes.append(labelRow('After a crash', crashGroup), this.crashNote);
 
-    // Keys: which one pops first, then a key for every action.
+    // Keys: the Controls screen, which one pops first, then a key for every action.
     const keys = section('Keys');
     keys.classList.add('keys-section');
+    const controls = document.createElement('button');
+    controls.type = 'button';
+    controls.className = 'plank plank-small controls-link';
+    controls.textContent = 'Controls and key tester';
+    controls.addEventListener('click', () => {
+      this.stopListening();
+      hooks.openControls();
+    });
+    keys.appendChild(controls);
     const popGroup = document.createElement('div');
     popGroup.className = 'segmented';
     popGroup.setAttribute('role', 'group');

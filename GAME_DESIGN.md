@@ -246,13 +246,13 @@ Three ski types, each with its own model, 3 to 4 top sheet graphics to pick from
 - Master and effects volume sliders plus a mute toggle in Settings, heard live while dragging and saved.
 
 ## Menus (HTML/CSS overlay, usable with keyboard or mouse)
-- **Title:** Play, Locker, Settings, Controls, Cheats
+- **Title:** Play, Locker, Settings, Cheats, Leaderboards, then the board name (milestone 13). Controls moved into Settings (the user found the menus had too many planks)
 - **Map select:** a card per map: Park, Freeride, Slalom, Big air, and the Test slope, each with a weather picker (one pick for every map)
 - **Locker:** outfit colors, headwear and skis with a live preview of the skier (see Locker)
-- **Settings:** quality (Auto / Low / Medium / High, applied live; Auto shows what it picked, and High's smooth edges come on from the next start); master and SFX volume plus mute; the combo score on or off; key rebinding for every action (it listens for the next key, refuses Esc, and swaps or warns on a key that's already taken), with reset to defaults. Saved locally.
-- **Controls:** the tables above, built from the current bindings so they show rebound keys
+- **Settings:** quality (Auto / Low / Medium / High, applied live; Auto shows what it picked, and High's smooth edges come on from the next start); master and SFX volume plus mute; the combo score on or off; key rebinding for every action (it listens for the next key, refuses Esc, and swaps or warns on a key that's already taken), with reset to defaults. Saved locally. The Keys column opens with *Controls and key tester*.
+- **Controls** (from Settings): the tables above, built from the current bindings so they show rebound keys, and the key tester
 - **Cheats:** see Cheats
-- **Pause (Esc or P):** Resume, Respawn, Back to top, Weather, Map select, Locker, Settings, Controls, Cheats. The simulation stops while paused (the fixed-step accumulator doesn't build up).
+- **Pause (Esc or P):** Resume, Respawn, Back to top, Weather, Map select, Leaderboards, Locker, Settings, Cheats, Main menu (leaves the map for the title; a combo on the snow banks). The simulation stops while paused (the fixed-step accumulator doesn't build up).
 - Every menu works with the keyboard alone (arrows or Tab move focus, Enter picks, Esc goes back, focus is always visible) and with the mouse. While a menu is open, no game key reaches the skier; while riding, Tab sets the checkpoint and never moves browser focus.
 - **HUD:** minimal. The combo score (see Scoring) bottom center with the best combo bottom left, a brief "Checkpoint set" toast, the Back to top button at the finish, the trail map button, "Open in new tab" when the game is embedded, and a small "Cheats on" tag while cheats are on.
 - **Trail map (M, or its HUD button):** a drawn map of the whole map, oriented like a piste map (the start's way down points down the page): shaded ground with rock, steep slopes and forests, the faces' names, every named run, flags (green once passed), finishes, the start, and you with your heading.

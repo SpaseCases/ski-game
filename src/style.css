@@ -1962,6 +1962,11 @@ body {
   margin-top: 14px;
 }
 
+/* Settings' way to the Controls screen, first in the Keys column. */
+.keys-section .controls-link {
+  margin: 0 0 14px;
+}
+
 .keys-section > .setting-note {
   margin-bottom: 14px;
 }

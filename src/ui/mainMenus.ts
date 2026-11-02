@@ -50,7 +50,6 @@ export interface TitleActions {
   play: () => void;
   locker: () => void;
   settings: () => void;
-  controls: () => void;
   cheats: () => void;
   leaderboards: () => void;
   /** The saved board name ('' for none), and saving a checked one. */
@@ -75,7 +74,6 @@ export class TitleScreen extends PlankScreen {
     this.addItem('Play', actions.play);
     this.addItem('Locker', actions.locker);
     this.addItem('Settings', actions.settings);
-    this.addItem('Controls', actions.controls);
     this.addItem('Cheats', actions.cheats);
     this.addItem('Leaderboards', actions.leaderboards);
 
@@ -150,9 +148,10 @@ export interface PauseActions {
   maps: () => void;
   locker: () => void;
   settings: () => void;
-  controls: () => void;
   cheats: () => void;
   leaderboards: () => void;
+  /** Leaves the map for the title. */
+  mainMenu: () => void;
   /** The weather picked, and picking another (it changes behind the menu at once). */
   weather: () => WeatherId;
   setWeather: (w: WeatherId) => void;
@@ -179,8 +178,8 @@ export class PauseScreen extends PlankScreen {
     this.addItem('Leaderboards', actions.leaderboards);
     this.addItem('Locker', actions.locker);
     this.addItem('Settings', actions.settings);
-    this.addItem('Controls', actions.controls);
     this.addItem('Cheats', actions.cheats);
+    this.addItem('Main menu', actions.mainMenu);
     setHints(this.foot, [
       [['↑', '↓'], 'Choose'],
       [['Enter'], 'Pick'],

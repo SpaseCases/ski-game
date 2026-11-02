@@ -13,8 +13,90 @@ function pine(x: number, y: number, s: number): string {
   );
 }
 
-function tower(x: number, y: number, h: number): string {
-  return `<path d="M${x} ${y} L${x} ${y - h} M${x - 14} ${y - h} L${x + 14} ${y - h}" stroke="#56606b" stroke-width="4"/>`;
+// The chairlift, seen from the side: a station with its bullwheel at each
+// end, towers whose crossarms carry the haul rope, the rope sagging a little
+// between them, and chairs hanging from it on their grips.
+const STEEL = '#56606b';
+const ROPE = '#1b2430';
+/** The bullwheels at the bottom and top stations, where the rope turns. */
+const LIFT_FROM: readonly [number, number] = [1188, 708];
+const LIFT_TO: readonly [number, number] = [1330, 552];
+/** Where the towers stand along the line (0 the bottom wheel, 1 the top), and each one's height. */
+const TOWERS: readonly [number, number][] = [
+  [0.27, 52],
+  [0.53, 56],
+  [0.79, 52],
+];
+/** Chairs: the span they hang in (0 from the bottom wheel), how far along it, and a rider's jacket ('' for an empty chair). */
+const CHAIRS: readonly [number, number, string][] = [
+  [0, 0.55, '#c8331f'],
+  [1, 0.4, ''],
+  [2, 0.6, '#2f62d0'],
+  [3, 0.45, '#f1c93b'],
+];
+/** How far the rope dips in the middle of a span. */
+const SAG = 5;
+
+function along(t: number): [number, number] {
+  return [LIFT_FROM[0] + (LIFT_TO[0] - LIFT_FROM[0]) * t, LIFT_FROM[1] + (LIFT_TO[1] - LIFT_FROM[1]) * t];
+}
+
+/**
+ * A station: the bullwheel at (x, y) on a short frame, and beside it a
+ * wooden hut under a pitched roof, downhill of the wheel at the bottom
+ * (`top` false) and uphill of it at the top.
+ */
+function station(x: number, y: number, top: boolean): string {
+  const w = 40;
+  const left = top ? x + 12 : x - 12 - w;
+  const right = left + w;
+  const eave = y + 6;
+  const ground = y + 34;
+  return (
+    `<path d="M${x} ${y} L${x - 6} ${ground} M${x} ${y} L${x + 6} ${ground}" stroke="${STEEL}" stroke-width="3"/>` +
+    `<path d="M${left} ${ground} L${left} ${eave} L${left + w / 2} ${eave - 12} L${right} ${eave} L${right} ${ground}Z" fill="#8a6440"/>` +
+    `<path d="M${left - 4} ${eave + 1} L${left + w / 2} ${eave - 14} L${right + 4} ${eave + 1}" fill="none" stroke="#46505c" stroke-width="4" stroke-linejoin="round"/>` +
+    `<rect x="${left + w / 2 - 6}" y="${eave + 6}" width="12" height="9" fill="#dce8f3"/>` +
+    `<circle cx="${x}" cy="${y}" r="9" fill="#f4f8fc" stroke="${STEEL}" stroke-width="3"/>`
+  );
+}
+
+/** A chair hanging at (x, y) on the rope: grip and hanger, a seat facing uphill with its back and footrest, and a rider if `jacket`. */
+function chair(x: number, y: number, jacket: string): string {
+  let out = `<path d="M${x} ${y} L${x} ${y + 17} M${x - 7} ${y + 17} L${x + 5} ${y + 17} M${x - 7} ${y + 17} L${x - 8} ${y + 8} M${x + 5} ${y + 17} L${x + 7} ${y + 24}" fill="none" stroke="${ROPE}" stroke-width="2" stroke-linecap="round"/>`;
+  if (jacket) {
+    out +=
+      `<rect x="${x - 6}" y="${y + 8}" width="6" height="8" rx="1.5" fill="${jacket}"/>` +
+      `<circle cx="${x - 3}" cy="${y + 5.5}" r="2.6" fill="${ROPE}"/>` +
+      `<path d="M${x - 1} ${y + 16} L${x + 5} ${y + 16} L${x + 7} ${y + 23}" fill="none" stroke="#4a5560" stroke-width="2.4" stroke-linecap="round"/>`;
+  }
+  return out;
+}
+
+function chairlift(): string {
+  const supports: [number, number][] = [[LIFT_FROM[0], LIFT_FROM[1]], ...TOWERS.map(([t]) => along(t)), [LIFT_TO[0], LIFT_TO[1]]];
+  let towers = '';
+  for (const [t, h] of TOWERS) {
+    const [x, y] = along(t);
+    towers += `<path d="M${x} ${y + h} L${x} ${y} M${x - 12} ${y} L${x + 12} ${y}" stroke="${STEEL}" stroke-width="4"/>`;
+  }
+  let rope = '';
+  let chairs = '';
+  for (let i = 0; i < supports.length - 1; i++) {
+    const [ax, ay] = supports[i]!;
+    const [bx, by] = supports[i + 1]!;
+    // A quadratic between two supports, its control point pulled down so the middle dips by SAG.
+    const cx = (ax + bx) / 2;
+    const cy = (ay + by) / 2 + SAG * 2;
+    rope += `M${ax} ${ay} Q${cx} ${cy} ${bx} ${by} `;
+    for (const [span, u, jacket] of CHAIRS) {
+      if (span !== i) continue;
+      const x = (1 - u) ** 2 * ax + 2 * u * (1 - u) * cx + u * u * bx;
+      const y = (1 - u) ** 2 * ay + 2 * u * (1 - u) * cy + u * u * by;
+      chairs += chair(x, y, jacket);
+    }
+  }
+  return station(LIFT_FROM[0], LIFT_FROM[1], false) + station(LIFT_TO[0], LIFT_TO[1], true) + towers + `<path d="${rope}" fill="none" stroke="${ROPE}" stroke-width="2"/>` + chairs;
 }
 
 export function titleArt(): string {
@@ -37,9 +119,7 @@ export function titleArt(): string {
     `<path d="M980 300 L1010 420 L960 520 L900 640 L760 660Z" fill="#d3e0ee"/>` +
     `<path d="M980 300 L1004 352 L986 372 L992 410 L970 380 L972 340Z M1120 330 L1136 372 L1118 392 L1112 360Z M1050 420 L1080 440 L1062 470 L1040 452Z" fill="#5d6773"/>` +
     // The chairlift up the shoulder.
-    `<path d="M1180 760 L1340 470" stroke="#1b2430" stroke-width="2"/>` +
-    tower(1222, 690, 46) + tower(1270, 600, 46) + tower(1318, 512, 46) +
-    `<rect x="1244" y="640" width="12" height="9" fill="#c8331f"/><rect x="1296" y="548" width="12" height="9" fill="#2f62d0"/>` +
+    chairlift() +
     // The run: a groomed slope down to a kicker.
     `<path d="M0 760 Q520 640 900 700 Q1240 760 1600 740 L1600 900 L0 900Z" fill="#ffffff"/>` +
     `<path d="M560 742 Q640 736 676 696 L700 696 L700 752Z" fill="#eef3f9" stroke="#c9d6e8" stroke-width="2"/>` +
