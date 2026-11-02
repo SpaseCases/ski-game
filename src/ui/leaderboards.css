@@ -321,3 +321,37 @@
     transition: none;
   }
 }
+
+/* The "Saved look" sign after a board name is entered: the look's tiny skier, drawn big, and what loading does. */
+.look-prompt {
+  width: min(460px, 100%);
+}
+
+.look-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.look-preview {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 64px;
+  height: 76px;
+  border-radius: 4px;
+  background: #c9d8e8;
+}
+
+.look-preview .lb-look {
+  width: 50px;
+  height: 60px;
+}
+
+.look-detail {
+  margin: 0;
+  color: var(--frost);
+  font-size: 14px;
+  line-height: 1.45;
+}

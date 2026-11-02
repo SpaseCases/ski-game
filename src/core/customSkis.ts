@@ -193,9 +193,50 @@ export function loadCustomSkis(): void {
 
 /** Writes every painted slot (if storage works; if not, they last the visit). */
 export function saveCustomSkis(): void {
+  writeStored(KEY, customSkisText());
+}
+
+/** Every slot as saved: { "park": [slot or null, ...], ... } as JSON (also what the online look stores). */
+export function customSkisText(): string {
   const out: Record<string, (string | null)[]> = {};
   for (const type of SKI_TYPES) out[type.id] = CUSTOM[type.id].map((g, slot) => (g ? encode(slotOf(type.id, slot)) : null));
-  writeStored(KEY, JSON.stringify(out));
+  return JSON.stringify(out);
+}
+
+/**
+ * Replaces every slot with `text` (customSkisText's form, from an online
+ * look) and saves it. A slot it leaves empty or can't read goes back to
+ * never opened. The grids are refilled in place, so the caller repaints.
+ */
+export function setCustomSkisText(text: string): void {
+  let saved: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (parsed && typeof parsed === 'object') saved = parsed as Record<string, unknown>;
+  } catch {
+    return;
+  }
+  for (const type of SKI_TYPES) {
+    const list = saved[type.id];
+    for (let slot = 0; slot < CUSTOM_SLOTS; slot++) {
+      const entry = Array.isArray(list) ? list[slot] : null;
+      if (typeof entry === 'string' && decode(entry, type.id, slot)) continue;
+      slots.delete(customId(type.id, slot));
+      CUSTOM[type.id][slot] = null;
+    }
+  }
+  saveCustomSkis();
+}
+
+/** How many slots `text` (customSkisText's form) has painted. */
+export function paintedSlots(text: string): number {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (!parsed || typeof parsed !== 'object') return 0;
+    return Object.values(parsed as Record<string, unknown>).reduce<number>((n, list) => n + (Array.isArray(list) ? list.filter((s) => typeof s === 'string').length : 0), 0);
+  } catch {
+    return 0;
+  }
 }
 
 /**
@@ -240,29 +281,31 @@ function unruns(text: string, count: number): Uint8Array | null {
   return n === count ? cells : null;
 }
 
-function decode(text: string, ski: SkiId, slot: number): void {
+/** Fills the slot from saved text; false (the slot untouched) if it can't be read. */
+function decode(text: string, ski: SkiId, slot: number): boolean {
   const { rows, cols } = skiType(ski).model;
   const wall = letterIndex(text[0]);
-  if (wall < 0) return;
+  if (wall < 0) return false;
   if (text[1] === '=' || text[1] === '~') {
     const [topText, baseText] = text.slice(2).split('/');
     const top = unruns(topText ?? '', rows * cols * 2);
     const base = unruns(baseText ?? '', rows * cols * 2);
-    if (!top || !base) return;
+    if (!top || !base) return false;
     const s = slotOf(ski, slot);
     s.top.cells.set(top);
     s.base.cells.set(base);
     s.linked = text[1] === '=';
     setCustomSidewall(ski, slot, wall);
-    return;
+    return true;
   }
   // The first format: one ski's top sheet, the same on both, and one color underneath.
   const one = unruns(text.slice(1), rows * cols);
-  if (!one) return;
+  if (!one) return false;
   const s = slotOf(ski, slot);
   for (let r = 0; r < rows; r++) {
     for (let side = 0; side < 2; side++) s.top.cells.set(one.subarray(r * cols, (r + 1) * cols), r * cols * 2 + side * cols);
   }
   s.base.cells.fill(wall);
   setCustomSidewall(ski, slot, wall);
+  return true;
 }

@@ -14,6 +14,11 @@ rules_version = '2';
 // board. Fields: name (3 to 16 letters, digits, spaces, - and _; no space at
 // either end or doubled), look (the skier's look, src/online/look.ts), and
 // combo (points, 1 to 10,000,000) or ms (milliseconds, 20 s to an hour).
+//
+//   looks/<key>      the look saved under a name (testLooks/<key> for tests):
+//                    name, outfit and skis, the game's own saved JSON text
+//                    (src/online/looks.ts). Anyone can read one or replace it;
+//                    nobody can list them or delete one.
 // Deployed by hand: firebase deploy --only firestore:rules
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -24,6 +29,31 @@ service cloud.firestore {
       allow create: if isRoot(root) && valid(board, key);
       allow update: if isRoot(root) && valid(board, key) && better(board);
       allow delete: if false;
+    }
+
+    match /{root}/{key} {
+      allow get: if isLooks(root);
+      allow create, update: if isLooks(root) && validLook(key);
+    }
+
+    function isLooks(root) {
+      return root == 'looks' || root == 'testLooks';
+    }
+
+    function validLook(key) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['name', 'outfit', 'skis'])
+        && okName(d.name, key)
+        && d.outfit is string && d.outfit.size() <= 2000
+        && d.skis is string && d.skis.size() <= 50000;
+    }
+
+    // 3 to 16 letters, digits, spaces, - and _ (no space at either end or doubled), and the key is it in lower case.
+    function okName(name, key) {
+      return name is string
+        && name.size() >= 3 && name.size() <= 16
+        && name.matches('[A-Za-z0-9_-]+( [A-Za-z0-9_-]+)*')
+        && name.lower() == key;
     }
 
     function isRoot(root) {
@@ -40,10 +70,7 @@ service cloud.firestore {
 
     function valid(board, key) {
       let d = request.resource.data;
-      return d.name is string
-        && d.name.size() >= 3 && d.name.size() <= 16
-        && d.name.matches('[A-Za-z0-9_-]+( [A-Za-z0-9_-]+)*')
-        && d.name.lower() == key
+      return okName(d.name, key)
         && d.look is string && d.look.matches('[a-z0-9]{0,24}')
         && ((comboBoard(board) && d.keys().hasOnly(['name', 'look', 'combo'])
               && d.combo is int && d.combo >= 1 && d.combo <= 10000000)

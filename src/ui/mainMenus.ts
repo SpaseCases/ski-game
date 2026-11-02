@@ -56,6 +56,8 @@ export interface TitleActions {
   /** The saved board name ('' for none), and saving a checked one. */
   name: () => string;
   setName: (name: string) => void;
+  /** The name box was left or Enter pressed in it, with this name saved ('' for none). */
+  nameDone: (name: string) => void;
 }
 
 const NAME_NOTE = 'A nickname, not your real name. 3 to 16 letters, digits, spaces, - and _.';
@@ -102,7 +104,7 @@ export class TitleScreen extends PlankScreen {
     box.append(row, this.nameNote);
     this.list.after(box);
     this.nameInput.addEventListener('input', () => this.typed());
-    this.nameInput.addEventListener('blur', () => this.syncName());
+    this.nameInput.addEventListener('blur', () => this.done());
   }
 
   enter(): HTMLElement | null {
@@ -114,9 +116,15 @@ export class TitleScreen extends PlankScreen {
   onKey(e: KeyboardEvent): boolean {
     if (e.target !== this.nameInput || e.key !== 'Enter') return false;
     this.typed();
-    this.syncName();
+    // Focus leaves the box, and its blur finishes the name (see done).
     this.list.querySelector('button')?.focus();
     return true;
+  }
+
+  /** Leaving the box: it shows the saved name again, and the game hears which name that is. */
+  private done(): void {
+    this.syncName();
+    this.actions.nameDone(this.actions.name());
   }
 
   private typed(): void {

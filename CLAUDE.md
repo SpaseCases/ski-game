@@ -6,7 +6,7 @@ Browser-based 3D freeski game for Chromebooks. Read `GAME_DESIGN.md` before star
 - Three.js (pin the exact version), `WebGLRenderer` only (no WebGPU)
 - TypeScript (strict), Vite
 - No accounts and no server of our own. Static build output in `/dist`
-- One optional online service: the leaderboards (milestone 13), Firestore in project `parklaps-3b60f`, reached with `fetch` over the REST API (no Firebase SDK), in its own lazy chunk (`src/online/`) that the first load never fetches. Blocked or offline, the game works the same and the board says "Leaderboard offline"
+- One optional online service: the leaderboards and the looks saved under a board name (milestone 13), Firestore in project `parklaps-3b60f`, reached with `fetch` over the REST API (no Firebase SDK), in its own lazy chunk (`src/online/`) that the first load never fetches. Blocked or offline, the game works the same and the board says "Leaderboard offline"
 - lil-gui panel for live-tuning physics values, lazy-loaded in its own chunk: in production it loads only when opened from the Cheats screen (milestone 6b), so it never adds to the first load
 - No physics engine in v1. Rapier comes in only if ragdoll crashes are added later
 
@@ -64,5 +64,5 @@ src/
 
 ## Deploy
 - A GitHub Actions workflow builds on every push to `main` and deploys `/dist` to GitHub Pages and to Firebase Hosting (https://parklaps.web.app, project `parklaps-3b60f`, site `parklaps`; `firebase.json`). GitHub is blocked on the school network, so Firebase is the address players use
-- `firestore.rules` (the leaderboards' only protection: types, name format, plausible ranges, updates only when better) is deployed by hand, never by the workflow: `firebase deploy --only firestore:rules`. It changes the live project, so ask first. Play-tests post with `?boards=test` (the `testBoards` collection), never to the real boards
+- `firestore.rules` (the only protection: for the boards types, name format, plausible ranges, updates only when better; for looks their shape and size) is deployed by hand, never by the workflow: `firebase deploy --only firestore:rules`. It changes the live project, so ask first. Play-tests use `?boards=test` (the `testBoards` and `testLooks` collections), never the real ones
 - Vite's `base` is `./` (relative paths), so one build works at Pages' `/ski-game/` and at Firebase's root

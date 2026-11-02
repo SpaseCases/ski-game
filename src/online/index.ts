@@ -3,14 +3,16 @@ import type { Outfit } from '../core/outfit.ts';
 import type { MapId } from '../maps/registry.ts';
 import { FinishBoard } from '../ui/finishBoard.ts';
 import { LeaderboardScreen } from '../ui/leaderboardScreen.ts';
+import { LookPrompt } from '../ui/lookPrompt.ts';
 import { boardFor, post, type BoardRef, type PostResult } from './boards.ts';
 import { encodeLook, setLookTables, type LookTables } from './look.ts';
+import { fetchLook, saveLook, type SavedLook } from './looks.ts';
 
 // The online leaderboards' lazy chunk: main.ts imports this only when a
 // board opens or a score posts, so the first load never fetches it, and a
 // failed import (offline before it was ever loaded) leaves the game as it
-// was. It holds the Leaderboards screen, the finish-line board, and the
-// posts made this visit.
+// was. It holds the Leaderboards screen, the finish-line board, the posts
+// made this visit, and the looks saved online under board names.
 
 export interface OnlineHooks {
   /** The name to post under ('' for none: nothing posts). */
@@ -34,6 +36,12 @@ export interface Online {
   ref: (map: MapId, course: number, cheats: boolean) => BoardRef;
   /** Posts a banked combo or a course time (ms) under the player's name, if they have one. */
   post: (ref: BoardRef, value: number) => void;
+  /** The sign asking whether to load a name's saved look (main adds it to the menus). */
+  lookPrompt: LookPrompt;
+  fetchLook: (name: string) => Promise<SavedLook | null>;
+  saveLook: (look: SavedLook) => Promise<boolean>;
+  /** An outfit as the 13-character look its tiny skier is drawn from. */
+  lookCode: (o: Outfit) => string;
 }
 
 export function createOnline(hooks: OnlineHooks): Online {
@@ -55,6 +63,10 @@ export function createOnline(hooks: OnlineHooks): Online {
   return {
     screen,
     finish,
+    lookPrompt: new LookPrompt(),
+    fetchLook,
+    saveLook,
+    lookCode: encodeLook,
     ref: (map, course, cheats) => ({ board: boardFor(map, course), cheats }),
     post: (ref, value) => {
       const name = hooks.myName();

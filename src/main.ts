@@ -5,7 +5,8 @@ import { createInputState, Keyboard, type Bindings } from './core/input.ts';
 import { startLoop } from './core/loop.ts';
 import { PointerOrbit } from './core/pointerOrbit.ts';
 import { bestCombo, submitCombo } from './core/bests.ts';
-import { HEADWEAR, loadOutfit, PALETTE, PATTERNS, saveOutfit, type Outfit } from './core/outfit.ts';
+import { customSkisText, paintedSlots, setCustomSkisText } from './core/customSkis.ts';
+import { HEADWEAR, loadOutfit, outfitFrom, PALETTE, PATTERNS, saveOutfit, type Outfit } from './core/outfit.ts';
 import { SKI_TYPES } from './core/skis.ts';
 import {
   clampRung,
@@ -160,6 +161,7 @@ const titleScreen = new TitleScreen({
     settings.name = name;
     saveSettings(settings);
   },
+  nameDone: nameChosen,
 });
 const pauseScreen = new PauseScreen({
   resume: closeMenus,
@@ -251,6 +253,10 @@ function showStage(screen: { viewRect(): Rect } | null): void {
   if (!screen) {
     menus.setHole(null);
     repaintSkis();
+    // The ski editor opening over the Locker shows the stage again at once: only leaving both saves.
+    queueMicrotask(() => {
+      if (!stageScreen) saveLookOnline(false);
+    });
   }
 }
 const lockerScreen = new LockerScreen(
@@ -315,6 +321,7 @@ function loadOnline(): Promise<Online> {
       });
       o.finish.setKey(mainKey(settings.bindings, 'board'));
       menus.add(o.screen);
+      menus.add(o.lookPrompt);
       online = o;
       return o;
     },
@@ -380,6 +387,64 @@ function showFinishBoard(): void {
     },
     () => {},
   );
+}
+
+// The look saved online under the board name (src/online/looks.ts): the
+// outfit and every custom ski, always saved on this computer first. A new
+// name entered on the title brings up the look saved under it, if any, to
+// load or not; with none there yet, this computer's look is saved under it.
+// After that, closing the Locker saves the look online when it changed.
+/** The name this visit last loaded, saved or asked about a look for (the name already set at startup counts). */
+let lookName = settings.name;
+/** The look as last loaded or saved online (outfit and custom skis), so only a change is saved. */
+let lookSaved = lookText();
+
+function lookText(): string {
+  return `${JSON.stringify(outfit)}\n${customSkisText()}`;
+}
+
+/** The title's name box was finished with `name` saved: offer the look saved online under it. */
+function nameChosen(name: string): void {
+  if (!name || name === lookName) return;
+  lookName = name;
+  loadOnline()
+    .then((o) => o.fetchLook(name).then((found) => ({ o, found })))
+    .then(
+      ({ o, found }) => {
+        if (settings.name !== name) return;
+        if (!found) {
+          saveLookOnline(true);
+          return;
+        }
+        // Only over the title: anywhere else the player has moved on.
+        if (menus.top !== titleScreen) return;
+        o.lookPrompt.ask(found.name, o.lookCode(outfitFrom(found.outfit)), paintedSlots(found.skis), () => {
+          // Custom skis first, so the outfit can wear one of them.
+          setCustomSkisText(found.skis);
+          setOutfit(outfitFrom(found.outfit));
+          skisDirty = true;
+          repaintSkis();
+          lookSaved = lookText();
+          menus.back();
+        }, () => menus.back());
+        menus.push(o.lookPrompt);
+      },
+      () => {},
+    );
+}
+
+/** Saves the look online under the board name (when it changed since the last load or save, unless `always`). */
+function saveLookOnline(always: boolean): void {
+  const name = settings.name;
+  const text = lookText();
+  if (!name || (!always && text === lookSaved)) return;
+  lookSaved = text;
+  loadOnline()
+    .then((o) => o.saveLook({ name, outfit: JSON.stringify(outfit), skis: customSkisText() }))
+    .catch(() => {
+      // Offline: try again the next time the Locker closes.
+      lookSaved = '';
+    });
 }
 
 /** The board key at the finish: hides the board, or shows it again. */

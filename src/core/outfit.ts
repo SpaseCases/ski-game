@@ -123,11 +123,15 @@ export function contrastColor(hex: string): string {
 export function loadOutfit(): Outfit {
   // A saved custom graphic is found only once the slots are read.
   loadCustomSkis();
+  return outfitFrom(readStored(KEY));
+}
+
+/** An outfit from saved JSON (this computer's, or an online look): the default for anything missing or not a palette color. */
+export function outfitFrom(json: string | null): Outfit {
   const out: Outfit = { ...DEFAULT_OUTFIT };
   let saved: Record<string, unknown> = {};
   try {
-    const raw = readStored(KEY);
-    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    const parsed: unknown = json ? JSON.parse(json) : null;
     if (parsed && typeof parsed === 'object') saved = parsed as Record<string, unknown>;
   } catch {
     // Corrupt entry: keep the defaults.
