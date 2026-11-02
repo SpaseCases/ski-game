@@ -14,6 +14,7 @@ export type Action =
   | 'checkpoint'
   | 'confirm'
   | 'trailMap'
+  | 'board'
   | 'pause'
   | GrabAction;
 
@@ -54,6 +55,7 @@ export const ACTIONS: readonly Action[] = [
   'checkpoint',
   'confirm',
   'trailMap',
+  'board',
   'pause',
   ...GRAB_ACTIONS,
 ];
@@ -74,6 +76,8 @@ export const DEFAULT_BINDINGS: Bindings = {
   checkpoint: ['Tab'],
   confirm: ['Enter', 'NumpadEnter'],
   trailMap: ['KeyM'],
+  // Hides or shows the leaderboard at the finish line.
+  board: ['KeyL'],
   // Esc opens the pause menu too, but it isn't a binding: in fullscreen the browser takes it.
   pause: ['KeyP'],
   grabLeftMute: ['KeyA'],

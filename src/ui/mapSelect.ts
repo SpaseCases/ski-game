@@ -7,7 +7,8 @@ import { addBackButton, board, setHints, type Screen } from './menus.ts';
  * The map select: a card per map, picked with the arrow keys and Enter or
  * with the mouse. Each card has a picture, the map's name and what's on it,
  * and the weather picker under it (one pick for every map, so every
- * card's row shows it).
+ * card's row shows it). A Leaderboards button by Back opens the board of
+ * the card last focused.
  */
 export class MapSelect implements Screen {
   readonly el: HTMLElement;
@@ -19,12 +20,20 @@ export class MapSelect implements Screen {
   private busy = false;
   private readonly weatherRows: WeatherRow[] = [];
   private readonly weather: WeatherHooks;
+  /** The card focused last, for the Leaderboards button. */
+  private picked: MapId = MAPS[0]!.id;
 
-  /** `onPick`: a map's card was chosen. `onBack`: the Back button. `weather`: the weather picked and picking it. */
-  constructor(onPick: (entry: MapEntry) => void, onBack: () => void, weather: WeatherHooks) {
+  /** `onPick`: a map's card was chosen. `onBack`: the Back button. `weather`: the weather picked and picking it. `onBoards`: the Leaderboards button, with the card focused last. */
+  constructor(onPick: (entry: MapEntry) => void, onBack: () => void, weather: WeatherHooks, onBoards: (id: MapId) => void) {
     this.weather = weather;
     const b = board('Choose a map', 'maps-screen');
     this.el = b.el;
+    const boards = document.createElement('button');
+    boards.type = 'button';
+    boards.className = 'board-back board-link';
+    boards.textContent = 'Leaderboards';
+    boards.addEventListener('click', () => onBoards(this.picked));
+    b.head.appendChild(boards);
     addBackButton(b.head, onBack);
 
     const grid = document.createElement('div');
@@ -42,6 +51,7 @@ export class MapSelect implements Screen {
         `<span class="map-text"><span class="map-name">${entry.name}</span>` +
         `<span class="map-blurb">${entry.blurb}</span></span>` +
         `<span class="map-badge">${entry.load ? '' : 'Coming soon'}</span>`;
+      pick.addEventListener('focus', () => (this.picked = entry.id));
       pick.addEventListener('click', () => {
         if (entry.load && !this.busy) onPick(entry);
       });
@@ -73,6 +83,7 @@ export class MapSelect implements Screen {
   prepare(current: MapId | null, suggested: MapId): void {
     this.current = current;
     this.focusOn = current ?? suggested;
+    this.picked = this.focusOn;
   }
 
   enter(): HTMLElement | null {

@@ -1,5 +1,6 @@
 import { CONFIG } from '../config.ts';
 import { ACTIONS, DEFAULT_BINDINGS, type Action, type Bindings } from './input.ts';
+import { nameProblem } from './playerName.ts';
 import { readStored, writeStored } from './storage.ts';
 
 // Player settings, saved locally as one versioned JSON entry. Anything
@@ -32,6 +33,8 @@ export interface Settings {
   popWith: PopWith;
   /** The rung of CONFIG.quality.auto.rungs that Auto settled on (0 = the best); the next visit tries one better. */
   autoRung: number;
+  /** The name scores post under on the online leaderboards (see core/playerName.ts), or '' for none: then nothing posts. */
+  name: string;
   bindings: Bindings;
 }
 
@@ -44,7 +47,7 @@ function isQuality(value: unknown): value is Quality {
 }
 
 export function defaultSettings(): Settings {
-  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, popWith: 'pop', autoRung: 0, bindings: { ...DEFAULT_BINDINGS } };
+  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, popWith: 'pop', autoRung: 0, name: '', bindings: { ...DEFAULT_BINDINGS } };
 }
 
 /** The saved settings, or the defaults for anything not saved (or unreadable). */
@@ -67,6 +70,7 @@ export function loadSettings(): Settings {
   if (typeof saved.crashWait === 'boolean') out.crashWait = saved.crashWait;
   if (saved.popWith === 'pop' || saved.popWith === 'up') out.popWith = saved.popWith;
   if (typeof saved.autoRung === 'number' && Number.isInteger(saved.autoRung)) out.autoRung = clampRung(saved.autoRung);
+  if (typeof saved.name === 'string' && nameProblem(saved.name) === null) out.name = saved.name;
   out.bindings = readBindings(saved.bindings);
   return out;
 }

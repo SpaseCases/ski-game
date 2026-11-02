@@ -1,0 +1,323 @@
+/*
+ * The online leaderboards (milestone 13), loaded with their lazy chunk:
+ * the Leaderboards screen and the board beside "Finished!". Same trail-sign
+ * enamel as the menus; the rows are painted slats, the top three carry trail
+ * signs, and the player's own row is marked like a focused plank.
+ */
+
+.leaderboards-screen {
+  width: min(620px, 100%);
+}
+
+/* ◀ board ▶ and the Clean / Cheats switch. */
+.lb-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.lb-arrow {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--plank);
+  color: var(--snow);
+  cursor: pointer;
+}
+
+.lb-arrow:hover {
+  background: var(--plank-hover);
+}
+
+.lb-arrow:focus,
+.fb-close:focus {
+  outline: 3px solid var(--flag);
+  outline-offset: 2px;
+}
+
+.lb-sign {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.lb-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.lb-what {
+  margin: 2px 0 0;
+  color: var(--frost);
+  font-size: 13px;
+}
+
+.lb-tabs {
+  flex: 0 0 168px;
+}
+
+.lb-caption {
+  margin: 0 0 6px;
+  color: var(--frost);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* The rows. */
+.lb-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  transition: opacity 0.15s;
+}
+
+.lb-rows.is-loading {
+  opacity: 0.5;
+}
+
+.lb-row {
+  display: grid;
+  grid-template-columns: 4.2em 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 2px 12px 2px 10px;
+  border-radius: 3px;
+  background: var(--enamel-deep);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.lb-row.is-me {
+  background: var(--snow);
+  color: var(--ink);
+  box-shadow: inset 6px 0 0 var(--flag);
+}
+
+.lb-rank {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+/* A pale chip behind the figure, so dark outfits (the default is all charcoal) show on the dark rows. */
+.lb-look-box {
+  display: grid;
+  place-items: center;
+  height: 26px;
+  border-radius: 3px;
+  background: #c9d8e8;
+}
+
+.lb-look {
+  display: block;
+}
+
+.lb-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-score {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  text-align: right;
+}
+
+/* The gap between the top of the board and the player's own row further down. */
+.lb-gap {
+  height: 10px;
+  background: radial-gradient(circle, var(--frost) 1.5px, transparent 2px) center / 10px 10px repeat-x;
+  opacity: 0.6;
+}
+
+.lb-status,
+.lb-note {
+  margin: 10px 0 0;
+  color: var(--frost);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.lb-status:empty,
+.lb-note:empty {
+  display: none;
+}
+
+.lb-find {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.lb-find .text-box {
+  flex: 1;
+}
+
+/* The finish-line board, right of "Finished!" (in RunHud's slot). */
+.finish-board {
+  pointer-events: auto;
+  box-sizing: border-box;
+  width: 300px;
+  padding: 10px 12px 12px;
+  border-radius: 6px;
+  background: rgb(23 51 82 / 0.92);
+  color: var(--snow);
+  outline: 2px solid var(--snow);
+  outline-offset: -6px;
+}
+
+.finish-board[hidden] {
+  display: none;
+}
+
+.fb-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 2px 8px 4px;
+}
+
+.fb-title {
+  margin: 0;
+  overflow: hidden;
+  font-size: 18px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fb-tag {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 3px;
+  background: var(--plank);
+  color: var(--frost);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.fb-tag.is-cheats {
+  background: var(--flag);
+  color: var(--ink);
+}
+
+.fb-close {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 4px 6px 4px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--plank);
+  color: var(--snow);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.fb-close:hover {
+  background: var(--plank-hover);
+}
+
+.fb-close kbd {
+  padding: 0 5px;
+  border: 1px solid rgb(255 255 255 / 0.5);
+  border-radius: 3px;
+  font: 11px/1.4 ui-monospace, Consolas, monospace;
+}
+
+.fb-rows .lb-row {
+  grid-template-columns: 3.4em 20px minmax(0, 1fr) auto;
+  gap: 7px;
+  min-height: 26px;
+  padding: 1px 8px 1px 6px;
+  font-size: 14px;
+}
+
+.fb-status {
+  margin: 8px 4px 0;
+  color: var(--frost);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.fb-status:empty {
+  display: none;
+}
+
+/* A small embed: a narrower board, and only the top three. */
+@media (max-width: 640px), (max-height: 480px) {
+  .finish-board {
+    width: 232px;
+    padding: 8px 8px 10px;
+  }
+
+  .fb-title {
+    font-size: 15px;
+  }
+
+  .fb-rows .lb-row {
+    grid-template-columns: 2.9em minmax(0, 1fr) auto;
+    gap: 5px;
+    min-height: 22px;
+    font-size: 12px;
+  }
+
+  .fb-rows .lb-look-box {
+    display: none;
+  }
+
+  .fb-rows .lb-row:nth-child(n + 4):not(.is-me) {
+    display: none;
+  }
+
+  .fb-rows .lb-gap {
+    height: 6px;
+  }
+
+  .fb-status {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 560px) {
+  .lb-bar {
+    flex-wrap: wrap;
+  }
+
+  .lb-tabs {
+    flex: 1 0 100%;
+    order: 4;
+  }
+
+  .lb-row {
+    grid-template-columns: 3.6em 22px minmax(0, 1fr) auto;
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lb-rows {
+    transition: none;
+  }
+}

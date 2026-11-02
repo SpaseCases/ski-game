@@ -155,11 +155,35 @@ body {
   display: none;
 }
 
-.finish-panel {
+/* The finish panel and, right of it, the finish-line leaderboard (lazy, ui/leaderboards.css). */
+.finish-row {
   position: absolute;
   top: 20%;
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+/* A small embed: the pair moves up and closes in (the board shrinks too). */
+@media (max-width: 640px), (max-height: 480px) {
+  .finish-row {
+    /* Below the window buttons along the top. */
+    top: 50px;
+    gap: 8px;
+  }
+
+  .finish-row .finish-panel {
+    padding: 10px 14px 12px;
+  }
+
+  .finish-row .finish-title {
+    font-size: 22px;
+  }
+}
+
+.finish-panel {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -554,6 +578,71 @@ body {
 
 .title-screen .sign-text {
   height: clamp(48px, 9vw, 76px);
+}
+
+/* A typed box on a sign: the title's board name, the Leaderboards search. */
+.text-box {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--snow);
+  color: var(--ink);
+  font: 600 16px/1.2 inherit;
+  font-family: inherit;
+}
+
+.text-box::placeholder {
+  color: #6c7f95;
+  font-weight: 500;
+}
+
+.text-box:focus {
+  outline: 3px solid var(--flag);
+  outline-offset: 2px;
+}
+
+/* The board name, under the title's planks: a strip of the sign with the note under it. */
+.name-box {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 2px solid var(--plank);
+}
+
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.name-label {
+  flex: none;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.name-input {
+  flex: 1;
+}
+
+.name-note {
+  margin: 8px 0 0;
+  color: var(--frost);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.name-note.is-problem {
+  color: var(--flag);
+  font-weight: 700;
+}
+
+/* Map select's Leaderboards button sits beside Back. */
+.board-link {
+  margin-left: auto;
+  padding-right: 14px;
 }
 
 /* Map select. */

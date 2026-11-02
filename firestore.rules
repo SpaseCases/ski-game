@@ -1,0 +1,60 @@
+rules_version = '2';
+
+// The online leaderboards (GAME_DESIGN.md, milestone 13). There are no
+// accounts: anyone can read every board and post under any name, so these
+// rules only keep entries well formed and plausible, and let an entry change
+// only to a better score. Anyone can still post a made-up score.
+//
+//   boards/<board>/names/<key>      the real boards
+//   testBoards/<board>/names/<key>  the same, for play-tests (?boards=test)
+//
+// <board> is a map's best combo (park, jampark, freeride, bigair, test) or a
+// Slalom course's best time (slalom-sl, slalom-gs), each with a "-cheats"
+// twin. <key> is the name in lower case, so each name has one entry per
+// board. Fields: name (3 to 16 letters, digits, spaces, - and _; no space at
+// either end or doubled), look (the skier's look, src/online/look.ts), and
+// combo (points, 1 to 10,000,000) or ms (milliseconds, 20 s to an hour).
+// Deployed by hand: firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{root}/{board}/names/{key} {
+      allow get: if isRoot(root);
+      // The top 10, a name search, and counting the scores above one (a rank, up to 1000).
+      allow list: if isRoot(root) && request.query.limit <= 1000;
+      allow create: if isRoot(root) && valid(board, key);
+      allow update: if isRoot(root) && valid(board, key) && better(board);
+      allow delete: if false;
+    }
+
+    function isRoot(root) {
+      return root == 'boards' || root == 'testBoards';
+    }
+
+    function comboBoard(board) {
+      return board.matches('(park|jampark|freeride|bigair|test)(-cheats)?');
+    }
+
+    function timeBoard(board) {
+      return board.matches('slalom-(sl|gs)(-cheats)?');
+    }
+
+    function valid(board, key) {
+      let d = request.resource.data;
+      return d.name is string
+        && d.name.size() >= 3 && d.name.size() <= 16
+        && d.name.matches('[A-Za-z0-9_-]+( [A-Za-z0-9_-]+)*')
+        && d.name.lower() == key
+        && d.look is string && d.look.matches('[a-z0-9]{0,24}')
+        && ((comboBoard(board) && d.keys().hasOnly(['name', 'look', 'combo'])
+              && d.combo is int && d.combo >= 1 && d.combo <= 10000000)
+          || (timeBoard(board) && d.keys().hasOnly(['name', 'look', 'ms'])
+              && d.ms is int && d.ms >= 20000 && d.ms <= 3600000));
+    }
+
+    // An entry only ever improves: a higher combo, a faster time.
+    function better(board) {
+      return (comboBoard(board) && request.resource.data.combo > resource.data.combo)
+        || (timeBoard(board) && request.resource.data.ms < resource.data.ms);
+    }
+  }
+}

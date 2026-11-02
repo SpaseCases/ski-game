@@ -265,8 +265,8 @@ export class Menus {
       case 'ArrowLeft':
       case 'ArrowRight': {
         const horizontal = e.key === 'ArrowLeft' || e.key === 'ArrowRight';
-        // Sliders keep left and right for their value.
-        if (horizontal && active instanceof HTMLInputElement && active.type === 'range') return;
+        // Sliders keep left and right for their value, text boxes for the caret.
+        if (horizontal && active instanceof HTMLInputElement && (active.type === 'range' || active.type === 'text')) return;
         e.preventDefault();
         if (at < 0) {
           items[0]?.focus();

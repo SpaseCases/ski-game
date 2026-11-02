@@ -36,7 +36,7 @@ const KEY_GROUPS: readonly (readonly [string, readonly Action[]])[] = [
     ],
   ],
   ['Style moves', ['styleSeaman', 'styleDaffy', 'styleIronCross', 'styleSpreadEagle']],
-  ['Run', ['checkpoint', 'respawn', 'confirm', 'trailMap', 'pause']],
+  ['Run', ['checkpoint', 'respawn', 'confirm', 'trailMap', 'board', 'pause']],
 ];
 
 /** Keys that can't be bound: Esc (menus and pause) and the system's own keys. */

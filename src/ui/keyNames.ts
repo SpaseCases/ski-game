@@ -64,6 +64,7 @@ export const ACTION_NAMES: Record<Action, string> = {
   respawn: 'Respawn (hold for top)',
   confirm: 'Back to top at the finish',
   trailMap: 'Trail map',
+  board: 'Leaderboard at the finish',
   pause: 'Pause',
   grabLeftMute: 'Left mute',
   grabLeftSafety: 'Left safety',

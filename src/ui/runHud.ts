@@ -2,7 +2,9 @@ import { CONFIG } from '../config.ts';
 
 /**
  * The Back to top button shown at the finish (Enter works too), and the bar
- * that fills while R is held to go back to the top.
+ * that fills while R is held to go back to the top. Beside the finish panel
+ * sits an empty slot for the finish-line leaderboard (the lazy
+ * ui/finishBoard.ts mounts into boardSlot).
  */
 export class RunHud {
   private readonly finish: HTMLElement;
@@ -12,6 +14,8 @@ export class RunHud {
   private readonly holdFill: HTMLElement;
   private readonly holdLabel: HTMLElement;
   private readonly button: HTMLButtonElement;
+  /** Where the finish-line leaderboard goes, right of the finish panel. */
+  readonly boardSlot: HTMLElement;
   private holdShown = -1;
 
   constructor(hud: HTMLElement, onBackToTop: () => void) {
@@ -36,7 +40,12 @@ export class RunHud {
     this.hint.className = 'finish-detail finish-hint';
     this.hint.hidden = true;
     this.finish.append(title, this.detail, button, this.hint);
-    hud.appendChild(this.finish);
+    const row = document.createElement('div');
+    row.className = 'finish-row';
+    this.boardSlot = document.createElement('div');
+    this.boardSlot.className = 'finish-slot';
+    row.append(this.finish, this.boardSlot);
+    hud.appendChild(row);
 
     this.hold = document.createElement('div');
     this.hold.className = 'hold-top';

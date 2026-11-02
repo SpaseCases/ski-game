@@ -1,9 +1,11 @@
+import { NAME_MAX, NAME_PROBLEM_TEXT, nameProblem, tidyName } from '../core/playerName.ts';
 import { stepWeather, type WeatherId } from '../core/weather.ts';
 import { board, plank, setHints, setPlankKeys, type Screen } from './menus.ts';
 import { setPlankWeather } from './weatherPicker.ts';
 
 // The two bottom screens: the title (before any map is loaded) and the pause
-// menu (Esc or P while riding). Both are a sign board of planks. Later
+// menu (Esc or P while riding). Both are a sign board of planks; the title
+// also has the box for the name scores post under on the leaderboards. Later
 // milestones add their own planks (Cheats, the Locker, Weather) with
 // addItem, so neither needs rebuilding.
 
@@ -44,9 +46,28 @@ class PlankScreen implements Screen {
   }
 }
 
+export interface TitleActions {
+  play: () => void;
+  locker: () => void;
+  settings: () => void;
+  controls: () => void;
+  cheats: () => void;
+  leaderboards: () => void;
+  /** The saved board name ('' for none), and saving a checked one. */
+  name: () => string;
+  setName: (name: string) => void;
+}
+
+const NAME_NOTE = 'A nickname, not your real name. 3 to 16 letters, digits, spaces, - and _.';
+
 export class TitleScreen extends PlankScreen {
-  constructor(actions: { play: () => void; locker: () => void; settings: () => void; controls: () => void; cheats: () => void }) {
+  private readonly nameInput: HTMLInputElement;
+  private readonly nameNote: HTMLElement;
+  private readonly actions: TitleActions;
+
+  constructor(actions: TitleActions) {
     super('Park Laps', 'title-screen');
+    this.actions = actions;
     this.sub.textContent = 'Freeskiing in a terrain park, on a big mountain, through race gates and off a big air tower.';
     this.sub.hidden = false;
     this.addItem('Play', actions.play);
@@ -54,6 +75,63 @@ export class TitleScreen extends PlankScreen {
     this.addItem('Settings', actions.settings);
     this.addItem('Controls', actions.controls);
     this.addItem('Cheats', actions.cheats);
+    this.addItem('Leaderboards', actions.leaderboards);
+
+    // The board name: saved as it's typed whenever it passes the checks;
+    // left with a problem, it goes back to the saved one.
+    const box = document.createElement('div');
+    box.className = 'name-box';
+    const row = document.createElement('label');
+    row.className = 'name-row';
+    const label = document.createElement('span');
+    label.className = 'name-label';
+    label.textContent = 'Board name';
+    this.nameInput = document.createElement('input');
+    this.nameInput.type = 'text';
+    this.nameInput.className = 'text-box name-input';
+    this.nameInput.maxLength = NAME_MAX;
+    this.nameInput.autocomplete = 'off';
+    this.nameInput.spellcheck = false;
+    this.nameInput.placeholder = 'None yet';
+    row.append(label, this.nameInput);
+    this.nameNote = document.createElement('p');
+    this.nameNote.className = 'name-note';
+    this.nameNote.id = 'name-note';
+    this.nameNote.setAttribute('aria-live', 'polite');
+    this.nameInput.setAttribute('aria-describedby', this.nameNote.id);
+    box.append(row, this.nameNote);
+    this.list.after(box);
+    this.nameInput.addEventListener('input', () => this.typed());
+    this.nameInput.addEventListener('blur', () => this.syncName());
+  }
+
+  enter(): HTMLElement | null {
+    this.syncName();
+    return super.enter();
+  }
+
+  /** Enter in the name box keeps it and goes back to the planks. */
+  onKey(e: KeyboardEvent): boolean {
+    if (e.target !== this.nameInput || e.key !== 'Enter') return false;
+    this.typed();
+    this.syncName();
+    this.list.querySelector('button')?.focus();
+    return true;
+  }
+
+  private typed(): void {
+    const name = tidyName(this.nameInput.value);
+    const problem = name === '' ? null : nameProblem(name);
+    if (!problem) this.actions.setName(name);
+    this.nameNote.textContent = problem ? NAME_PROBLEM_TEXT[problem] : NAME_NOTE;
+    this.nameNote.classList.toggle('is-problem', problem !== null);
+  }
+
+  /** The box shows the saved name. */
+  private syncName(): void {
+    this.nameInput.value = this.actions.name();
+    this.nameNote.textContent = NAME_NOTE;
+    this.nameNote.classList.remove('is-problem');
   }
 }
 
@@ -66,6 +144,7 @@ export interface PauseActions {
   settings: () => void;
   controls: () => void;
   cheats: () => void;
+  leaderboards: () => void;
   /** The weather picked, and picking another (it changes behind the menu at once). */
   weather: () => WeatherId;
   setWeather: (w: WeatherId) => void;
@@ -89,6 +168,7 @@ export class PauseScreen extends PlankScreen {
     this.weather = this.addItem('Weather', () => this.stepWeather(1));
     this.weather.classList.add('weather-plank');
     this.addItem('Map select', actions.maps);
+    this.addItem('Leaderboards', actions.leaderboards);
     this.addItem('Locker', actions.locker);
     this.addItem('Settings', actions.settings);
     this.addItem('Controls', actions.controls);

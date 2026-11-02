@@ -5,7 +5,8 @@ import { createInputState, Keyboard, type Bindings } from './core/input.ts';
 import { startLoop } from './core/loop.ts';
 import { PointerOrbit } from './core/pointerOrbit.ts';
 import { bestCombo, submitCombo } from './core/bests.ts';
-import { loadOutfit, saveOutfit, type Outfit } from './core/outfit.ts';
+import { HEADWEAR, loadOutfit, PALETTE, PATTERNS, saveOutfit, type Outfit } from './core/outfit.ts';
+import { SKI_TYPES } from './core/skis.ts';
 import {
   clampRung,
   decorDensity,
@@ -61,10 +62,11 @@ import { ControlsScreen } from './ui/controlsMenu.ts';
 import { KeyTesterScreen } from './ui/keyTester.ts';
 import { mainKey } from './ui/keyNames.ts';
 import { LockerScreen } from './ui/lockerMenu.ts';
+import type { Online } from './online/index.ts';
 import { SkiEditorScreen } from './ui/skiEditor.ts';
 import { PauseScreen, TitleScreen } from './ui/mainMenus.ts';
 import { MapSelect } from './ui/mapSelect.ts';
-import { Menus, type Screen } from './ui/menus.ts';
+import { addBackButton, board, Menus, type Screen } from './ui/menus.ts';
 import { SettingsScreen } from './ui/settingsMenu.ts';
 import { titleArt } from './ui/titleArt.ts';
 import { formatTime, missedText, RaceHud } from './ui/raceHud.ts';
@@ -131,6 +133,8 @@ const scoreHud = new ScoreHud(
     // Ridden with cheats on: it can only be the map's cheats best, never its clean one.
     const note = !level ? 'banked' : tainted ? (submitCombo(level.id, total, true) ? 'cheatsBest' : 'cheats') : submitCombo(level.id, total) ? 'best' : 'banked';
     sound.combo(note === 'best' || note === 'cheatsBest' ? 'best' : 'bank');
+    // A new personal best goes on the map's online board too.
+    if (level && (note === 'best' || note === 'cheatsBest')) postScore(level.id, -1, note === 'cheatsBest', total);
     return note;
   },
   () => sound.combo('lost'),
@@ -144,7 +148,19 @@ keyboard.attach(window);
 // and the screens they open. The game waits while any is open.
 const menus = new Menus(hud, onRootBack, onGameKey, () => [...windowBar.querySelectorAll<HTMLElement>('a, button')]);
 menus.scenery.innerHTML = titleArt();
-const titleScreen = new TitleScreen({ play: openMapSelect, locker: openLocker, settings: openSettings, controls: openControls, cheats: openCheats });
+const titleScreen = new TitleScreen({
+  play: openMapSelect,
+  locker: openLocker,
+  settings: openSettings,
+  controls: openControls,
+  cheats: openCheats,
+  leaderboards: () => openBoards((mapEntry(readStored('map'))?.id ?? MAPS[0]!.id) as MapId),
+  name: () => settings.name,
+  setName: (name) => {
+    settings.name = name;
+    saveSettings(settings);
+  },
+});
 const pauseScreen = new PauseScreen({
   resume: closeMenus,
   respawn: () => {
@@ -160,10 +176,13 @@ const pauseScreen = new PauseScreen({
   settings: openSettings,
   controls: openControls,
   cheats: openCheats,
+  leaderboards: () => {
+    if (level) openBoards(level.id, level.race && level.race.course >= 0 ? level.race.course : -1);
+  },
   weather: () => weather,
   setWeather,
 });
-const mapSelect = new MapSelect((entry) => void loadMap(entry), () => menus.back(), { get: () => weather, set: setWeather });
+const mapSelect = new MapSelect((entry) => void loadMap(entry), () => menus.back(), { get: () => weather, set: setWeather }, (id) => openBoards(id));
 const settingsScreen = new SettingsScreen(
   {
     get: () => ({ ...settings, quality }),
@@ -260,6 +279,120 @@ const skiEditor = new SkiEditorScreen(
 );
 for (const screen of [titleScreen, pauseScreen, mapSelect, settingsScreen, controlsScreen, keyTester, cheatsScreen, lockerScreen, skiEditor]) menus.add(screen);
 
+// The online leaderboards (src/online, its own chunk): imported the first
+// time a board opens or a score posts, never at startup. Blocked or offline,
+// the boards say so and nothing else changes.
+let online: Online | null = null;
+let onlineLoading: Promise<Online> | null = null;
+/** When this run began (back to the top, or a timed run restarted): the finish board shows only this run's post. */
+let runSince = 0;
+/** True when cheats were on at any moment of the timed run (its time goes on the course's Cheats board). */
+let raceCheats = false;
+/** Whether the finish being shown has had its board opened (see the frame), and whether the player hid it. */
+let finishSeen = false;
+let boardHidden = false;
+/** Shown instead of the Leaderboards screen if its chunk can't be fetched. */
+let offlineScreen: Screen | null = null;
+
+function loadOnline(): Promise<Online> {
+  onlineLoading ??= import('./online/index.ts').then(
+    ({ createOnline }) => {
+      const o = createOnline({
+        myName: () => settings.name,
+        outfit: () => outfit,
+        lookTables: {
+          palette: PALETTE.map((c) => c.hex),
+          headwear: HEADWEAR.map((h) => h.id),
+          patterns: PATTERNS.map((x) => x.id),
+          skis: SKI_TYPES.map((x) => x.id),
+        },
+        finishSlot: runHud.boardSlot,
+        back: () => menus.back(),
+        closeFinish: () => {
+          boardHidden = true;
+          o.finish.hide();
+        },
+      });
+      o.finish.setKey(mainKey(settings.bindings, 'board'));
+      menus.add(o.screen);
+      online = o;
+      return o;
+    },
+    (err: unknown) => {
+      onlineLoading = null;
+      throw err;
+    },
+  );
+  return onlineLoading;
+}
+
+/** The Leaderboards screen, on a map's board (on the Slalom, a course's). */
+function openBoards(map: MapId, course = -1): void {
+  const cheats = !cheatsTag.hidden;
+  loadOnline().then(
+    (o) => {
+      if (!menus.isOpen || menus.top === o.screen) return;
+      o.screen.show(o.ref(map, course, cheats));
+      menus.push(o.screen);
+    },
+    () => {
+      if (!menus.isOpen) return;
+      offlineScreen ??= offlineBoards();
+      menus.push(offlineScreen);
+    },
+  );
+}
+
+function offlineBoards(): Screen {
+  const b = board('Leaderboards', 'leaderboards-screen');
+  addBackButton(b.head, () => menus.back());
+  const status = document.createElement('p');
+  status.className = 'board-status';
+  status.textContent = 'Leaderboard offline. Your bests still save on this computer.';
+  b.body.appendChild(status);
+  const screen: Screen = { el: b.el, enter: () => null };
+  menus.add(screen);
+  return screen;
+}
+
+/** Posts a new best combo (course -1) or a clean course time (ms) to its online board, if the player has a name. */
+function postScore(map: MapId, course: number, cheats: boolean, value: number): void {
+  if (!settings.name) return;
+  loadOnline().then(
+    (o) => o.post(o.ref(map, course, cheats), value),
+    () => {},
+  );
+}
+
+/** At the finish: the map's board beside "Finished!" (on the Slalom, the timed course's; none after an untimed run). */
+function showFinishBoard(): void {
+  if (!level || boardHidden) return;
+  const { id, race, built } = level;
+  const timed = race?.finished === true;
+  if (built.map.scoring === false && !timed) return;
+  const course = timed && race ? race.course : -1;
+  const cheats = timed ? raceCheats : !cheatsTag.hidden;
+  const note = timed && race && race.missed > 0 ? 'Missed a gate: not posted.' : '';
+  const since = runSince;
+  loadOnline().then(
+    (o) => {
+      if (level?.run.finished && !boardHidden) o.finish.show({ ref: o.ref(id, course, cheats), since, note });
+    },
+    () => {},
+  );
+}
+
+/** The board key at the finish: hides the board, or shows it again. */
+function toggleFinishBoard(): void {
+  if (online?.finish.shown) {
+    boardHidden = true;
+    online.finish.hide();
+  } else {
+    boardHidden = false;
+    showFinishBoard();
+  }
+}
+
 // HUD buttons for the mouse, beside the window buttons; hidden while a menu is open.
 /** Under a finished timed run's result: the respawn key races the course again. */
 let raceAgainHint = '';
@@ -328,6 +461,7 @@ function respawn(): void {
   if (scoring()) endCombo(score, skier);
   const start = timedCourse()?.start;
   if (race && start) {
+    runSince = performance.now();
     resetRace(race);
     run.finished = false;
     placeSkierAt(skier, start.x, start.z, start.heading, built.hf);
@@ -343,6 +477,7 @@ function respawn(): void {
 /** A fresh run from the top: every checkpoint and passed flag is forgotten. */
 function backToTop(): void {
   if (!level) return;
+  runSince = performance.now();
   resetRun(level.run);
   if (level.race) resetRace(level.race);
   respawn();
@@ -477,6 +612,7 @@ function repaintSkis(): void {
 /** "Cheats on" in a corner while any cheat is on or the tuning panel has changed a number. */
 function syncCheatsTag(): void {
   cheatsTag.hidden = !(anyCheat() || configChanged());
+  if (!cheatsTag.hidden) raceCheats = true;
   // A combo ridden with any cheat on can't set a best, even if they're off again by the time it banks.
   taintCombo(score);
 }
@@ -547,6 +683,7 @@ function syncKeyLabels(): void {
   crashHint.setKey(mainKey(b, 'respawn'), settings.crashWait);
   runHud.setKeys(mainKey(b, 'confirm'), mainKey(b, 'respawn'));
   raceAgainHint = `${mainKey(b, 'respawn')}: race it again`;
+  online?.finish.setKey(mainKey(b, 'board'));
 }
 
 /** Switches to a quality preset (and remembers it): view range, decoration and pixel ratio. */
@@ -688,6 +825,8 @@ if (import.meta.env.DEV) {
       respawn,
       backToTop,
       teleport,
+      /** Posts a score to its online board as a banked best or a finished course would (use ?boards=test). */
+      postScore,
       setQuality,
       setWeather,
       loadMap: (id: MapId) => loadMap(mapEntry(id)!),
@@ -785,6 +924,7 @@ startLoop(
       backToTop();
       return;
     }
+    if (keys.board.pressed && run.finished) toggleFinishBoard();
     if (keys.checkpoint.pressed) {
       if (timedRun()) {
         toast.show('No checkpoints on a timed run');
@@ -804,6 +944,9 @@ startLoop(
     if (race && built.race) {
       const raceEvent = stepRace(race, built.race, skierPrev.position, skier, dt);
       if (raceEvent === 'missed') toast.show('Missed gate');
+      if (raceEvent === 'start') raceCheats = !cheatsTag.hidden;
+      // A clean run's time goes on the course's online board (a missed gate means no time).
+      if (raceEvent === 'finish' && race.missed === 0) postScore(level.id, race.course, raceCheats, Math.round(race.time * 1000));
     }
     if (event === 'flag' && !timedRun()) toast.show(`Checkpoint: flag ${run.flag + 1} of ${built.map.flags.length}`);
     // After a crash, let the tumble play out, then fade and respawn (unless
@@ -864,6 +1007,13 @@ startLoop(
     // While cheats are on (the "Cheats on" tag shows), the best shown is the map's cheats best.
     const cheats = !cheatsTag.hidden;
     scoreHud.update(scoring(), score, level?.built.course.rails ?? NO_RAILS, level ? bestCombo(level.id, cheats) : 0, cheats, hudTime);
+    // The finish board opens with the finish panel and goes with it.
+    if (finished !== finishSeen) {
+      finishSeen = finished;
+      boardHidden = false;
+      if (finished) showFinishBoard();
+      else online?.finish.hide();
+    }
     fps.frame(realFrameTime);
     // Auto quality judges riding frames only (it holds off after jumps, loads and menus).
     if (quality === 'auto' && level) {

@@ -38,6 +38,7 @@ const OTHER_ROWS: readonly Row[] = [
   { keys: ['checkpoint'], ground: 'Set your checkpoint', air: '', rail: '' },
   { keys: ['respawn'], ground: 'Back to your last checkpoint (hold 1 s: back to the top)' },
   { keys: ['trailMap'], ground: 'Trail map (the game waits until you close it)' },
+  { keys: ['board'], ground: 'At the finish: hide or show the leaderboard' },
   { keys: ['Esc', '/', 'pause'], ground: 'Pause menu (in fullscreen the browser takes Esc, so use the pause key)' },
 ];
 
