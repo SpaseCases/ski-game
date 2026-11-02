@@ -1,6 +1,6 @@
 # Architecture
 
-A map of the code for finding things fast. `GAME_DESIGN.md` says what to build; `CLAUDE.md` gives the rules. This file says where things live and what breaks easily. Written 2026-10-29 at `4bbd1c9` (after milestone 8); updated for milestones 9 to 14. Line numbers rot, so prefer the function names.
+A map of the code for finding things fast. `GAME_DESIGN.md` says what to build; `CLAUDE.md` gives the rules. This file says where things live and what breaks easily. Written 2026-10-29 at `4bbd1c9` (after milestone 8); updated for milestones 9 to 15. Line numbers rot, so prefer the function names.
 
 ## The big picture
 
@@ -28,7 +28,7 @@ maps/*.json ──registry (lazy import)──► parseMap ──► buildMap �
 | `rails.ts` | `buildRailShapes` (polylines into typed arrays), `railUnder` (snap), `railFrame`, `collideRails`, and for 3D rails `railUp` (the up, a smoothly blended direction and the bend at a distance along) |
 | `obstacles.ts` | Capsules (trees, rocks, fences, walls) in an 8 m grid; `collideObstacles` and `insideObstacle`. Fences stand only as high as they look (`follow`, `rise`) |
 | `bounds.ts` | `keepInside`: map rectangle plus the optional polygon |
-| `powder.ts` | `inPowder`: off a map's runs and groomed patches (Freeride). `Course.powder` carries it; `land` uses it for `landing.powderImpact`, and `snowFx` for spray and the carve sound |
+| `powder.ts` | `inPowder`: off a map's runs and groomed patches (Freeride). A run marked `powder` (M15: the Steeps' and the Bowl's lines over the big cliffs) leaves its corridor powder. `Course.powder` carries it; `land` uses it for `landing.powderImpact`, and `snowFx` for spray and the carve sound |
 | `checkpoints.ts` | `RunState`: flags, personal checkpoint, `respawnSkier`, finish zones |
 | `race.ts` | Slalom courses: wand start, gate pass or miss, the finish, and spring-damper bending gates that `knock` the skier |
 | `score.ts` | A pure observer: rotation from the `trick` quaternion delta in body axes, kept per axis as `Runs` each way (a reversal past `reverseMin` closes a run; each run counts its own whole steps, grace only on the last), combos and multipliers. `endGaps` scores gaps after `endAir`. `sketchyLanding` is shared with audio |
@@ -63,7 +63,7 @@ maps/*.json ──registry (lazy import)──► parseMap ──► buildMap �
 |---|---|---|
 | park | `park.ts` | 280×2150, 121 features, 2 pipes, the 1,948 m rail |
 | jampark | `jampark.ts` (began as a copy of park.ts) | 300×2030, 203 features, quarters and wallrides, the Cat gap (`gaps`); on trial beside the Park |
-| freeride | `freeride.ts` | Peak, 6.2 km square, 3 m cells (~4.3M samples), town, 4 finishes, 16 runs, powder |
+| freeride | `freeride.ts` | Peak, 6.2 km square, 3 m cells (~4.3M samples), town, 4 finishes, 18 runs, powder; M15's steeps zone (North: three bands of 12 to 25 m and two couloir airs on a 42° face; East: two chutes with airs and a band in the bowl's headwall) |
 | slalom | `slalom.ts` | Two race courses, `scoring: false`, no flags |
 | bigair | `bigair.ts` | 6 lanes (the ski jump and landings are terrain lanes) and a tower |
 | test | `test-slope.ts` (took over the hand-written JSON unchanged in M14) | Every feature in 4 lanes, plus M14's rail lane at x 2 and its close-out and 3D rails below the rail lane |
@@ -77,6 +77,7 @@ maps/*.json ──registry (lazy import)──► parseMap ──► buildMap �
 - **Feature order is identity for the tools:** `features.ts` reports rails by index and the sim's rails follow feature order. New features go after the older ones (the parks collect their table rails in `deckTables` / `knuckleTables` and lay them at the end), and new rails sit where riders coming off older ones don't run onto them (in the jib lines, 4 m either side of the middle), so older rails' outputs stay byte-identical. Generators bake in terrain-derived numbers (Freeride's booter yaws and log heights, finish widths), so a change to `peak.ts` or `terrain.ts` means rerunning them. Nothing checks for drift.
 - Tree seeds count the decor before them (`seed: 100 + decor.length` in slalom and bigair): add new decor **after** the trees. Big air's shared `rand()` is consumed by spectators first. Changing a scatter's `count` or `area` re-places the whole set.
 - `peak.ts` element order matters: a `flat` pad samples the elements before it. Bounds must be star-shaped from the summit.
+- **Freeride's steeps (M15):** the North and East spokes' pitches were reshaped and the lower faces eased so each face still drops as far in all (the finishes and valley floors stay put); a change there moves everything below it. The East chutes are laid along the fall line of `groundSoFar()` (the ground near the summit from the elements laid before them), so an element added before them moves them. A cliff band's `clear` (on every band of 12 m or more, `STEEPS_CLEAR`) keeps decor off its bench, face and landing (`keepOutZones` in `maps/decor.ts`); without it, boulders on the benches and crags at the lips stop riders short. Today's bench shape (2.5 × the drop + 8 m) lands 25 m onto 38 to 45° powder at 18.6 m/s or less at any speed; the cap is about 30 m on 40° and 35 m on 43°. Groomed snow (a run without `powder`) still caps drops near 9 m. `tools/sim/cliffs.ts` is the check.
 - Authoring errors throw at build time (gap ≤ 1.5 m, pipe sections too long, a lane that can't get back level).
 - Freeride's build is the heaviest (~38 MB of typed arrays, ~2M decor candidates). That matters on 4 GB machines.
 - Numbers outside config: `HILLSIDE_RISE`, `RIM_HOLD`, `SHAPE_CELL`, `PIPE_WALL_START`, start-gate sizes, `CHUNK`.
@@ -181,6 +182,7 @@ The game's one online service: Firestore in project `parklaps-3b60f` (database `
   - `flips.ts [map] [jump] [speed] [--tricks back,front,spin]`: the landing windows for letting go of a trick key (default the Park's jump 48 at 16 m/s); its front flip rides "Pop with: Space".
   - `line.ts <map> <x> <fromD> <toD> [stand|tuck] [pop|nopop] [720] [steer] …`: rides Park-style lines.
   - `face.ts <map> [runs] | --fall N`: Freeride runs and fall lines.
+  - `cliffs.ts <map> [--min m] [--caps 12,16,20]` (M15): rides straight over every drop of each cliff band of `--min` m or more, from just above its bench at each speed cap, and prints the air, how far it fell, and the impact against the limit (powder or groomed); a crash is a problem.
   - `course.ts`: slalom courses.
   - `features.ts <map> [kinds]`: every jump, kicker, quarter or jib, ending with a problem count. Its jib runs (5 to 13 m/s) skip 3D rails; the smallest deck rails count one MISSED at 13 m/s on each park (a fast rider flies the 3 m rail).
   - `loop.ts <map> [--speeds]` (M14): rides every 3D rail from the snow at 8 to 20 m/s and prints, where the rider was most upside down, its speed against what it needed, how far round the up turned, where it let go, and what scoring named; a ride that got round short of the pull, or let go with it covered, is a problem.

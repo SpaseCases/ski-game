@@ -160,6 +160,12 @@ export interface CliffsElement {
   face: number;
   bench: number;
   taper: number;
+  /**
+   * Decoration (trees, boulders, crags) is kept off the band's bench, its
+   * face and this far (m) past its foot, so its drops are clean to ride and
+   * land (the steeps zone, milestone 15). 0 keeps nothing clear.
+   */
+  clear: number;
 }
 
 /**
@@ -808,6 +814,11 @@ export interface RunDef {
   name: string;
   points: XZ[];
   clear: number;
+  /**
+   * Its corridor is left as powder (the Steeps, milestone 15): on a map with
+   * `powder`, a run is otherwise groomed within `clear`. Default false.
+   */
+  powder: boolean;
 }
 
 export interface MapDef {

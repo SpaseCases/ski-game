@@ -214,7 +214,7 @@ function parseElement(raw: unknown, path: string): TerrainElement {
     case 'cliffs': {
       const points = heightPoints(e.points, `${path}.points`);
       const tallest = Math.max(...points.map((p) => p.height));
-      return { type: 'cliffs', points, heading: n('heading'), face: n('face', 3), bench: n('bench', 4 * tallest + 8), taper: n('taper', 12) };
+      return { type: 'cliffs', points, heading: n('heading'), face: n('face', 3), bench: n('bench', 4 * tallest + 8), taper: n('taper', 12), clear: n('clear', 0) };
     }
     case 'lip':
       return {
@@ -334,7 +334,12 @@ function parseFinish(raw: unknown, path: string): FinishDef {
 
 function parseRun(raw: unknown, path: string): RunDef {
   const o = obj(raw, path);
-  return { name: str(o.name, `${path}.name`), points: xzPoints(o.points, `${path}.points`, 2), clear: reader(o, path)('clear', 0) };
+  return {
+    name: str(o.name, `${path}.name`),
+    points: xzPoints(o.points, `${path}.points`, 2),
+    clear: reader(o, path)('clear', 0),
+    powder: o.powder === undefined ? false : bool(o.powder, `${path}.powder`),
+  };
 }
 
 function parseGap(raw: unknown, path: string): GapDef {

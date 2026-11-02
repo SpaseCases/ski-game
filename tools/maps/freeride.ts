@@ -9,8 +9,8 @@
 // Four faces drop away from it, each with its own character, with a ridge
 // between each pair. Positions here are mostly given along a spoke: r meters
 // out from the summit, `across` meters to the right of it, facing down.
-//   North face (heading 0, toward -Z)   The Steeps: couloirs between rock ribs, two cliff bands, pillows
-//   East face (heading -95)             The Bowl: a corniced cirque, a pillow field below it
+//   North face (heading 0, toward -Z)   The Steeps: couloirs between rock ribs ending in airs, three big cliff bands, pillows
+//   East face (heading -95)             The Bowl: a corniced cirque with chutes and a cliff band in its headwall, pillows below
 //   South face (heading 178)            The Glades: mellow tree runs, logs and stumps, a creek; the town at its base
 //   West face (heading 88)              The Gully: rolling terrain with side hits, a long natural halfpipe
 // The ridges carry wind lips and booters. Each face ends in a run-out basin
@@ -62,7 +62,9 @@ const SPOKES: Record<string, Spoke> = {
     heading: 0,
     bend: 4,
     sharp: 0,
-    sections: [TOP, sec(40, 26, 24), sec(300, 39, 30), sec(80, 24, 30), sec(400, 34, 40), sec(450, 25, 60), sec(400, 16, 80), sec(150, 6, 60), sec(200, -14, 60)],
+    // The headwall, then the steeps zone at 42° (the three cliff bands land on it), then a lower face eased so the
+    // whole face drops as far as before milestone 15 and the valley floor and finish stay where they were.
+    sections: [TOP, sec(40, 26, 24), sec(300, 39, 30), sec(313, 42, 30), sec(100, 30, 40), sec(333, 22, 60), sec(400, 17, 80), sec(200, 10, 80), sec(133, 6, 60), sec(200, -14, 60)],
   },
   northeast: {
     name: 'Northeast ridge',
@@ -77,7 +79,8 @@ const SPOKES: Record<string, Spoke> = {
     heading: -95,
     bend: 2,
     sharp: 0,
-    sections: [TOP, sec(45, 18, 24), sec(260, 28, 24), sec(380, 18, 60), sec(100, 27, 40), sec(230, 31, 40), sec(450, 21, 60), sec(260, 12, 60), sec(140, 5, 60), sec(200, -14, 60)],
+    // The headwall steepened for the chutes and the cliff band (milestone 15), the lower face eased by the same drop.
+    sections: [TOP, sec(45, 18, 24), sec(260, 34, 24), sec(380, 18, 60), sec(100, 27, 40), sec(230, 31, 40), sec(450, 18.4, 60), sec(260, 9, 60), sec(140, 5, 60), sec(200, -14, 60)],
   },
   southeast: {
     name: 'Southeast ridge',
@@ -138,18 +141,91 @@ const xzh = (p: XZ, height: number): Json => ({ x: r1(p.x), z: r1(p.z), height }
 
 // ---------------------------------------------------------------- elements
 const elements: Json[] = [];
+/** The East bowl's right-hand chute, down its middle (laid out with the Bowl below), for the Chutes run. */
+const EAST_CHUTE: XZ[] = [];
+
+/** The broad shape's settings, shared by the map's terrain and groundSoFar. */
+const SUMMIT = 3150;
+const ROLL = { amplitude: 1.2, wavelength: 90 };
+const RELIEF = { amplitude: 16, wavelength: 300 };
+const SEED = 21;
+/**
+ * The ground near the summit (a square `size` m across) from the elements
+ * laid so far, for placing things that must follow it (the bowl's chutes run
+ * down its real fall line). The same heights the map will have there, but
+ * for the elements that come later.
+ */
+function groundSoFar(size = 1206): Heightfield {
+  const h = size / 2;
+  const terrain = {
+    type: 'peak',
+    size,
+    cellSize: 3,
+    summit: SUMMIT,
+    spokes: Object.values(SPOKES),
+    roll: ROLL,
+    relief: RELIEF,
+    elements,
+    bounds: [{ x: -h, z: -h }, { x: h, z: -h }, { x: h, z: h }, { x: -h, z: h }],
+    rim: { inset: 80, ramp: 90, rise: 0.4 },
+    rockSlope: 56,
+    noise: 0,
+    rockNoise: 0,
+    seed: SEED,
+  };
+  return generateTerrain(parseMap({ name: 'pre', terrain, features: [], spawn: { x: 0, z: 0, heading: 0 }, flags: [], finishes: [{ x: 0, z: 0, heading: 0, width: 1, length: 1 }], colors: { sky: '#000000', fog: '#000000' } }).terrain);
+}
+/** The way straight down (heading, degrees) and how steep (degrees) at p on `hf`, measured over `span` m. */
+function fallOn(hf: Heightfield, p: XZ, span = 6): { heading: number; slope: number } {
+  const g = (x: number, z: number): number => heightAt(hf, x, z);
+  const gx = (g(p.x + span, p.z) - g(p.x - span, p.z)) / (2 * span);
+  const gz = (g(p.x, p.z + span) - g(p.x, p.z - span)) / (2 * span);
+  return { heading: Math.atan2(gx, gz) / DEG, slope: Math.atan(Math.hypot(gx, gz)) / DEG };
+}
+/** Spots every `step` m from p for `length` m: down the fall line (turn 0), or along the contour (turn ±90, + to the left facing down). */
+function traceOn(hf: Heightfield, p: XZ, length: number, turn = 0, step = 4): XZ[] {
+  const out = [p];
+  let q = p;
+  for (let d = step; d <= length + 1e-6; d += step) {
+    const a = (fallOn(hf, q).heading + turn) * DEG;
+    q = { x: q.x - Math.sin(a) * step, z: q.z - Math.cos(a) * step };
+    out.push(q);
+  }
+  return out;
+}
+/** The spot `d` m along a traced line (spots every 4 m), and the heading of the line there (degrees). */
+function alongTrace(line: XZ[], d: number, step = 4): { p: XZ; heading: number } {
+  const i = Math.min(line.length - 2, Math.max(0, Math.floor(d / step)));
+  const a = line[i]!;
+  const b = line[i + 1]!;
+  const t = Math.min(1, Math.max(0, d / step - i));
+  return { p: { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t }, heading: Math.atan2(-(b.x - a.x), -(b.z - a.z)) / DEG };
+}
+/** The spot `v` m to the right of p, facing `heading`. */
+const rightOf = (p: XZ, heading: number, v: number): XZ => ({ x: p.x + Math.cos(heading * DEG) * v, z: p.z - Math.sin(heading * DEG) * v });
 
 /** A rock rib down a spoke at `across`, with its height at each r. */
 function rib(s: SpokeId, across: number, heights: [number, number][], crest = 2, side = 4): void {
   elements.push({ type: 'ridge', points: heights.map(([r, h]) => xzh(P(s, r, across), h)), crest, side, taper: 25 });
 }
 /**
- * A cliff band across a spoke at r, with its drop at each `across`. Drops
- * stay under about 9 m: a bigger one lands too hard even on a steep slope.
+ * A cliff band across a spoke at r, with its drop at each `across`, and a
+ * bench above it 2.5 × its tallest drop + 8 m long. On groomed snow (a run)
+ * drops stay under about 9 m; off the runs (powder, and the Steeps' runs)
+ * the steeps zone's 12 to 25 m drops land on 42° (tools/sim/cliffs.ts).
  */
-function cliffs(s: SpokeId, r: number, drops: [number, number][], face = 3): void {
-  const tallest = Math.max(...drops.map(([, h]) => h));
-  elements.push({ type: 'cliffs', points: drops.map(([a, h]) => xzh(P(s, r, a), h)), heading: r1(angle(s, r)), face, bench: r1(2.5 * tallest + 8), taper: 12 });
+function cliffs(s: SpokeId, r: number, drops: [number, number][], face = 3, taper = 12): void {
+  cliffLine(drops.map(([a, h]) => ({ ...P(s, r, a), h })), angle(s, r), face, taper);
+}
+/** The steeps zone's bands (a drop of 12 m or more) keep trees, boulders and crags off their bench, face and this far (m) past the foot. */
+const STEEPS_CLEAR = 45;
+/** How far (m) down each of the East bowl's chutes its air is. */
+const CHUTE_LIP = 120;
+/** A cliff band along any line of spots (each with its drop `h`), ridden over toward `heading`. */
+function cliffLine(points: (XZ & { h: number })[], heading: number, face = 3, taper = 12): void {
+  const tallest = Math.max(...points.map((p) => p.h));
+  const clear = tallest >= 12 ? { clear: STEEPS_CLEAR } : {};
+  elements.push({ type: 'cliffs', points: points.map((p) => xzh(p, p.h)), heading: r1(heading), face, bench: r1(2.5 * tallest + 8), taper, ...clear });
 }
 /** A wind lip or cornice along a line of (r, across) spots on a spoke, facing `heading`. */
 function lip(s: SpokeId, spots: [number, number][], heading: number, height: number, ramp: number, drop: number): void {
@@ -191,24 +267,34 @@ function bumps(s: SpokeId, r: number, across: number, radius: number, amplitude:
 }
 
 // North face, The Steeps. Four rock ribs split the headwall into a narrow
-// chute, the main couloir and an open face; a cliff band crosses the bottom
-// of the headwall with the couloirs running out through a gap in it. Below
-// a bench, a second band with drops of 3 to 9 m (and gaps), then pillows on
-// the west side, an open apron and the forest.
+// chute, the main couloir and an open face. The steeps zone (milestone 15):
+// a cliff band of 12 to 16 m across the bottom of the headwall, the
+// couloirs running out through a gap in it and each ending in an air of
+// its own (12 and 16 m), then two more bands down a 42° face, 15 to 20 m
+// and 18 to 25 m, each with a gap to ride through. Then pillows, an open
+// apron and the forest.
 rib('north', -44, [[85, 2], [140, 7], [240, 9], [330, 4]]);
 rib('north', -14, [[85, 3], [150, 8], [250, 9], [335, 3]]);
 rib('north', 14, [[85, 3], [150, 7], [250, 8], [335, 3]]);
 rib('north', 58, [[95, 2], [160, 8], [260, 10], [320, 3]], 3, 5);
-gully('north', [[90, 0], [200, 0], [345, 0]], 8, 2.5, 7, 30);
-gully('north', [[90, -29], [200, -29], [345, -29]], 4, 2, 5, 30);
-cliffs('north', 305, [[-175, 1], [-145, 5], [-112, 8], [-82, 6], [-58, 3]]);
-cliffs('north', 305, [[32, 2], [60, 5], [92, 8], [122, 4], [150, 6], [178, 2]]);
-cliffs('north', 625, [[-205, 2], [-165, 4], [-125, 3], [-95, 0], [-62, 6], [-30, 9], [2, 5], [24, 0], [60, 0], [92, 3], [130, 7], [168, 4], [205, 2]]);
+gully('north', [[90, 0], [200, 0], [355, 0]], 8, 2.5, 7, 30);
+gully('north', [[90, -29], [200, -29], [355, -29]], 4, 2, 5, 30);
+// Band 1, across the foot of the headwall.
+cliffs('north', 305, [[-180, 0], [-152, 13], [-118, 16], [-88, 14], [-62, 12]]);
+cliffs('north', 305, [[30, 0], [58, 12], [92, 14], [122, 16], [152, 13], [180, 0]]);
+// The couloirs' airs: each ends in a drop across its floor, the ribs either side a way round.
+cliffs('north', 335, [[-14, 0], [-5, 12], [5, 12], [14, 0]], 3, 2);
+cliffs('north', 335, [[-37, 0], [-31, 16], [-27, 16], [-21, 0]], 3, 2);
+// Bands 2 and 3, down the 42° face; the gaps line up for the main couloir's way down.
+cliffs('north', 460, [[-215, 0], [-185, 16], [-140, 19], [-100, 20], [-68, 16], [-44, 0], [-2, 0], [25, 15], [60, 17], [100, 18], [140, 16], [180, 15], [212, 0]]);
+cliffs('north', 587, [[-220, 0], [-190, 19], [-150, 23], [-112, 25], [-80, 22], [-55, 0], [-12, 0], [15, 18], [52, 20], [92, 22], [132, 19], [170, 18], [205, 0]]);
 pillows('north', 755, -150, 120, 140, 26, [4, 7], [1.5, 3.5], 5);
 // The pillow line: snow-capped rocks stacked down the steep upper face,
 // east of the cliff band. Each is a short rounded step whose top slopes
 // downhill, so every drop lands on the next one's top, never on a flat.
 pillowLine('north', 205, 330, 245, 9, 31);
+// A pillow stack in the steeps, below band 3 on its west side (milestone 15).
+pillows('north', 690, -175, 70, 110, 16, [4, 7], [2, 4], 41);
 bumps('north', 1060, 0, 320, 1.6, 46, 7);
 // The apron: a low rock band with gaps, and wind-drifted lips to boost off.
 cliffs('north', 1150, [[-150, 0], [-120, 3], [-90, 5], [-62, 3], [-40, 0]]);
@@ -227,6 +313,52 @@ lip('northeast', [[900, 12], [950, 14], [1000, 12]], angle('northeast', 950) - 9
 lip('east', [[96, -125], [80, -90], [72, -55], [70, -22]], angle('east', 75), 3.2, 14, 5);
 lip('east', [[70, 22], [72, 55], [80, 90], [96, 125]], angle('east', 75), 3.2, 14, 5);
 elements.push({ type: 'bowl', ...xz(P('east', 82)), heading: r1(angle('east', 82)), length: 640 * K, width: 640, depth: 60, head: 280, exit: 300 * K, rim: 160 });
+// The headwall's steeps (milestone 15): two chutes between rock ribs down
+// its flanks, each ending in an air (14 and 16 m), and a cliff band of 12 to
+// 16 m across the headwall between them, open in the middle for the
+// Entrance. They start round the headwall's curve, Bp(ρ, φ): ρ m from the
+// middle of its half-circle, φ degrees round from the bowl's axis (positive
+// to the right, facing down); then the chutes follow the real fall line and
+// the band the contour, on the ground built so far.
+{
+  const BOWL = { r: 82, half: 320 };
+  const c = P('east', BOWL.r);
+  const hb = angle('east', BOWL.r) * DEG;
+  const Bp = (rho: number, phi: number): XZ => {
+    const u = BOWL.half - rho * Math.cos(phi * DEG);
+    const v = rho * Math.sin(phi * DEG);
+    return { x: c.x - Math.sin(hb) * u + Math.cos(hb) * v, z: c.z - Math.cos(hb) * u - Math.sin(hb) * v };
+  };
+  /** Each chute: where it starts, how far down its air is, and its drop. */
+  const CHUTES = [
+    { side: -1, top: Bp(318, -40), lip: CHUTE_LIP, drop: 14 },
+    { side: 1, top: Bp(318, 40), lip: CHUTE_LIP, drop: 16 },
+  ];
+  const pre = groundSoFar();
+  for (const ch of CHUTES) {
+    // Straight, from its top toward where the fall line reaches the air, so its floor runs true into the lip.
+    const traced = traceOn(pre, ch.top, ch.lip);
+    const end = traced[traced.length - 1]!;
+    const heading = Math.atan2(-(end.x - ch.top.x), -(end.z - ch.top.z)) / DEG;
+    const lip = Math.hypot(end.x - ch.top.x, end.z - ch.top.z);
+    const at = (d: number, v = 0): XZ => rightOf({ x: ch.top.x - Math.sin(heading * DEG) * d, z: ch.top.z - Math.cos(heading * DEG) * d }, heading, v);
+    if (ch.side > 0) for (let d = 0; d <= lip + 40; d += 20) EAST_CHUTE.push(at(d));
+    // Ribs either side, highest partway down, gone by the air.
+    for (const v of [-19, 19]) {
+      const pts = [[0, 1], [30, 6], [lip - 40, 8], [lip - 5, 3], [lip + 15, 0]].map(([d, h]) => xzh(at(d!, v), h!));
+      elements.push({ type: 'ridge', points: pts, crest: 2, side: 4, taper: 20 });
+    }
+    elements.push({ type: 'gully', points: [xz(at(0)), xz(at(lip + 50))], floor: 8, depth: 2.5, wall: 6, taper: 25 });
+    cliffLine([-10, -2.5, 2.5, 10].map((v, i) => ({ ...at(lip, v), h: i === 0 || i === 3 ? 0 : ch.drop })), heading, 3, 2);
+  }
+  // The band, along the contour from beside the Entrance out toward each chute.
+  for (const side of [-1, 1]) {
+    const line = traceOn(pre, Bp(185, 12 * side), 64, -90 * side);
+    const heights = side < 0 ? [0, 12, 14, 13, 0] : [0, 13, 16, 14, 0];
+    const mid = alongTrace(line, 32);
+    cliffLine([0, 10, 32, 54, 64].map((d, i) => ({ ...alongTrace(line, d).p, h: heights[i]! })), fallOn(pre, mid.p).heading, 3, 4);
+  }
+}
 cliffs('east', 520, [[40, 0], [60, 3], [85, 4], [105, 3], [125, 0]]);
 pillows('east', 915, -40, 240, 200, 40, [4, 8], [1.5, 4], 9);
 bumps('east', 1250, 0, 300, 1.4, 50, 11);
@@ -244,6 +376,8 @@ bumps('south', 1050, 0, 420, 1.8, 40, 13);
 cliffs('south', 960, [[-70, 0], [-50, 2], [-25, 3], [0, 2], [20, 0]]);
 cliffs('south', 1210, [[40, 0], [60, 3], [85, 4], [110, 3], [130, 0]]);
 gully('south', [[880, 150], [1050, 165], [1220, 140], [1420, 155]], 6, 3, 8, 50);
+// Tree pillows in the glades between the creek and the middle (milestone 15).
+pillows('south', 1030, 90, 80, 120, 14, [3, 6], [1.2, 2.8], 43);
 cliffs('south', 1400, [[-125, 0], [-100, 3], [-70, 4], [-45, 3], [-20, 0]]);
 for (const [r, a] of [[920, -90], [1100, 60], [1260, -110]] as const) lip('south', [[r, a - 8], [r + 2, a], [r, a + 8]], angle('south', r), 1.5, 9, 4);
 
@@ -323,6 +457,10 @@ flag('west', 60, 0, 18);
 flag('west', 445, 10, 18); // gully top
 flag('west', 1300, -60, 22);
 flag('northwest', 130, 0, 16);
+// Milestone 15: above band 3 on both sides of the steeps, and the top of the bowl's chutes.
+flag('north', 530, -100, 20);
+flag('north', 530, 95, 20);
+flag('east', 125, 185, 16);
 
 // ---------------------------------------------------------------- finishes and bounds
 /** Where each face's finish line crosses its run-out (r, before stretching), and how far past it the basin runs to the edge. */
@@ -398,10 +536,10 @@ const terrain = {
   type: 'peak',
   size: 6200,
   cellSize: 3,
-  summit: 3150,
+  summit: SUMMIT,
   spokes: Object.values(SPOKES),
-  roll: { amplitude: 1.2, wavelength: 90 },
-  relief: { amplitude: 16, wavelength: 300 },
+  roll: ROLL,
+  relief: RELIEF,
   elements,
   bounds: boundsPolygon(),
   // Past the play area the rim lets go and the land runs on into the foothills (milestone 8).
@@ -409,7 +547,7 @@ const terrain = {
   rockSlope: 56,
   noise: 0.2,
   rockNoise: 0.9,
-  seed: 21,
+  seed: SEED,
 };
 
 // ---------------------------------------------------------------- the ground, for placing features
@@ -741,18 +879,19 @@ for (const [s, r, a] of [
 // Named lines down each face, kept clear of trees, for the headless riders
 // (tools/sim/face.ts), the dev panel's test spots, the trail signs and the trail map.
 const runs: Json[] = [];
-function run(name: string, spots: XZ[], clear = 7): void {
-  runs.push({ name, points: spots.map(xz), clear });
+/** A named run; `powder` leaves its corridor ungroomed (the steeps' runs, whose big drops need powder's softer landings). */
+function run(name: string, spots: XZ[], clear = 7, powder = false): void {
+  runs.push({ name, points: spots.map(xz), clear, ...(powder ? { powder: true } : {}) });
 }
 const along = (s: SpokeId, list: [number, number][]): XZ[] => list.map(([r, a]) => P(s, r, a));
 const inTown = (list: [number, number][]): XZ[] => list.map(([u, v]) => T(u, v));
 /** Down the main street from the top of town to past the finish. */
 const MAIN_STREET: [number, number][] = [[6, 0], [40, 0], [80, -3], [118, -5], [150, -5], [176, -5], [196, 4], [230, 4], [270, 0], [300, 0], [350, 0]];
-run('Steeps: Main couloir', along('north', [[18, 0], [62, 0], [200, 0], [340, 0], [400, 10], [520, 40], [625, 42], [760, 20], [1000, 0], [1300, 0], [1600, 0], [1800, 0]]));
-run('Steeps: Narrow chute', along('north', [[18, -10], [62, -29], [200, -29], [345, -29], [400, -60], [560, -95], [640, -95], [755, -150], [900, -120], [1200, -60], [1600, -20], [1800, 0]]));
-run('Steeps: Pillow line', along('north', [[18, 20], [70, 80], [130, 200], [165, 245], [270, 245], [340, 245], [420, 230], [520, 205], [700, 180], [900, 120], [1300, 30], [1800, 0]]));
-run('Steeps: Cliff line', along('north', [[18, 20], [70, 80], [200, 90], [300, 92], [400, 110], [560, 130], [640, 130], [900, 80], [1300, 30], [1800, 0]]));
-run('Bowl: Cornice', along('east', [[18, -20], [55, -60], [100, -60], [300, -40], [600, -20], [800, -40], [1000, -40], [1300, 0], [1830, 0]]));
+run('Steeps: Main couloir', along('north', [[18, 0], [62, 0], [200, 0], [340, 0], [400, 4], [460, -22], [520, -30], [587, -32], [700, -20], [1000, 0], [1300, 0], [1600, 0], [1800, 0]]), 7, true);
+run('Steeps: Narrow chute', along('north', [[18, -10], [62, -29], [200, -29], [345, -29], [400, -55], [460, -68], [520, -78], [587, -85], [700, -120], [900, -120], [1200, -60], [1600, -20], [1800, 0]]), 7, true);
+run('Steeps: Pillow line', along('north', [[18, 20], [70, 80], [130, 200], [165, 245], [270, 245], [340, 245], [420, 230], [520, 205], [700, 180], [900, 120], [1300, 30], [1800, 0]]), 7, true);
+run('Steeps: Cliff line', along('north', [[18, 20], [70, 80], [200, 90], [305, 92], [400, 95], [460, 100], [520, 96], [587, 92], [700, 80], [900, 80], [1300, 30], [1800, 0]]), 7, true);
+run('Bowl: Cornice', along('east', [[18, -20], [55, -60], [100, -60], [300, -40], [600, -20], [800, -40], [1000, -40], [1300, 0], [1830, 0]]), 7, true);
 run('Bowl: Entrance', along('east', [[18, 0], [50, 0], [150, 0], [400, 30], [600, 60], [850, 120], [1100, 60], [1400, 0], [1830, 0]]));
 run('Glades', [...along('south', [[18, 0], [60, 0], [400, 0], [790, 0], [1000, -20], [1180, -30], [1450, 0], [1640, 0]]), ...inTown(MAIN_STREET)]);
 run('Glades: Creek', [...along('south', [[18, 10], [300, 60], [700, 120], [880, 150], [1050, 165], [1220, 140], [1420, 155], [1600, 60], [1640, 20]]), ...inTown(MAIN_STREET)]);
@@ -765,6 +904,9 @@ run('Northwest ridge', [...along('northwest', [[18, 0], [130, 0], [400, 0], [700
 run('Main street', [P('south', 1580, 0), ...inTown(MAIN_STREET)], 12);
 run('Rooftops', [P('south', 1580, -12), ...inTown([[6, -8], [26, ROOF.v], [48, ROOF.v], [100, ROOF.v], [131, ROOF.v], [146, ROOF.v], [176, ROOF.v], [188, ROOF.v], [230, ROOF.v], [243, ROOF.v], [270, -12], [300, -6], [350, -4]])], 6);
 run('Chalets', [P('south', 1580, 12), ...inTown([[6, 10], [30, 25], [50, 25], [80, 26], [96, 27], [123, 27], [160, 28], [190, 30], [234, 30], [250, 26], [277, 22], [295, 11], [350, 6]])], 6);
+// The steeps zone's lines (milestone 15): the tallest drop of each band, and the East bowl's right-hand chute.
+run('Steeps: Big cliffs', along('north', [[18, -14], [60, -45], [150, -100], [250, -118], [305, -118], [400, -105], [460, -100], [520, -108], [587, -112], [700, -100], [900, -90], [1200, -50], [1600, -15], [1800, 0]]), 7, true);
+run('Bowl: Chutes', [...along('east', [[18, 10], [60, 70], [110, 160]]), ...EAST_CHUTE, ...along('east', [[600, 60], [850, 120], [1100, 60], [1400, 0], [1830, 0]])], 7, true);
 
 // ---------------------------------------------------------------- trail signs
 // At each fork, a sign facing the riders coming down to it, a board per
@@ -813,13 +955,15 @@ function sign(p: XZ, heading: number, header: string, names: string[]): void {
   decor.push({ kind: 'sign', ...xz(p), heading: r1(heading), header, lines });
 }
 // The summit: one sign at the top of each face.
-sign(P('north', 9, -7), angle('north', 9), 'The Steeps', ['Steeps: Main couloir', 'Steeps: Narrow chute', 'Steeps: Pillow line', 'Steeps: Cliff line']);
-sign(P('east', 9, 7), angle('east', 9), 'The Bowl', ['Bowl: Cornice', 'Bowl: Entrance', 'Northeast ridge']);
+sign(P('north', 9, -7), angle('north', 9), 'The Steeps', ['Steeps: Big cliffs', 'Steeps: Main couloir', 'Steeps: Narrow chute', 'Steeps: Pillow line', 'Steeps: Cliff line']);
+sign(P('east', 9, 7), angle('east', 9), 'The Bowl', ['Bowl: Cornice', 'Bowl: Entrance', 'Bowl: Chutes', 'Northeast ridge']);
 sign(P('south', 9, -7), angle('south', 9), 'The Glades', ['Glades', 'Glades: Creek', 'Glades: Log jam']);
 sign(P('west', 9, 7), angle('west', 9), 'The Gully', ['Gully', 'Rollers', 'Northwest ridge']);
 // Down the faces, where runs part.
 sign(P('north', 48, 40), angle('north', 48), '', ['Steeps: Pillow line', 'Steeps: Cliff line']);
 sign(P('north', 345, -8), angle('north', 345), '', ['Steeps: Main couloir', 'Steeps: Narrow chute']);
+sign(P('north', 45, -50), angle('north', 45), '', ['Steeps: Big cliffs', 'Steeps: Narrow chute']);
+sign(P('east', 45, 22), angle('east', 45), '', ['Bowl: Entrance', 'Bowl: Chutes']);
 sign(P('south', 40, 14), angle('south', 40), '', ['Glades: Log jam', 'Glades', 'Glades: Creek']);
 sign(P('west', 40, -14), angle('west', 40), '', ['Gully', 'Rollers']);
 // The top of town.

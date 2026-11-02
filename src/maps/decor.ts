@@ -216,6 +216,17 @@ function keepOutZones(map: MapDef): KeepOut {
     }
   }
   for (const run of map.runs) if (run.clear > 0) zones.addLine(run.points, run.clear, Math.max(1, run.clear / 2));
+  // A cliff band kept clear: its bench, its face and the landing below, as lines along the band.
+  if (map.terrain.type === 'peak') {
+    for (const e of map.terrain.elements) {
+      if (e.type !== 'cliffs' || e.clear <= 0) continue;
+      const h = (e.heading * Math.PI) / 180;
+      const dx = -Math.sin(h);
+      const dz = -Math.cos(h);
+      const r = 4;
+      for (let s = -e.bench; s <= e.clear; s += r * 1.5) zones.addLine(e.points.map((p) => ({ x: p.x + dx * s, z: p.z + dz * s })), r, r);
+    }
+  }
   for (const d of map.decor) {
     if (d.kind === 'sign') zones.add(d.x, d.z, 3);
     else if (d.kind === 'chairlift' && 'points' in d) {
