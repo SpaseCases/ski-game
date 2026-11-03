@@ -13,6 +13,7 @@ import type {
   ScatterDecor,
   ScatterKind,
   SignDecor,
+  SpotsDecor,
   TerrainScatterDecor,
   XZ,
 } from './types.ts';
@@ -47,6 +48,12 @@ export const DECOR_SIZE = {
   snowmobileLength: 2.8,
   snowmobileWidth: 1.1,
   skiRackLength: 2.6,
+  /** A ridge's snow fence: wooden slats this high (milestone 15). */
+  snowFenceHeight: 1.5,
+  /** A warming cabin: its length (across its front), depth, and height to the ridge; its deck runs along the front. */
+  cabin: { length: 6.5, depth: 5, height: 4.6, deck: 2.4 },
+  /** A weather mast's height. */
+  mastHeight: 7,
 };
 
 /** Per scatter kind: obstacle radius and height at scale 1. */
@@ -57,9 +64,15 @@ const SCATTER_SOLID: Record<ScatterKind, { radius: number; height: number }> = {
   rock: { radius: 0.6, height: 0.8 },
   boulder: { radius: 1.3, height: 2 },
   crag: { radius: 2.2, height: 3 },
+  deadfall: { radius: 0.3, height: 0.5 },
 };
 
 const DEG = Math.PI / 180;
+/** A named gap's way in (m before the middle of its takeoff area) and half its width, kept clear of decoration (10, not 8: runway's lines are 4 m apart, so a half-width of 8 leaves gaps down its middle). */
+const GAP_RUN_IN = 45;
+/** A cliff band kept clear starts this far (m) above its bench, so the way in to its drops is clear too. */
+const CLIFF_RUN_IN = 25;
+const GAP_CLEAR = 10;
 /** Size (m) of the cells that sort keep-out spots, so checking a spot looks at only the few nearby. */
 const KEEP_OUT_CELL = 32;
 
@@ -77,11 +90,20 @@ export interface ScatterItem {
   rank: number;
 }
 
+/** A cornice to draw: along a lip's crest, curling out toward `heading` (degrees), `height` m tall at full strength, fading in over `taper` m at each end. */
+export interface CorniceLine {
+  points: readonly XZ[];
+  heading: number;
+  height: number;
+  taper: number;
+}
+
 export interface DecorLayout {
   scatter: ScatterItem[];
   lines: LineDecor[];
   props: PropDecor[];
   signs: SignDecor[];
+  cornices: CorniceLine[];
 }
 
 const sample: ShapeSample = { height: 0, dhdx: 0, dhdz: 0 };
@@ -97,10 +119,15 @@ export function layoutDecor(map: MapDef, hf: Heightfield): DecorLayout {
     if (d.kind === 'sign') signs.push(d);
     else if ('spacing' in d) terrainSet(d, hf, keepOut, scatter);
     else if ('area' in d) scatterSet(d, hf, keepOut, scatter);
+    else if ('spots' in d) spotsSet(d, hf, keepOut, scatter);
     else if ('heading' in d) props.push(d);
     else lines.push(d);
   });
-  return { scatter, lines, props, signs };
+  const cornices: CorniceLine[] = [];
+  if (map.terrain.type === 'peak') {
+    for (const e of map.terrain.elements) if (e.type === 'lip' && e.cornice) cornices.push({ points: e.points, heading: e.heading, height: e.height, taper: e.taper });
+  }
+  return { scatter, lines, props, signs, cornices };
 }
 
 /** The layout with scenery thinned to `density` (0..1); solid things all stay. */
@@ -216,6 +243,14 @@ function keepOutZones(map: MapDef): KeepOut {
     }
   }
   for (const run of map.runs) if (run.clear > 0) zones.addLine(run.points, run.clear, Math.max(1, run.clear / 2));
+  // A named gap: the way in to its takeoff, the gap and its landing (milestone 15: Freeride's cat gaps).
+  for (const g of map.gaps ?? []) {
+    const mid = (pts: readonly XZ[]): XZ => ({ x: pts.reduce((sum, q) => sum + q.x, 0) / pts.length, z: pts.reduce((sum, q) => sum + q.z, 0) / pts.length });
+    const a = mid(g.from);
+    const b = mid(g.to);
+    const yaw = (Math.atan2(-(b.x - a.x), -(b.z - a.z)) * 180) / Math.PI;
+    runway(a.x, a.z, yaw, -GAP_RUN_IN, Math.hypot(b.x - a.x, b.z - a.z), GAP_CLEAR);
+  }
   // A cliff band kept clear: its bench, its face and the landing below, as lines along the band.
   if (map.terrain.type === 'peak') {
     for (const e of map.terrain.elements) {
@@ -224,7 +259,7 @@ function keepOutZones(map: MapDef): KeepOut {
       const dx = -Math.sin(h);
       const dz = -Math.cos(h);
       const r = 4;
-      for (let s = -e.bench; s <= e.clear; s += r * 1.5) zones.addLine(e.points.map((p) => ({ x: p.x + dx * s, z: p.z + dz * s })), r, r);
+      for (let s = -e.bench - CLIFF_RUN_IN; s <= e.clear; s += r * 1.5) zones.addLine(e.points.map((p) => ({ x: p.x + dx * s, z: p.z + dz * s })), r, r);
     }
   }
   for (const d of map.decor) {
@@ -236,14 +271,23 @@ function keepOutZones(map: MapDef): KeepOut {
       const last = d.points[d.points.length - 1]!;
       zones.add(first.x, first.z, 14);
       zones.add(last.x, last.z, 14);
-    } else if ((d.kind === 'streetLamp' || d.kind === 'hut' || d.kind === 'snowmobile' || d.kind === 'skier' || d.kind === 'skiRack') && 'points' in d) {
-      for (const p of d.points) zones.add(p.x, p.z, d.kind === 'hut' ? 5 : 2.5);
+    } else if ((d.kind === 'streetLamp' || d.kind === 'hut' || d.kind === 'snowmobile' || d.kind === 'skier' || d.kind === 'skiRack' || d.kind === 'cabin' || d.kind === 'mast') && 'points' in d) {
+      for (const p of d.points) zones.add(p.x, p.z, d.kind === 'hut' ? 5 : d.kind === 'cabin' ? 9 : 2.5);
     }
   }
   return zones;
 }
 
 /** Scatters an area set: one spot per grid cell, jittered. Lower presets keep the ones ranked under their density. */
+/** Places a spots set: one item at each spot that's on the map and clear. */
+function spotsSet(d: SpotsDecor, hf: Heightfield, keepOut: KeepOut, out: ScatterItem[]): void {
+  d.spots.forEach((p, i) => {
+    if (!onMap(hf, p.x, p.z) || !clear(p.x, p.z, hf, keepOut)) return;
+    const r = (k: number): number => 0.5 + 0.5 * hash2(i * 7 + k, k * 3, d.seed);
+    out.push({ kind: d.kind, x: p.x, z: p.z, yaw: r(3) * Math.PI * 2, scale: d.minScale + (d.maxScale - d.minScale) * r(4), tint: r(5), solid: d.solid, rank: r(0) });
+  });
+}
+
 function scatterSet(d: ScatterDecor, hf: Heightfield, keepOut: KeepOut, out: ScatterItem[]): void {
   const { area } = d;
   const cell = Math.sqrt((area.width * area.length) / Math.max(1, d.count));
@@ -370,7 +414,8 @@ export function decorObstacles(layout: DecorLayout): ObstacleDef[] {
     post(t, solid.radius * t.scale, solid.height * t.scale);
   }
   for (const l of layout.lines) {
-    const height = l.kind === 'fence' ? S.fenceHeight : l.kind === 'netting' ? S.nettingHeight : l.kind === 'barrier' ? S.barrierHeight : 0;
+    const height =
+      l.kind === 'fence' ? S.fenceHeight : l.kind === 'netting' ? S.nettingHeight : l.kind === 'barrier' ? S.barrierHeight : l.kind === 'snowFence' ? S.snowFenceHeight : 0;
     if (height > 0) {
       for (let i = 1; i < l.points.length; i++) {
         const a = l.points[i - 1]!;
@@ -401,6 +446,15 @@ export function decorObstacles(layout: DecorLayout): ObstacleDef[] {
       if (p.kind === 'lightPole') post(at, 0.15, S.lightPoleHeight);
       else if (p.kind === 'streetLamp') post(at, 0.12, S.streetLampHeight);
       else if (p.kind === 'hut') post(at, S.hutSize / 2 + 0.2, 3);
+      else if (p.kind === 'mast') post(at, 0.2, S.mastHeight);
+      else if (p.kind === 'cabin') {
+        // The cabin and its deck in front, one capsule across the front.
+        const c = S.cabin;
+        const fx = -Math.sin(h) * ((c.deck - 0.5) / 2);
+        const fz = -Math.cos(h) * ((c.deck - 0.5) / 2);
+        const half = c.length / 2 - (c.depth + c.deck) / 2;
+        out.push({ ax: at.x + fx - rx * half, az: at.z + fz - rz * half, bx: at.x + fx + rx * half, bz: at.z + fz + rz * half, radius: (c.depth + c.deck) / 2, height: c.height });
+      }
       else if (p.kind === 'skier') post(at, 0.35, 1.8);
       else if (p.kind === 'snowmobile' || p.kind === 'skiRack') {
         // Along its length: a snowmobile points along its heading, a rack stands across it.

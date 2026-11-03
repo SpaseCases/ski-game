@@ -161,8 +161,8 @@ export interface CliffsElement {
   bench: number;
   taper: number;
   /**
-   * Decoration (trees, boulders, crags) is kept off the band's bench, its
-   * face and this far (m) past its foot, so its drops are clean to ride and
+   * Decoration (trees, boulders, crags) is kept off the band's bench (and
+   * the way in above it), its face and this far (m) past its foot, so its drops are clean to ride and
    * land (the steeps zone, milestone 15). 0 keeps nothing clear.
    */
   clear: number;
@@ -181,6 +181,8 @@ export interface LipElement {
   ramp: number;
   drop: number;
   taper: number;
+  /** Drawn with a cornice: snow curling out over the lee drop from its crest (milestone 15, scenery only). */
+  cornice: boolean;
 }
 
 /** A cirque: a bowl dug into a face, U-shaped from above with a curved headwall at the back, opening downhill. */
@@ -716,11 +718,11 @@ export interface FinishDef {
 }
 
 /** Things scattered over an area. */
-export type ScatterKind = 'pine' | 'aspen' | 'snag' | 'rock' | 'boulder' | 'crag';
+export type ScatterKind = 'pine' | 'aspen' | 'snag' | 'rock' | 'boulder' | 'crag' | 'deadfall';
 /** Things built along a line. */
-export type LineKind = 'fence' | 'netting' | 'barrier' | 'dyeLine' | 'bunting' | 'chairlift';
+export type LineKind = 'fence' | 'netting' | 'barrier' | 'dyeLine' | 'bunting' | 'chairlift' | 'snowFence' | 'ropeLine' | 'markers';
 /** Single props, one at each point. */
-export type PropKind = 'lightPole' | 'floodlight' | 'banner' | 'flag' | 'groomer' | 'streetLamp' | 'hut' | 'snowmobile' | 'skier' | 'skiRack';
+export type PropKind = 'lightPole' | 'floodlight' | 'banner' | 'flag' | 'groomer' | 'streetLamp' | 'hut' | 'snowmobile' | 'skier' | 'skiRack' | 'cabin' | 'mast';
 
 /** A run's difficulty, for trail signs: easy, intermediate, advanced, expert. */
 export type RunLevel = 'green' | 'blue' | 'black' | 'double';
@@ -809,7 +811,17 @@ export interface TerrainScatterDecor {
   reach: number;
 }
 
-export type DecorDef = ScatterDecor | TerrainScatterDecor | LineDecor | PropDecor | SignDecor;
+/** Scatter at given spots (a forest's edge along a run, milestone 15), each still kept off the keep-out zones. */
+export interface SpotsDecor {
+  kind: ScatterKind;
+  spots: XZ[];
+  seed: number;
+  minScale: number;
+  maxScale: number;
+  solid: boolean;
+}
+
+export type DecorDef = ScatterDecor | TerrainScatterDecor | SpotsDecor | LineDecor | PropDecor | SignDecor;
 
 /**
  * Mountain ranges far around the map, past the end of its terrain: drawn

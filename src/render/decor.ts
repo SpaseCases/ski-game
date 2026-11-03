@@ -9,7 +9,7 @@ import {
   Vector3,
   type BufferGeometry,
 } from 'three';
-import { alongLine, DECOR_SIZE, type DecorLayout, type ScatterItem } from '../maps/decor.ts';
+import { alongLine, DECOR_SIZE, type CorniceLine, type DecorLayout, type ScatterItem } from '../maps/decor.ts';
 import type { Feature, Heightfield, LineDecor, XZ } from '../maps/types.ts';
 import type { DistanceCuller } from './culling.ts';
 import { MeshKit, TiledKit } from './meshKit.ts';
@@ -87,6 +87,7 @@ export function createDecor(layout: DecorLayout, features: readonly Feature[], h
   const glows = new TiledKit(TILE);
   const cloths = new TiledKit(TILE);
   for (const line of layout.lines) drawLine(line, hf, line.kind === 'dyeLine' ? decals : kits, cloths);
+  for (const c of layout.cornices) cornice(c, hf, kits);
   for (const p of layout.props) {
     const yaw = (p.heading * Math.PI) / 180;
     p.points.forEach((at, i) => {
@@ -217,8 +218,8 @@ function scatterMesh(geometry: BufferGeometry, mine: readonly ScatterItem[], hf:
  */
 function baseHeight(hf: Heightfield, t: ScatterItem): number {
   const y = drawnHeightAt(hf, t.x, t.z);
-  if (t.kind !== 'rock' && t.kind !== 'boulder') return y;
-  const r = (t.kind === 'rock' ? 0.8 : 1.1) * t.scale;
+  if (t.kind !== 'rock' && t.kind !== 'boulder' && t.kind !== 'deadfall') return y;
+  const r = (t.kind === 'rock' ? 0.8 : t.kind === 'deadfall' ? 1.6 : 1.1) * t.scale;
   return Math.min(
     y,
     drawnHeightAt(hf, t.x + r, t.z),
@@ -254,8 +255,85 @@ function drawLine(line: LineDecor, hf: Heightfield, kits: TiledKit, cloths: Tile
     case 'chairlift':
       chairlift(line.points, hf, kits);
       break;
+    case 'snowFence':
+      // Wooden slats on posts, the top boards weathered darker.
+      postsAndPanels(line.points, hf, kits, 2.4, 0.25, S.snowFenceHeight, PALETTE.wood, PALETTE.woodDark, 0.06);
+      break;
+    case 'ropeLine':
+      bamboo(line.points, hf, kits, 6, true);
+      break;
+    case 'markers':
+      bamboo(line.points, hf, kits, 0, false);
+      break;
   }
 }
+
+/**
+ * Bamboo poles, orange with a black tip: every `spacing` m along the line
+ * (0: at its points), with a rope sagging between them when `rope`.
+ */
+function bamboo(points: readonly XZ[], hf: Heightfield, kits: TiledKit, spacing: number, rope: boolean): void {
+  const top = 1.5;
+  const spots = spacing > 0 ? alongLine(points, spacing) : points;
+  spots.forEach((p, i) => {
+    const y = ground(hf, p);
+    const k = kits.near(p.x, p.z).at(p.x, y, p.z);
+    k.prism(0, 0, -SINK, top - 0.25, 0.03, 0.025, 4, PALETTE.orange);
+    k.prism(0, 0, top - 0.25, top, 0.025, 0.02, 4, PALETTE.dark);
+    const next = spots[i + 1];
+    if (!rope || !next) return;
+    const y2 = ground(hf, next);
+    const n = 4;
+    for (let j = 0; j < n; j++) {
+      const at = (t: number): Vector3 => new Vector3(p.x + (next.x - p.x) * t, y + (y2 - y) * t + top - 0.3 - 0.35 * 4 * t * (1 - t), p.z + (next.z - p.z) * t);
+      kits.near(p.x, p.z).beamWorld(at(j / n), at((j + 1) / n), 0.015, PALETTE.orangeDark);
+    }
+  });
+}
+
+/**
+ * A cornice along a lip's crest: wind-packed snow curling out over the lee
+ * drop, a snow top and a shadowed underside, in a cross-section that grows
+ * with the lip's height (CORNICE) and fades in at its ends.
+ */
+function cornice(c: CorniceLine, hf: Heightfield, kits: TiledKit): void {
+  const spots = alongLine(c.points, 2);
+  const h = (c.heading * Math.PI) / 180;
+  const dx = -Math.sin(h);
+  const dz = -Math.cos(h);
+  let total = 0;
+  const along = spots.map((p, i) => (total += i === 0 ? 0 : Math.hypot(p.x - spots[i - 1]!.x, p.z - spots[i - 1]!.z)));
+  const k = c.height / 2.4;
+  /** The cross-section at spot i: points out from the crest along the heading, [out, up]. */
+  const section = (i: number): Vector3[] => {
+    const p = spots[i]!;
+    const fade = c.taper > 0 ? Math.min(1, along[i]! / c.taper, (total - along[i]!) / c.taper) : 1;
+    const s = k * Math.max(0, fade);
+    const y = drawnHeightAt(hf, p.x, p.z);
+    return CORNICE.map(([out, up]) => new Vector3(p.x + dx * out * s, y + up * s, p.z + dz * out * s));
+  };
+  const up = new Vector3(0, 1, 0);
+  const under = new Vector3(dx, -1, dz).normalize();
+  for (let i = 1; i < spots.length; i++) {
+    const a = section(i - 1);
+    const b = section(i);
+    const kit = kits.near(spots[i]!.x, spots[i]!.z);
+    for (let j = 1; j < a.length; j++) {
+      const out = j < CORNICE_TOP ? up : under;
+      kit.quad(a[j - 1]!, b[j - 1]!, b[j]!, a[j]!, j < CORNICE_TOP ? PALETTE.snow : PALETTE.corniceShade, out);
+    }
+  }
+}
+/** A cornice's cross-section for a 2.4 m lip: [out along its heading, up] from the crest; the first CORNICE_TOP - 1 faces are its top. */
+const CORNICE: readonly [number, number][] = [
+  [-1.6, -0.1],
+  [0.2, 0.3],
+  [1.5, 0.1],
+  [2.1, -0.35],
+  [1.6, -0.9],
+  [0.6, -1.7],
+];
+const CORNICE_TOP = 4;
 
 /** Posts along a line with a two-sided panel strung between each pair; the top band is a darker shade. */
 function postsAndPanels(

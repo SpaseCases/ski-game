@@ -18,9 +18,11 @@ export const PALETTE = {
   twigs: c('#b6aaa0'),
   twigsDark: c('#9d9188'),
   snag: c('#8b7c6c'),
-  rock: c('#7d848c'),
-  rockDark: c('#666d75'),
+  rock: c('#77716b'),
+  rockDark: c('#5b5550'),
   snow: c('#f1f5fa'),
+  /** A cornice's shadowed underside. */
+  corniceShade: c('#a9c3e3'),
   post: c('#3a4450'),
   metal: c('#9aa4ad'),
   metalDark: c('#6c7680'),
@@ -43,8 +45,8 @@ export const PALETTE = {
 /** Flag and banner colors, cycled through when a map doesn't pick one. */
 export const FLAG_COLORS = ['#2f7de1', '#ff7a1a', '#33c26a', '#e0c21f', '#d8342c', '#8a4fd6'].map(c);
 
-/** Scatter prototypes: two pines, two aspens, a snag, three rocks, two boulders, three crags. Picked per item by its tint. */
-export function scatterModels(): Record<'pine' | 'aspen' | 'snag' | 'rock' | 'boulder' | 'crag', BufferGeometry[]> {
+/** Scatter prototypes: two pines, two aspens, a snag, three rocks, two boulders, three crags, a fallen tree. Picked per item by its tint. */
+export function scatterModels(): Record<'pine' | 'aspen' | 'snag' | 'rock' | 'boulder' | 'crag' | 'deadfall', BufferGeometry[]> {
   return {
     pine: [pine(false), pine(true)],
     aspen: [aspen(false), aspen(true)],
@@ -52,6 +54,7 @@ export function scatterModels(): Record<'pine' | 'aspen' | 'snag' | 'rock' | 'bo
     rock: [rock(11, false), rock(23, false), rock(37, false)],
     boulder: [rock(51, true), rock(67, true)],
     crag: [crag(5), crag(19), crag(29)],
+    deadfall: [deadfall()],
   };
 }
 
@@ -125,6 +128,18 @@ function snag(): BufferGeometry {
   k.beam(0, 2.4, 0, 1.1, 3.1, 0.2, 0.09, PALETTE.snag);
   k.beam(0, 3.4, 0, -0.9, 4.2, -0.3, 0.08, PALETTE.snag);
   k.beam(0, 4.4, 0, 0.3, 5.0, 0.8, 0.06, PALETTE.snag);
+  return k.geometry();
+}
+
+/** A fallen tree lying in the snow along x: a tapering trunk with snow along its top, its root plate standing up at one end, two broken branches. */
+function deadfall(): BufferGeometry {
+  const k = new MeshKit();
+  k.beam(-2.9, 0.2, 0, 3.1, 0.12, 0, 0.22, PALETTE.snag);
+  k.beam(-2.7, 0.4, 0, 2.9, 0.3, 0, 0.11, PALETTE.snow);
+  k.box(-3.05, 0.45, 0, 0.3, 1.3, 1.25, PALETTE.trunk);
+  k.box(-3.0, 1.12, 0, 0.32, 0.08, 1.1, PALETTE.snow);
+  k.beam(-0.6, 0.2, 0, -0.1, 0.55, 0.9, 0.07, PALETTE.snag);
+  k.beam(1.4, 0.15, 0, 1.9, 0.5, -0.8, 0.06, PALETTE.snag);
   return k.geometry();
 }
 
@@ -282,6 +297,12 @@ export function drawProp(k: MeshKit, kind: string, color: Color, glow: MeshKit, 
     case 'skiRack':
       skiRack(k, index);
       break;
+    case 'cabin':
+      cabin(k);
+      break;
+    case 'mast':
+      mast(k);
+      break;
     case 'hut': {
       // A small timber hut with a snowy gable roof (a ticket booth, a ski patrol shed).
       const h = S.hutSize;
@@ -298,6 +319,56 @@ export function drawProp(k: MeshKit, kind: string, color: Color, glow: MeshKit, 
       break;
     }
   }
+}
+
+/**
+ * A warming cabin facing -Z: a log cabin on a stone footing under a snowy
+ * gable roof, a chimney, a door and windows on the front, and a deck along
+ * the front with a rail, a bench and a pair of skis stood against it.
+ */
+function cabin(k: MeshKit): void {
+  const C = DECOR_SIZE.cabin;
+  const w = C.length / 2;
+  const d = C.depth / 2;
+  const wall = 2.6;
+  k.box(0, 0.25, 0, C.length + 0.2, 0.6, C.depth + 0.2, PALETTE.rockDark);
+  k.box(0, 0.55 + wall / 2, 0, C.length, wall, C.depth, PALETTE.wood);
+  for (const y of [1.1, 1.9, 2.7]) k.box(0, y, -d - 0.02, C.length + 0.1, 0.08, 0.06, PALETTE.woodDark);
+  const top = 0.55 + wall;
+  for (const side of [-1, 1]) {
+    k.panel(k.p(side * (w + 0.45), top - 0.15, -d - 0.5), k.p(side * (w + 0.45), top - 0.15, d + 0.5), k.p(0, C.height, d + 0.5), k.p(0, C.height, -d - 0.5), PALETTE.snow, PALETTE.woodDark);
+  }
+  for (const z of [-d, d]) k.panel(k.p(-w, top, z), k.p(w, top, z), k.p(0, C.height - 0.05, z), k.p(0, C.height - 0.05, z), PALETTE.woodDark);
+  k.box(w * 0.3, C.height, d * 0.3, 0.6, 1.6, 0.6, PALETTE.rock);
+  k.box(w * 0.3, C.height + 0.82, d * 0.3, 0.7, 0.08, 0.7, PALETTE.dark);
+  // The front: a door and two windows.
+  k.box(-0.6, 1.5, -d - 0.03, 0.95, 1.9, 0.05, PALETTE.woodDark);
+  for (const x of [-2.2, 1.5]) k.box(x, 1.9, -d - 0.03, 1.0, 0.75, 0.05, PALETTE.dark);
+  // The deck, its rail and a bench.
+  const fz = -d - C.deck / 2;
+  k.box(0, 0.5, fz, C.length, 0.2, C.deck, PALETTE.woodDark);
+  k.box(0, 1.45, -d - C.deck + 0.05, C.length, 0.08, 0.08, PALETTE.woodDark);
+  for (const x of [-w + 0.1, -w / 2, w / 2, w - 0.1]) k.box(x, 1.0, -d - C.deck + 0.05, 0.1, 0.95, 0.1, PALETTE.woodDark);
+  for (const x of [-w + 0.1, w - 0.1]) k.box(x, 1.0, fz, 0.1, 0.95, C.deck - 0.1, PALETTE.woodDark);
+  k.box(1.6, 0.85, -d - 0.35, 1.8, 0.1, 0.4, PALETTE.wood);
+  for (const x of [-1.9, -1.75]) k.box(x, 1.35, -d - C.deck + 0.2, 0.08, 1.7, 0.03, FLAG_COLORS[x < -1.8 ? 0 : 1]!);
+}
+
+/** A weather mast: a thin pole on a footing, an arm at the top with three anemometer cups and a vane, a logger box and a solar panel. */
+function mast(k: MeshKit): void {
+  const top = DECOR_SIZE.mastHeight;
+  k.box(0, 0.15, 0, 0.6, 0.5, 0.6, PALETTE.rockDark);
+  k.prism(0, 0, 0, top, 0.08, 0.05, 6, PALETTE.metal);
+  k.beam(-0.7, top - 0.3, 0, 0.7, top - 0.3, 0, 0.03, PALETTE.metalDark);
+  for (let i = 0; i < 3; i++) {
+    const a = (i * 2 * Math.PI) / 3;
+    k.beam(-0.7, top - 0.1, 0, -0.7 + Math.cos(a) * 0.3, top - 0.1, Math.sin(a) * 0.3, 0.015, PALETTE.dark);
+    k.box(-0.7 + Math.cos(a) * 0.33, top - 0.1, Math.sin(a) * 0.33, 0.09, 0.09, 0.09, PALETTE.dark);
+  }
+  k.beam(0.7, top - 0.15, 0.25, 0.7, top - 0.15, -0.35, 0.02, PALETTE.dark);
+  k.box(0.7, top - 0.15, 0.32, 0.04, 0.22, 0.18, PALETTE.red);
+  k.box(0, 1.6, -0.14, 0.4, 0.5, 0.18, PALETTE.white);
+  k.panel(k.p(-0.45, 2.4, -0.05), k.p(0.45, 2.4, -0.05), k.p(0.45, 2.95, -0.55), k.p(-0.45, 2.95, -0.55), PALETTE.dark, PALETTE.metalDark);
 }
 
 /** A parked snowmobile facing -Z: skis in front, the track behind, a colored hood, seat and windshield. */

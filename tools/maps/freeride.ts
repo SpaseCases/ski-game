@@ -29,6 +29,7 @@ import type { Heightfield } from '../../src/maps/types.ts';
 import { gapRail, poleJam, SHAPES, slideJson } from './railKit.ts';
 import { insideBounds } from '../../src/sim/bounds.ts';
 import { heightAt } from '../../src/sim/terrain.ts';
+import { fbm } from '../../src/maps/peak.ts';
 
 type Json = Record<string, unknown>;
 interface XZ {
@@ -219,7 +220,15 @@ function cliffs(s: SpokeId, r: number, drops: [number, number][], face = 3, tape
   cliffLine(drops.map(([a, h]) => ({ ...P(s, r, a), h })), angle(s, r), face, taper);
 }
 /** The steeps zone's bands (a drop of 12 m or more) keep trees, boulders and crags off their bench, face and this far (m) past the foot. */
-const STEEPS_CLEAR = 45;
+const STEEPS_CLEAR = 60;
+/** Forest edges along the runs: a tree every `step` m each side, `gap` to `gap` + `jitter` m past the run's clear width, where the forest's clump noise is `inside` over its threshold; none within `town` m of the town, nor along runs cleared wider than `widest` (the Gully, whose booters throw riders out of it). */
+const EDGE = { step: 6, gap: 1.5, jitter: 2, inside: 0.03, town: 300, widest: 10 };
+/** Wind drifts: half their height (m) and the distance between them. */
+const DRIFT = { amplitude: 0.9, wavelength: 26 };
+/** A cabin's pad: tilted this many degrees down the face, its radius and how far it blends back into the slope. */
+const CABIN_PAD = { pitch: 5, radius: 10, blend: 14 };
+/** Rope lines down the edges of the steeps' gaps (spots on the ground, from above the bench to below the drop), filled in as the bands are laid. */
+const ropeLines: XZ[][] = [];
 /** How far (m) down each of the East bowl's chutes its air is. */
 const CHUTE_LIP = 120;
 /** A cliff band along any line of spots (each with its drop `h`), ridden over toward `heading`. */
@@ -228,9 +237,12 @@ function cliffLine(points: (XZ & { h: number })[], heading: number, face = 3, ta
   const clear = tallest >= 12 ? { clear: STEEPS_CLEAR } : {};
   elements.push({ type: 'cliffs', points: points.map((p) => xzh(p, p.h)), heading: r1(heading), face, bench: r1(2.5 * tallest + 8), taper, ...clear });
 }
+/** Lips this tall (m) or taller are cornices, drawn curling out over their drop (the ridges' and the bowl's rim, milestone 15). */
+const CORNICE_MIN = 1.8;
 /** A wind lip or cornice along a line of (r, across) spots on a spoke, facing `heading`. */
 function lip(s: SpokeId, spots: [number, number][], heading: number, height: number, ramp: number, drop: number): void {
-  elements.push({ type: 'lip', points: spots.map(([r, a]) => xz(P(s, r, a))), heading: r1(heading), height, ramp, drop, taper: 15 });
+  const cornice = height >= CORNICE_MIN ? { cornice: true } : {};
+  elements.push({ type: 'lip', points: spots.map(([r, a]) => xz(P(s, r, a))), heading: r1(heading), height, ramp, drop, taper: 15, ...cornice });
 }
 /** A gully along (r, across) spots on a spoke. */
 function gully(s: SpokeId, spots: [number, number][], floor: number, depth: number, wall: number, taper = 40): void {
@@ -288,6 +300,12 @@ cliffs('north', 335, [[-14, 0], [-5, 12], [5, 12], [14, 0]], 3, 2);
 cliffs('north', 335, [[-37, 0], [-31, 16], [-27, 16], [-21, 0]], 3, 2);
 // Bands 2 and 3, down the 42° face; the gaps line up for the main couloir's way down.
 cliffs('north', 460, [[-215, 0], [-185, 16], [-140, 19], [-100, 20], [-68, 16], [-44, 0], [-2, 0], [25, 15], [60, 17], [100, 18], [140, 16], [180, 15], [212, 0]]);
+for (const [r, bench, edges] of [
+  [460, 58, [-41, -5]],
+  [587, 70.5, [-52, -15]],
+] as const) {
+  for (const a of edges) ropeLines.push([P('north', r - (bench + 5) / K, a), P('north', r + 12, a)]);
+}
 cliffs('north', 587, [[-220, 0], [-190, 19], [-150, 23], [-112, 25], [-80, 22], [-55, 0], [-12, 0], [15, 18], [52, 20], [92, 22], [132, 19], [170, 18], [205, 0]]);
 pillows('north', 755, -150, 120, 140, 26, [4, 7], [1.5, 3.5], 5);
 // The pillow line: snow-capped rocks stacked down the steep upper face,
@@ -358,6 +376,8 @@ elements.push({ type: 'bowl', ...xz(P('east', 82)), heading: r1(angle('east', 82
     const heights = side < 0 ? [0, 12, 14, 13, 0] : [0, 13, 16, 14, 0];
     const mid = alongTrace(line, 32);
     cliffLine([0, 10, 32, 54, 64].map((d, i) => ({ ...alongTrace(line, d).p, h: heights[i]! })), fallOn(pre, mid.p).heading, 3, 4);
+    // A rope line down the edge of the Entrance's gap, beside the band's start.
+    ropeLines.push(traceOn(pre, Bp(235, 10 * side), 75, 0, 15));
   }
 }
 cliffs('east', 520, [[40, 0], [60, 3], [85, 4], [105, 3], [125, 0]]);
@@ -533,6 +553,33 @@ function boundsPolygon(): XZ[] {
   return out;
 }
 
+// ---------------------------------------------------------------- filling the open ground
+// Milestone 15: wind drifts over the ridges and the open upper faces (short
+// rollers, so no stretch is a smooth plane), and a level pad on a shoulder
+// of each face for its warming cabin. Before the cat tracks, whose roads are
+// cut through whatever lies under them.
+for (const [s, r, a, radius, seed] of [
+  ['northeast', 450, 0, 260, 51],
+  ['southeast', 500, 0, 260, 53],
+  ['southwest', 500, 0, 260, 55],
+  ['northwest', 450, 0, 260, 57],
+  ['south', 430, 0, 240, 59],
+  ['west', 330, -60, 200, 61],
+] as const) {
+  bumps(s, r, a, radius, DRIFT.amplitude, DRIFT.wavelength, seed);
+}
+/** A warming cabin on each face: (face, r, across), its front toward the run beside it. */
+const CABINS: [SpokeId, number, number][] = [
+  ['north', 860, 45],
+  ['east', 600, -110],
+  ['south', 790, -60],
+  ['west', 500, 110],
+];
+for (const [f, r, a] of CABINS) {
+  const c = P(f, r, a);
+  elements.push({ type: 'flat', ...xz(c), heading: r1(angle(f, r)), pitch: CABIN_PAD.pitch, radius: CABIN_PAD.radius, blend: CABIN_PAD.blend });
+}
+
 // ---------------------------------------------------------------- cat tracks
 // Milestone 15: a cat track low on each face, a level road cut across the
 // slope at TRACK.grade down along it, traced on the ground built from every
@@ -652,7 +699,8 @@ const terrain = {
   bounds: boundsPolygon(),
   // Past the play area the rim lets go and the land runs on into the foothills (milestone 8).
   rim: RIM,
-  rockSlope: 56,
+  // Bolder rock bands (milestone 15): rock from 50°, not 56°.
+  rockSlope: 50,
   noise: 0.2,
   rockNoise: 0.9,
   seed: SEED,
@@ -1183,7 +1231,7 @@ const TREELINE = 2775;
 // pines stand alone; groves of bare white aspens lower down. Rock breaks
 // out of every steep face, with crags standing out of the cliffs.
 decor.push(
-  { kind: 'pine', spacing: 10, height: [0, 0, TREELINE - 90, TREELINE], slope: [0, 0, 26, 34], clumps: { size: 220, clear: 0.72 }, seed: 3, minScale: 0.8, maxScale: 1.5, solid: true },
+  { kind: 'pine', spacing: 10, height: [0, 0, TREELINE - 35, TREELINE], slope: [0, 0, 26, 34], clumps: { size: 220, clear: 0.72 }, seed: 3, minScale: 0.8, maxScale: 1.5, solid: true },
   { kind: 'pine', spacing: 34, height: [0, 0, TREELINE - 60, TREELINE + 20], slope: [0, 0, 28, 36], clumps: { size: 60, clear: 0.2 }, seed: 13, minScale: 0.9, maxScale: 1.6, solid: true },
   { kind: 'aspen', spacing: 10, height: [TREELINE - 650, TREELINE - 550, TREELINE - 300, TREELINE - 200], slope: [0, 0, 22, 30], clumps: { size: 80, clear: 0.9 }, seed: 23, minScale: 0.8, maxScale: 1.25, solid: true },
   { kind: 'snag', spacing: 60, height: [TREELINE - 110, TREELINE - 70, TREELINE, TREELINE + 50], slope: [0, 0, 32, 40], clumps: { size: 50, clear: 0.55 }, seed: 4, minScale: 0.8, maxScale: 1.2, solid: true },
@@ -1220,6 +1268,91 @@ lift(T(368, -78), P('south', 560, -190));
 lift(P('east', 1720, 150), P('east', 760, 270));
 lift(P('north', 1700, 230), P('north', 980, 330));
 lift(P('west', 1640, 170), P('west', 820, 290));
+
+// Milestone 15: filling the open ground. Lone pines and tree islands out in
+// the open, stunted pines (krummholz) in a band over the treeline, fallen
+// trees in the forests, boulder fields and rock outcrops on the open slopes.
+decor.push(
+  { kind: 'pine', spacing: 70, height: [0, 0, TREELINE - 40, TREELINE + 10], slope: [0, 0, 24, 32], seed: 31, minScale: 0.9, maxScale: 1.7, solid: true },
+  { kind: 'pine', spacing: 10, height: [TREELINE - 170, TREELINE - 120, TREELINE, TREELINE + 40], slope: [0, 0, 26, 34], clumps: { size: 30, clear: 1 }, seed: 33, minScale: 0.8, maxScale: 1.5, solid: true },
+  { kind: 'pine', spacing: 14, height: [TREELINE - 30, TREELINE + 10, TREELINE + 130, TREELINE + 190], slope: [0, 0, 30, 38], clumps: { size: 24, clear: 0.6 }, seed: 35, minScale: 0.35, maxScale: 0.6, solid: true },
+  { kind: 'deadfall', spacing: 45, height: [0, 0, TREELINE - 80, TREELINE], slope: [0, 0, 28, 34], clumps: { size: 220, clear: 0.72 }, seed: 37, minScale: 0.8, maxScale: 1.3, solid: false },
+  { kind: 'boulder', spacing: 26, height: [TREELINE - 300, TREELINE - 200, 4000, 4000], slope: [6, 10, 34, 40], clumps: { size: 40, clear: 1 }, seed: 39, minScale: 0.6, maxScale: 1.3, solid: true },
+  { kind: 'rock', spacing: 24, height: [TREELINE - 200, TREELINE - 100, 4000, 4000], slope: [20, 26, 44, 48], clumps: { size: 30, clear: 0.9 }, seed: 41, minScale: 2, maxScale: 3.4, solid: true },
+  // A band of snags along the treeline.
+  { kind: 'snag', spacing: 20, height: [TREELINE - 30, TREELINE, TREELINE + 40, TREELINE + 80], slope: [0, 0, 32, 40], clumps: { size: 40, clear: 0.4 }, seed: 43, minScale: 0.8, maxScale: 1.3, solid: true },
+);
+// Crisp forest edges: a row of pines along both sides of each run wherever
+// it goes through the big forests (the first pine set's clumps), so a run
+// reads as a cut through the trees.
+{
+  const forest = decor.find((d) => d.kind === 'pine' && d.seed === 3) as { clumps: { size: number; clear: number }; seed: number };
+  const level = (forest.clumps.clear - 0.5) * 0.7 + EDGE.inside;
+  const town = T(TOWN.length / 2);
+  const inForest = (q: XZ): boolean =>
+    fbm(q.x / forest.clumps.size, q.z / forest.clumps.size, forest.seed + 7) > level && gy(q) < TREELINE - 40 && fall(q).slope < 30 && Math.hypot(q.x - town.x, q.z - town.z) > EDGE.town;
+  const spots: Json[] = [];
+  runs.forEach((run, k) => {
+    const pts = run.points as XZ[];
+    const clear = run.clear as number;
+    if (clear > EDGE.widest) return;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1]!;
+      const b = pts[i]!;
+      const len = Math.hypot(b.x - a.x, b.z - a.z);
+      const heading = Math.atan2(-(b.x - a.x), -(b.z - a.z)) / DEG;
+      for (let d = 0; d < len; d += EDGE.step) {
+        const q = { x: a.x + ((b.x - a.x) * d) / len, z: a.z + ((b.z - a.z) * d) / len };
+        for (const side of [-1, 1]) {
+          const jitter = 0.5 + 0.5 * Math.sin(k * 91.7 + i * 13.1 + d * 7.3 + side * 3.1);
+          const spot = rightOf(q, heading, side * (clear + EDGE.gap + EDGE.jitter * jitter));
+          if (inForest(spot)) spots.push(xz(spot));
+        }
+      }
+    }
+  });
+  decor.push({ kind: 'pine', spots, seed: 45, minScale: 0.9, maxScale: 1.6, solid: true });
+}
+// Mountain buildings: a patrol hut and a weather mast on the summit, a warming cabin on each face.
+decor.push({ kind: 'hut', points: [xz(P('southwest', 22, -4))], heading: r1(angle('southwest', 22) + 180) });
+decor.push({ kind: 'mast', points: [xz(P('southwest', 26, 7))], heading: r1(angle('southwest', 26)) });
+for (const [f, r, a] of CABINS) decor.push({ kind: 'cabin', points: [xz(P(f, r, a))], heading: r1(angle(f, r) + (a > 0 ? 90 : -90)) });
+// Snow fences along the ridges' flanks, off their crests and booters.
+for (const s of ['northeast', 'southeast', 'southwest', 'northwest'] as const) {
+  for (const [r, a] of [
+    [230, 30],
+    [560, -30],
+  ] as const) {
+    decor.push({ kind: 'snowFence', points: [xz(P(s, r, a)), xz(P(s, r + 27, a))] });
+  }
+}
+// Rope lines down the edges of the steeps' gaps.
+for (const line of ropeLines) decor.push({ kind: 'ropeLine', points: line.map(xz) });
+// Bamboo markers along each cat track's downhill edge, every 20 m, kept off its cat gap's landing.
+trackLines.forEach((line, k) => {
+  const gap = gaps.find((g) => g.name === TRACKS[k]!.gap) as { from: XZ[] } | undefined;
+  const at = gap ? { x: gap.from.reduce((sum, q) => sum + q.x, 0) / gap.from.length, z: gap.from.reduce((sum, q) => sum + q.z, 0) / gap.from.length } : null;
+  let run: Json[] = [];
+  const flush = (): void => {
+    if (run.length >= 2) decor.push({ kind: 'markers', points: run });
+    run = [];
+  };
+  for (let i = 5; i < line.length - 5; i += 5) {
+    const q = line[i]!;
+    const n = line[i + 1]!;
+    const len = Math.hypot(n.x - q.x, n.z - q.z);
+    let nx = -(n.z - q.z) / len;
+    let nz = (n.x - q.x) / len;
+    if (gy({ x: q.x + nx * 10, z: q.z + nz * 10 }) > gy({ x: q.x - nx * 10, z: q.z - nz * 10 })) {
+      nx = -nx;
+      nz = -nz;
+    }
+    const spot = { x: q.x + nx * (TRACK.width / 2 + TRACK.bank + 1.5), z: q.z + nz * (TRACK.width / 2 + TRACK.bank + 1.5) };
+    if (at && Math.hypot(spot.x - at.x, spot.z - at.z) < 35) flush();
+    else run.push(xz(spot));
+  }
+  flush();
+});
 
 // ---------------------------------------------------------------- the map
 const spawn = { x: 0, z: 0, heading: 0 };

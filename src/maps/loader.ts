@@ -34,9 +34,9 @@ import type {
   XZ,
 } from './types.ts';
 
-const SCATTER_KINDS: readonly ScatterKind[] = ['pine', 'aspen', 'snag', 'rock', 'boulder', 'crag'];
-const LINE_KINDS: readonly LineKind[] = ['fence', 'netting', 'barrier', 'dyeLine', 'bunting', 'chairlift'];
-const PROP_KINDS: readonly PropKind[] = ['lightPole', 'floodlight', 'banner', 'flag', 'groomer', 'streetLamp', 'hut', 'snowmobile', 'skier', 'skiRack'];
+const SCATTER_KINDS: readonly ScatterKind[] = ['pine', 'aspen', 'snag', 'rock', 'boulder', 'crag', 'deadfall'];
+const LINE_KINDS: readonly LineKind[] = ['fence', 'netting', 'barrier', 'dyeLine', 'bunting', 'chairlift', 'snowFence', 'ropeLine', 'markers'];
+const PROP_KINDS: readonly PropKind[] = ['lightPole', 'floodlight', 'banner', 'flag', 'groomer', 'streetLamp', 'hut', 'snowmobile', 'skier', 'skiRack', 'cabin', 'mast'];
 const START_STYLES: readonly StartStyle[] = ['deck', 'tower', 'ridge', 'race'];
 const RAIL_STYLES: readonly RailStyle[] = ['metal', 'handrail', 'log', 'tube', 'loop', 'corkscrew'];
 const BOX_STYLES: readonly BoxStyle[] = ['wood', 'ledge', 'bench', 'rock', 'stump', 'table', 'barrels', 'spool'];
@@ -226,6 +226,7 @@ function parseElement(raw: unknown, path: string): TerrainElement {
         height: n('height'),
         ramp: n('ramp'),
         drop: n('drop'),
+        cornice: e.cornice === undefined ? false : bool(e.cornice, `${path}.cornice`),
         taper: n('taper', 15),
       };
     case 'bowl':
@@ -614,6 +615,16 @@ function parseDecor(raw: unknown, path: string): DecorDef {
       maxScale: n('maxScale', 1.2),
       solid: d.solid === undefined ? false : bool(d.solid, `${path}.solid`),
       reach: n('reach', 450),
+    };
+  }
+  if ((SCATTER_KINDS as readonly string[]).includes(kind) && d.spots !== undefined) {
+    return {
+      kind: kind as ScatterKind,
+      spots: xzPoints(d.spots, `${path}.spots`, 1),
+      seed: n('seed', 1),
+      minScale: n('minScale', 0.8),
+      maxScale: n('maxScale', 1.2),
+      solid: d.solid === undefined ? false : bool(d.solid, `${path}.solid`),
     };
   }
   if ((SCATTER_KINDS as readonly string[]).includes(kind)) {

@@ -7,8 +7,8 @@ import { litByPools } from './lightPools.ts';
 const SNOW = new Color('#f5f8fc');
 const SNOW_SHADE = new Color('#c4d3e6');
 /** Rock faces: a mid and a dark gray, with a little variation between facets. */
-const ROCK = new Color('#7a8189');
-const ROCK_DARK = new Color('#5e656d');
+const ROCK = new Color('#6e6862');
+const ROCK_DARK = new Color('#4c4743');
 /** Cells per side of a near chunk (72 m at 3 m cells). Each chunk is its own mesh, so chunks off screen aren't drawn. */
 const CHUNK = 24;
 /** Near chunks per side of a far chunk: the same ground drawn coarsely as one mesh, when it's far away. */
