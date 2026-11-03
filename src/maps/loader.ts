@@ -209,6 +209,8 @@ function parseElement(raw: unknown, path: string): TerrainElement {
   switch (e.type) {
     case 'ridge':
       return { type: 'ridge', points: heightPoints(e.points, `${path}.points`), crest: n('crest'), side: n('side'), taper: n('taper', 20) };
+    case 'track':
+      return { type: 'track', points: xzPoints(e.points, `${path}.points`, 2), width: n('width'), bank: n('bank'), smooth: n('smooth', 30), crossfall: n('crossfall', 0), taper: n('taper', 20) };
     case 'gully':
       return { type: 'gully', points: xzPoints(e.points, `${path}.points`, 2), floor: n('floor'), depth: n('depth'), wall: n('wall'), taper: n('taper', 30) };
     case 'cliffs': {

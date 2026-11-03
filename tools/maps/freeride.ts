@@ -26,6 +26,7 @@ import { writeFileSync } from 'node:fs';
 import { buildMap, generateTerrain } from '../../src/maps/build.ts';
 import { parseMap } from '../../src/maps/loader.ts';
 import type { Heightfield } from '../../src/maps/types.ts';
+import { gapRail, poleJam, SHAPES, slideJson } from './railKit.ts';
 import { insideBounds } from '../../src/sim/bounds.ts';
 import { heightAt } from '../../src/sim/terrain.ts';
 
@@ -155,7 +156,7 @@ const SEED = 21;
  * down its real fall line). The same heights the map will have there, but
  * for the elements that come later.
  */
-function groundSoFar(size = 1206): Heightfield {
+function groundSoFar(size = 1206, edge?: { bounds: XZ[]; rim: Json }): Heightfield {
   const h = size / 2;
   const terrain = {
     type: 'peak',
@@ -166,8 +167,8 @@ function groundSoFar(size = 1206): Heightfield {
     roll: ROLL,
     relief: RELIEF,
     elements,
-    bounds: [{ x: -h, z: -h }, { x: h, z: -h }, { x: h, z: h }, { x: -h, z: h }],
-    rim: { inset: 80, ramp: 90, rise: 0.4 },
+    bounds: edge?.bounds ?? [{ x: -h, z: -h }, { x: h, z: -h }, { x: h, z: h }, { x: -h, z: h }],
+    rim: edge?.rim ?? { inset: 80, ramp: 90, rise: 0.4 },
     rockSlope: 56,
     noise: 0,
     rockNoise: 0,
@@ -532,6 +533,113 @@ function boundsPolygon(): XZ[] {
   return out;
 }
 
+// ---------------------------------------------------------------- cat tracks
+// Milestone 15: a cat track low on each face, a level road cut across the
+// slope at TRACK.grade down along it, traced on the ground built from every
+// element before it. Riding down the fall line, its cut bank drops onto the
+// road and its fill drops off the far side. Where the face's main run
+// crosses, a kicker lip on the bank's top edge sends riders over the road:
+// a named cat gap.
+const TRACK = { width: 8, bank: 3, smooth: 30, crossfall: 0.35, taper: 20, grade: 5, step: 4 };
+/** The cat gap's kicker on the cut bank's top edge: its height, windward ramp and length along the road. */
+const CAT_KICK = { height: 2, ramp: 10, length: 24 };
+const CAT_GAP_POINTS = 400;
+/** A side hit's size: how high, how long its windward ramp and its lee drop, how long across, and how far it's turned off the fall line. */
+const SIDE_HIT = { height: 1.6, ramp: 10, drop: 4, length: 18, turn: 30 };
+/** Side hits per face: (face, r, across, 1 if right of its run or -1 if left). */
+const SIDE_HITS: [SpokeId, number, number, 1 | -1][] = [
+  ['north', 860, -100, 1],
+  ['north', 930, 100, 1],
+  ['north', 1450, 25, 1],
+  ['east', 780, -55, -1],
+  ['east', 1150, 85, 1],
+  ['east', 1450, 20, 1],
+  ['south', 830, 25, 1],
+  ['south', 1250, 175, 1],
+  ['south', 1440, -100, -1],
+  ['west', 650, -140, 1],
+  ['west', 1060, -128, 1],
+  ['west', 1200, 125, 1],
+];
+const RIM = { inset: 80, ramp: 90, rise: 0.4, ease: 350 };
+const gaps: Json[] = [];
+/** Problems found laying out the tracks, reported with the warnings. */
+const trackNotes: string[] = [];
+/** Each track: where it starts (r, across on the face), which way it heads across (1 right, -1 left, facing down), how long it runs, and where on it the gap is (the spot on the track nearest this run line). */
+const TRACKS: { face: SpokeId; start: [number, number]; side: 1 | -1; length: number; gap: string; run: [number, number][] }[] = [
+  { face: 'north', start: [1300, -380], side: 1, length: 720, gap: 'Steeps cat gap', run: [[1000, 0], [1300, 0], [1600, 0]] },
+  { face: 'east', start: [1010, -400], side: 1, length: 760, gap: 'Bowl cat gap', run: [[850, 120], [1100, 60], [1400, 0]] },
+  { face: 'south', start: [1060, 320], side: -1, length: 820, gap: 'Glades cat gap', run: [[1000, -20], [1180, -30], [1450, 0]] },
+  { face: 'west', start: [1380, 300], side: -1, length: 820, gap: 'Gully cat gap', run: [[1200, -120], [1450, -40], [1720, 0]] },
+];
+/** Where each track's road runs (spots every TRACK.step m), for the report's checks. */
+const trackLines: XZ[][] = [];
+{
+  const pre = groundSoFar(6200, { bounds: boundsPolygon(), rim: RIM });
+  const g = (p: XZ): number => heightAt(pre, p.x, p.z);
+  for (const t of TRACKS) {
+    // Across the slope at the grade: as far off the fall line as makes the slope along it TRACK.grade.
+    const line: XZ[] = [P(t.face, ...t.start)];
+    for (let d = TRACK.step; d <= t.length; d += TRACK.step) {
+      const q = line[line.length - 1]!;
+      const f = fallOn(pre, q, 8);
+      const off = Math.acos(Math.min(1, Math.tan(TRACK.grade * DEG) / Math.tan(Math.max(TRACK.grade, f.slope) * DEG))) / DEG;
+      const a = (f.heading - t.side * off) * DEG;
+      line.push({ x: q.x - Math.sin(a) * TRACK.step, z: q.z - Math.cos(a) * TRACK.step });
+    }
+    trackLines.push(line);
+    elements.push({ type: 'track', points: line.filter((_, i) => i % 5 === 0 || i === line.length - 1).map(xz), width: TRACK.width, bank: TRACK.bank, smooth: TRACK.smooth, crossfall: TRACK.crossfall, taper: TRACK.taper });
+    // The gap: where the run line comes nearest the road.
+    const run = t.run.map(([r, a]) => P(t.face, r, a));
+    let best = Infinity;
+    let at = 0;
+    line.forEach((q, i) => {
+      for (let k = 1; k < run.length; k++) {
+        const a = run[k - 1]!;
+        const b = run[k]!;
+        const sx = b.x - a.x;
+        const sz = b.z - a.z;
+        const u = Math.min(1, Math.max(0, ((q.x - a.x) * sx + (q.z - a.z) * sz) / (sx * sx + sz * sz)));
+        const d = Math.hypot(q.x - a.x - sx * u, q.z - a.z - sz * u);
+        if (d < best) {
+          best = d;
+          at = i;
+        }
+      }
+    });
+    if (best > 10) trackNotes.push(`${t.gap}: the track passes ${best.toFixed(0)} m from its run`);
+    const c = line[at]!;
+    const n = line[Math.min(line.length - 1, at + 1)]!;
+    const m = line[Math.max(0, at - 1)]!;
+    const tx = (n.x - m.x) / Math.hypot(n.x - m.x, n.z - m.z);
+    const tz = (n.z - m.z) / Math.hypot(n.x - m.x, n.z - m.z);
+    // The uphill side of the road there.
+    let nx = -tz;
+    let nz = tx;
+    if (g({ x: c.x + nx * 12, z: c.z + nz * 12 }) < g({ x: c.x - nx * 12, z: c.z - nz * 12 })) {
+      nx = -nx;
+      nz = -nz;
+    }
+    const spot = (along: number, out: number): XZ => ({ x: c.x + tx * along + nx * out, z: c.z + tz * along + nz * out });
+    const edge = TRACK.width / 2 + TRACK.bank;
+    const L = CAT_KICK.length / 2;
+    // Riders go over it toward the road, square to it.
+    const over = Math.atan2(nx, nz) / DEG;
+    elements.push({ type: 'lip', points: [xz(spot(-L, edge)), xz(spot(0, edge)), xz(spot(L, edge))], heading: r1(over), height: CAT_KICK.height, ramp: CAT_KICK.ramp, drop: TRACK.bank, taper: 6 });
+    const quad = (a0: number, a1: number, o0: number, o1: number): Json[] => [spot(a0, o0), spot(a1, o0), spot(a1, o1), spot(a0, o1)].map(xz);
+    gaps.push({ name: t.gap, from: quad(-L - 2, L + 2, edge - 1, edge + CAT_KICK.ramp + 4), to: quad(-L - 8, L + 8, -TRACK.width / 2, -(TRACK.width / 2 + TRACK.bank + 50)), points: CAT_GAP_POINTS });
+  }
+  // Natural side hits (milestone 15): drifted banks just off a run, each
+  // turned SIDE_HIT.turn degrees off the fall line back toward the run (`side`:
+  // 1 when it's right of the run, facing down), to boost off and land back on it.
+  for (const [face, r, a, side] of SIDE_HITS) {
+    const c = P(face, r, a);
+    const heading = fallOn(pre, c, 8).heading + side * SIDE_HIT.turn;
+    const half = SIDE_HIT.length / 2;
+    elements.push({ type: 'lip', points: [xz(rightOf(c, heading, -half)), xz(c), xz(rightOf(c, heading, half))], heading: r1(heading), height: SIDE_HIT.height, ramp: SIDE_HIT.ramp, drop: SIDE_HIT.drop, taper: 6 });
+  }
+}
+
 const terrain = {
   type: 'peak',
   size: 6200,
@@ -543,7 +651,7 @@ const terrain = {
   elements,
   bounds: boundsPolygon(),
   // Past the play area the rim lets go and the land runs on into the foothills (milestone 8).
-  rim: { inset: 80, ramp: 90, rise: 0.4, ease: 350 },
+  rim: RIM,
   rockSlope: 56,
   noise: 0.2,
   rockNoise: 0.9,
@@ -875,6 +983,105 @@ for (const [s, r, a] of [
   booter(at(s, r, a), 1.4, 22);
 }
 
+// ---- milestone 15: more to hit on every face
+// About four more booters per face (kickers and tables, one big one), four
+// more logs, and a set-up from the rail kit: a rock jib line in the Steeps and
+// the Bowl, a log garden in the Glades, a log gap beside the Gully's creek.
+// All after the older features, so theirs keep their numbers.
+/** Rail-kit JSON (laid out down -Z from x = d = 0) placed at p, its fall line turned to `yaw` (degrees). */
+function placeKit(items: Json[], p: XZ, yaw: number): Json[] {
+  const a = yaw * DEG;
+  const to = (q: XZ): XZ => ({ x: p.x - Math.sin(a) * -q.z + Math.cos(a) * q.x, z: p.z - Math.cos(a) * -q.z - Math.sin(a) * q.x });
+  return items.map((f) => {
+    const out: Json = { ...f };
+    if (typeof f.x === 'number' && typeof f.z === 'number') Object.assign(out, xz(to(f as unknown as XZ)));
+    if (typeof f.yaw === 'number') out.yaw = r1(f.yaw + yaw);
+    if (Array.isArray(f.points)) out.points = (f.points as Json[]).map((q) => ({ ...q, ...xz(to(q as unknown as XZ)) }));
+    return out;
+  });
+}
+/** A big natural booter: a 2 m table with a long landing. */
+const BIG_BOOTER = { lip: 2, angle: 24, land: { gap: 12, angle: 26 }, width: 8 };
+/** Each rock's length in a rock jib line (long enough to land on from 14 m/s; at 18 the bot flies the shorter old rocks). */
+const ROCK_LINE_LENGTH = 12;
+/** A rock jib line: three flat rocks down the fall line from (r, across), each with its drift kicking up to it. */
+function rockLine(s: SpokeId, r: number, a: number): void {
+  for (let i = 0; i < 3; i++) rockJib(at(s, r + i * 22, a + (i === 1 ? -3 : 0)), ROCK_LINE_LENGTH, 2.2, 0.7);
+}
+// North
+booter(at('north', 820, 40), 1.3, 22);
+booter(at('north', 900, -150), 1.4, 22, { land: { gap: 8, angle: 22 } });
+booter(at('north', 1400, -60), 1.2, 20);
+booter(at('north', 1000, 110), BIG_BOOTER.lip, BIG_BOOTER.angle, { land: BIG_BOOTER.land, width: BIG_BOOTER.width });
+for (const [r, a, len, turn] of [
+  [1180, 40, 11, 5],
+  [1420, 100, 12, -6],
+  [1600, -90, 11, 4],
+  [1560, 130, 10, -5],
+] as const) {
+  log(at('north', r, a), len, { turn });
+}
+rockLine('north', 1000, -45);
+// East
+booter(at('east', 760, 150), 1.3, 22);
+booter(at('east', 1120, -60), 1.4, 22, { land: { gap: 8, angle: 22 } });
+booter(at('east', 1250, 60), 1.2, 20);
+booter(at('east', 880, 190), BIG_BOOTER.lip, BIG_BOOTER.angle, { land: BIG_BOOTER.land, width: BIG_BOOTER.width });
+for (const [r, a, len, turn] of [
+  [1100, -100, 11, 6],
+  [1300, 140, 12, -4],
+  [1470, 60, 10, 5],
+  [1510, -30, 11, -6],
+] as const) {
+  log(at('east', r, a), len, { turn });
+}
+rockLine('east', 1060, 105);
+// South
+booter(at('south', 820, 70), 1.2, 20);
+booter(at('south', 980, -250), 1.3, 21, { land: { gap: 7, angle: 20 } });
+booter(at('south', 1300, -210), 1.2, 20);
+booter(at('south', 950, 230), BIG_BOOTER.lip, BIG_BOOTER.angle, { land: BIG_BOOTER.land, width: BIG_BOOTER.width });
+for (const [r, a, len, turn] of [
+  [940, -40, 11, 5],
+  [1240, -200, 12, -6],
+  [1460, 120, 10, 4],
+  [1080, -230, 11, -4],
+] as const) {
+  log(at('south', r, a), len, { turn, root: 0.5 });
+}
+// The log garden: a stump beside the way in, then a dead tree leaning out of the snow to ride up and pop off (a pole jam), and beside it a wavy log and a kinked one.
+{
+  const g = at('south', 1150, 235);
+  const yaw = r1(fall(g, 10).heading);
+  stump(rightOf(ahead(g, yaw, -6), yaw, -3.5), 0.7);
+  features.push(...placeKit([{ ...poleJam(0, 0, 1.1, 22), style: 'log', radius: 0.22 }], g, yaw));
+  features.push(...placeKit([slideJson('rail', 7, 2, SHAPES.wave(12, 0.5, 0.2, 1), { style: 'log', radius: 0.26 })], g, yaw));
+  features.push(...placeKit([slideJson('rail', -7, 4, SHAPES.doubleKink(13), { style: 'log', radius: 0.26 })], g, yaw));
+}
+// West
+booter(at('west', 800, -165), 1.2, 20);
+booter(at('west', 980, 150), 1.4, 22, { land: { gap: 8, angle: 22 } });
+booter(at('west', 1240, -60), 1.2, 20);
+booter(at('west', 1300, 160), BIG_BOOTER.lip, BIG_BOOTER.angle, { land: BIG_BOOTER.land, width: BIG_BOOTER.width });
+for (const [r, a, len, turn] of [
+  [900, -230, 11, 5],
+  [1100, 120, 12, -5],
+  [1350, -300, 10, 4],
+  [1560, 150, 11, -4],
+] as const) {
+  log(at('west', r, a), len, { turn });
+}
+// The log gap beside the creek: a log climbing off the snow and ending in the air, then a landing past a gap.
+{
+  const g = at('west', 1340, -232);
+  const yaw = r1(fall(g, 10).heading);
+  const set = gapRail(0, 0, { length: 11, gap: 2.5, end: 1.4, landing: 0.8, width: 6 });
+  const placed = placeKit(set.features, g, yaw).map((f) => (f.type === 'rail' ? { ...f, style: 'log', radius: 0.28 } : { ...f, natural: true }));
+  features.push(...placed);
+  const gp = placeKit([{ points: (set.gap.from as XZ[]).map((q) => ({ ...q, height: 0 })) }, { points: (set.gap.to as XZ[]).map((q) => ({ ...q, height: 0 })) }], g, yaw);
+  gaps.push({ name: 'Log gap', from: (gp[0]!.points as Json[]).map((q) => ({ x: q.x, z: q.z })), to: (gp[1]!.points as Json[]).map((q) => ({ x: q.x, z: q.z })), points: set.gap.points });
+}
+
 // ---------------------------------------------------------------- runs
 // Named lines down each face, kept clear of trees, for the headless riders
 // (tools/sim/face.ts), the dev panel's test spots, the trail signs and the trail map.
@@ -1033,6 +1240,7 @@ function mapJson(): Json {
     peaks,
     // Off the named runs the mountain is powder; the town is groomed.
     powder: { groomed: [{ ...xz(T(TOWN.length / 2)), heading: r1(TH), width: TOWN.width, length: TOWN.length }] },
+    gaps,
   };
 }
 
@@ -1080,6 +1288,22 @@ console.log(
     `${count('building')} buildings, ${count('terrace')} terraces, ${count('jump')} jumps, ${count('kicker')} kickers, ${count('rail')} rails, ${count('box')} boxes; ` +
     `${built.course.obstacles.count} obstacles, ${built.decor.scatter.length} scatter, ${built.decor.signs.length} signs`,
 );
+// Nothing built within a road's reach of a cat track (its banks would cut through it).
+trackLines.forEach((line, k) => {
+  const near = new Set<number>();
+  for (let i = 0; i < line.length; i += 2) {
+    const q = line[i]!;
+    built.map.features.forEach((f, j) => {
+      const spots = 'points' in f ? f.points : 'x' in f ? [f] : [];
+      for (const sp of spots) if (Math.hypot(sp.x - q.x, sp.z - q.z) < TRACK.width / 2 + TRACK.bank + 8) near.add(j);
+    });
+  }
+  for (const j of near) trackNotes.push(`${TRACKS[k]!.gap}: ${built.map.features[j]!.type} ${j} is on its track`);
+  const g0 = h(line[0]!);
+  const g1 = h(line[line.length - 1]!);
+  console.log(`  ${TRACKS[k]!.face} cat track: ${line.length * TRACK.step} m, from ${g0.toFixed(0)} to ${g1.toFixed(0)} m (${((Math.atan((g0 - g1) / (line.length * TRACK.step)) * 180) / Math.PI).toFixed(1)}° on average)`);
+});
+warnings.push(...trackNotes);
 for (const w of warnings) console.log(`WARNING: ${w}`);
 writeFileSync('src/maps/freeride.json', JSON.stringify(map, null, 1) + '\n');
 console.log('wrote src/maps/freeride.json');

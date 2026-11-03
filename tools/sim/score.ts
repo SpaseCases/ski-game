@@ -4,7 +4,8 @@
 // without a browser. On the Park it then rides milestone 10's cases:
 // rotations (reversed spins, a reversed tail butter, spin + Lincoln, five
 // and six flips with Turbo spins and Low gravity) and, on Jam Park, gaps (an
-// open gap, the Cat gap, a rail transfer, a fence hop).
+// open gap, the Cat gap, a rail transfer, a fence hop), and last Freeride's
+// named gaps (milestone 15).
 //   node tools/sim/score.ts [map.json] [x] [--tricks a,b,c] [--verbose]
 // Defaults: the Park, its x = -38 line of tables. Tricks (cycled, one per
 // jump): 360, 540, 720, cork540, cork720, backflip, frontflip, rodeo, misty,
@@ -522,3 +523,62 @@ if (sim.map.name === 'Park') {
 }
 
 console.log(`${banked} banked, ${lost} lost; best combo ${pointsText(best)}; last state: ${score.active ? `live, ${pointsText(comboTotal(score))}` : 'no combo'}`);
+
+// ---------------------------------------------------------------- milestone 15
+
+// Freeride's named gaps (the four cat gaps and the log gap): off each one's takeoff toward its landing, at three speeds.
+if (sim.map.name === 'Park') {
+  const fr = loadMap('src/maps/freeride.json');
+  const named = fr.gaps.zones.filter((z) => z.named);
+  console.log(`milestone 15 named gaps on Freeride (${named.length}):`);
+  const centre = (poly: Float32Array): { x: number; z: number } => {
+    let x = 0;
+    let z = 0;
+    for (let i = 0; i < poly.length; i += 2) {
+      x += poly[i]!;
+      z += poly[i + 1]!;
+    }
+    return { x: x / (poly.length / 2), z: z / (poly.length / 2) };
+  };
+  /** Brakes to a stop on the snow until the combo banks (as milestone 10's cases do). */
+  const settle = (rs: Rider): void => {
+    for (let i = 0; i < 12 / DT && (i < 0.5 / DT || score.active || !rs.s.grounded); i++) {
+      step(rs, rs.s.grounded ? ['down'] : []);
+      if (rs.s.bailed) {
+        console.log(`  crashed (${rs.s.bailReason})`);
+        endCombo(score, rs.s);
+        return;
+      }
+    }
+  };
+  let scored = 0;
+  let rides = 0;
+  for (const zone of named) {
+    const a = centre(zone.from);
+    const b = centre(zone.to);
+    const heading = Math.atan2(-(b.x - a.x), -(b.z - a.z));
+    for (const speed of [14, 18, 22]) {
+      console.log(`${zone.name} at ${speed} m/s, from 40 m above its takeoff:`);
+      const before = score.seq;
+      const rf = new Rider(fr);
+      rf.t = r.t;
+      rf.place(a.x + Math.sin(heading) * 40, a.z + Math.cos(heading) * 40, heading / DEG, speed);
+      let flew = false;
+      for (let i = 0; i < 12 / DT && !rf.s.bailed; i++) {
+        const err = wrapAngle(heading - rf.s.yaw);
+        step(rf, rf.s.grounded ? (err > 0.03 ? ['left'] : err < -0.03 ? ['right'] : []) : []);
+        if (!rf.s.grounded) flew = true;
+        if (flew && rf.s.grounded && rf.s.airTime === 0 && !score.active) break;
+        if (flew && rf.s.grounded && i * DT > 6) break;
+      }
+      if (rf.s.bailed) {
+        console.log(`  crashed (${rf.s.bailReason})`);
+        endCombo(score, rf.s);
+      } else settle(rf);
+      rides++;
+      for (let k = before; k < score.seq; k++) if (scoreEvent(score, k)?.kind === 'trick' && trickText(scoreEvent(score, k)!).includes(zone.name)) scored++;
+      r.t = rf.t;
+    }
+  }
+  console.log(`${scored} of ${rides} rides scored their gap`);
+}

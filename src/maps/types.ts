@@ -259,6 +259,27 @@ export interface FlatElement {
   blend: number;
 }
 
+/**
+ * A cat track: a level road cut across the slope along a line (milestone
+ * 15). Its height follows the ground along its middle, smoothed; above it a
+ * straight cut bank climbs back to the slope, below it a fill falls to it,
+ * so riding down the fall line meets a drop onto the road and off its far
+ * edge. Its banks are always snow.
+ */
+export interface TrackElement {
+  type: 'track';
+  points: XZ[];
+  /** Width of the level road, and the horizontal width of the cut bank above it and the fill below. */
+  width: number;
+  bank: number;
+  /** Length (m) of the stretch the road's height is averaged over along it. */
+  smooth: number;
+  /** How much of the slope across it the road keeps (0 level, 1 none cut): a little softens the drop onto it. */
+  crossfall: number;
+  /** Length over which it fades in from nothing at each end. */
+  taper: number;
+}
+
 export type TerrainElement =
   | RidgeElement
   | GullyElement
@@ -268,7 +289,8 @@ export type TerrainElement =
   | PillowsElement
   | BumpsElement
   | DipElement
-  | FlatElement;
+  | FlatElement
+  | TrackElement;
 
 /**
  * A mountain built around a summit at x = z = 0: spokes give each face and

@@ -15,8 +15,8 @@ import type { Heightfield, HeightPoint, PeakTerrainDef, TerrainElement, XZ } fro
 // (which, with rim.ease, lets go again a little past the play area, so the
 // land carries on into the foothills).
 // Then the terrain elements, in order:
-// ridges, gullies, cliff bands, wind lips, bowls, pillows, bumps, dips and
-// flat pads. Each is an exact function of position, sampled onto the grid.
+// ridges, gullies, cliff bands, wind lips, bowls, pillows, bumps, dips,
+// flat pads and cat tracks. Each is an exact function of position, sampled onto the grid.
 
 const DEG = Math.PI / 180;
 /** Step (m) of each spoke's drop table out from the summit. */
@@ -500,6 +500,44 @@ class PeakSampler {
             return h - e.depth * k * k;
           },
         };
+      case 'track': {
+        const line = new Polyline(e.points, path);
+        const half = e.width / 2;
+        const reach = half + e.bank;
+        // The road's height along the line: the ground under its middle (from the elements before it), averaged over `smooth` m.
+        const n = Math.max(2, Math.ceil(line.total / TRACK_STEP) + 1);
+        const raw = new Float64Array(n);
+        for (let i = 0; i < n; i++) {
+          line.pointAt(Math.min(line.total, i * TRACK_STEP));
+          raw[i] = this.heightBefore(line.qx, line.qz, this.elements.length);
+        }
+        const road = new Float64Array(n);
+        const k = Math.max(0, Math.round(e.smooth / 2 / TRACK_STEP));
+        for (let i = 0; i < n; i++) {
+          let sum = 0;
+          let count = 0;
+          for (let j = Math.max(0, i - k); j <= Math.min(n - 1, i + k); j++) {
+            sum += raw[j]!;
+            count++;
+          }
+          road[i] = sum / count;
+        }
+        return {
+          ...line.box(reach),
+          snowy: true,
+          apply: (x, z, h) => {
+            line.nearest(x, z);
+            if (line.dist >= reach) return h;
+            const f = Math.min(n - 1.000001, line.along / TRACK_STEP);
+            const i = Math.floor(f);
+            const mid = road[i]! + (road[i + 1]! - road[i]!) * (f - i);
+            // The road: level across, but for `crossfall` of the slope; then straight back to the slope over the bank.
+            const y = mid + e.crossfall * (h - (raw[i]! + (raw[i + 1]! - raw[i]!) * (f - i)));
+            const target = line.dist <= half ? y : y + (h - y) * ((line.dist - half) / e.bank);
+            return h + (target - h) * line.taper(e.taper);
+          },
+        };
+      }
       case 'flat': {
         const f = frame(e.x, e.z, e.heading);
         const h0 = this.heightBefore(e.x, e.z, this.elements.length);
@@ -640,6 +678,19 @@ class Polyline {
     this.along = this.at[this.seg]! + (this.at[this.seg + 1]! - this.at[this.seg]!) * this.t;
   }
 
+  /** Puts the spot `d` m along the line into qx, qz (and along, seg, t). */
+  pointAt(d: number): void {
+    let i = 0;
+    while (i < this.xs.length - 2 && this.at[i + 1]! < d) i++;
+    const len = this.at[i + 1]! - this.at[i]!;
+    const t = len > 0 ? Math.min(1, Math.max(0, (d - this.at[i]!) / len)) : 0;
+    this.seg = i;
+    this.t = t;
+    this.qx = this.xs[i]! + (this.xs[i + 1]! - this.xs[i]!) * t;
+    this.qz = this.zs[i]! + (this.zs[i + 1]! - this.zs[i]!) * t;
+    this.along = this.at[i]! + len * t;
+  }
+
   /** Height at the last nearest spot, between the points' heights. */
   heightAt(points: readonly HeightPoint[]): number {
     const a = points[this.seg]!.height;
@@ -652,6 +703,9 @@ class Polyline {
     return smoothstep(0, taper, this.along) * smoothstep(0, taper, this.total - this.along);
   }
 }
+
+/** Spacing (m) of the samples a cat track's road height is worked out from along its line. */
+const TRACK_STEP = 2;
 
 /** Smooth value noise in about [-1, 1] at lattice spacing 1. */
 export function valueNoise(x: number, z: number, seed: number): number {
