@@ -3,7 +3,7 @@ import type { Outfit } from '../core/outfit.ts';
 // The skier's look posted with each score and drawn beside the name as a
 // tiny figure (20 × 24). A look is 13 characters, one per part: palette
 // colors as letters (a is PALETTE[0]), headwear, patterns and the ski type as
-// digits. firestore.rules allows [a-z0-9]{0,24}. Anything unreadable draws
+// digits. The API allows [a-z0-9]{0,24} (LOOK_FORMAT). Anything unreadable draws
 // as the default look's color, so a bad or old look never breaks a board.
 // The palette and lists come from main (setLookTables): importing
 // core/outfit.ts here would split it, with config.ts, into a chunk of its

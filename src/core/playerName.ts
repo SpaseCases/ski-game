@@ -2,8 +2,9 @@
 // milestone 13): 3 to 16 letters, digits, spaces, - and _, through a small
 // word filter. Nobody owns a name. It's saved in settings; this module only
 // tidies and checks it, so the title screen's name box needs nothing from
-// the leaderboard chunk. firestore.rules checks the same format on the
-// server, but not the words: a hand-made request can skip this filter.
+// the leaderboard chunk. The leaderboard Worker (worker/) runs this same
+// module, filter included, so a hand-made request can't skip it. Keep it
+// free of DOM and browser APIs for that reason.
 
 export const NAME_MIN = 3;
 export const NAME_MAX = 16;

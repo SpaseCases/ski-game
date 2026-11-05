@@ -1872,6 +1872,16 @@ body {
   color: var(--ink);
 }
 
+/* Saved data: Erase turns red once armed, with Cancel beside it. */
+.wipe-button.is-armed {
+  background: #ff5f4d;
+  color: var(--ink);
+}
+
+.toggle[hidden] {
+  display: none;
+}
+
 .slider {
   flex: 1;
   min-width: 0;

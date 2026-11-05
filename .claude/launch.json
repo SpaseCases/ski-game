@@ -39,6 +39,17 @@
         "--strictPort"
       ],
       "port": 5181
+    },
+    {
+      "name": "worker",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "worker",
+        "run",
+        "dev"
+      ],
+      "port": 8787
     }
   ]
 }

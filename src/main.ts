@@ -23,7 +23,7 @@ import {
   type Quality,
   type QualityLevel,
 } from './core/settings.ts';
-import { readStored, writeStored } from './core/storage.ts';
+import { clearStored, readStored, writeStored } from './core/storage.ts';
 import { loadWeather, saveWeather, urlWeather, type WeatherId } from './core/weather.ts';
 import { buildMap, type BuiltMap } from './maps/build.ts';
 import { parseMap } from './maps/loader.ts';
@@ -216,6 +216,11 @@ const settingsScreen = new SettingsScreen(
     setBindings,
     openControls,
     trapNextKey: (fn) => menus.trapNextKey(fn),
+    wipeLocal: () => {
+      clearStored();
+      // Start again from nothing: nothing in memory gets a chance to save itself back.
+      window.location.reload();
+    },
   },
   () => menus.back(),
 );

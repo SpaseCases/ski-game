@@ -18,3 +18,8 @@ reference/
 
 # Firebase deploy cache
 .firebase/
+
+# Cloudflare Worker: local state and local secrets (never commit a key)
+worker/.wrangler/
+worker/.dev.vars
+*.key.json

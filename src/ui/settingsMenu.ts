@@ -70,7 +70,13 @@ export interface SettingsHooks {
   openControls: () => void;
   /** Hands the next key pressed to `fn` and nothing else (null: stop listening). */
   trapNextKey: (fn: ((e: KeyboardEvent) => void) | null) => void;
+  /** Erases everything the game saved in this browser and starts it again. */
+  wipeLocal: () => void;
 }
+
+const WIPE_NOTE =
+  'Settings, keys, your board name, your Locker look, custom skis, best combos and weather are kept in this browser. Erasing them starts the game fresh. Scores and looks already posted online stay there.';
+const WIPE_ARMED_NOTE = 'Press Erase everything to confirm. This can’t be undone.';
 
 export class SettingsScreen implements Screen {
   readonly el: HTMLElement;
@@ -89,6 +95,9 @@ export class SettingsScreen implements Screen {
   private readonly slots = new Map<string, HTMLButtonElement>();
   private readonly status: HTMLElement;
   private listening: HTMLButtonElement | null = null;
+  private readonly wipe: HTMLButtonElement;
+  private readonly wipeCancel: HTMLButtonElement;
+  private readonly wipeNote: HTMLElement;
   private readonly hooks: SettingsHooks;
 
   constructor(hooks: SettingsHooks, onBack: () => void) {
@@ -187,6 +196,29 @@ export class SettingsScreen implements Screen {
     this.crashNote.className = 'setting-note';
     crashes.append(labelRow('After a crash', crashGroup), this.crashNote);
 
+    // Saved data: erase everything this browser keeps, after a second press to confirm.
+    const data = section('Saved data');
+    this.wipe = document.createElement('button');
+    this.wipe.type = 'button';
+    this.wipe.className = 'toggle wipe-button';
+    this.wipe.addEventListener('click', () => {
+      if (this.wipe.classList.contains('is-armed')) this.hooks.wipeLocal();
+      else this.armWipe(true);
+    });
+    this.wipeCancel = document.createElement('button');
+    this.wipeCancel.type = 'button';
+    this.wipeCancel.className = 'toggle';
+    this.wipeCancel.textContent = 'Cancel';
+    this.wipeCancel.addEventListener('click', () => {
+      this.armWipe(false);
+      this.wipe.focus();
+    });
+    this.wipeNote = document.createElement('p');
+    this.wipeNote.className = 'setting-note';
+    this.wipeNote.setAttribute('aria-live', 'polite');
+    data.append(labelRow('This browser', this.wipe, this.wipeCancel), this.wipeNote);
+    this.armWipe(false);
+
     // Keys: the Controls screen, which one pops first, then a key for every action.
     const keys = section('Keys');
     keys.classList.add('keys-section');
@@ -268,7 +300,7 @@ export class SettingsScreen implements Screen {
     columns.className = 'settings-columns';
     const left = document.createElement('div');
     left.className = 'settings-column';
-    left.append(picture, sound, scoring, crashes);
+    left.append(picture, sound, scoring, crashes, data);
     columns.append(left, keys);
     b.body.appendChild(columns);
     setHints(b.foot, [
@@ -290,11 +322,21 @@ export class SettingsScreen implements Screen {
     this.syncScoreLabel();
     this.syncKeys();
     this.status.textContent = '';
+    this.armWipe(false);
     return this.qualityButtons.get(s.quality) ?? null;
   }
 
   leave(): void {
     this.stopListening();
+    this.armWipe(false);
+  }
+
+  /** The erase button's two steps: Erase, then Erase everything (with Cancel beside it). */
+  private armWipe(armed: boolean): void {
+    this.wipe.classList.toggle('is-armed', armed);
+    this.wipe.textContent = armed ? 'Erase everything' : 'Erase';
+    this.wipeCancel.hidden = !armed;
+    this.wipeNote.textContent = armed ? WIPE_ARMED_NOTE : WIPE_NOTE;
   }
 
   /** Delete or Backspace on a second-key slot clears it. */

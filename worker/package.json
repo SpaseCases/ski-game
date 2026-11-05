@@ -1,0 +1,15 @@
+{
+  "name": "parklaps-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8787 --var STORE:memory --var ALLOWED_ORIGINS:http://localhost:*",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types",
+    "typecheck": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "6.0.2",
+    "wrangler": "4.151.2"
+  }
+}

@@ -1,0 +1,23 @@
+// The leaderboard API (worker/src/index.ts). Deployed by hand from this
+// folder: `npm run deploy`. Its one secret, the Google service account's
+// JSON key, is set with `npx wrangler secret put GCP_SERVICE_ACCOUNT` and
+// never goes in the repo. See worker/README.md.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "parklaps-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-15",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "vars": {
+    "PROJECT_ID": "parklaps-3b60f",
+    "STORE": "firestore",
+    "ALLOWED_ORIGINS": "https://parklaps.web.app,https://parklaps.firebaseapp.com,https://spasecases.github.io"
+  },
+  // Per address, per minute. A classroom shares one address, so these are loose.
+  "ratelimits": [
+    { "name": "READS", "namespace_id": "4101", "simple": { "limit": 600, "period": 60 } },
+    { "name": "WRITES", "namespace_id": "4102", "simple": { "limit": 120, "period": 60 } }
+  ]
+}

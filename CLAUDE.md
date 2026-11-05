@@ -5,8 +5,9 @@ Browser-based 3D freeski game for Chromebooks. Read `GAME_DESIGN.md` before star
 ## Stack (don't add dependencies without asking)
 - Three.js (pin the exact version), `WebGLRenderer` only (no WebGPU)
 - TypeScript (strict), Vite
-- No accounts and no server of our own. Static build output in `/dist`
-- One optional online service: the leaderboards and the looks saved under a board name (milestone 13), Firestore in project `parklaps-3b60f`, reached with `fetch` over the REST API (no Firebase SDK), in its own lazy chunk (`src/online/`) that the first load never fetches. Blocked or offline, the game works the same and the board says "Leaderboard offline"
+- No accounts. Static build output in `/dist`
+- One optional online service: the leaderboards and the looks saved under a board name (milestone 13), stored in Firestore (project `parklaps-3b60f`) and reached **only through the leaderboard Worker** (`worker/`, a Cloudflare Worker, the user's choice): the game `fetch`es the Worker's small JSON API (`src/online/api.ts`, address in `VITE_API_URL`), and the Worker calls Firestore's REST API as a service account (no Firebase SDK anywhere). The client code is its own lazy chunk (`src/online/`) that the first load never fetches. Blocked or offline, the game works the same and the board says "Leaderboard offline"
+- Production builds are obfuscated (`tools/vite/obfuscate.js`, javascript-obfuscator, the user's choice): the menu, online and core modules get encoded strings and hex names, and the page's title and loading text are base64 in the HTML. The per-frame code (sim, render, maps, audio, config, `core/input.ts`, `core/loop.ts`) is only minified; keep runtime-costly options (control-flow flattening, dead code, self-defending) off
 - lil-gui panel for live-tuning physics values, lazy-loaded in its own chunk: in production it loads only when opened from the Cheats screen (milestone 6b), so it never adds to the first load
 - No physics engine in v1. Rapier comes in only if ragdoll crashes are added later
 
@@ -42,7 +43,8 @@ src/
   maps/      map loader, terrain generation, maps/*.json
   ui/        HTML/CSS menus and HUD overlays
   audio/     Web Audio sound effects
-  online/    the online leaderboards: Firestore REST client and boards (a lazy chunk)
+  online/    the online leaderboards: the Worker API client and boards (a lazy chunk); limits.ts is shared with the Worker
+worker/      the leaderboard Worker (Cloudflare): its own package.json, deployed by hand (worker/README.md)
 ```
 
 ## Tools
@@ -64,5 +66,6 @@ src/
 
 ## Deploy
 - A GitHub Actions workflow builds on every push to `main` and deploys `/dist` to GitHub Pages and to Firebase Hosting (https://parklaps.web.app, project `parklaps-3b60f`, site `parklaps`; `firebase.json`). GitHub is blocked on the school network, so Firebase is the address players use
-- `firestore.rules` (the only protection: for the boards types, name format, plausible ranges, updates only when better; for looks their shape and size) is deployed by hand, never by the workflow: `firebase deploy --only firestore:rules`. It changes the live project, so ask first. Play-tests use `?boards=test` (the `testBoards` and `testLooks` collections), never the real ones
+- The leaderboard Worker is deployed by hand from `worker/` (`npm run deploy`), never by the workflow; its one secret, the service account's JSON key, is set with `wrangler secret put` and never enters the repo or a chat. It changes the live game, so ask first
+- `firestore.rules` shuts out every request but the Worker's (service-account requests skip the rules). It's deployed by hand, never by the workflow, and only once the Worker is live: `firebase deploy --only firestore:rules`. It changes the live project, so ask first. Play-tests use `?boards=test` (the `testBoards` and `testLooks` collections), never the real ones; locally, `npm run dev` in `worker/` serves an in-memory store
 - Vite's `base` is `./` (relative paths), so one build works at Pages' `/ski-game/` and at Firebase's root
