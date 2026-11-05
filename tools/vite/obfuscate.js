@@ -17,7 +17,7 @@
 import JavaScriptObfuscator from 'javascript-obfuscator';
 
 /** Modules to obfuscate (paths with forward slashes). */
-const INCLUDE = /\/src\/(main\.ts$|poses\.ts$|ui\/.+\.ts$|online\/.+\.ts$|core\/.+\.ts$)/;
+const INCLUDE = /\/src\/(boot\.ts$|main\.ts$|poses\.ts$|ui\/.+\.ts$|online\/.+\.ts$|core\/.+\.ts$)/;
 /** Read on every frame or every key: left minified only. */
 const EXCLUDE = /\/src\/core\/(loop|input)\.ts$/;
 

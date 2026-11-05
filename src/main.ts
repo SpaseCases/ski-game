@@ -1076,8 +1076,9 @@ startLoop(
       sound.frame(true, 1, skier, NO_RAILS, 1, 0, 1, false);
     }
 
+    // With no map, the menus' painted backdrop covers the canvas: drawing an empty scene behind it is wasted work.
     if (stageScreen) drawLocker(stageScreen, realFrameTime);
-    else if (!warming) renderFrame(view);
+    else if (!warming && level) renderFrame(view);
     fader.update(hudTime);
     crashHint.show(pose.bailed);
     toast.update(hudTime);

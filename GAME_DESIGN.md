@@ -247,6 +247,7 @@ Three ski types, each with its own model, 3 to 4 top sheet graphics to pick from
 - Master and effects volume sliders plus a mute toggle in Settings, heard live while dragging and saved.
 
 ## Menus (HTML/CSS overlay, usable with keyboard or mouse)
+- **Start screen** (added 2026-11-05 at the user's request, for Chromebooks with the game open in the background): "Park Laps" and *Click or press any key to start*. Nothing else loads or runs until then (no Three.js, no WebGL, no frame loop); then it says Loading… and the title opens. With no map loaded, the menus' painted backdrop covers the canvas, so the 3D view isn't drawn behind them.
 - **Title:** Play, Locker, Settings, Cheats, Leaderboards, then the board name (milestone 13). Controls moved into Settings (the user found the menus had too many planks)
 - **Map select:** a card per map: Park, Freeride, Slalom, Big air, and the Test slope, each with a weather picker (one pick for every map)
 - **Locker:** outfit colors, headwear and skis with a live preview of the skier (see Locker)

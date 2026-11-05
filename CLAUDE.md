@@ -26,6 +26,8 @@ Browser-based 3D freeski game for Chromebooks. Read `GAME_DESIGN.md` before star
 - Lighting: one directional light plus one hemisphere light. No shadow maps on Low; use a blob-shadow decal under the skier instead
 - Quality presets Low / Medium / High plus Auto, which lowers the pixel ratio when frame time stays over budget. Low = pixelRatio 1, antialias off
 - No allocations in the per-frame loop (reuse vectors and quaternions)
+- Nothing loads or runs before the player's first input: `src/boot.ts` shows a start screen and imports the game on the first click or key. Don't add a static import, preload or timer that starts game work before then
+- With no map loaded the menus' painted backdrop covers the canvas, so the frame loop doesn't draw the 3D scene then
 
 ## Architecture
 - Fixed-timestep simulation (120 Hz with an accumulator), separate from rendering; the renderer interpolates

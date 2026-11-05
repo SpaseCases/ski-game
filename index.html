@@ -6,7 +6,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Park Laps</title>
     <style>
-      /* Shown until the game's script has loaded (it can take a while on a slow network); the game removes it. */
+      /* The start screen (src/boot.ts): nothing else loads until it's clicked or a key is pressed. Then it says Loading… until the game removes it. */
       #boot {
         position: fixed;
         inset: 0;
@@ -17,13 +17,29 @@
         background: linear-gradient(#9fc3e6, #dce8f3 70%, #f5f8fc);
         color: #142030;
         font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        cursor: pointer;
+        user-select: none;
+      }
+      #boot.is-loading {
+        cursor: progress;
       }
       #boot b {
         font-size: 40px;
         letter-spacing: 0.04em;
       }
       #boot span {
+        justify-self: center;
+        padding: 8px 16px;
+        border-radius: 3px;
+        background: #21466f;
+        color: #f4f8fc;
         font-size: 16px;
+        font-weight: 700;
+      }
+      #boot.is-loading span {
+        background: none;
+        color: #142030;
+        font-weight: 400;
         opacity: 0.75;
       }
     </style>
@@ -31,8 +47,8 @@
   <body>
     <div id="app"></div>
     <div id="hud"></div>
-    <div id="boot"><b>Park Laps</b><span>Loading…</span></div>
+    <div id="boot"><b>Park Laps</b><span>Click or press any key to start</span></div>
     <noscript>This game needs JavaScript turned on.</noscript>
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/boot.ts"></script>
   </body>
 </html>
