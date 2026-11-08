@@ -61,14 +61,23 @@ const DECODE = 'const d=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c
 
 /** @returns {import('vite').Plugin} */
 export function obfuscate() {
+  /** Vite's import.meta.env for this build (MODE, DEV, PROD, BASE_URL, SSR, VITE_*). */
+  let env = {};
   return {
     name: 'park-laps-obfuscate',
     apply: 'build',
     enforce: 'post',
+    configResolved(config) {
+      env = { ...config.env, SSR: false };
+    },
     transform(code, id) {
       const path = id.split('?')[0].replace(/\\/g, '/');
       if (!INCLUDE.test(path) || EXCLUDE.test(path)) return null;
-      const result = JavaScriptObfuscator.obfuscate(code, OPTIONS);
+      // Fill in import.meta.env.X first. The obfuscator would turn it into a
+      // computed lookup, and Vite would then inline its whole env object as
+      // plain text (the Worker's address included) and keep DEV-only code.
+      const filled = code.replace(/\bimport\.meta\.env\.([A-Za-z_]\w*)/g, (_, name) => (name in env ? JSON.stringify(env[name]) : 'undefined'));
+      const result = JavaScriptObfuscator.obfuscate(filled, OPTIONS);
       return { code: result.getObfuscatedCode(), map: null };
     },
     transformIndexHtml: {
