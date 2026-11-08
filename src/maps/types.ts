@@ -393,9 +393,11 @@ export interface RailFeature {
  * a bench, a flat-topped rock, a tree stump, or a bonk feature: a picnic
  * table (slid along its top, a bench seat each side), a row of steel
  * barrels lying across the line (slid along their tops), or a wooden cable
- * spool standing on end (slid or bonked across its round top).
+ * spool standing on end (slid or bonked across its round top). The City
+ * (milestone 16) adds a concrete planter with a snowy top and a street
+ * barrier (a concrete crash barrier, wider at its foot, striped).
  */
-export type BoxStyle = 'wood' | 'ledge' | 'bench' | 'rock' | 'stump' | 'table' | 'barrels' | 'spool';
+export type BoxStyle = 'wood' | 'ledge' | 'bench' | 'rock' | 'stump' | 'table' | 'barrels' | 'spool' | 'planter' | 'barrier';
 
 /** A box: a wide deck along a polyline, like a rail. */
 export interface BoxFeature {
@@ -484,8 +486,13 @@ export interface LandingFeature {
  * sloping down the building's length, or a flat roof.
  */
 export type RoofStyle = 'gable' | 'shed' | 'flat';
-/** How a building looks: a timber chalet, a painted shop, a stone-based lodge, a lift station. */
-export type BuildingStyle = 'chalet' | 'shop' | 'lodge' | 'station';
+/**
+ * How a building looks: a timber chalet, a painted shop, a stone-based lodge,
+ * a lift station, and (milestone 16, the City) a mid-rise of several floors
+ * and a glass tower. Mid-rises and towers draw their floors level, so they
+ * suit a shed roof turned to stand level on a slope.
+ */
+export type BuildingStyle = 'chalet' | 'shop' | 'lodge' | 'station' | 'block' | 'tower';
 
 /**
  * A building whose snowy roof can be ridden: up a snow drift against its

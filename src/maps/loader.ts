@@ -39,10 +39,10 @@ const LINE_KINDS: readonly LineKind[] = ['fence', 'netting', 'barrier', 'dyeLine
 const PROP_KINDS: readonly PropKind[] = ['lightPole', 'floodlight', 'banner', 'flag', 'groomer', 'streetLamp', 'hut', 'snowmobile', 'skier', 'skiRack', 'cabin', 'mast'];
 const START_STYLES: readonly StartStyle[] = ['deck', 'tower', 'ridge', 'race'];
 const RAIL_STYLES: readonly RailStyle[] = ['metal', 'handrail', 'log', 'tube', 'loop', 'corkscrew'];
-const BOX_STYLES: readonly BoxStyle[] = ['wood', 'ledge', 'bench', 'rock', 'stump', 'table', 'barrels', 'spool'];
+const BOX_STYLES: readonly BoxStyle[] = ['wood', 'ledge', 'bench', 'rock', 'stump', 'table', 'barrels', 'spool', 'planter', 'barrier'];
 const QUARTER_STYLES: readonly QuarterStyle[] = ['snow', 'wood'];
 const ROOF_STYLES: readonly RoofStyle[] = ['gable', 'shed', 'flat'];
-const BUILDING_STYLES: readonly BuildingStyle[] = ['chalet', 'shop', 'lodge', 'station'];
+const BUILDING_STYLES: readonly BuildingStyle[] = ['chalet', 'shop', 'lodge', 'station', 'block', 'tower'];
 const RUN_LEVELS: readonly RunLevel[] = ['green', 'blue', 'black', 'double'];
 const GATE_KINDS: readonly GateKind[] = ['slalom', 'giant'];
 

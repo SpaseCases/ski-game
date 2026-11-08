@@ -3,7 +3,7 @@
 // no imports: the Worker bundles this file as it is.
 
 /** Boards scored by best combo (each also has a "-cheats" twin). */
-export const COMBO_BOARDS: readonly string[] = ['park', 'jampark', 'freeride', 'bigair', 'test'];
+export const COMBO_BOARDS: readonly string[] = ['park', 'jampark', 'freeride', 'city', 'bigair', 'test'];
 /** Boards scored by best time: the Slalom's courses by index (0 the slalom, 1 the giant slalom). */
 export const TIME_BOARDS: readonly string[] = ['slalom-sl', 'slalom-gs'];
 

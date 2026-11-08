@@ -9,6 +9,10 @@ import { renderedHeightAt } from './terrainMesh.ts';
 // touches: the roofs, drifts, terrace tops and stairs are shapes (snow,
 // drawn with the other shapes), so here go the walls, the trim along each
 // roof's edge, windows, doors, shop signs, terrace walls and the steps.
+// The City's mid-rises and towers (milestone 16) draw their floors level in
+// the world, counted from the lowest ground at their walls, so on a slope
+// they stand like real buildings: a taller wall downhill, rows of windows
+// level across it.
 
 const c = (hex: string): Color => new Color(hex);
 const TIMBER = c('#6e4a2e');
@@ -31,6 +35,16 @@ const SINK = 0.35;
 const FASCIA_DEPTH = 0.32;
 /** Riser height (m) of one step. */
 const RISER = 0.18;
+/** A mid-rise's floor-to-floor height (m), and its windows: spacing along a wall, size, and how high the upper floors start above the ground. */
+const BLOCK = { floor: 3.2, spacing: 3, wide: 1.1, tall: 1.5, upper: 3.0, plinth: 0.9 };
+/** A tower's floor-to-floor height (m), its glass lobby's height, each pane's width along a wall, a band's height, and the mullion between panes. */
+const TOWER = { floor: 3.6, lobby: 4.4, pane: 6, tall: 2.4, mullion: 0.45 };
+const PLINTH = c('#6f6a64');
+const PLINTH_DARK = c('#5f5a55');
+const TOWER_GLASS = c('#34506e');
+const LOBBY_GLASS = c('#26384c');
+const ROOF_BOX = c('#9aa0a6');
+const MAST = c('#3a3f45');
 
 /** Draws every building and terrace in the feature list into `kits` (one kit per tile). */
 export function drawTown(features: readonly Feature[], hf: Heightfield, kits: TiledKit, glows: TiledKit): void {
@@ -93,6 +107,12 @@ class Drawer {
     }
   }
 
+  /** A flat panel on a wall facing `out`, from (u0, v0) to (u1, v1) along it and from world height y0 to y1, pushed out by `lift`. */
+  levelPanel(u0: number, v0: number, u1: number, v1: number, y0: number, y1: number, out: Vector3, color: Color, lift = 0.05): void {
+    const o = out.clone().normalize().multiplyScalar(lift);
+    this.k.quad(this.level(u0, v0, y0).add(o), this.level(u1, v1, y0).add(o), this.level(u1, v1, y1).add(o), this.level(u0, v0, y1).add(o), color, out);
+  }
+
   /** A flat panel on a wall facing `out`: from (u0, v0) to (u1, v1) along it, y0 to y1 above the ground at its middle, pushed out by `lift`. */
   panel(u0: number, v0: number, u1: number, v1: number, y0: number, y1: number, out: Vector3, color: Color, lift = 0.03): void {
     const g = this.ground((u0 + u1) / 2, (v0 + v1) / 2);
@@ -106,6 +126,10 @@ class Drawer {
 }
 
 function drawBuilding(b: BuildingFeature, hf: Heightfield, kits: TiledKit, glows: TiledKit): void {
+  if (b.style === 'block' || b.style === 'tower') {
+    drawHighrise(b, hf, kits, glows);
+    return;
+  }
   const t = townFrame(b);
   const mid = framePoint(t, b.length / 2, 0);
   const d = new Drawer(t, hf, kits.near(mid.x, mid.z));
@@ -195,6 +219,103 @@ function drawBuilding(b: BuildingFeature, hf: Heightfield, kits: TiledKit, glows
       d.panel(span[0] + 0.1, span[1], span[2] - 0.1, span[3], y0, y0 + 0.9, w.out, GLASS, 0.05);
     }
     if (isFront && b.sign !== '') shopSign(d, b, (w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2, w.out, room);
+  }
+}
+
+/**
+ * A mid-rise (`block`) or a glass tower: plain walls in long pieces, and
+ * rows of windows level in the world from the lowest ground at its walls up
+ * to under the roof. A mid-rise has a stone plinth and ground-floor windows
+ * (a door, shop windows and a sign on its front if it has one) that follow
+ * the ground; a tower has a dark glass lobby and a band of panes on every
+ * floor, about two in five lit at night, and a plant room on its roof (a
+ * mast too past 60 m).
+ */
+function drawHighrise(b: BuildingFeature, hf: Heightfield, kits: TiledKit, glows: TiledKit): void {
+  const t = townFrame(b);
+  const mid = framePoint(t, b.length / 2, 0);
+  const d = new Drawer(t, hf, kits.near(mid.x, mid.z));
+  const glow = new Drawer(t, hf, glows.near(mid.x, mid.z));
+  const tower = b.style === 'tower';
+  const u0 = WALL_INSET;
+  const u1 = b.length - WALL_INSET;
+  const v = b.width / 2 - WALL_INSET;
+  const under = (u: number): number => roofHeight(b, u) - FASCIA_DEPTH;
+  const wallColor = new Color(b.color);
+  const walls: { name: BuildingFeature['front']; a: [number, number]; b: [number, number]; out: Vector3 }[] = [
+    { name: 'left', a: [u0, -v], b: [u1, -v], out: d.dir(0, -1) },
+    { name: 'right', a: [u1, v], b: [u0, v], out: d.dir(0, 1) },
+    { name: 'up', a: [u0, v], b: [u0, -v], out: d.dir(-1, 0) },
+    { name: 'down', a: [u1, -v], b: [u1, v], out: d.dir(1, 0) },
+  ];
+  let floor0 = Infinity;
+  for (const [u, vv] of [[u0, -v], [u0, v], [u1, -v], [u1, v]] as const) floor0 = Math.min(floor0, d.ground(u, vv));
+  const seed = Math.round(Math.abs(b.x * 3 + b.z * 7));
+  for (const w of walls) {
+    const du = w.b[0] - w.a[0];
+    const dv = w.b[1] - w.a[1];
+    const len = Math.hypot(du, dv);
+    const eu = du / len;
+    const ev = dv / len;
+    const isFront = w.name === b.front;
+    const uAt = (s: number): number => w.a[0] + du * s;
+    d.wall(w.a[0], w.a[1], w.b[0], w.b[1], (s) => under(uAt(s)), w.out, () => wallColor, tower ? TOWER.pane : 3);
+    if (!tower) {
+      // The plinth, a little proud of the wall, in alternating stones.
+      const ou = w.out.dot(d.dir(1, 0)) * 0.04;
+      const ov = w.out.dot(d.dir(0, 1)) * 0.04;
+      const stone = (s: number): Color => (Math.floor((s * len) / 2) % 2 === 0 ? PLINTH : PLINTH_DARK);
+      d.wall(w.a[0] + ou, w.a[1] + ov, w.b[0] + ou, w.b[1] + ov, () => BLOCK.plinth, w.out, stone, 3);
+    }
+    const count = Math.max(1, Math.floor(len / (tower ? TOWER.pane : BLOCK.spacing)));
+    const half = tower ? len / count / 2 - TOWER.mullion / 2 : BLOCK.wide / 2;
+    const doorAt = isFront ? Math.floor(count / 2) : -1;
+    for (let i = 0; i < count; i++) {
+      const s = (i + 0.5) / count;
+      const uc = w.a[0] + du * s;
+      const vc = w.a[1] + dv * s;
+      const span = (h: number): [number, number, number, number] => [uc - eu * h, vc - ev * h, uc + eu * h, vc + ev * h];
+      const g = d.ground(uc, vc);
+      const top = g + under(uc) - 0.4;
+      // The ground floor, following the ground.
+      if (tower) {
+        if (i === doorAt) d.panel(...span(1.1), -0.1, 2.6, w.out, DOOR);
+        else d.panel(...span(half), 0.2, Math.min(TOWER.lobby - 0.5, top - g), w.out, LOBBY_GLASS, 0.05);
+      } else if (i === doorAt) {
+        d.panel(...span(0.55), -0.1, 2.1, w.out, DOOR);
+        d.panel(...span(0.75), 2.1, 2.3, w.out, TRIM);
+      } else {
+        const big = isFront && b.sign !== '';
+        const wide = big ? Math.min(2.4, len / count - 0.8) : BLOCK.wide;
+        const y0 = big ? 0.5 : 1.0;
+        const tall = big ? 1.9 : 1.2;
+        if (y0 + tall < top - g) {
+          d.panel(...span(wide / 2 + 0.1), y0 - 0.1, y0 + tall + 0.1, w.out, TRIM);
+          d.panel(...span(wide / 2), y0, y0 + tall, w.out, GLASS, 0.05);
+        }
+      }
+      // The floors above, level in the world.
+      const step = tower ? TOWER.floor : BLOCK.floor;
+      const tall = tower ? TOWER.tall : BLOCK.tall;
+      const above = g + (tower ? TOWER.lobby : BLOCK.upper);
+      for (let f = 0; ; f++) {
+        const y0 = floor0 + (tower ? TOWER.lobby + 0.6 : BLOCK.upper + 0.6) + f * step;
+        if (y0 + tall > top) break;
+        if (y0 < above) continue;
+        const lit = tower ? (i * 5 + f * 11 + seed) % 7 < 3 : (i * 7 + f * 3 + seed) % 3 === 0;
+        (lit ? glow : d).levelPanel(...span(half), y0, y0 + tall, w.out, lit ? GLASS_LIT : tower ? TOWER_GLASS : GLASS);
+      }
+    }
+    if (isFront && b.sign !== '' && !tower) shopSign(d, b, (w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2, w.out, 3.4);
+  }
+  roofTrim(d, b);
+  if (tower) {
+    // A plant room on the roof, and a mast on the tallest.
+    const g = d.ground(b.length / 2, 0);
+    const roof = g + roofHeight(b, b.length / 2);
+    d.k.at(mid.x, roof, mid.z, Math.atan2(t.dirX, t.dirZ));
+    d.k.box(0, 1.6, 0, b.width * 0.45, 3.2, b.length * 0.35, ROOF_BOX);
+    if (b.eave > 60) d.k.box(0, 3.2 + 7, 0, 0.35, 14, 0.35, MAST);
   }
 }
 

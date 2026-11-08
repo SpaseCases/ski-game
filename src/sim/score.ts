@@ -625,6 +625,8 @@ const LOOK_NAMES: Record<RailStyle | BoxStyle, string> = {
   table: 'table',
   barrels: 'barrel',
   spool: 'spool',
+  planter: 'planter',
+  barrier: 'barrier',
   loop: 'rail',
   corkscrew: 'rail',
 };

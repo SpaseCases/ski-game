@@ -13,7 +13,8 @@ import { litByPools } from './lightPools.ts';
 // look: park rails and handrails on posts, fat tubes on saddles, fallen logs
 // lying on the snow, park boxes, concrete ledges, benches, flat-topped rocks
 // and stumps, bonk features (picnic tables, rows of barrels and cable
-// spools), and 3D rails (loops and corkscrews) on posts and frames.
+// spools), the City's planters and street barriers (milestone 16), and 3D
+// rails (loops and corkscrews) on posts and frames.
 
 const BOX_DECK = new Color('#9aa4ad');
 const BOX_SIDE = new Color('#8a5a32');
@@ -41,6 +42,14 @@ const BARREL_COLORS = [new Color('#2f62d0'), new Color('#d8342c'), new Color('#e
 const BARREL_RIM = new Color('#2b3138');
 const SPOOL = new Color('#c08a52');
 const SPOOL_DARK = new Color('#8f6236');
+const PLANTER_SIDE = new Color('#a3968a');
+const BARRIER_TOP = new Color('#c4c6c4');
+const BARRIER_SIDE = new Color('#a9aba9');
+const BARRIER_BAND = new Color('#e8622a');
+/** A barrier's flare (m out at its foot each side) and its reflective band (m below its top, and tall). */
+const BARRIER_FLARE = 0.14;
+const BARRIER_BAND_AT = 0.16;
+const BARRIER_BAND_TALL = 0.1;
 /** Sides around a barrel and around a spool's flanges. */
 const BARREL_SIDES = 10;
 const SPOOL_SIDES = 14;
@@ -118,6 +127,13 @@ export function createRailMesh(rails: readonly RailShape[], hf: Heightfield): Gr
       case 'spool':
         addSpool(near, r, hf);
         break;
+      case 'planter':
+        addBox(near, r, hf, SNOW, PLANTER_SIDE, 0);
+        break;
+      case 'barrier':
+        addBox(near, r, hf, BARRIER_TOP, BARRIER_SIDE, BARRIER_FLARE, BARRIER_SIDE);
+        addBands(near, r);
+        break;
     }
   });
   const group = new Group();
@@ -143,7 +159,7 @@ const UP = new Vector3(0, 1, 0);
  * A box: sides down into the snow under a deck along its top line. `flare`
  * widens the sides toward the bottom (a rock's rough flanks).
  */
-function addBox(near: Near, r: RailShape, hf: Heightfield, deck: Color, side: Color, flare: number): void {
+function addBox(near: Near, r: RailShape, hf: Heightfield, deck: Color, side: Color, flare: number, shade: Color = ROCK_DARK): void {
   const segs = r.dist.length - 1;
   const w = r.halfWidth;
   for (let k = 0; k < segs; k++) {
@@ -167,11 +183,31 @@ function addBox(near: Near, r: RailShape, hf: Heightfield, deck: Color, side: Co
     const eLb = below(eL, -flare, fore);
     const eRb = below(eR, flare, fore);
     b.quad(aL, aR, eR, eL, deck, UP);
-    const rockShade = flare > 0 && hash2(k, 3, 17) > 0 ? ROCK_DARK : side;
+    const rockShade = flare > 0 && hash2(k, 3, 17) > 0 ? shade : side;
     b.quad(aR, eR, eRb, aRb, side, right);
     b.quad(aL, eL, eLb, aLb, rockShade, right.clone().negate());
     if (k === 0) b.quad(aL, aR, aRb, aLb, side, along.clone().negate());
     if (k === segs - 1) b.quad(eL, eR, eRb, eLb, rockShade, along);
+  }
+}
+
+/** A street barrier's reflective band along both sides, just under its top. */
+function addBands(near: Near, r: RailShape): void {
+  // Out past the flared side face at that height.
+  const w = r.halfWidth + 0.05;
+  for (let k = 0; k < r.dist.length - 1; k++) {
+    const a = point(r, k);
+    const e = point(r, k + 1);
+    const b = near(a.x, a.z);
+    const along = new Vector3(e.x - a.x, 0, e.z - a.z).normalize();
+    const right = new Vector3(-along.z, 0, along.x);
+    for (const side of [-1, 1]) {
+      const at = (q: Vector3, y: number): Vector3 => q.clone().addScaledVector(right, side * w).setY(q.y - y);
+      const lo = BARRIER_BAND_AT + BARRIER_BAND_TALL;
+      const out = right.clone().multiplyScalar(side);
+      if (side > 0) b.quad(at(a, lo), at(e, lo), at(e, BARRIER_BAND_AT), at(a, BARRIER_BAND_AT), BARRIER_BAND, out);
+      else b.quad(at(a, BARRIER_BAND_AT), at(e, BARRIER_BAND_AT), at(e, lo), at(a, lo), BARRIER_BAND, out);
+    }
   }
 }
 

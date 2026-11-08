@@ -9,7 +9,8 @@
 //   rolling off it catches; any other is a booter or a hip (air and landing).
 // - log: ridden onto at its tip, along it; reports the slide and the landing off its end.
 // - building: up its drift (or at its uphill wall) along its length, with and without a pop at the top.
-// - terrace: across it and off its front: down the stairs, off the wall beside them, and popped onto each handrail.
+// - terrace: across it and off its front: down the stairs, off the wall beside them, and popped onto each handrail
+//   (with no stairs or handrails: off the middle of its front and beside it).
 // - jib (only when named): ridden onto every ride-on rail and box (one starting at the snow) along its
 //   first stretch; reports whether it caught, how long it slid, and the landing off its end. Loops and
 //   corkscrews need more speed than these runs carry: tools/sim/loop.ts rides them.
@@ -316,12 +317,20 @@ function rideBuilding(b: BuildingFeature, i: number): void {
 function rideTerrace(f: TerraceFeature, i: number): void {
   const t = townFrame(f);
   const end = f.length + stairRun(f) + 25;
-  for (const [label, v, pop] of [
-    ['stairs', 0, false],
-    ['wall', f.stairs / 2 + 3, false],
-    ['handrail left', -(f.stairs / 2 - 0.3), true],
-    ['handrail right', f.stairs / 2 - 0.3, true],
-  ] as const) {
+  // A terrace with no stairs (the City's drops onto banks, milestone 16) is ridden off its front: the middle and beside it.
+  const rides: (readonly [string, number, boolean])[] =
+    f.stairs > 0 && f.handrails
+      ? [
+          ['stairs', 0, false],
+          ['wall', f.stairs / 2 + 3, false],
+          ['handrail left', -(f.stairs / 2 - 0.3), true],
+          ['handrail right', f.stairs / 2 - 0.3, true],
+        ]
+      : [
+          [f.stairs > 0 ? 'stairs' : 'drop', 0, false],
+          ['wall', f.stairs / 2 + 3, false],
+        ];
+  for (const [label, v, pop] of rides) {
     const results: string[] = [];
     for (const s of speeds(pop ? [7, 10, 13] : [5, 8, 12])) {
       const p = framePoint(t, -8, v);

@@ -66,6 +66,20 @@ const ART: Record<MapId, string> = {
     `<path d="M0 70 Q60 58 160 74 L160 90 L0 90Z" fill="#e8eff7"/>` +
     pine(104, 74, 1) + pine(114, 77, 1.2) + pine(124, 74, 0.9) + pine(134, 78, 1.1) + pine(146, 76, 1) +
     pine(12, 80, 0.9) + pine(20, 82, 1.1),
+  city:
+    sky('city', '#3d4f86', '#f0b27a') +
+    `<path d="M0 62 L0 40 h10 v-6 h8 v8 h6 v18Z" fill="#7d86a6"/>` +
+    `<path d="M40 64 V20 h14 V64Z M58 64 V8 h12 V64Z M74 64 V28 h16 V64Z M96 64 V14 h11 V64Z M112 64 V32 h18 V64Z M134 64 V22 h12 V64Z" fill="#5a6488"/>` +
+    `<path d="M61 6 v-6" stroke="#5a6488" stroke-width="1.2"/>` +
+    `<path d="M43 26 h8 M43 34 h8 M43 42 h8 M61 14 h6 M61 22 h6 M61 30 h6 M61 38 h6 M99 20 h5 M99 30 h5 M99 40 h5 M137 28 h6 M137 38 h6" stroke="#ffd98a" stroke-width="1.6"/>` +
+    `<path d="M0 54 h44 v36 H0Z" fill="#9a6a4a"/><path d="M0 52 h46 l-2 3 H0Z" fill="${SNOW}"/>` +
+    `<path d="M6 62 h5 v5 h-5Z M18 62 h5 v5 h-5Z M30 62 h5 v5 h-5Z M6 74 h5 v5 h-5Z M30 74 h5 v5 h-5Z" fill="#ffd98a"/>` +
+    `<path d="M112 66 h48 v24 h-48Z" fill="#c8553d"/><path d="M110 64 h50 v3 h-50Z" fill="${SNOW}"/>` +
+    `<path d="M118 72 h6 v5 h-6Z M132 72 h6 v5 h-6Z M146 72 h6 v5 h-6Z" fill="#2a3c52"/>` +
+    rider(80, 40, -18) +
+    `<path d="M46 90 L60 80 h10 L84 90Z" fill="#e8eff7"/><path d="M60 80 L82 90 M56 83 L74 91" stroke="#c9d6e8" stroke-width="1"/>` +
+    `<path d="M58 76 L78 87" stroke="#2f4a3c" stroke-width="1.8" stroke-linecap="round"/><path d="M62 78 v6 M72 84 v5" stroke="#26372e" stroke-width="1.2"/>` +
+    `<path d="M92 90 v-22 M90 68 h4" stroke="#3a3f45" stroke-width="1.2"/><circle cx="92" cy="67" r="1.6" fill="#ffe8a8"/>`,
   slalom:
     sky('slalom', '#82b6ea', '#dceaf7') +
     `<path d="M0 44 L36 26 L60 36 L92 16 L124 34 L160 24 L160 90 L0 90Z" fill="#bfd2e6"/>` +
