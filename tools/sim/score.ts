@@ -5,7 +5,7 @@
 // rotations (reversed spins, a reversed tail butter, spin + Lincoln, five
 // and six flips with Turbo spins and Low gravity) and, on Jam Park, gaps (an
 // open gap, the Cat gap, a rail transfer, a fence hop), and last Freeride's
-// named gaps (milestone 15).
+// named gaps (milestone 15), then the City's roof gaps (milestone 16).
 //   node tools/sim/score.ts [map.json] [x] [--tricks a,b,c] [--verbose]
 // Defaults: the Park, its x = -38 line of tables. Tricks (cycled, one per
 // jump): 360, 540, 720, cork540, cork720, backflip, frontflip, rodeo, misty,
@@ -526,11 +526,14 @@ console.log(`${banked} banked, ${lost} lost; best combo ${pointsText(best)}; las
 
 // ---------------------------------------------------------------- milestone 15
 
-// Freeride's named gaps (the four cat gaps and the log gap): off each one's takeoff toward its landing, at three speeds.
-if (sim.map.name === 'Park') {
-  const fr = loadMap('src/maps/freeride.json');
+// A map's named gaps: off each one's takeoff toward its landing, at three
+// speeds. Last, after everything above (so its lines stay as they were):
+// Freeride's (the four cat gaps and the log gap, milestone 15), then the
+// City's five roof gaps (milestone 16).
+function rideNamedGaps(file: string, label: string, speeds: readonly number[], back = 40): void {
+  const fr = loadMap(file);
   const named = fr.gaps.zones.filter((z) => z.named);
-  console.log(`milestone 15 named gaps on Freeride (${named.length}):`);
+  console.log(`${label} (${named.length}):`);
   const centre = (poly: Float32Array): { x: number; z: number } => {
     let x = 0;
     let z = 0;
@@ -557,12 +560,12 @@ if (sim.map.name === 'Park') {
     const a = centre(zone.from);
     const b = centre(zone.to);
     const heading = Math.atan2(-(b.x - a.x), -(b.z - a.z));
-    for (const speed of [14, 18, 22]) {
-      console.log(`${zone.name} at ${speed} m/s, from 40 m above its takeoff:`);
+    for (const speed of speeds) {
+      console.log(`${zone.name} at ${speed} m/s, from ${back} m above its takeoff:`);
       const before = score.seq;
       const rf = new Rider(fr);
       rf.t = r.t;
-      rf.place(a.x + Math.sin(heading) * 40, a.z + Math.cos(heading) * 40, heading / DEG, speed);
+      rf.place(a.x + Math.sin(heading) * back, a.z + Math.cos(heading) * back, heading / DEG, speed);
       let flew = false;
       for (let i = 0; i < 12 / DT && !rf.s.bailed; i++) {
         const err = wrapAngle(heading - rf.s.yaw);
@@ -581,4 +584,9 @@ if (sim.map.name === 'Park') {
     }
   }
   console.log(`${scored} of ${rides} rides scored their gap`);
+}
+if (sim.map.name === 'Park') {
+  rideNamedGaps('src/maps/freeride.json', 'milestone 15 named gaps on Freeride', [14, 18, 22]);
+  // From the takeoff roof itself: further back, the hops between roofs come first.
+  rideNamedGaps('src/maps/city.json', 'milestone 16 named roof gaps on the City', [12, 16, 20], 12);
 }

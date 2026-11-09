@@ -99,7 +99,7 @@ const terrain = {
   type: 'generated',
   width: WIDTH,
   length: END,
-  cellSize: 2,
+  cellSize: 4,
   profile,
   bermWidth: 14,
   bermHeight: 5,
@@ -220,8 +220,9 @@ const side = (): number => (sideFlip = -sideFlip);
 
 const BENCH = { width: 0.5, height: 0.45, length: 2.4 };
 const PLANTER = { width: 1.2, height: 0.6, length: 3.2 };
-const BARRIER = { width: 0.6, height: 0.8, length: 3.6 };
-const LEDGE = { width: 0.6, height: 0.5, length: 11 };
+const BARRIER = { width: 0.6, height: 0.8, length: 10 };
+/** A ledge, and how far either side of a strip's middle the pair stands (clear of a stair set's handrails below, 2.7 m out). */
+const LEDGE = { width: 0.6, height: 0.5, length: 11, off: 4 };
 /** A kicker onto a rail: the kicker's lip, angle and size. */
 const KICK = { lip: 0.6, angle: 14, width: 2.6, side: 1.2 };
 
@@ -240,8 +241,8 @@ const makers: Record<string, Maker> = {
   },
   ledges: (x, d) => {
     // Two ledges side by side: one ridden on from the snow, one to pop onto.
-    box('ledge', LEDGE.width, [[x - 2.5, d, 0], [x - 2.5, d + 1.5, LEDGE.height], [x - 2.5, d + LEDGE.length, LEDGE.height]]);
-    box('ledge', LEDGE.width, [[x + 2.5, d + 2, LEDGE.height], [x + 2.5, d + LEDGE.length, LEDGE.height]]);
+    box('ledge', LEDGE.width, [[x - LEDGE.off, d, 0], [x - LEDGE.off, d + 1.5, LEDGE.height], [x - LEDGE.off, d + LEDGE.length, LEDGE.height]]);
+    box('ledge', LEDGE.width, [[x + LEDGE.off, d + 2, LEDGE.height], [x + LEDGE.off, d + LEDGE.length, LEDGE.height]]);
     return LEDGE.length;
   },
   planters: (x, d) => {
@@ -254,10 +255,11 @@ const makers: Record<string, Maker> = {
     return 3.5 + BENCH.length;
   },
   barriers: (x, d) => {
-    // Three street barriers in a line beside the strip's middle (kept clear), gaps between, to bonk or slide.
+    // A run of street barriers end to end beside the strip's middle (kept clear), to bonk or slide. (With gaps between them,
+    // a slow rider sliding off one dropped into the side of the next.)
     const v = OFF * side();
-    for (let i = 0; i < 3; i++) box('barrier', BARRIER.width, [[x + v, d + i * 6, BARRIER.height], [x + v, d + i * 6 + BARRIER.length, BARRIER.height]]);
-    return 12 + BARRIER.length;
+    box('barrier', BARRIER.width, [[x + v, d, BARRIER.height], [x + v, d + BARRIER.length, BARRIER.height]]);
+    return BARRIER.length;
   },
   barrels: (x, d) => {
     const v = OFF * side();
@@ -303,9 +305,10 @@ const POP_ON = new Set(['planters', 'benches', 'barriers', 'barrels', 'ledges'])
 const CLEAR_BEFORE = 26;
 
 /** Lays makers down a strip from d0 to d1 at x, `gap` m apart (CLEAR_BEFORE before one to pop onto), as far as they fit. */
-function strip(x: number, d0: number, d1: number, list: string[], gap = 7): void {
+function strip(x: number, d0: number, d1: number, list: string[], gap = 7, belowLaunch = false): void {
   let d = d0;
-  let first = true;
+  // `belowLaunch`: the strip starts just below a stair set, so its first item needs the clear snow too.
+  let first = !belowLaunch;
   for (const name of list) {
     const maker = makers[name];
     if (!maker) throw new Error(`no maker ${name}`);
@@ -365,7 +368,7 @@ function wallrides(segments: [number, number][], wallX: number, side: 1 | -1, mo
   for (const [i, [d0, d1]] of segments.entries()) {
     if (i < skip || n >= most) continue;
     const length = Math.min(WALLRIDE.length, d1 - d0 - WALLRIDE.before - WALLRIDE.past);
-    if (length < 12) continue;
+    if (length < WALLRIDE.length) continue; // shorter ones end with the rider still on the wall, heading into it
     wallride(wallX, side, d0 + WALLRIDE.before, length);
     n++;
   }
@@ -505,7 +508,7 @@ function towerBlock(b: Block, side: 'W' | 'E', height: number): void {
   box('ledge', LEDGE.width, [[px - 9, row.top + 62, LEDGE.height], [px - 9, row.top + 80, LEDGE.height]]);
   box('planter', PLANTER.width, [[px + 8, row.top + 64, PLANTER.height], [px + 8, row.top + 70, PLANTER.height]]);
   const below = row.top + 58 + 26 + h / Math.tan(22 * DEG) + 6;
-  strip(px, below, row.bottom - 6, pick([['kinkedRail', 'planters', 'barriers'], ['ledges', 'benches', 'downRail']]));
+  strip(px, below, row.bottom - 6, pick([['kinkedRail', 'planters', 'barriers'], ['ledges', 'benches', 'downRail']]), 7, true);
   strip((b.x0 + b.x1) / 2, row.top + 10, row.top + 54, ['benches', 'planters']);
 }
 
@@ -541,7 +544,8 @@ type Template = (b: Block) => void;
 const GRID: Template[][] = [
   [(b) => rooftops(b, 'W', { alleyGap: 'Old town alley gap' }), plaza, stairStreet, alley],
   [stairStreet, alley, (b) => rooftops(b, 'E', { alleyGap: 'Market alley gap' }), plaza],
-  [alley, (b) => rooftops(b, 'W', { streetGap: true }), plaza, stairStreet],
+  // The Street gap's roofs on the west edge, so it lands in the plaza's open west side below.
+  [(b) => rooftops(b, 'W', { streetGap: true }), alley, plaza, stairStreet],
   [plaza, stairStreet, alley, (b) => rooftops(b, 'E', { alleyGap: 'Foundry alley gap' })],
   [(b) => rooftops(b, 'W', {}), plaza, stairStreet, alley],
   [(b) => towerBlock(b, 'W', 92), garageBlock, (b) => towerBlock(b, 'E', 108), (b) => towerBlock(b, 'W', 74)],
@@ -640,7 +644,8 @@ for (const c of CROSS) {
   decor.push({ kind: 'streetLamp', points: pts, heading: 0, color: '#33c26a' });
 }
 for (const X of AVES) for (const c of [CROSS[1]!, CROSS[3]!, CROSS[5]!]) decor.push({ kind: 'bunting', points: [xz(X - AVE.half, c + 6), xz(X + AVE.half, c + 6)] });
-decor.push({ kind: 'sign', ...xz(0, 30), heading: 0, header: 'City', lines: AVE_NAMES.map((name, i) => ({ text: name, level: 'blue', arrow: Math.sign(AVES[i]!) })) });
+// Beside the start deck, out of the way of riders dropping in.
+decor.push({ kind: 'sign', ...xz(-12, 30), heading: 0, header: 'City', lines: AVE_NAMES.map((name, i) => ({ text: name, level: 'blue', arrow: Math.sign(AVES[i]!) })) });
 
 // ---------------------------------------------------------------- the map
 const map = {

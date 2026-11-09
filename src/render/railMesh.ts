@@ -9,7 +9,7 @@ import { litByPools } from './lightPools.ts';
 
 // Rails and boxes, drawn from the slide lines the physics uses so the skis
 // sit exactly on what you see. They're merged into one vertex-colored mesh
-// per 64 m tile, so a long rail drops out of view past the fog. Each has its
+// per 128 m tile, so a long rail drops out of view past the fog. Each has its
 // look: park rails and handrails on posts, fat tubes on saddles, fallen logs
 // lying on the snow, park boxes, concrete ledges, benches, flat-topped rocks
 // and stumps, bonk features (picnic tables, rows of barrels and cable
@@ -69,8 +69,8 @@ const POST_SPACING = 2.5;
 const POST_INSET = 0.4;
 /** How far (m) boxes and posts reach below the snow, so bumps in it never show a gap. */
 const BURY = 0.25;
-/** Size (m) of a tile of merged rail meshes. */
-const TILE = 64;
+/** Size (m) of a tile of merged rail meshes: thin and never culled by distance, so big tiles cost little (128 m since milestone 16, the City's rails and boxes fill every tile). */
+const TILE = 128;
 
 const material = litByPools(new MeshLambertMaterial({ vertexColors: true, flatShading: true }));
 

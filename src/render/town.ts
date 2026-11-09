@@ -228,7 +228,7 @@ function drawBuilding(b: BuildingFeature, hf: Heightfield, kits: TiledKit, glows
  * to under the roof. A mid-rise has a stone plinth and ground-floor windows
  * (a door, shop windows and a sign on its front if it has one) that follow
  * the ground; a tower has a dark glass lobby and a band of panes on every
- * floor, about two in five lit at night, and a plant room on its roof (a
+ * floor, about two in seven lit, and a plant room on its roof (a
  * mast too past 60 m).
  */
 function drawHighrise(b: BuildingFeature, hf: Heightfield, kits: TiledKit, glows: TiledKit): void {
@@ -302,7 +302,7 @@ function drawHighrise(b: BuildingFeature, hf: Heightfield, kits: TiledKit, glows
         const y0 = floor0 + (tower ? TOWER.lobby + 0.6 : BLOCK.upper + 0.6) + f * step;
         if (y0 + tall > top) break;
         if (y0 < above) continue;
-        const lit = tower ? (i * 5 + f * 11 + seed) % 7 < 3 : (i * 7 + f * 3 + seed) % 3 === 0;
+        const lit = tower ? (i * 5 + f * 11 + seed) % 7 < 2 : (i * 7 + f * 3 + seed) % 3 === 0;
         (lit ? glow : d).levelPanel(...span(half), y0, y0 + tall, w.out, lit ? GLASS_LIT : tower ? TOWER_GLASS : GLASS);
       }
     }

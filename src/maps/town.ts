@@ -121,7 +121,9 @@ function buildingShapes(b: BuildingFeature, out: RampShape[]): void {
   const s1 = roofSlope(b);
   const up = eaveUp(b);
   // The roof: a sheer rise at the uphill wall, the roof itself, a sheer drop at the downhill wall.
-  const roof = new ProfileBuilder().to(EDGE, up, 0, s1);
+  // A mid-rise's or a tower's sheer ends are left undrawn (hidden): as tall as the building, drawn as snow they'd cover its end walls.
+  const ends = b.style === 'block' || b.style === 'tower' ? SURFACE.hidden : SURFACE.snow;
+  const roof = new ProfileBuilder().to(EDGE, up, 0, s1, ends);
   const k = lipLength(b);
   if (b.roof === 'gable') {
     // Up the near side, round over the ridge, down the far side.
@@ -135,7 +137,7 @@ function buildingShapes(b: BuildingFeature, out: RampShape[]): void {
   } else {
     roof.to(b.length, b.eave, s1, 0);
   }
-  roof.ease(EDGE, 0);
+  roof.ease(EDGE, 0, ends);
   const o = framePoint(t, -EDGE, 0);
   out.push(makeRamp(o.x, o.z, b.yaw, b.width, EDGE, roof, false));
 

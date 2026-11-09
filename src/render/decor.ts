@@ -29,6 +29,12 @@ import { litByPools } from './lightPools.ts';
 // trees, drawn instead of the tiles once the block is far away.
 
 const TILE = 64;
+/**
+ * Side (m) of a tile of lit windows and lamp glows: they're small and
+ * scattered over nearly every town tile, so bigger tiles save a draw call
+ * each (milestone 16: the City's buildings fill every tile).
+ */
+const GLOW_TILE = 128;
 /** Side (m) of one tile of instanced trees and rocks. */
 const SCATTER_TILE = 160;
 /** Tree tiles per side of a block that shares one set of far trees. */
@@ -84,7 +90,7 @@ export function createDecor(layout: DecorLayout, features: readonly Feature[], h
 
   const kits = new TiledKit(TILE);
   const decals = new TiledKit(TILE);
-  const glows = new TiledKit(TILE);
+  const glows = new TiledKit(GLOW_TILE);
   const cloths = new TiledKit(TILE);
   for (const line of layout.lines) drawLine(line, hf, line.kind === 'dyeLine' ? decals : kits, cloths);
   for (const c of layout.cornices) cornice(c, hf, kits);
