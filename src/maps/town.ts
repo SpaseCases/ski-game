@@ -26,6 +26,9 @@ const WALL_PIECE = 2;
 const RIDGE_ROUND = 2;
 /** Steepness (degrees, against the roof) of a roof's lip at the downhill eave. */
 const LIP_ANGLE = 22;
+/** Buildings that stand level (a shed roof turned uphill) and nobody rides: their roof's sheer ends are left undrawn. */
+const LEVEL_STYLES: ReadonlySet<string> = new Set(['block', 'tower', 'church', 'clock', 'civic', 'deco', 'twist', 'depot', 'rampart', 'turret']);
+
 /** Handrails: height (m) above the steps, and how far they run on past the top and bottom. */
 export const HANDRAIL = { height: 0.9, inset: 0.3, top: 2.5, bottom: 2 };
 
@@ -122,7 +125,7 @@ function buildingShapes(b: BuildingFeature, out: RampShape[]): void {
   const up = eaveUp(b);
   // The roof: a sheer rise at the uphill wall, the roof itself, a sheer drop at the downhill wall.
   // A mid-rise's or a tower's sheer ends are left undrawn (hidden): as tall as the building, drawn as snow they'd cover its end walls.
-  const ends = b.style === 'block' || b.style === 'tower' ? SURFACE.hidden : SURFACE.snow;
+  const ends = LEVEL_STYLES.has(b.style) ? SURFACE.hidden : SURFACE.snow;
   const roof = new ProfileBuilder().to(EDGE, up, 0, s1, ends);
   const k = lipLength(b);
   if (b.roof === 'gable') {

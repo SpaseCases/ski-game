@@ -255,6 +255,16 @@ function createPipe(s: PipeShape, hf: Heightfield, seed: number, out: Tris): voi
   );
 }
 
+/** A wall-look wallride's colors: parsed once per color. */
+const WALL_COLORS = new Map<string, Color>();
+const wallColor = (hex: string): Color => {
+  let c = WALL_COLORS.get(hex);
+  if (!c) WALL_COLORS.set(hex, (c = new Color(hex)));
+  return c;
+};
+const WALL_FOOT_SHADE = new Color('#4a4642');
+const WALL_COPING = new Color('#d9d2c4');
+
 /** Steps along a quarter: fine over its tapered ends, coarser between. */
 const QUARTER_STEP_FINE = 0.75;
 
@@ -285,7 +295,15 @@ function createQuarter(q: QuarterShape, hf: Heightfield, seed: number, out: Tris
       const lo = Math.abs(across[b] ?? 0);
       const hi = Math.abs(across[b + 1] ?? 0);
       const vMid = (lo + hi) / 2;
-      if (vMid > q.transition && vMid < q.transition + coping) color.copy(LIP_LINE);
+      if (q.wall) {
+        // Drawn as the building's own wall (the City): its face in the wall's color in stone courses, darker toward
+        // the foot, a pale coping, and the strip under the eaves as the wall's plinth.
+        const facet = leftHanded ? across.length - 2 - b : b;
+        const base = wallColor(q.wall);
+        if (vMid <= q.transition) color.copy(base).multiplyScalar(facet % 2 === 0 ? 0.92 : 0.82).lerp(WALL_FOOT_SHADE, Math.max(0, 0.35 - facet * 0.08));
+        else if (vMid < q.transition + coping) color.copy(WALL_COPING);
+        else color.copy(base).multiplyScalar(0.7);
+      } else if (vMid > q.transition && vMid < q.transition + coping) color.copy(LIP_LINE);
       else if (q.wood && vMid <= q.transition) {
         const facet = leftHanded ? across.length - 2 - b : b;
         color.copy(facet === PIPE_TRANSITION_STEPS - 1 ? WOOD_DARK : facet % 2 === 0 ? WOOD : WOOD_MID);

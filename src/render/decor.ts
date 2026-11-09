@@ -19,6 +19,7 @@ import { clothMaterial } from './cloth.ts';
 import { drawSign } from './signs.ts';
 import { drawnHeightAt, renderedHeightAt } from './terrainMesh.ts';
 import { drawTown, GLASS, GLASS_LIT } from './town.ts';
+import { drawCityLine } from './cityStructures.ts';
 import { litByPools } from './lightPools.ts';
 
 // Draws a map's decoration: trees, snags and rocks as instanced meshes (one
@@ -283,6 +284,8 @@ function drawLine(line: LineDecor, hf: Heightfield, kits: TiledKit, cloths: Tile
     case 'markers':
       bamboo(line.points, hf, kits, 0, false);
       break;
+    default:
+      drawCityLine(line, hf, kits);
   }
 }
 

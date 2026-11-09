@@ -39,6 +39,7 @@ import { createSkierPose, interpolateSkier, SkierView } from './render/skierView
 import { SnowFx } from './render/snowFx.ts';
 import { weatherLook, weatherRange } from './render/weather.ts';
 import { WorldView } from './render/world.ts';
+import { loadPropModels, needsPropModels } from './render/propModels.ts';
 import {
   canSetPersonal,
   createRun,
@@ -563,6 +564,8 @@ async function loadMap(entry: MapEntry): Promise<void> {
   mapSelect.setLoading(entry.id);
   try {
     const map = parseMap(await entry.load());
+    // The City's street props come from converted model packs, a chunk of their own fetched only for a map that uses them.
+    if (needsPropModels(map)) await loadPropModels();
     await nextPaint();
     // Free the old map before building the new one, to keep peak memory down.
     level?.world.dispose();

@@ -322,6 +322,9 @@ export function railUp(r: RailShape, s: number, k: number, up: Vec3Like, along: 
   return (b[k] ?? 0) * (1 - t) + (b[k + 1] ?? 0) * t;
 }
 
+/** How far (m) under its top a parapet is solid (render/cityStructures.ts draws the viaduct below it). */
+const PARAPET_DEPTH = 2.5;
+
 /**
  * Keeps a body at feet position `p` out of the sides and ends of rails and
  * boxes, where its feet are below their top. Pushes it out the nearest way
@@ -353,6 +356,8 @@ export function collideRails(rails: readonly RailShape[], p: Vec3Like, v: Vec3Li
       if (Math.abs(side) >= reach) continue;
       const t = seg.lenH > 1e-6 ? Math.min(1, Math.max(0, u / seg.lenH)) : 0;
       if (p.y > seg.ay + t * (seg.by - seg.ay) - R.stepTolerance) continue;
+      // A viaduct's parapet (the City) stands on its deck high over the street: solid only near its top.
+      if (r.look === 'parapet' && p.y < seg.ay + t * (seg.by - seg.ay) - PARAPET_DEPTH) continue;
 
       // Out the nearest way: off a side, or off either end of the whole line.
       const sign = side < 0 ? -1 : 1;

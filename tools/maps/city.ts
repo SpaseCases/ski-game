@@ -1,764 +1,1063 @@
-// Lays out the City and writes it to src/maps/city.json (milestone 16). The
-// map file is the source the game loads; this script is how it was
-// authored. Edit here and rerun, from the repo root:
+// Lays out the City and writes it to src/maps/city.json (milestone 16,
+// reworked into a city on a hill). The map file is the source the game
+// loads; this script is how it was authored. Edit here and rerun, from the
+// repo root:
 //   node tools/maps/city.ts
 // Then check it: tools/maps/sinks.ts (stuck spots), tools/sim/features.ts
 // (every jump, kicker, quarter, building, terrace and jib), tools/sim/face.ts
-// (rides each avenue to the finish), tools/sim/score.ts (its City section
-// rides the five named roof gaps), tools/maps/overview.ts (a top-down PNG).
+// (rides each run from the plaza to a finish), tools/sim/score.ts (its City
+// section rides the named gaps and the wallrides), tools/maps/overview.ts.
+// The building kit (frames, makers, buildings) is tools/maps/cityKit.ts.
 //
-// A snowed-in city down a steep hill, open to ride any way: five avenues
-// run down the fall line, near-flat cross streets run across it every
-// 220 m, and between them are blocks of buildings with their own alleys,
-// courtyards, stair streets, plazas and roofs. Positions are x across (+x to
-// the right facing down) and d down the hill from the top (z = -d).
-//   d    0 to   40   the top plaza and the start deck, among the old town's small houses
-//   d   40 to 1140   five rows of blocks at 12 to 16°, a cross street (3.5°) above each
-//   d 1140 to 1590   downtown at 5°: towers, tower plazas, the Tower gap
-//   d 1590 to 1680   the square, the finish line across the whole city and its arch
-//   d 1680 to 1770   a run-out climbing to stop riders
-// The buildings grow taller down the hill: small shops and houses at the
-// top, mid-rises lower down, glass towers downtown. Both outer edges are
-// outskirts of small houses (the play area's edge is a snow bank there).
-//
-// Every block is built from one of a few templates (rooftops, stair street,
-// plaza, alley; downtown: tower plaza, garage), so each avenue passes a mix.
-// Rideable roofs follow the slope like Freeride's town; the buildings nobody
-// rides (mid-rises and towers) get a shed roof turned uphill so they stand
-// level, their downhill walls taller.
+// A snowed-in city on a hill, open to ride any way, like Freeride: the old
+// town's walled plaza on the summit, and the city spilling down every side
+// of the hill to four finish squares round its foot. Ring roads wind round
+// the hill along the contours; radial streets wind down it from the plaza's
+// gates, doubling at each ring as the city widens (8, then 16, then 32);
+// between them are blocks of buildings, alleys, courtyards and stair streets.
+// Headings follow the game's: 0 straight down from the start (south, here),
+// +90 to its left (east), 180 behind (north), -90 right (west).
+//   South: downtown, towers at the foot.
+//   East: the rail quarter (the station, the elevated line, warehouses, the garage, a building site).
+//   North: the old town spilling down (the cathedral, the viaduct, the funicular).
+//   West: homes, the park and its frozen fountain, the church.
 
 import { writeFileSync } from 'node:fs';
-import { buildMap } from '../../src/maps/build.ts';
+import { buildMap, generateTerrain } from '../../src/maps/build.ts';
 import { parseMap } from '../../src/maps/loader.ts';
-import { generateSlope } from '../../src/maps/terrain.ts';
+import type { Heightfield } from '../../src/maps/types.ts';
 import { heightAt } from '../../src/sim/terrain.ts';
-import { poleJam, SHAPES, slideJson, type Json, type Pt } from './railKit.ts';
+import * as K from './cityKit.ts';
+import { DEG, out, r1, r2, type Json } from './cityKit.ts';
 
-const DEG = Math.PI / 180;
-const r1 = (v: number): number => Math.round(v * 10) / 10;
-const r2 = (v: number): number => Math.round(v * 100) / 100;
-
-/** A small seeded random (mulberry32), so a rerun lays out the same city. */
-function random(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+// ---------------------------------------------------------------- the hill
+const SUMMIT = 300;
+/** The walled plaza on the summit: level out to PLAZA m from the middle. */
+const PLAZA = 50;
+/** The ring roads: middle radius (m from the summit), width, and how far each winds in and out (3 times round). */
+const RINGS = [
+  { r: 152, width: 14, wind: 7, phase: 0.4 },
+  { r: 278, width: 14, wind: 8, phase: 1.7 },
+  { r: 412, width: 16, wind: 9, phase: 2.9 },
+  // The boulevard round the foot, through the four finish squares.
+  { r: 548, width: 20, wind: 6, phase: 4.2 },
+];
+/** The four faces: heading, name, and the pitch down each (sections out from the summit, as a spoke's). */
+type FaceId = 'S' | 'E' | 'N' | 'W';
+const FACES: Record<FaceId, { heading: number; name: string }> = {
+  S: { heading: 0, name: 'Downtown' },
+  E: { heading: 90, name: 'Rail quarter' },
+  N: { heading: 180, name: 'Old town' },
+  W: { heading: -90, name: 'Hillside homes' },
+};
+const sec = (length: number, pitch: number, ease = 30): Json => ({ length, pitch, ease });
+const TOP = { length: PLAZA, pitch: 1, ease: 0 };
+/** Where each face's finish square sits (m from the summit). */
+const FOOT = 590;
+const SPOKES: Json[] = [
+  // Downtown: steep streets, then easing into the flatter towers at the foot.
+  { name: 'Downtown', heading: 0, bend: 0, sharp: 0, sharpTo: 1, sections: [TOP, sec(40, 10, 20), sec(250, 14), sec(40, 10), sec(170, 6), sec(80, 2.5), sec(200, -9, 40)] },
+  { name: 'Rail quarter', heading: 90, bend: 0, sharp: 0, sharpTo: 1, sections: [TOP, sec(40, 10, 20), sec(300, 13.5), sec(60, 8), sec(100, 5), sec(90, 2.5), sec(200, -9, 40)] },
+  { name: 'Old town', heading: 180, bend: 0, sharp: 0, sharpTo: 1, sections: [TOP, sec(40, 11, 20), sec(350, 15), sec(60, 7), sec(40, 4), sec(90, 2.5), sec(200, -9, 40)] },
+  { name: 'Hillside homes', heading: -90, bend: 0, sharp: 0, sharpTo: 1, sections: [TOP, sec(40, 10, 20), sec(380, 12.5), sec(70, 5), sec(100, 2.5), sec(200, -9, 40)] },
+  // Spurs between the faces: a little less drop, so the foot of each side drains toward its own square.
+  ...[45, 135, -135, -45].map((h) => ({ name: `Spur ${h}`, heading: h, bend: 0, sharp: 0.4, sharpTo: 500, sections: [TOP, sec(40, 9, 20), sec(330, 12), sec(140, 6), sec(60, 4), sec(200, -9, 40)] })),
+];
+/** How far the play area reaches out from the summit: past the finish squares on the faces, a little short of that on the spurs. */
+function boundsPolygon(): Json[] {
+  const pts: Json[] = [];
+  for (let a = 0; a < 360; a += 3) {
+    const toFace = Math.abs(((a + 45) % 90) - 45); // 0 on a face, 45 on a spur
+    const r = 650 - 60 * Math.sin((toFace / 45) * (Math.PI / 2)) ** 2;
+    pts.push({ x: r1(-Math.sin(a * DEG) * r), z: r1(-Math.cos(a * DEG) * r) });
+  }
+  return pts;
 }
-const rand = random(16);
-const pick = <T>(list: readonly T[]): T => list[Math.floor(rand() * list.length)]!;
-const between = (a: number, b: number): number => a + (b - a) * rand();
+const ringR = (i: number, theta: number): number => {
+  const g = RINGS[i]!;
+  return g.r + g.wind * Math.sin(3 * theta * DEG + g.phase);
+};
+const polar = (theta: number, r: number): Json => ({ x: r1(-Math.sin(theta * DEG) * r), z: r1(-Math.cos(theta * DEG) * r) });
 
-// ---------------------------------------------------------------- the grid
-const WIDTH = 640;
-/** The avenues' middles, west to east, and their names (runs, signs). */
-const AVES = [-240, -120, 0, 120, 240];
-const AVE_NAMES = ['Ridge Avenue', 'Market Street', 'Main Street', 'Lantern Avenue', 'Foundry Row'];
-/** Half an avenue's width curb to curb, and the sidewalk: buildings start at LINE from its middle. */
-const AVE = { half: 13, walk: 3 };
-const LINE = AVE.half + AVE.walk;
-/** Cross streets: where each starts (d) and how wide it is. */
-const CROSS = [40, 260, 480, 700, 920, 1140, 1370];
-const STREET = 24;
-/** Pitch (degrees) of the five rows of blocks, then downtown's, the cross streets', the top plaza's. */
-const PITCH = [12, 14, 16, 14, 13];
-const DOWNTOWN_PITCH = 5;
-const STREET_PITCH = 3.5;
-const TOP = { length: 40, pitch: 3 };
-/** The square (finish), and the run-out climbing past it to the end of the play area. */
-const SQUARE = { top: 1590, bottom: 1680, pitch: 3 };
-const END = 1770;
-const CLIMB = -9;
-/** Where a pitch change eases in (m, centered on the change). */
-const EASE = 20;
-
-interface Row {
-  top: number;
-  bottom: number;
-  pitch: number;
-  /** 0 to 4 the steep rows, 5 and 6 downtown. */
-  index: number;
+// ---------------------------------------------------------------- streets
+// Radial streets wind down the hill from where they start (the plaza's
+// gates, then each ring road): each swings `amp` m either way over `wave` m.
+interface Street {
+  theta: number;
+  from: number;
+  width: number;
+  amp: number;
+  wave: number;
+  main: boolean;
 }
-const ROWS: Row[] = CROSS.map((c, i) => ({ top: c + STREET, bottom: CROSS[i + 1] ?? SQUARE.top, pitch: PITCH[i] ?? DOWNTOWN_PITCH, index: i }));
+const streets: Street[] = [];
+for (let k = 0; k < 8; k++) streets.push({ theta: k * 45, from: PLAZA, width: 16, amp: k % 2 === 0 ? 5 : 9, wave: 300, main: true });
+for (let k = 0; k < 8; k++) streets.push({ theta: 22.5 + k * 45, from: RINGS[0]!.r, width: 12, amp: k % 2 === 0 ? -8 : 8, wave: 240, main: false });
+for (let k = 0; k < 16; k++) streets.push({ theta: 11.25 + k * 22.5, from: RINGS[2]!.r, width: 10, amp: k % 2 === 0 ? 6 : -6, wave: 200, main: false });
+/** A street's heading (degrees) from the summit at r. */
+const streetAt = (s: Street, r: number): number => s.theta + (s.amp * Math.sin((2 * Math.PI * Math.max(0, r - s.from)) / s.wave)) / Math.max(r, 1) / DEG;
+const streetPoints = (s: Street, r0: number, r1: number, step = 6): Json[] => {
+  const pts: Json[] = [];
+  for (let r = r0; r <= r1 + 1e-6; r += step) pts.push(polar(streetAt(s, r), r));
+  return pts;
+};
+/** Sidewalk (m) between a street's edge and the buildings. */
+const WALK = 2;
 
-// ---------------------------------------------------------------- terrain
-const sec = (length: number, pitch: number, ease = EASE): Json => ({ length, pitch, ease });
-const profile: Json[] = [sec(TOP.length, TOP.pitch, 0)];
-for (const row of ROWS) {
-  profile.push(sec(STREET, STREET_PITCH));
-  profile.push(sec(row.bottom - row.top, row.pitch));
+const elements: Json[] = [];
+// The summit plaza, level.
+elements.push({ type: 'flat', x: 0, z: 0, heading: 0, pitch: 0, radius: PLAZA, blend: 14 });
+// The ring roads: roads cut level across the hill (but for a little crossfall), banks back to the slope.
+RINGS.forEach((g, i) => {
+  const pts: Json[] = [];
+  for (let a = 0; a <= 366; a += 3) pts.push(polar(a, ringR(i, a)));
+  elements.push({ type: 'track', points: pts, width: g.width, bank: 6, smooth: 36, crossfall: 0.3, taper: 0 });
+});
+// The four finish squares: broad and nearly level.
+for (const f of Object.values(FACES)) {
+  elements.push({ type: 'flat', ...polar(f.heading, FOOT), heading: f.heading, pitch: 2, width: 150, length: 90, blend: 60 });
 }
-profile.push(sec(SQUARE.bottom - SQUARE.top, SQUARE.pitch));
-profile.push(sec(END - SQUARE.bottom, CLIMB, 30));
+
+// The old town's sunken street: the North street cut 6 m into the hill where the viaduct crosses it.
+const VIADUCT = { r: 345, span: 40, pier: 7, width: 7, height: 0.3 };
+{
+  const s = streets.find((t) => t.main && t.theta === 180)!;
+  elements.push({ type: 'gully', points: streetPoints(s, VIADUCT.r - 48, VIADUCT.r + 48, 4), floor: 10, depth: 6, wall: 4, taper: 40 });
+}
 
 const terrain = {
-  type: 'generated',
-  width: WIDTH,
-  length: END,
+  type: 'peak',
+  // Wide, so the far stand-in of the ground (render/backdrop.ts, round the heightfield's middle) reaches past the whole city: the skyline stands on it.
+  size: 2200,
   cellSize: 4,
-  profile,
-  bermWidth: 14,
-  bermHeight: 5,
+  summit: SUMMIT,
+  spokes: SPOKES,
+  roll: { amplitude: 1.2, wavelength: 120 },
+  relief: { amplitude: 2.5, wavelength: 260 },
+  elements,
+  bounds: boundsPolygon(),
+  rim: { inset: 40, ramp: 50, rise: 0.35, ease: 260 },
+  rockSlope: 60,
   noise: 0.06,
+  rockNoise: 0,
   seed: 16,
-  // Wide, so the far stand-in of the ground (render/backdrop.ts, round the heightfield's middle) reaches the whole city: the skyline stands on it.
-  margin: 600,
-  hills: { amplitude: 4, wavelength: 160 },
 };
-const spawn = { x: 0, z: -16, heading: 0 };
-const ground = generateSlope(
-  parseMap({ name: 'City', terrain, features: [], spawn, flags: [], finishes: [{ x: 0, z: -1630, heading: 0, width: 100, length: 50 }], decor: [], colors: { sky: '#000000', fog: '#000000' } }).terrain as never,
-);
-/** Height of the bare slope at (x, d). */
-const gy = (x: number, d: number): number => heightAt(ground, x, -d);
-/** The slope's pitch (degrees) down the fall line at (x, d). */
-const pitchAt = (x: number, d: number): number => Math.atan((gy(x, d - 1) - gy(x, d + 1)) / 2) / DEG;
+const DUMMY = { spawn: { x: 0, z: 0, heading: 0 }, flags: [], finishes: [{ x: 0, z: 0, heading: 0, width: 1, length: 1 }], colors: { sky: '#000000', fog: '#000000' } };
+const ground: Heightfield = generateTerrain(parseMap({ name: 'City', terrain, features: [], ...DUMMY }).terrain);
+K.setGround(ground);
+const gw = (x: number, z: number): number => heightAt(ground, x, z);
 
-// ---------------------------------------------------------------- what goes in the map
-const features: Json[] = [];
-const gaps: Json[] = [];
-const decor: Json[] = [];
-const flags: Json[] = [];
-const runs: Json[] = [];
-const notes: string[] = [];
-const xz = (x: number, d: number): Json => ({ x: r1(x), z: r1(-d) });
-
-const SHOP_COLORS = ['#c8553d', '#3f7fbf', '#e0b84a', '#6a8f5a', '#e8e0d0', '#b8483a', '#4f6fa8', '#d9a441', '#7a8f9f', '#a65f8a'];
-const BLOCK_COLORS = ['#9a5b45', '#b8735a', '#8c6f5a', '#c9b48e', '#7d8590', '#a8a29a', '#6e7c8c', '#b9a27e', '#8a4f3d', '#d0c4ac', '#5f6b78', '#a7826a'];
-const TOWER_COLORS = ['#8d9aa8', '#a7b0b8', '#6f7a86', '#b9bfc5', '#7f8b84'];
-const SHOP_SIGNS = ['Bakery', 'Cafe', 'Books', 'Records', 'Deli', 'Noodles', 'Hardware', 'Florist', 'Barber', 'Bikes', 'Tea', 'Pizza', 'Diner', 'Market', 'Gallery', 'Bagels', 'Toys', 'Grocer', 'Tune shop', 'Outfitters', 'Rentals', 'Soup', 'Tailor', 'Laundry'];
-
-type Side = 'W' | 'E' | 'N' | 'S';
-/** A building's `front` for a door facing world side `s`, for its yaw (0 runs down the hill, 180 up it). */
-function front(s: Side, yaw: 0 | 180): string {
-  const down = { W: 'left', E: 'right', N: 'up', S: 'down' } as const;
-  const up = { W: 'right', E: 'left', N: 'down', S: 'up' } as const;
-  return (yaw === 0 ? down : up)[s];
+// ---------------------------------------------------------------- blocks
+type Line = [number, number][];
+interface Block {
+  face: FaceId;
+  /** 0 the old town inside the first ring, then 1, 2, 3 out to the boulevard. */
+  band: number;
+  /** Heading (degrees) of its middle at its top. */
+  theta: number;
+  /** Its top and bottom (m from the summit) and depth. */
+  r0: number;
+  r1: number;
+  depth: number;
+  /** Half its width (m) at d down it, to the sidewalks. */
+  hw: (d: number) => number;
+  frame: K.Frame;
+  /** Its open line, for its run. */
+  line?: Line;
 }
-
-/** A building's footprint (roof edge), for the checks at the end: x0..x1 across, d0..d1 down. */
-interface Footprint {
-  x0: number;
-  x1: number;
-  d0: number;
-  d1: number;
-}
-const footprints: Footprint[] = [];
-
-/** A rideable building (a shop or house) whose roof follows the slope: its roof's uphill edge centered at (x, d). */
-function shop(x: number, d: number, b: Json): void {
-  features.push({ type: 'building', ...xz(x, d), yaw: 0, ...b });
-  const len = b.length as number;
-  const w = (b.width as number) / 2;
-  footprints.push({ x0: x - w, x1: x + w, d0: d, d1: d + len });
-}
-
-/**
- * A building nobody rides (a mid-rise or a tower), standing level: from d
- * to d + length down the hill, centered at x, at least `eave` tall at its
- * uphill wall. It's laid out turned uphill with a shed roof as high above
- * its downhill end as the slope drops along it, so the roof is level.
- */
-function highrise(x: number, d: number, length: number, width: number, eave: number, style: 'block' | 'tower', color: string, door: Side, sign = ''): void {
-  const rise = Math.max(0, gy(x, d) - gy(x, d + length));
-  features.push({ type: 'building', ...xz(x, d + length), yaw: 180, length: r1(length), width: r1(width), eave: r1(eave), roof: 'shed', rise: r2(rise), style, color, front: front(door, 180), sign });
-  footprints.push({ x0: x - width / 2, x1: x + width / 2, d0: d, d1: d + length });
-}
-
-/** A terrace (a plaza with a wall drop on every side) from (x, d) down `length`, level on the slope, `extra` m higher at its front; stairs `stairs` wide down its front. */
-function terrace(x: number, d: number, length: number, width: number, stairs: number, extra = 0, stairAngle = 22): number {
-  const height = length * Math.tan(pitchAt(x, d + length / 2) * DEG) + extra;
-  features.push({ type: 'terrace', ...xz(x, d), yaw: 0, length, width, height: r2(height), stairs, stairAngle, handrails: stairs > 0 });
-  return height;
-}
-
-/** A box or rail through [x, d, height above the snow] points. */
-function box(style: string, width: number, pts: [number, number, number][]): void {
-  features.push({ type: 'box', style, width, points: pts.map(([x, d, h]) => ({ x: r2(x), z: r2(-d), height: r2(h) })) });
-}
-function rail(pts: [number, number, number][], style = 'metal'): void {
-  features.push({ type: 'rail', style, points: pts.map(([x, d, h]) => ({ x: r2(x), z: r2(-d), height: r2(h) })) });
-}
-
-/** A snow bank (a plow pile or a landing below a drop): rising from (x, d) along `yaw` (0 down the hill), its face falling away beyond its top. */
-function bank(x: number, d: number, yaw: number, width: number, o: { height?: number; back?: number; top?: number; angle?: number; side?: number } = {}): void {
-  const height = o.height ?? BANK.height;
-  features.push({
-    type: 'landing',
-    ...xz(x, d),
-    yaw,
-    width: r1(width),
-    sideWidth: o.side ?? BANK.side,
-    height,
-    angle: o.angle ?? BANK.angle,
-    back: o.back ?? BANK.back,
-    top: o.top ?? BANK.top,
-    knuckle: BANK.knuckle,
-    transition: BANK.transition,
-    natural: true,
-  });
-}
-/** A plow bank along a curb: 1.3 m of snow (tall enough to read as a bank from the street), an eased back from the street, a short top, its face toward the sidewalk. */
-const BANK = { height: 1.3, back: 2.6, top: 0.8, angle: 26, knuckle: 0.6, transition: 1.5, side: 4, from: 6.5 };
-
-// ---------------------------------------------------------------- street furniture and small features
-// Each maker lays one feature (or a small set) with its top end at (x, d) and
-// returns how far down the hill it reaches. Templates string them down a
-// strip of a block.
-type Maker = (x: number, d: number) => number;
-/**
- * How far (m) to one side of a strip's middle the bonks stand: the middle
- * stays clear, so a rider coming off a stair set or a rail straight down
- * the strip never runs into the side of something to pop onto.
- */
-const OFF = 2.5;
-let sideFlip = 1;
-/** Set: every bonk goes to this side of its strip (an avenue's lane: toward the street's middle, off the curb banks). */
-let towardSide: number | null = null;
-const side = (): number => towardSide ?? (sideFlip = -sideFlip);
-
-const BENCH = { width: 0.5, height: 0.45, length: 2.4 };
-const PLANTER = { width: 1.2, height: 0.6, length: 3.2 };
-const BARRIER = { width: 0.6, height: 0.8, length: 10 };
-/** A parked car: its width, length, the gap to the next one, and its shape as [m along, height above the snow]: hood, windshield, roof, back window, trunk. */
-const CAR = { width: 1.8, length: 4.3, gap: 0.4, shape: [[0, 0.9], [1.0, 0.95], [1.5, 1.45], [2.9, 1.45], [3.4, 0.95], [4.3, 0.9]] as [number, number][] };
-const DUMPSTER = { width: 1.6, height: 1.3, length: 2.2 };
-/** A ledge, and how far either side of a strip's middle the pair stands (clear of a stair set's handrails below, 2.7 m out). */
-const LEDGE = { width: 0.6, height: 0.5, length: 11, off: 4 };
-/** A kicker onto a rail: the kicker's lip, angle and size. */
-const KICK = { lip: 0.6, angle: 14, width: 2.6, side: 1.2 };
-
-const makers: Record<string, Maker> = {
-  kinkedRail: (x, d) => {
-    features.push(slideJson('rail', x, d, SHAPES.doubleKink(14)));
-    return 14;
-  },
-  downRail: (x, d) => {
-    features.push(slideJson('rail', x, d, SHAPES.flatDownFlatDown(16)));
-    return 16;
-  },
-  aFrame: (x, d) => {
-    features.push(slideJson('rail', x, d, SHAPES.aFrame(12)));
-    return 12;
-  },
-  ledges: (x, d) => {
-    // Two ledges side by side: one ridden on from the snow, one to pop onto.
-    box('ledge', LEDGE.width, [[x - LEDGE.off, d, 0], [x - LEDGE.off, d + 1.5, LEDGE.height], [x - LEDGE.off, d + LEDGE.length, LEDGE.height]]);
-    box('ledge', LEDGE.width, [[x + LEDGE.off, d + 2, LEDGE.height], [x + LEDGE.off, d + LEDGE.length, LEDGE.height]]);
-    return LEDGE.length;
-  },
-  planters: (x, d) => {
-    box('planter', PLANTER.width, [[x - 2.2, d, PLANTER.height], [x - 2.2, d + PLANTER.length, PLANTER.height]]);
-    box('planter', PLANTER.width, [[x + 2.2, d + 5, PLANTER.height], [x + 2.2, d + 5 + PLANTER.length, PLANTER.height]]);
-    return 5 + PLANTER.length;
-  },
-  benches: (x, d) => {
-    for (const [v, b] of [[-2, 0], [2, 3.5]] as const) box('bench', BENCH.width, [[x + v, d + b, BENCH.height], [x + v, d + b + BENCH.length, BENCH.height]]);
-    return 3.5 + BENCH.length;
-  },
-  barriers: (x, d) => {
-    // A run of street barriers end to end beside the strip's middle (kept clear), to bonk or slide. (With gaps between them,
-    // a slow rider sliding off one dropped into the side of the next.)
-    const v = OFF * side();
-    box('barrier', BARRIER.width, [[x + v, d, BARRIER.height], [x + v, d + BARRIER.length, BARRIER.height]]);
-    return BARRIER.length;
-  },
-  cars: (x, d) => {
-    // Two cars parked bumper to bumper, snowed over: slide the hoods, roofs and trunks.
-    const v = OFF * side();
-    for (const at of [0, CAR.length + CAR.gap]) box('car', CAR.width, CAR.shape.map(([u, h]) => [x + v, d + at + u, h] as [number, number, number]));
-    return 2 * CAR.length + CAR.gap;
-  },
-  dumpster: (x, d) => {
-    const v = OFF * side();
-    box('dumpster', DUMPSTER.width, [[x + v, d, DUMPSTER.height], [x + v, d + DUMPSTER.length, DUMPSTER.height]]);
-    return DUMPSTER.length;
-  },
-  barrels: (x, d) => {
-    const v = OFF * side();
-    box('barrels', 1.4, [[x + v, d, 0.6], [x + v, d + 3, 0.6]]);
-    return 3;
-  },
-  poleJam: (x, d) => {
-    features.push(poleJam(x, d, 1.2, 25));
-    return 3;
-  },
-  kickerRail: (x, d) => {
-    const lipAt = (2 * KICK.lip) / Math.tan(KICK.angle * DEG);
-    features.push({ type: 'kicker', ...xz(x, d), yaw: 0, width: KICK.width, sideWidth: KICK.side, lipHeight: KICK.lip, lipAngle: KICK.angle, natural: true });
-    const a = d + lipAt + 1;
-    rail([[x, a, KICK.lip], [x, a + 12, KICK.lip]]);
-    return lipAt + 13;
-  },
-  stairs: (x, d) => {
-    // A stair set with handrails down both sides, from a little plaza level on the slope.
-    const length = 12;
-    const h = terrace(x, d, length, 14, 6, 0);
-    return length + h / Math.tan(22 * DEG) + 3;
-  },
-  bigStairs: (x, d) => {
-    const length = 14;
-    const h = terrace(x, d, length, 16, 7, 0.8);
-    return length + h / Math.tan(22 * DEG) + 3;
-  },
-  dropBank: (x, d) => {
-    // Drop onto a bank: a plaza level on the slope, 3.5 m above it at its
-    // front, no stairs; below its front wall a bank to land on.
-    const p = pitchAt(x, d + 8);
-    const length = Math.max(10, Math.min(18, 3.5 / Math.tan(p * DEG)));
-    const h = terrace(x, d, length, 12, 0, 0);
-    bank(x, d + length + 0.4, 0, 12, { height: Math.min(1.6, h * 0.45), back: 0.8, top: 1.2, angle: 26, side: 2 });
-    return length + 10;
-  },
+const faceOf = (theta: number): FaceId => {
+  const a = (((theta + 45) % 360) + 360) % 360;
+  return (['S', 'E', 'N', 'W'] as const)[Math.floor(a / 90)]!;
 };
-
-/** Makers that lay something to pop onto (its end stands above the snow), which a rider must not meet straight off the feature before. */
-const POP_ON = new Set(['planters', 'benches', 'barriers', 'barrels', 'ledges', 'cars', 'dumpster']);
-/** Clear snow (m) before something to pop onto: a rider off a stair set, a drop or a rail lands and rides this far before needing to steer. */
-const CLEAR_BEFORE = 26;
-
-/** Lays makers down a strip from d0 to d1 at x, `gap` m apart (CLEAR_BEFORE before one to pop onto), as far as they fit. */
-function strip(x: number, d0: number, d1: number, list: string[], gap = 7, belowLaunch = false): void {
-  let d = d0;
-  // `belowLaunch`: the strip starts just below a stair set, so its first item needs the clear snow too.
-  let first = !belowLaunch;
-  for (const name of list) {
-    const maker = makers[name];
-    if (!maker) throw new Error(`no maker ${name}`);
-    if (!first && POP_ON.has(name)) d += Math.max(0, CLEAR_BEFORE - gap);
-    if (d + 18 > d1) break;
-    d += maker(x, d) + gap;
-    first = false;
+const BAND_EDGES = [PLAZA + 9, ...RINGS.map((g) => g.r)];
+const blocks: Block[] = [];
+for (let band = 0; band < 4; band++) {
+  const inner = BAND_EDGES[band]!;
+  const here = streets.filter((s) => s.from <= inner + 1).sort((a, b) => a.theta - b.theta);
+  for (let i = 0; i < here.length; i++) {
+    const R = here[i]!;
+    const L = here[(i + 1) % here.length]!;
+    const lift = L.theta < R.theta ? 360 : 0;
+    const left = (r: number): number => streetAt(L, r) + lift;
+    const right = (r: number): number => streetAt(R, r);
+    // Top and bottom: clear of the ring roads (they wind) across the whole block.
+    let r0 = band === 0 ? inner : -Infinity;
+    let r1 = Infinity;
+    for (let t = 0; t <= 1; t += 0.05) {
+      const a = R.theta + (L.theta + lift - R.theta) * t;
+      if (band > 0) r0 = Math.max(r0, ringR(band - 1, a) + RINGS[band - 1]!.width / 2 + 3 + WALK);
+      r1 = Math.min(r1, ringR(band, a) - RINGS[band]!.width / 2 - 3 - WALK);
+    }
+    const mid = (r: number): number => (left(r) + right(r)) / 2;
+    const hw = (d: number): number => {
+      const r = r0 + d;
+      return (r * (left(r) - right(r)) * DEG) / 2 - Math.max(L.width, R.width) / 2 - WALK;
+    };
+    const frame: K.Frame = (x, d) => {
+      const r = r0 + d;
+      const t = (mid(r) - x / r / DEG) * DEG;
+      return [-Math.sin(t) * r, -Math.cos(t) * r];
+    };
+    const theta = mid(r0);
+    blocks.push({ face: faceOf(theta), band, theta, r0, r1, depth: r1 - r0, hw, frame });
   }
 }
 
-// ---------------------------------------------------------------- blocks
-interface Block {
-  x0: number;
-  x1: number;
-  row: Row;
-  col: number;
-}
-/** How tall (eave, m) the buildings nobody rides stand in each row: at least, and up to this much more. */
-const TALL: [number, number][] = [
-  [5, 2],
-  [8, 3],
-  [10, 4],
-  [13, 5],
-  [15, 6],
-  [18, 8],
-  [20, 8],
-];
-const tallFor = (row: Row): number => {
-  const [a, b] = TALL[row.index]!;
-  return a + rand() * b;
-};
+// ---------------------------------------------------------------- block templates
+// Each lays a block in its own frame (x across from its middle, d down from
+// its top) and returns its open line for the runs. A column of buildings
+// follows a street's edge (`edgeX`), so it curves with the street.
+const edgeX = (b: Block, side: -1 | 1, inset: number): ((d: number) => number) => (d) => side * (b.hw(d) - inset);
+const STYLE_COLORS: Record<FaceId, readonly string[]> = { S: K.BLOCK_COLORS, E: K.BRICK_COLORS, N: K.OLD_COLORS, W: K.BLOCK_COLORS };
 
-/** A column of buildings nobody rides down one side of a block, alleys between: x0..x1 across, from d0 to d1. */
-function buildingColumn(b: Block, x0: number, x1: number, d0: number, d1: number, door: Side, o: { gap?: number; min?: number; max?: number; shops?: boolean } = {}): [number, number][] {
-  const out: [number, number][] = [];
+/** How tall (eave, m) the buildings nobody rides stand: by band (out from the summit) and face. */
+function tallFor(b: Block): number {
+  const base = b.face === 'S' ? [7, 9, 12, 16][b.band]! : b.face === 'N' ? [6, 7, 8, 9][b.band]! : [6, 8, 9, 10][b.band]!;
+  return base + K.rand() * (b.face === 'S' ? 3 + 2 * b.band : 3);
+}
+
+/** Is a building from d to d + len down the line x, `width` across, clear of other buildings and of features' clear zones? */
+function clearFor(x: K.X, d: number, len: number, width: number): boolean {
+  for (let u = 0; u <= len + 1e-6; u += len / Math.ceil(len / 2.5)) {
+    const cx = K.xAt(x, d + u);
+    for (let v = -width / 2; v <= width / 2 + 1e-6; v += width / Math.ceil(width / 2.5)) {
+      const [px, pz] = K.W(cx + v, d + u);
+      if (K.insideBuilding(px, pz, 0.6) || K.inKeep(px, pz, 0.3)) return false;
+    }
+  }
+  return true;
+}
+
+/** A column of buildings nobody rides down one side of a block, alleys between; returns their spans and colors. */
+function column(b: Block, side: -1 | 1, width: number, d0: number, d1: number, o: { gap?: number; min?: number; max?: number; shops?: boolean; colors?: readonly string[]; inset?: number; middle?: number } = {}): K.Segment[] {
+  const out: K.Segment[] = [];
   let d = d0;
-  const gap = o.gap ?? 7;
-  while (d < d1 - 12) {
-    const len = Math.min(d1 - d, between(o.min ?? 22, o.max ?? 38));
-    if (len < 12) break;
-    const sign = o.shops && rand() < 0.6 ? pick(SHOP_SIGNS) : '';
-    highrise((x0 + x1) / 2, d, len, x1 - x0, tallFor(b.row), 'block', pick(BLOCK_COLORS), door, sign);
-    out.push([d, d + len]);
-    d += len + gap;
+  const gap = o.gap ?? 6;
+  const inset = o.inset ?? 0;
+  const x = edgeX(b, side, inset + width / 2);
+  while (d < d1 - 10) {
+    const len = Math.min(d1 - d, K.between(o.min ?? 18, o.max ?? 32));
+    if (len < 10) break;
+    // Leave the block's middle open (`middle` m across) all along the building, and keep off other buildings and features' clear zones.
+    if (Math.min(b.hw(d), b.hw(d + len)) - inset - width < (o.middle ?? 0) / 2 || !clearFor(x, d, len, width)) {
+      d += 4;
+      continue;
+    }
+    const color = K.pick(o.colors ?? STYLE_COLORS[b.face]);
+    const sign = o.shops && K.rand() < 0.6 ? K.pick(K.SHOP_SIGNS) : '';
+    const g = K.highrise(x, d, len, width, tallFor(b), 'block', color, side < 0 ? 'E' : 'W', sign);
+    out.push([d, d + len, color, g]);
+    // Mostly attached (a party wall between neighbors), now and then an alley.
+    d += len + (o.gap !== undefined ? gap : K.rand() < 0.35 ? 6 : 0.8);
   }
   return out;
 }
 
-/**
- * Wallrides on a column of buildings' wall at x (`side` as wallride()):
- * on up to `most` of its buildings long enough to leave WALLRIDE.past m of
- * wall beyond the wallride's end, so a rider thrown over the coping comes
- * down beside the wall, not into the alley after it.
- */
-function wallrides(segments: [number, number][], wallX: number, side: 1 | -1, most: number, skip = 0): void {
-  let n = 0;
-  for (const [i, [d0, d1]] of segments.entries()) {
-    if (i < skip || n >= most) continue;
-    const length = Math.min(WALLRIDE.length, d1 - d0 - WALLRIDE.before - WALLRIDE.past);
-    if (length < WALLRIDE.length) continue; // shorter ones end with the rider still on the wall, heading into it
-    wallride(wallX, side, d0 + WALLRIDE.before, length);
-    n++;
+/** Inner rows where the block is wide: buildings backing onto the edge column across a service alley (wallrides on the alley's walls). */
+const ALLEY = 7;
+function pack(b: Block, outer: number, d0: number, d1: number, middle = 24): void {
+  for (const side of [-1, 1] as const) {
+    const w = K.between(12, 18);
+    column(b, side, w, d0, d1, { inset: outer + ALLEY, middle, min: 24, max: 46, gap: 5, shops: true });
   }
 }
 
-/**
- * Rooftops: a row of low shops along one avenue edge whose flat roofs step
- * down the block, ridden from a drift at the top, with an alley gap (named)
- * between two of them and a landing drift below; then a second row lower
- * down, the last roof either dropping to the snow or (the Street gap)
- * kicking over the cross street onto a plow pile. Mid-rises down the other
- * edge, and a courtyard of features between.
- */
-function rooftops(b: Block, edge: 'W' | 'E', o: { alleyGap?: string; streetGap?: boolean }): number {
-  const { row } = b;
-  const w = 14;
-  const x = edge === 'W' ? b.x0 + w / 2 : b.x1 - w / 2;
-  const door: Side = edge;
-  const d = row.top;
-  const roof = (u: number, len: number, eave: number, extra: Json): void =>
-    shop(x, d + u, { length: len, width: w, eave, roof: 'flat', style: 'shop', color: pick(SHOP_COLORS), front: front(door, 0), sign: pick(SHOP_SIGNS), ...extra });
-  // The first row: up the drift, along four roofs, over the alley, down the landing drift.
-  roof(22, 16, 4.4, { drift: 14 });
-  roof(38, 16, 4.0, { lip: o.alleyGap ? 0.45 : 0 });
-  const alley = o.alleyGap ? ROOF_GAP.alley : 0;
-  roof(54 + alley, 16, 3.4, {});
-  roof(70 + alley, 14, 2.6, { roof: 'shed', rise: 0.4 });
-  roof(84 + alley, 16, 2.3, { apron: 14 });
-  if (o.alleyGap) {
-    const from = rect(x, d + 47, d + 54.2, w / 2);
-    const to = rect(x, d + 54 + alley, d + 54 + alley + 34, w / 2 + 1);
-    gaps.push({ name: o.alleyGap, from, to, points: ROOF_GAP.alleyPoints });
+/** Roof rows: rideable shops whose flat roofs step down the block from a drift, with an alley gap; returns where the row ends. */
+const ROOF_GAP = { alley: 5, points: 250 };
+function roofRow(b: Block, side: -1 | 1, d0: number, d1: number, o: { gapName?: string; colors?: readonly string[]; w?: number } = {}): number {
+  const w = o.w ?? 12;
+  const x = edgeX(b, side, w / 2);
+  const door: K.Side = side < 0 ? 'W' : 'E';
+  // Each roof lower than the last; the last one onto a landing drift. As many as fit, the last given the landing drift.
+  // The lip roof is 16 m: a ride from 12 m back on it (tools/sim/score.ts) starts past the step down onto it. So are
+  // the roofs after it: the last is ridden (tools/sim/features.ts) from 15 m back, on the roof before it.
+  const lengths = [14, 16, 16, 16, 14];
+  const eaves = [4.4, 4.0, 3.4, 2.8, 2.4];
+  const APRON = 12;
+  const DRIFT = 13;
+  const spots = (alley: boolean): number[] => {
+    const at: number[] = [];
+    let d = d0 + DRIFT;
+    for (let i = 0; i < lengths.length; i++) {
+      at.push(d);
+      d += lengths[i]! + (i === 1 && alley ? ROOF_GAP.alley : 0);
+    }
+    return at;
+  };
+  const fit = (at: number[]): number => {
+    let n = lengths.length;
+    while (n > 1 && at[n - 1]! + lengths[n - 1]! + APRON > d1) n--;
+    return n;
+  };
+  // With a named gap, it needs two roofs past the alley (the last is ridden from the one before it); without one, no alley.
+  let at = spots(o.gapName !== undefined);
+  let n = fit(at);
+  const gap = o.gapName !== undefined && n >= 4;
+  if (!gap) {
+    at = spots(false);
+    n = fit(at);
   }
-  // The second row.
-  const second = 128;
-  const high = o.streetGap ? STREET_GAP.eave + 1 : 4.2;
-  roof(second, 16, high, { drift: o.streetGap ? 18 : 14 });
-  roof(second + 16, 14, high - 0.45, {});
-  if (o.streetGap) {
-    // The last roof ends at the bottom of the block, with a lip over the cross street.
-    const len = row.bottom - (d + second + 30) - STREET_GAP.short;
-    roof(second + 30, len, STREET_GAP.eave, { lip: STREET_GAP.lip });
-    const lipD = row.bottom - STREET_GAP.short;
-    const pile = lipD + STREET_GAP.pileAt;
-    bank(x, pile, 0, w + 6, { height: STREET_GAP.pile, back: 3, top: 1.5, angle: STREET_GAP.face, side: 3 });
-    gaps.push({ name: 'Street gap', from: rect(x, lipD - 8, lipD + 0.2, w / 2), to: rect(x, pile + 4.5, pile + 4.5 + 45, w / 2 + 3), points: STREET_GAP.points });
-  } else {
-    roof(second + 30, 16, high - 0.9, { apron: 13 });
+  const laid: Json[] = [];
+  for (let i = 0; i < n; i++) {
+    const extra: Json = i === 0 ? { drift: DRIFT } : {};
+    if (i === 1 && gap) extra.lip = 0.45;
+    if (i === n - 1) extra.apron = APRON;
+    const g = K.shop(x, at[i]!, { length: lengths[i]!, width: w, eave: eaves[i]!, roof: 'flat', style: 'shop', color: K.pick(o.colors ?? K.SHOP_COLORS), front: K.front(door, 0), sign: K.rand() < 0.7 ? K.pick(K.SHOP_SIGNS) : '', ...extra });
+    if (!g) break;
+    laid.push(g);
   }
-  // Mid-rises down the other edge, and the courtyard between.
-  const far = edge === 'W' ? [b.x1 - 26, b.x1] : [b.x0, b.x0 + 26];
-  const column = buildingColumn(b, far[0]!, far[1]!, row.top + 6, row.bottom - 6, edge === 'W' ? 'E' : 'W', { shops: true, min: 30, max: 44 });
-  const cx = edge === 'W' ? (b.x0 + w + b.x1 - 26) / 2 : (b.x0 + 26 + b.x1 - w) / 2;
-  strip(cx, row.top + 8, row.bottom - 8, pick([
-    ['kinkedRail', 'planters', 'ledges', 'benches', 'downRail', 'barriers', 'poleJam', 'stairs'],
+  if (gap && laid.length >= 3) {
+    // From the last 7 m of the lip roof to the roofs past the alley and the landing drift: on the roofs as laid.
+    const lip = laid[1]!;
+    out.gaps.push({ name: o.gapName, from: roofRect(lip, lengths[1]! - 7, lengths[1]! + 0.2, 0), to: [...roofRect(laid[2]!, 0, (laid[2]!.length as number) + 16, 1)], points: ROOF_GAP.points });
+  }
+  return laid.length ? at[laid.length - 1]! + lengths[laid.length - 1]! + APRON : d0;
+}
+/** A rectangle on a laid building's roof (world): from u0 to u1 along it, `pad` m wider than it either side. */
+function roofRect(g: Json, u0: number, u1: number, pad: number): Json[] {
+  const a = (g.yaw as number) * DEG;
+  const dx = -Math.sin(a);
+  const dz = -Math.cos(a);
+  const half = (g.width as number) / 2 + pad;
+  const p = (u: number, v: number): Json => ({ x: r1((g.x as number) + dx * u - dz * v), z: r1((g.z as number) + dz * u + dx * v) });
+  return [p(u0, -half), p(u0, half), p(u1, half), p(u1, -half)];
+}
+const xAt = K.xAt;
+
+/** A stair street: columns of buildings either side, stair sets and rails down the middle. */
+function stairStreet(b: Block): Line {
+  column(b, -1, 18, 6, b.depth - 4, { shops: true, min: 24, max: 44 });
+  const right = column(b, 1, 18, 12, b.depth - 4, { shops: true, min: 24, max: 44 });
+  K.wallrides(right, 0, 1);
+  pack(b, 18, 8, b.depth - 4);
+  K.strip(0, 6, b.depth - 4, K.pick([
+    ['stairs8', 'planters', 'kinkSet', 'ledges', 'stairs5', 'kinkedRail'],
+    ['stairs12', 'ledges', 'hubba', 'benches', 'stairs20', 'barriers'],
+    ['hubba', 'planters', 'stairs16', 'benches', 'bigKinkSet'],
+    ['bigKinkSet', 'ledges', 'stairs12', 'planters', 'stairs5'],
+  ]), 6);
+  return [[0, 2], [0, b.depth - 2]];
+}
+
+/** Roofs down one side (a roof row with an alley gap), buildings down the other, a courtyard of features between. */
+function rooftops(b: Block, gapName?: string): Line {
+  const s: -1 | 1 = K.rand() < 0.5 ? -1 : 1;
+  roofRow(b, s, 0, b.depth - 2, { gapName, colors: b.face === 'N' ? K.OLD_COLORS : K.SHOP_COLORS });
+  const other = column(b, (-s) as -1 | 1, 16, 8, b.depth - 4, { shops: true, min: 24, max: 44 });
+  K.wallrides(other, s * 4, 1);
+  column(b, (-s) as -1 | 1, 14, 8, b.depth - 4, { inset: 16 + ALLEY, middle: 30, min: 22, max: 40 });
+  const cx = s * 4;
+  K.strip(cx, 8, b.depth - 6, K.pick([
+    ['kinkedRail', 'planters', 'ledges', 'benches', 'downRail', 'barriers', 'poleJam'],
     ['ledges', 'kickerRail', 'planters', 'aFrame', 'benches', 'dropBank', 'barrels'],
   ]));
-  // A wallride on the mid-rises' wall facing the courtyard.
-  wallrides(column, edge === 'W' ? b.x1 - 26 : b.x0 + 26, edge === 'W' ? 1 : -1, 1, 1);
-  return cx;
-}
-/** The named roof gaps' sizes and points. */
-const ROOF_GAP = { alley: 5, alleyPoints: 250 };
-/** The Street gap: the lip roof stops this far above the cross street, its eave and lip, the pile's back this far past the lip, its height and face, and its points. */
-const STREET_GAP = { short: 2, eave: 4.6, lip: 0.6, pileAt: 9, pile: 2.2, face: 20, points: 500 };
-
-/** A rectangle across x ± half from d0 to d1, as a gap polygon. */
-function rect(x: number, d0: number, d1: number, half: number): Json[] {
-  return [xz(x - half, d0), xz(x + half, d0), xz(x + half, d1), xz(x - half, d1)];
+  return [[cx, 2], [cx, b.depth - 2]];
 }
 
-/**
- * A wallride on a building's wall: wooden boards curving up to 80° beside
- * the wall at x (the roof's edge), its foot running down the hill from d,
- * the wall to its `side` (1: the wall is east of the foot).
- */
-function wallride(wallX: number, side: 1 | -1, d: number, length = WALLRIDE.length): void {
-  const foot = wallX - side * WALLRIDE.off;
-  features.push({ type: 'quarter', ...xz(foot, d), yaw: 0, side, length, radius: WALLRIDE.radius, wallAngle: WALLRIDE.angle, deckWidth: WALLRIDE.deck, back: WALLRIDE.back, taper: WALLRIDE.taper, style: 'wood' });
-}
-/** A wallride's size, and how far its foot stands out from the building's roof edge (its transition, deck and a clear strip under the eaves). */
-const WALLRIDE = { length: 18, radius: 3.4, angle: 80, deck: 0.6, back: 2, taper: 3.5, off: 3.4 * Math.sin(80 * DEG) + 0.6 + 0.9, before: 6, past: 14 };
-
-/** A stair street: a pedestrian street of stair sets and handrails down the block's middle, mid-rises either side. */
-function stairStreet(b: Block): number {
-  const { row } = b;
-  const cx = (b.x0 + b.x1) / 2;
-  buildingColumn(b, b.x0, b.x0 + 28, row.top + 4, row.bottom - 4, 'W', { shops: true });
-  buildingColumn(b, b.x1 - 28, b.x1, row.top + 10, row.bottom - 4, 'E', { shops: true });
-  strip(cx, row.top + 6, row.bottom - 4, pick([
-    ['stairs', 'planters', 'bigStairs', 'ledges', 'stairs', 'benches', 'stairs', 'kinkedRail'],
-    ['bigStairs', 'ledges', 'stairs', 'planters', 'bigStairs', 'barriers', 'stairs'],
-  ]), 6);
-  return cx;
+/** An alley: two columns of mid-rises, a wide alley between with wallrides on both walls. */
+function alley(b: Block): Line {
+  // The alley stays at least 30 m wide: room to ride into the wallrides from either side of the features down its middle.
+  const w = Math.max(10, Math.min(28, b.hw(0) - 15));
+  const west = column(b, -1, w, 4, b.depth - 4, { gap: 8, min: 36, max: 50, shops: true });
+  const east = column(b, 1, w, 4, b.depth - 4, { gap: 8, min: 36, max: 50, shops: true });
+  K.wallrides(west, 0, 2);
+  K.wallrides(east, 0, 1, 1);
+  K.strip(0, 30, b.depth - 6, K.pick([['barriers', 'poleJam', 'kinkedRail'], ['dumpster', 'downRail', 'barriers'], ['cars', 'aFrame', 'dumpster']]), 18);
+  return [[0, 2], [0, b.depth - 2]];
 }
 
-/** A plaza: an open block of trees, benches, planters, rails and a drop onto a bank; mid-rises at its two bottom corners. */
-function plaza(b: Block): number {
-  const { row } = b;
-  const cx = (b.x0 + b.x1) / 2;
-  highrise(b.x0 + 11, row.bottom - 46, 40, 22, tallFor(row), 'block', pick(BLOCK_COLORS), 'W', pick(SHOP_SIGNS));
-  highrise(b.x1 - 11, row.bottom - 46, 40, 22, tallFor(row), 'block', pick(BLOCK_COLORS), 'E', pick(SHOP_SIGNS));
-  strip(cx - 14, row.top + 8, row.bottom - 50, pick([['benches', 'kinkedRail', 'planters', 'dropBank', 'barrels'], ['planters', 'downRail', 'benches', 'ledges']]));
-  strip(cx + 14, row.top + 14, row.bottom - 50, pick([['ledges', 'planters', 'aFrame', 'benches', 'kickerRail'], ['dropBank', 'benches', 'kinkedRail', 'planters']]));
-  strip(cx, row.bottom - 44, row.bottom - 4, ['stairs', 'planters']);
-  // Trees in two beds down the plaza's middle.
-  for (const k of [0, 1]) {
-    const d = row.top + 30 + k * 60;
-    decor.push({ kind: 'pine', area: { x: r1(cx), z: r1(-(d + 12)), width: 8, length: 22 }, count: 6, seed: 300 + decor.length, minScale: 0.7, maxScale: 1.1, solid: true });
+/** A courtyard: an open block of trees, benches, planters, rails and drops; buildings at its bottom corners. */
+function courtyard(b: Block): Line {
+  const D = b.depth;
+  K.highrise(edgeX(b, -1, 10), D - 40, 36, 20, tallFor(b), 'block', K.pick(STYLE_COLORS[b.face]), 'W', K.pick(K.SHOP_SIGNS));
+  K.highrise(edgeX(b, 1, 10), D - 40, 36, 20, tallFor(b), 'block', K.pick(STYLE_COLORS[b.face]), 'E', K.pick(K.SHOP_SIGNS));
+  for (const side of [-1, 1] as const) column(b, side, 12, 4, D - 46, { shops: true, min: 14, max: 22, gap: 4, middle: 40 });
+  K.strip(-12, 8, D - 44, K.pick([['benches', 'kinkedRail', 'planters', 'dropBank'], ['planters', 'downRail', 'benches', 'ledges']]));
+  K.strip(12, 14, D - 44, K.pick([['ledges', 'planters', 'aFrame', 'benches'], ['dropBank', 'benches', 'kinkedRail', 'planters']]));
+  K.strip(0, D - 40, D - 2, ['stairs8', 'planters']);
+  // Trees in a bed down the middle.
+  const spots: Json[] = [];
+  for (let d = 14; d < D - 48; d += 9) spots.push(...K.poly([[0, d]]));
+  trees(spots, 300 + out.decor.length, 0.7, 1.1);
+  return [[-12, 2], [-12, D - 46], [0, D - 40], [0, D - 2]];
+}
+
+/** Tree spots clear of every building and every feature's clear zone (3 m round each). */
+const treesClear = (spots: Json[]): Json[] => spots.filter((p) => !K.insideBuilding(p.x as number, p.z as number, 3) && !K.inKeep(p.x as number, p.z as number, 3));
+/** Adds a set of trees (if any spots are left clear). */
+function trees(spots: Json[], seed: number, min: number, max: number): void {
+  const clear = treesClear(spots);
+  if (clear.length > 0) out.decor.push({ kind: 'pine', spots: clear, seed, minScale: min, maxScale: max, solid: true });
+}
+
+/** Houses: two columns of gable-roofed houses (ridden like Freeride's chalets: up a drift, off the ridge, onto a landing drift), a lane between. */
+function houses(b: Block): Line {
+  for (const side of [-1, 1] as const) {
+    const x = edgeX(b, side, 7);
+    // Ridden like Freeride's chalets, except out on the easing foot of the hill (a pop off the ridge there flies past the landing drift).
+    const ride = b.band < 3;
+    for (let d = 14; d + 10 + 12 + 20 < b.depth; d += 58) {
+      K.shop(x, d + 10, { length: 12, width: 11, eave: 3, roof: 'gable', rise: 2.2, drift: ride ? 12 : 0, apron: ride ? 20 : 0, style: 'chalet', color: K.pick(K.HOUSE_COLORS), front: K.front(side < 0 ? 'E' : 'W', 0), chimney: false });
+    }
   }
-  return cx - 14;
+  // A second row of houses where the block is wide.
+  for (const side of [-1, 1] as const) {
+    for (let d = 40; d + 10 + 12 + 20 < b.depth; d += 58) {
+      if (b.hw(d) < 52 || !clearFor(edgeX(b, side, 26), d - 12, 54, 13)) continue;
+      K.shop(edgeX(b, side, 26), d + 10, { length: 12, width: 11, eave: 3.2, roof: 'gable', rise: 2.4, drift: b.band < 3 ? 12 : 0, apron: b.band < 3 ? 20 : 0, style: 'chalet', color: K.pick(K.HOUSE_COLORS), front: K.front(side < 0 ? 'W' : 'E', 0), chimney: false });
+    }
+  }
+  const spots: Json[] = [];
+  for (let d = 20; d < b.depth - 10; d += 17) for (const s of [-1, 1]) spots.push(...K.poly([[s * (b.hw(d) - 16), d]]));
+  trees(spots, 400 + out.decor.length, 0.7, 1.2);
+  K.strip(0, 10, b.depth - 4, K.pick([['benches', 'kinkedRail', 'stairs5', 'planters'], ['poleJam', 'cars', 'downRail'], ['planters', 'aFrame', 'stairs8']]), 10);
+  return [[0, 2], [0, b.depth - 2]];
 }
 
-/** An alley: two rows of mid-rises with a wide alley between, wallrides on both walls, barriers, barrels, rails. */
-function alley(b: Block): number {
-  const { row } = b;
-  const w = 32;
-  const west = buildingColumn(b, b.x0, b.x0 + w, row.top + 4, row.bottom - 4, 'W', { gap: 8, min: 40, max: 56, shops: true });
-  const east = buildingColumn(b, b.x1 - w, b.x1, row.top + 4, row.bottom - 4, 'E', { gap: 8, min: 40, max: 56, shops: true });
-  wallrides(west, b.x0 + w, -1, 2);
-  wallrides(east, b.x1 - w, 1, 1, 1);
-  const cx = (b.x0 + b.x1) / 2;
-  strip(cx, row.top + 40, row.bottom - 6, pick([['barriers', 'poleJam', 'kinkedRail'], ['dumpster', 'downRail', 'barriers']]), 22);
-  return cx;
+/** Warehouses: long flat-roofed sheds up drifts (the roof is a long cruise with a gap to the next), a yard of features between. */
+function warehouses(b: Block): Line {
+  const s: -1 | 1 = K.rand() < 0.5 ? -1 : 1;
+  const w = Math.min(22, b.hw(0) - 6);
+  const x = edgeX(b, s, w / 2);
+  let d = 4;
+  let eave = 5.2;
+  while (d + 14 + 20 + 12 < b.depth) {
+    const len = Math.min(b.depth - d - 14 - 12, K.between(28, 40));
+    if (len < 20) break;
+    K.shop(x, d + 14, { length: len, width: w, eave, roof: 'flat', drift: 14, apron: 12, style: 'shop', color: K.pick(K.BRICK_COLORS), front: K.front(s < 0 ? 'E' : 'W', 0), sign: K.rand() < 0.4 ? 'Freight' : '' });
+    d += 14 + len + 12 + 18;
+    eave = Math.max(4, eave - 0.4);
+  }
+  const other = column(b, (-s) as -1 | 1, 16, 6, b.depth - 4, { colors: K.BRICK_COLORS, min: 26, max: 44 });
+  K.wallrides(other, -s * 2, 1);
+  column(b, (-s) as -1 | 1, 16, 6, b.depth - 4, { colors: K.BRICK_COLORS, inset: 16 + ALLEY, middle: 28 });
+  const cx = -s * 2;
+  K.strip(cx, 8, b.depth - 4, K.pick([['barrels', 'kickerRail', 'dumpster', 'downRail'], ['barriers', 'poleJam', 'cars', 'kinkedRail'], ['dumpster', 'aFrame', 'barrels', 'dropBank']]));
+  return [[cx, 2], [cx, b.depth - 2]];
 }
 
+/** Downtown: a glass tower at the back of the block, its plaza beside it (stairs and handrails down its front), a mid-rise above. */
+let towersLaid = 0;
+function towerBlock(b: Block): Line {
+  const s: -1 | 1 = K.rand() < 0.5 ? -1 : 1;
+  // Narrow enough to leave the plaza room on its other side.
+  const tw = Math.min(26, b.hw(40) - 12);
+  // The first two downtown towers are the twisted glass one and the art-deco one; the rest glass, now and then another of either.
+  const look = towersLaid === 0 ? 0.9 : towersLaid === 1 ? 0.7 : K.rand();
+  towersLaid++;
+  K.highrise(edgeX(b, s, tw / 2), 36, Math.min(40, b.depth - 40), tw, 40 + K.rand() * 60, look < 0.6 ? 'tower' : look < 0.8 ? 'deco' : 'twist', look < 0.6 || look >= 0.8 ? K.pick(K.TOWER_COLORS) : K.pick(['#c9b48e', '#b9a27e', '#d0c4ac']), s < 0 ? 'E' : 'W');
+  const px = -s * Math.max(4, b.hw(30) - 22);
+  K.highrise(edgeX(b, s, 12), 4, 26, 24, tallFor(b), 'block', K.pick(K.BLOCK_COLORS), s < 0 ? 'E' : 'W', K.pick(K.SHOP_SIGNS));
+  const run = 36;
+  const h = K.terrace(px, run, 22, 20, 8);
+  K.box('ledge', K.LEDGE.width, [[px - 8, run + 3, K.LEDGE.height], [px - 8, run + 18, K.LEDGE.height]]);
+  const below = run + 22 + h / Math.tan(22 * DEG) + 6;
+  K.strip(px, below, b.depth - 4, K.pick([['kinkedRail', 'planters', 'barriers'], ['ledges', 'benches', 'downRail']]), 7, true);
+  K.strip(0, 6, 30, ['benches']);
+  column(b, (-s) as -1 | 1, 16, 34, b.depth - 4, { inset: 0, min: 24, max: 36, middle: 30 });
+  return [[0, 2], [0, 30], [px, run - 4], [px, b.depth - 2]];
+}
+
+/** The old town: crooked lanes of small houses (rideable roofs stepping down), a stair lane in the middle. */
+function oldTown(b: Block): Line {
+  // Small houses along both edges: rideable shed roofs following the slope.
+  for (const side of [-1, 1] as const) {
+    const w = 9;
+    const x = edgeX(b, side, w / 2);
+    // The first house's drift starts clear of the plaza's wall above.
+    // A row of up to five roofs, each lower than the last (a hop over a narrow lane now and then), the last onto a landing drift.
+    // Its drift (13 m, as gentle as the first City's) starts clear of the plaza's wall above.
+    let d = 27;
+    const eaves = [4.6, 4.2, 3.8, 3.4, 3.0];
+    for (const [i, eave] of eaves.entries()) {
+      // 16 m or so: the last is ridden (tools/sim/features.ts) from 15 m back, on the house before it.
+      const len = K.between(15.5, 17);
+      const last = i === eaves.length - 1 || d + len + 10 + 17 > b.depth;
+      if (d + len + 10 > b.depth || b.hw(d) < 10) break;
+      if (!K.shop(x, d, { length: len, width: w, eave, roof: 'flat', style: 'shop', color: K.pick(K.OLD_COLORS), front: K.front(side < 0 ? 'E' : 'W', 0), sign: K.rand() < 0.5 ? K.pick(K.SHOP_SIGNS) : '', drift: i === 0 ? 13 : 0, apron: last ? 10 : 0 })) break;
+      // Now and then a hop over a narrow lane, never just before the last roof (ridden from the one before it).
+      const nextLast = i + 1 === eaves.length - 1 || d + len + 2.5 + 17 + 10 + 17 > b.depth;
+      d += len + (!nextLast && K.rand() < 0.3 ? 2.5 : 0);
+      if (last) break;
+    }
+  }
+  column(b, -1, 10, 16, b.depth - 4, { inset: 9 + 5, middle: 24, min: 12, max: 20, gap: 4, colors: K.OLD_COLORS });
+  column(b, 1, 10, 20, b.depth - 4, { inset: 9 + 5, middle: 24, min: 12, max: 20, gap: 4, colors: K.OLD_COLORS });
+  K.strip(0, 10, b.depth - 4, K.pick([['stairs5', 'planters', 'stairs8', 'benches'], ['hubba', 'barrels', 'stairs5'], ['kinkedRail', 'stairs8', 'planters']]), 6);
+  return [[0, 2], [0, b.depth - 2]];
+}
+
+/** Which template each block gets: by face and band, a few named gaps placed in particular blocks. */
+const tpl = random0(23);
+function random0(seed: number): () => number {
+  return K.random(seed);
+}
+const GAP_NAMES: Record<string, string> = {
+  // (N1's middle block holds the cathedral.)
+  'N2': 'Old town alley gap',
+  'S2': 'Market alley gap',
+  'E2': 'Freight alley gap',
+  'W1': 'Hillside alley gap',
+};
+const usedGap = new Set<string>();
+function template(b: Block): (b: Block) => Line {
+  const own = special.get(b);
+  if (own) return own;
+  const key = `${b.face}${b.band}`;
+  const r = tpl();
+  if (b.band === 0) return oldTown;
+  if (GAP_NAMES[key] && !usedGap.has(key)) {
+    usedGap.add(key);
+    return (bb) => rooftops(bb, GAP_NAMES[key]);
+  }
+  switch (b.face) {
+    case 'S':
+      if (b.band === 3) return towerBlock;
+      return r < 0.35 ? stairStreet : r < 0.6 ? alley : r < 0.8 ? rooftops : courtyard;
+    case 'E':
+      return r < 0.45 ? warehouses : r < 0.65 ? alley : r < 0.85 ? stairStreet : rooftops;
+    case 'N':
+      return r < 0.45 ? oldTown : r < 0.7 ? stairStreet : r < 0.85 ? rooftops : courtyard;
+    case 'W':
+      return r < 0.5 ? houses : r < 0.7 ? courtyard : r < 0.85 ? stairStreet : rooftops;
+  }
+}
 /**
- * Downtown: a glass tower at the back of the block, its plaza beside it
- * (stairs and handrails down its front, ledges and planters on it), a
- * mid-rise in the other corner.
+ * Packs what's left of a block with buildings (5 m alleys between them):
+ * anywhere clear of its open line, its features and the buildings, drifts
+ * and landing drifts already there.
  */
-function towerBlock(b: Block, side: 'W' | 'E', height: number): number {
-  const { row } = b;
-  const tw = 34;
-  const tx = side === 'W' ? b.x0 + tw / 2 + 2 : b.x1 - tw / 2 - 2;
-  highrise(tx, row.top + 70, 40, tw, height, 'tower', pick(TOWER_COLORS), side === 'W' ? 'E' : 'W');
-  highrise(side === 'W' ? b.x1 - 15 : b.x0 + 15, row.top + 8, 36, 28, tallFor(row), 'block', pick(BLOCK_COLORS), side === 'W' ? 'E' : 'W', pick(SHOP_SIGNS));
-  const px = side === 'W' ? b.x1 - 24 : b.x0 + 24;
-  // The tower plaza: 26 m level on the slope, stairs down its front.
-  const h = terrace(px, row.top + 58, 26, 22, 8, 0);
-  box('ledge', LEDGE.width, [[px - 9, row.top + 62, LEDGE.height], [px - 9, row.top + 80, LEDGE.height]]);
-  box('planter', PLANTER.width, [[px + 8, row.top + 64, PLANTER.height], [px + 8, row.top + 70, PLANTER.height]]);
-  const below = row.top + 58 + 26 + h / Math.tan(22 * DEG) + 6;
-  strip(px, below, row.bottom - 6, pick([['kinkedRail', 'planters', 'barriers'], ['ledges', 'benches', 'downRail']]), 7, true);
-  strip((b.x0 + b.x1) / 2, row.top + 10, row.top + 54, ['benches', 'planters']);
-  // The open middle: the corner mid-rise stands above the plaza.
-  return (b.x0 + b.x1) / 2;
+const CORRIDOR = 5;
+const REJ = { corridor: 0, building: 0, feature: 0, placed: 0, width: 0 };
+function infill(b: Block, from: number): void {
+  const line = b.line!;
+  const lineX = (d: number): number => {
+    for (let i = 1; i < line.length; i++) {
+      const [x0, d0] = line[i - 1]!;
+      const [x1, d1] = line[i]!;
+      if (d <= d1 || i === line.length - 1) return x0 + (x1 - x0) * Math.min(1, Math.max(0, (d - d0) / Math.max(1e-6, d1 - d0)));
+    }
+    return line[0]![0];
+  };
+  const style = b.face;
+  for (let d = 6; d < b.depth - 12; d += 3) {
+    for (let x = -b.hw(d) + 2; x < b.hw(d) - 8; x += 3) {
+      const len = b.face === 'W' ? K.between(12, 16) : K.between(14, 26);
+      const w = b.face === 'W' ? K.between(10, 13) : b.face === 'N' ? K.between(9, 13) : K.between(11, 17);
+      const cx = x + w / 2;
+      if (d + len > b.depth - 4) continue;
+      if (cx + w / 2 > Math.min(b.hw(d), b.hw(d + len)) || cx - w / 2 < -Math.min(b.hw(d), b.hw(d + len))) { REJ.width++; continue; }
+      let ok = true;
+      for (let u = 0; u <= len && ok; u += len / 3) if (Math.abs(cx - lineX(d + u)) < w / 2 + CORRIDOR) ok = false;
+      if (!ok) { REJ.corridor++; continue; }
+      const samples: [number, number][] = [];
+      for (let u = 0; u <= len + 1e-6; u += len / Math.ceil(len / 2.5)) for (let v = -w / 2; v <= w / 2 + 1e-6; v += w / Math.ceil(w / 2.5)) samples.push(K.W(cx + v, d + u));
+      if (samples.some(([px, pz]) => K.insideBuilding(px, pz, 1.2))) { REJ.building++; continue; }
+      if (samples.some(([px, pz]) => K.inKeep(px, pz, 0.5))) { REJ.feature++; continue; }
+      REJ.placed++;
+      if (style === 'W' && K.rand() < 0.7) {
+        K.shop(cx, d, { length: len - 4, width: w, eave: 3, roof: 'gable', rise: 2.2, style: 'chalet', color: K.pick(K.HOUSE_COLORS), front: K.front(K.rand() < 0.5 ? 'E' : 'W', 0) });
+      } else if (K.rand() < 0.35) {
+        K.shop(cx, d, { length: len, width: w, eave: K.between(3.2, 5), roof: 'flat', style: 'shop', color: K.pick(style === 'N' ? K.OLD_COLORS : K.SHOP_COLORS), front: K.front(K.rand() < 0.5 ? 'E' : 'W', 0), sign: K.pick(K.SHOP_SIGNS) });
+      } else {
+        K.highrise(cx, d, len, w, tallFor(b), 'block', K.pick(STYLE_COLORS[style]), K.rand() < 0.5 ? 'E' : 'W', K.rand() < 0.4 ? K.pick(K.SHOP_SIGNS) : '');
+      }
+      x += w + 0.6;
+    }
+  }
+}
+// ---------------------------------------------------------------- landmarks
+// A few blocks get a landmark of their own instead of a template; the
+// structures that span streets (the viaduct over the old town's sunken
+// street) go in first, their clear zones keeping the blocks off them.
+const angleOff = (a: number, b: number): number => Math.abs(((((a - b) % 360) + 540) % 360) - 180);
+const blockNear = (theta: number, band: number): Block => blocks.filter((b) => b.band === band).sort((p, q) => angleOff(p.theta, theta) - angleOff(q.theta, theta))[0]!;
+const special = new Map<Block, (b: Block) => Line>();
+/** Landmark blocks left as laid out (no packing): the park. */
+const open = new Set<Block>();
+/** A street's own frame: x across from its middle (+x to the right going down), d down from r0. */
+const streetFrame = (s: Street, r0: number): K.Frame => (x, d) => {
+  const r = r0 + d;
+  const t = (streetAt(s, r) - x / r / DEG) * DEG;
+  return [-Math.sin(t) * r, -Math.cos(t) * r];
+};
+const mainStreet = (theta: number): Street => streets.find((s) => s.main && angleOff(s.theta, theta) < 1)!;
+
+/** A landmark down the middle of a block, a stair set below its front, rows of buildings down both sides. */
+function landmarkBlock(o: { len: number; width: number; eave: number; style: string; color: string; from?: number; stairs?: string; colors?: readonly string[]; sign?: string }): (b: Block) => Line {
+  return (b) => {
+    const from = o.from ?? 14;
+    const w = Math.min(o.width, 2 * Math.min(b.hw(from), b.hw(from + o.len)) - 26);
+    K.highrise(0, from, o.len, w, o.eave, o.style, o.color, 'S', o.sign ?? '');
+    // Room behind the stairs' plaza for a run-up (features.ts rides it from 8 m back).
+    const foot = from + o.len + 10;
+    const reach = o.stairs ? K.makers[o.stairs]!(0, foot) : 0;
+    for (const side of [-1, 1] as const) column(b, side, 12, 4, b.depth - 4, { colors: o.colors ?? STYLE_COLORS[b.face], middle: w + 16, shops: true });
+    const by = w / 2 + 4;
+    return [[by, 2], [by, foot - 6], [0, foot - 1], [0, Math.min(b.depth - 2, foot + reach + 2)], [0, b.depth - 2]];
+  };
 }
 
-/**
- * The garage and the Tower gap: a parking garage with a long drift up its
- * uphill end, a flat roof and a lip, a gap over an alley onto a lower
- * building's roof that slopes down to a landing drift.
- */
-function garageBlock(b: Block): Line {
-  const { row } = b;
-  const cx = (b.x0 + b.x1) / 2;
-  const g = TOWER_GAP;
-  const d = row.top + 6;
-  shop(cx, d + g.drift, { length: g.roof, width: g.width, eave: g.eave, roof: 'flat', drift: g.drift, lip: g.lip, style: 'shop', color: '#8f969c', front: front('W', 0), sign: 'Parking' });
+// The cathedral at the top of the old town: its nave down the block, two spires over its front, a grand set of twenty stairs below.
+special.set(blockNear(180, 1), landmarkBlock({ len: 44, width: 32, eave: 15, style: 'church', color: '#cfc2a4', from: 12, stairs: 'stairs20', colors: K.OLD_COLORS }));
+// A parish church among the hillside homes.
+special.set(blockNear(-78.75, 1), landmarkBlock({ len: 30, width: 18, eave: 10, style: 'church', color: '#d8cbb0', stairs: 'stairs8' }));
+// The domed civic hall over downtown's square, a broad stair set down its front.
+special.set(blockNear(5.6, 3), landmarkBlock({ len: 36, width: 30, eave: 13, style: 'civic', color: '#d9cfb8', stairs: 'stairs12', sign: '' }));
+// The train station in the rail quarter, under its arched roof, its stairs down to the boulevard.
+special.set(blockNear(95.6, 3), (b) => {
+  const line = landmarkBlock({ len: 52, width: 30, eave: 8, style: 'depot', color: '#8a4f3d', from: 10, stairs: 'stairs12', colors: K.BRICK_COLORS })(b);
+  out.decor.push({ kind: 'waterTower', points: K.poly([[-(b.hw(20) - 6), 8]]), heading: r1(K.downAt(0, 8)) });
+  return line;
+});
+
+// The parking garage and the Garage gap: up a long drift onto its top deck, off its lip over an alley onto a lower roof that slopes to a landing drift.
+const GARAGE = { drift: 28, roof: 24, width: 18, eave: 7, lip: 0.6, gap: 8, lower: 20, lowEave: 3.2, lowRise: 1.2, apron: 16, points: 600 };
+special.set(blockNear(78.75, 2), (b) => {
+  const g = GARAGE;
+  const d = 4;
+  K.shop(0, d + g.drift, { length: g.roof, width: g.width, eave: g.eave, roof: 'flat', drift: g.drift, lip: g.lip, style: 'garage', color: '#9a9992', front: K.front('W', 0), sign: '' });
   const lipD = d + g.drift + g.roof;
   const land = lipD + g.gap;
-  shop(cx, land, { length: g.lower, width: g.width + 4, eave: g.lowEave, roof: 'shed', rise: g.lowRise, apron: g.apron, style: 'shop', color: pick(SHOP_COLORS), front: front('E', 0), sign: pick(SHOP_SIGNS) });
-  gaps.push({ name: 'Tower gap', from: rect(cx, lipD - 8, lipD + 0.2, g.width / 2), to: rect(cx, land, land + g.lower + g.apron + 10, g.width / 2 + 3), points: g.points });
-  notes.push(`Tower gap: lip at d ${r1(lipD)}, eave ${g.eave} + lip ${g.lip}, gap ${g.gap} m onto a roof ${g.lowEave + g.lowRise} m up`);
-  // Towers either side of it.
-  highrise(b.x0 + 16, row.top + 20, 36, 28, 46 + rand() * 20, 'tower', pick(TOWER_COLORS), 'E');
-  highrise(b.x1 - 16, row.top + 100, 40, 28, 52 + rand() * 24, 'tower', pick(TOWER_COLORS), 'W');
-  strip(cx, land + g.lower + g.apron + 8, row.bottom - 6, ['kinkedRail', 'planters', 'benches']);
-  // Round the garage's east side, then back to the middle below its landing drift (the tower lower down stands east).
-  return [[cx + 20, 2], [cx + 20, d - row.top + g.drift + g.roof + g.gap + g.lower - 4], [cx, land - row.top + g.lower + g.apron + 6], [cx, row.bottom - row.top - 2]];
+  K.shop(0, land, { length: g.lower, width: g.width + 4, eave: g.lowEave, roof: 'shed', rise: g.lowRise, apron: g.apron, style: 'shop', color: K.pick(K.BRICK_COLORS), front: K.front('E', 0), sign: 'Parts' });
+  out.gaps.push({ name: 'Garage gap', from: K.rect(0, lipD - 8, lipD + 0.2, g.width / 2), to: K.rect(0, land, land + g.lower + g.apron + 10, g.width / 2 + 3), points: g.points });
+  for (const side of [-1, 1] as const) column(b, side, 12, 4, b.depth - 4, { colors: K.BRICK_COLORS, middle: g.width + 30, shops: true });
+  // The block's line runs well clear of the garage's lip and the drop off its side.
+  const by = g.width / 2 + 8;
+  return [[by, 2], [by, land + g.lower + g.apron], [0, Math.min(b.depth - 2, land + g.lower + g.apron + 12)], [0, b.depth - 2]];
+});
+
+// The building site: a half-built building to ride (up its drift, along its top slab, off onto a landing drift), a tower crane,
+// scaffolding, pipes laid out to slide, jersey barriers, a dumpster.
+special.set(blockNear(101.25, 1), (b) => {
+  K.shop(0, 18, { length: 22, width: 16, eave: 5.5, roof: 'flat', drift: 16, apron: 14, style: 'site', color: '#a3a29c', front: K.front('W', 0) });
+  out.decor.push({ kind: 'crane', points: K.poly([[-(b.hw(30) - 7), 30]]), heading: r1(K.downAt(0, 30) + 30) });
+  out.decor.push({ kind: 'scaffold', points: K.poly([[9, 20], [9, 38]]), height: 6 });
+  const pipes = 4 + 18 + 22 + 14 + 22;
+  K.slide('rail', 12, pipes, [[0, 0, 0], [3.5, 0, 0.5], [14, 0, 0.5]], { style: 'tube', radius: 0.35 });
+  K.slide('rail', -12, pipes + 4, [[0, 0, 0], [3.5, 0, 0.5], [12, 0, 0.6]], { style: 'tube', radius: 0.35 });
+  K.setToward(1);
+  K.makers.barriers!(-6, pipes + 26);
+  K.setToward(null);
+  for (const side of [-1, 1] as const) column(b, side, 12, 4, b.depth - 4, { colors: K.BRICK_COLORS, middle: 46 });
+  return [[0, 2], [0, b.depth - 2]];
+});
+
+// The park and its frozen fountain: a round stone rim to slide (round and round), a statue, benches and trees.
+open.add(blockNear(-78.75, 2));
+special.set(blockNear(-78.75, 2), (b) => {
+  const cy = Math.round(b.depth * 0.45);
+  out.decor.push({ kind: 'fountain', points: K.poly([[0, cy]]), heading: 0 });
+  const rim: [number, number, number][] = [];
+  for (let a = 0; a <= 360; a += 15) rim.push([Math.sin(a * DEG) * 6.3, cy + Math.cos(a * DEG) * 6.3, 0.75]);
+  K.box('ledge', 0.7, rim);
+  out.decor.push({ kind: 'statue', points: K.poly([[-16, cy - 26]]), heading: r1(K.downAt(0, cy)) });
+  K.box('bench', K.BENCH.width, [[-12, cy - 4, K.BENCH.height], [-12, cy - 4 + K.BENCH.length, K.BENCH.height]]);
+  K.box('bench', K.BENCH.width, [[12, cy + 2, K.BENCH.height], [12, cy + 2 + K.BENCH.length, K.BENCH.height]]);
+  K.strip(18, 8, cy - 14, ['ledges', 'planters'], 8);
+  K.strip(-18, cy + 14, b.depth - 4, ['kinkedRail', 'benches'], 8);
+  const spots: Json[] = [];
+  for (let d = 6; d < b.depth - 4; d += 8) for (const s of [-1, 1]) spots.push(...K.poly([[s * (b.hw(d) - 3), d]]));
+  for (let d = 10; d < b.depth - 8; d += 14) spots.push(...K.poly([[(d % 28 < 14 ? -1 : 1) * 26, d]]));
+  trees(spots, 700, 0.8, 1.3);
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2;
+    out.decor.push({ kind: 'person', points: K.poly([[Math.sin(a) * 9.5, cy + Math.cos(a) * 9.5]]), heading: r1(K.downAt(0, cy) + (i * 37) % 360), color: '#b8483a' });
+  }
+  return [[-9, 2], [-9, b.depth - 2]];
+});
+
+// The viaduct: an arched stone bridge along the hill over the old town's sunken street. Ride down the street under its
+// arches, or along its parapets across the street, the rim to the far rim (named: "Viaduct rail").
+{
+  const s = mainStreet(180);
+  const r = VIADUCT.r;
+  const f = streetFrame(s, r);
+  K.useFrame((x, d) => f(-d, x));
+  // In this frame x runs down the hill and d across it (to the street's left going down): the viaduct runs along d.
+  const half = VIADUCT.span / 2;
+  const deckEnds = [-half, half].map((d) => K.gy(0, d) + VIADUCT.height);
+  const deckAt = (d: number): number => deckEnds[0]! + ((deckEnds[1]! - deckEnds[0]!) * (d + half)) / (2 * half);
+  out.decor.push({ kind: 'viaduct', points: K.poly([[0, -half], [0, -VIADUCT.pier], [0, VIADUCT.pier], [0, half]]), height: VIADUCT.height });
+  for (const side of [-1, 1]) {
+    const x = side * (VIADUCT.width / 2 - 0.4);
+    const pts: [number, number, number][] = [];
+    for (let d = -half - 2; d <= half + 2 + 1e-6; d += 2) pts.push([x, d, Math.max(0.6, deckAt(Math.max(-half, Math.min(half, d))) + 1.0 - K.gy(x, d))]);
+    K.box('parapet', 0.5, pts);
+  }
+  // Its ends reach into the blocks either side: keep them clear, and the way on and off.
+  K.keeps.add(K.rectAt(...(K.W(0, -half - 24) as [number, number]), r1(K.downAt(0, 0)), 0, 2 * half + 48, -VIADUCT.width / 2 - 3, VIADUCT.width / 2 + 3, 'viaduct'));
+  K.useFrame(null);
 }
-/** The Tower gap's garage: its drift and roof (m), roof width and eave, lip; the gap; the lower roof (length, eave, shed rise) and its landing drift. */
-const TOWER_GAP = { drift: 34, roof: 26, width: 18, eave: 7.5, lip: 0.6, gap: 8, lower: 22, lowEave: 3.2, lowRise: 1.2, apron: 16, points: 600 };
 
-// ---------------------------------------------------------------- laying out the blocks
-const COLS: [number, number][] = [];
-for (let i = 0; i + 1 < AVES.length; i++) COLS.push([AVES[i]! + LINE, AVES[i + 1]! - LINE]);
+blocks.forEach((b, i) => {
+  K.useFrame(b.frame);
+  K.useRandom(1000 + i);
+  const from = out.features.length;
+  b.line = template(b)(b);
+  K.useRandom(5000 + i);
+  if (!open.has(b)) infill(b, from);
+});
+K.useFrame(null);
 
-/** A block's open line: straight down at x, or waypoints [x, m down from the row's top]. */
-type Line = number | [number, number][];
-type Template = (b: Block) => Line;
-const GRID: Template[][] = [
-  [(b) => rooftops(b, 'W', { alleyGap: 'Old town alley gap' }), plaza, stairStreet, alley],
-  [stairStreet, alley, (b) => rooftops(b, 'E', { alleyGap: 'Market alley gap' }), plaza],
-  // The Street gap's roofs on the west edge, so it lands in the plaza's open west side below.
-  [(b) => rooftops(b, 'W', { streetGap: true }), alley, plaza, stairStreet],
-  [plaza, stairStreet, alley, (b) => rooftops(b, 'E', { alleyGap: 'Foundry alley gap' })],
-  [(b) => rooftops(b, 'W', {}), plaza, stairStreet, alley],
-  [(b) => towerBlock(b, 'W', 92), garageBlock, (b) => towerBlock(b, 'E', 108), (b) => towerBlock(b, 'W', 74)],
-  [(b) => towerBlock(b, 'E', 64), (b) => towerBlock(b, 'W', 118), (b) => towerBlock(b, 'E', 86), (b) => towerBlock(b, 'W', 58)],
+console.log('infill', JSON.stringify(REJ));
+// ---------------------------------------------------------------- the summit plaza
+// The start deck facing downtown, the clock tower behind it, the citadel's
+// walls round the plaza with a gate (and two towers) at each main street.
+K.useRandom(7);
+K.put({ type: 'start', style: 'deck', x: 0, z: 8, heading: 0, height: 0.6 });
+// The clock tower behind the start, seen from all over town.
+K.highrise(0, -38, 10, 10, 28, 'clock', '#cdb48a', 'S', '');
+K.box('planter', K.PLANTER.width, [[-10, -2, K.PLANTER.height], [-10, 1.2, K.PLANTER.height]]);
+K.box('planter', K.PLANTER.width, [[10, -2, K.PLANTER.height], [10, 1.2, K.PLANTER.height]]);
+const WALL_R = PLAZA + 5;
+const GATE = 16;
+const CITADEL = { thick: 4, eave: 5.5, turret: 5.5, turretEave: 11, ledge: PLAZA - 4 };
+for (let k = 0; k < 8; k++) {
+  // The wall from one gate's turret to the next, in straight stretches round the plaza.
+  const a0 = k * 45 + (GATE / 2 + CITADEL.turret) / WALL_R / DEG;
+  const a1 = (k + 1) * 45 - (GATE / 2 + CITADEL.turret) / WALL_R / DEG;
+  const n = 4;
+  for (let i = 0; i < n; i++) {
+    const p = polar(a0 + ((a1 - a0) * i) / n, WALL_R);
+    const q = polar(a0 + ((a1 - a0) * (i + 1)) / n, WALL_R);
+    const len = Math.hypot((q.x as number) - (p.x as number), (q.z as number) - (p.z as number));
+    const dx = ((q.x as number) - (p.x as number)) / len;
+    const dz = ((q.z as number) - (p.z as number)) / len;
+    // A rigid frame along the stretch: d from p toward q.
+    K.useFrame((x, d) => [(p.x as number) + dx * d - dz * x, (p.z as number) + dz * d + dx * x]);
+    K.highrise(0, 0, len + 0.6, CITADEL.thick, CITADEL.eave, 'rampart', '#b9ad98', 'N');
+  }
+  // A turret either side of the gate.
+  for (const side of [-1, 1]) {
+    const a = k * 45 + (side * (GATE / 2 + CITADEL.turret / 2)) / WALL_R / DEG;
+    const c = polar(a, WALL_R);
+    const h = a * DEG;
+    K.useFrame((x, d) => [(c.x as number) - Math.sin(h) * (d - CITADEL.turret / 2) + Math.cos(h) * x, (c.z as number) - Math.cos(h) * (d - CITADEL.turret / 2) - Math.sin(h) * x]);
+    K.highrise(0, 0, CITADEL.turret, CITADEL.turret, CITADEL.turretEave, 'turret', '#b9ad98', 'S');
+  }
+  K.useFrame(null);
+  // Inside, a stone ledge along the foot of the wall to slide.
+  const b0 = k * 45 + (GATE / 2 + 2) / CITADEL.ledge / DEG;
+  const b1 = (k + 1) * 45 - (GATE / 2 + 2) / CITADEL.ledge / DEG;
+  const pts: Json[] = [];
+  for (let a = b0; a <= b1 + 1e-6; a += (b1 - b0) / 6) pts.push({ ...polar(a, CITADEL.ledge), height: 0.6 });
+  out.features.push({ type: 'box', style: 'ledge', width: 1, points: pts });
+}
+// The plaza: people about, benches and trees between the gates, a statue facing the way down to downtown.
+for (let k = 0; k < 8; k++) {
+  const a = k * 45 + 22.5;
+  if (k === 3 || k === 4) continue; // behind the start: the clock tower
+  if (k === 1) out.decor.push({ kind: 'statue', points: [polar(a, 30)], heading: r1(a + 180) });
+  else K.put({ type: 'box', style: 'bench', width: K.BENCH.width, points: [{ ...polar(a - 3, 34), height: K.BENCH.height }, { ...polar(a + 3, 34), height: K.BENCH.height }] });
+  out.decor.push({ kind: 'pine', spots: [polar(a - 8, 40), polar(a + 8, 40)], seed: 60 + k, minScale: 0.8, maxScale: 1.1, solid: true });
+  for (let i = 0; i < 3; i++) out.decor.push({ kind: 'person', points: [polar(a + (i - 1) * 6 + K.rand() * 3, 24 + K.rand() * 14)], heading: r1(K.rand() * 360) });
+}
+
+// ---------------------------------------------------------------- finishes, flags, runs
+const finishes = (Object.entries(FACES) as [FaceId, { heading: number; name: string }][]).map(([, f]) => ({
+  ...polar(f.heading, FOOT - 45),
+  heading: f.heading,
+  width: 320,
+  length: 90,
+  arch: { ...polar(f.heading, FOOT - 40), width: 24 },
+}));
+const flags: Json[] = [];
+for (const s of streets.filter((t) => t.main)) {
+  for (const [i, g] of RINGS.entries()) {
+    if (i === 3) continue;
+    const r = ringR(i, s.theta) - g.width / 2 - 4;
+    flags.push({ ...polar(streetAt(s, r), r), heading: r1(streetAt(s, r)), width: 14 });
+  }
+}
+const runs: Json[] = [];
+// Down each main street from its gate.
+for (const s of streets.filter((t) => t.main)) {
+  const pts = streetPoints(s, PLAZA - 10, RINGS[3]!.r, 20);
+  const face = FACES[faceOf(s.theta)];
+  if (Math.abs(((s.theta - face.heading + 540) % 360) - 180) > 5) {
+    // A diagonal street: along the boulevard to its side's square.
+    const dir = ((((face.heading - s.theta) % 360) + 540) % 360) - 180;
+    for (let t = 8; Math.abs(t) <= 45; t += 8) pts.push(polar(s.theta + Math.sign(dir) * t, ringR(3, s.theta + Math.sign(dir) * t)));
+  }
+  pts.push(polar(face.heading, FOOT));
+  runs.push({ name: `${face.name}: ${['South', 'Southeast', 'East', 'Northeast', 'North', 'Northwest', 'West', 'Southwest'][Math.round(s.theta / 45) % 8]} Street`, points: pts, clear: 6 });
+}
+// Through the blocks: one line from each old-town block down through a block in each band below it.
+blocks.filter((b) => b.band === 0).forEach((top) => {
+  const pts: Json[] = [];
+  let theta = top.theta;
+  for (let band = 0; band < 4; band++) {
+    const b = band === 0 ? top : blocks.filter((c) => c.band === band).sort((p, q) => Math.abs(((p.theta - theta + 540) % 360) - 180) - Math.abs(((q.theta - theta + 540) % 360) - 180))[0]!;
+    theta = b.theta;
+    K.useFrame(b.frame);
+    pts.push(...K.poly(b.line!));
+  }
+  K.useFrame(null);
+  const face = FACES[top.face];
+  pts.push(polar(face.heading + (((theta - face.heading + 540) % 360) - 180) * 0.3, FOOT));
+  runs.push({ name: `${face.name}: blocks ${r1(top.theta)}`, points: pts, clear: 3 });
+});
+
+// ---------------------------------------------------------------- street life
+// Vehicles parked along the ring roads (buses at their shelters, trams on
+// the tracks round the second ring, each with a plow pile up to its roof),
+// plow trucks on the main streets, street furniture and people on the
+// sidewalks, traffic lights and signs at the crossings, the elevated line
+// round the rail quarter, the funicular up the old town's side, a skybridge
+// downtown. Everything keeps off the buildings, the features' clear zones
+// and the runs.
+K.useRandom(4242);
+/** Distance from (x, z) to the nearest run's line. */
+function nearRun(x: number, z: number): number {
+  let best = Infinity;
+  for (const run of runs) {
+    const pts = run.points as { x: number; z: number }[];
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1]!;
+      const b = pts[i]!;
+      const dx = b.x - a.x;
+      const dz = b.z - a.z;
+      const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz || 1)));
+      best = Math.min(best, Math.hypot(x - a.x - dx * t, z - a.z - dz * t));
+    }
+  }
+  return best;
+}
+/** Is a spot free for a prop: off buildings, features' clear zones and (by `run` m) the runs? */
+const free = (x: number, z: number, pad = 1, run = 5): boolean => !K.insideBuilding(x, z, pad) && !K.inKeep(x, z, pad) && nearRun(x, z) > run;
+/** A ring road's frame: x out from the hill (+), d round it (clockwise seen from above, toward lower headings). */
+const ringFrame = (i: number): K.Frame => (x, d) => {
+  const g = RINGS[i]!;
+  const theta = -(d / g.r) / DEG;
+  const r = ringR(i, theta) + x;
+  return [-Math.sin(theta * DEG) * r, -Math.cos(theta * DEG) * r];
+};
+const ringD = (i: number, theta: number): number => -theta * DEG * RINGS[i]!.r;
+
+/** A vehicle (a box along the line from d to d + length, x out) with a plow pile at its uphill-most end, up to its roof. */
+function vehicle(style: string, x: number, d: number, length: number, width: number, shape: [number, number][]): boolean {
+  const pts = shape.map(([u, h]) => [x, d + u * length, h] as [number, number, number]);
+  for (const [px, pd] of [[x, d - 9], [x, d], [x, d + length / 2], [x, d + length]] as const) {
+    const [wx, wz] = K.W(px, pd);
+    if (!free(wx, wz, 1.5, 7)) return false;
+  }
+  const top = Math.max(...shape.map(([, h]) => h));
+  K.bank(x, d - 8.6, 0, width + 0.6, { height: top + 0.15, back: 7.5, top: 1.2, angle: 40, side: 1.5 });
+  K.box(style, width, pts);
+  return true;
+}
+const COACH = (h: number): [number, number][] => [[0, h], [1, h]];
+const PLOW_SHAPE: [number, number][] = [[0, 0.9], [0.1, 1.2], [0.17, 2.8], [0.42, 2.8], [0.44, 2.4], [1, 2.4]];
+
+// Trams on the tracks round the second ring, buses at shelters on the first and third.
+out.decor.push({ kind: 'tramTracks', points: Array.from({ length: 122 }, (_, k) => polar(k * 3, ringR(1, k * 3) + 3)) });
+let vehicles = 0;
+for (const theta of [101.25, -78.75, 191.25, 11.25]) {
+  K.useFrame(ringFrame(1));
+  if (vehicle('tram', 3, ringD(1, theta), 14, 2.4, COACH(3.2))) vehicles++;
+}
+for (const [ring, theta] of [[0, 33.75], [0, 213.75], [0, 123.75], [2, -33.75], [2, 146.25], [2, 56.25]] as const) {
+  K.useFrame(ringFrame(ring));
+  const g = RINGS[ring]!;
+  const x = g.width / 2 - 2;
+  const d = ringD(ring, theta);
+  if (vehicle('bus', x, d, 11, 2.5, COACH(3.0))) {
+    vehicles++;
+    const [wx, wz] = K.W(x + 4.2, d + 3);
+    if (free(wx, wz, 1, 3)) K.box('shelter', 1.6, [[x + 4.2, d + 3, 2.5], [x + 4.2, d + 7, 2.5]]);
+  }
+}
+// A plow truck on each face's main street, near the top of town, at the side of the street.
+for (const f of Object.values(FACES)) {
+  const s = mainStreet(f.heading);
+  K.useFrame(streetFrame(s, 100));
+  if (vehicle('plow', 4.6, 0, 8, 2.5, PLOW_SHAPE)) vehicles++;
+}
+K.useFrame(null);
+
+// Street furniture and people along the main streets' sidewalks; traffic lights where they cross the ring roads, stop signs where the side streets do.
+const FURNITURE: [string, number, number, number][] = [
+  ['hydrant', 0.45, 0.45, 0.8],
+  ['newsBox', 0.5, 0.45, 1.1],
+  ['bin', 0.9, 0.9, 1.0],
+  ['bikeRack', 0.6, 3.2, 0.8],
+  ['bollards', 0.3, 5.6, 0.9],
+  ['bench', 0.5, 2.4, 0.45],
 ];
-/** Each block's open line (x) down it, by row and column, for the block runs. */
-const LINES: Line[][] = ROWS.map((row, r) => COLS.map(([x0, x1], c) => GRID[r]![c]!({ x0, x1, row, col: c })));
-
-// ---------------------------------------------------------------- the avenues
-// Plow banks along both curbs (open at every cross street and wherever an
-// alley or drift meets the street), and in each block a few features in the
-// lanes either side of a clear middle: barriers, a ledge, a kinked rail.
-const LANE = 5.5;
-AVES.forEach((X, a) => {
-  ROWS.forEach((row, r) => {
-    for (const s of [-1, 1] as const) {
-      const yaw = s > 0 ? -90 : 90;
-      // Two banks per side, a gap between them at the middle of the block.
-      const mid = (row.top + row.bottom) / 2;
-      for (const [d0, d1] of [[row.top + 6, mid - 6], [mid + 6, row.bottom - 6]] as const) {
-        bank(X + s * BANK.from, (d0 + d1) / 2, yaw, d1 - d0);
+let furniture = 0;
+let people = 0;
+for (const s of streets) {
+  const r0 = s.from + 8;
+  const rEnd = RINGS[3]!.r - 12;
+  K.useFrame(streetFrame(s, r0));
+  for (let d = 0, k = 0; d < rEnd - r0; d += 13, k++) {
+    for (const side of [-1, 1]) {
+      const x = side * (s.width / 2 + 1.1);
+      const [wx, wz] = K.W(x, d);
+      if (!free(wx, wz, 1.2, 6)) continue;
+      const roll = K.rand();
+      if (roll < 0.28) {
+        const [style, width, length, h] = FURNITURE[(k + (side > 0 ? 3 : 0)) % FURNITURE.length]!;
+        const [ex, ez] = K.W(x, d + length);
+        if (!free(ex, ez, 1.2, 6)) continue;
+        K.box(style, width, [[x, d, h], [x, d + length, h]]);
+        furniture++;
+      } else if (roll < 0.55) {
+        out.decor.push({ kind: 'person', points: K.poly([[x + side * 0.3, d]]), heading: r1(K.downAt(x, d) + (K.rand() < 0.5 ? 0 : 180) + (K.rand() - 0.5) * 60) });
+        people++;
       }
     }
-    // Street features: on alternate sides of the clear middle.
-    const s = (a + r) % 2 === 0 ? 1 : -1;
-    const lane = X + s * LANE;
-    const list = row.index >= 5 ? ['ledges', 'cars'] : pick([['barriers', 'kinkedRail'], ['ledges', 'cars', 'downRail'], ['kickerRail', 'benches'], ['planters', 'aFrame']]);
-    towardSide = -s;
-    strip(lane, row.top + 14, row.bottom - 20, list, 40);
-    towardSide = null;
-  });
-});
-
-// ---------------------------------------------------------------- the top of town
-// Small shops and houses round the start plaza, between the avenues' heads
-// (a square kept open round the start deck), their doors on the top cross
-// street; benches and planters on the plaza, cars parked on the street.
-const TOP_SQUARE = 30;
-const top = random(91);
-const topPick = <T>(list: readonly T[]): T => list[Math.floor(top() * list.length)]!;
-for (const [c0, c1] of COLS) {
-  const x0 = c0 > 0 ? Math.max(c0, TOP_SQUARE) : c0;
-  const x1 = c1 < 0 ? Math.min(c1, -TOP_SQUARE) : c1;
-  const n = (x1 - x0) > 60 ? 3 : 2;
-  const gap = 6;
-  const w = (x1 - x0 - gap * (n - 1)) / n;
-  for (let i = 0; i < n; i++) {
-    const x = x0 + w / 2 + i * (w + gap);
-    highrise(x, 4, 26, w, 5.5 + top() * 3, 'block', topPick(BLOCK_COLORS), 'S', top() < 0.7 ? topPick(SHOP_SIGNS) : '');
   }
 }
-box('planter', PLANTER.width, [[-9, 5, PLANTER.height], [-9, 5 + PLANTER.length, PLANTER.height]]);
-box('planter', PLANTER.width, [[9, 5, PLANTER.height], [9, 5 + PLANTER.length, PLANTER.height]]);
-box('bench', BENCH.width, [[10, 24, BENCH.height], [10, 24 + BENCH.length, BENCH.height]]);
-for (const x of [-180, -62, 62, 180]) makers.cars!(x, CROSS[0]! + 4);
-
-// ---------------------------------------------------------------- the outskirts
-// Both edges past the outer avenues: small houses whose gable roofs ride
-// like Freeride's chalets (up a drift, off the ridge, onto a landing drift),
-// trees between them; outside the play area, more houses and forest.
-const CHALET_COLORS = ['#7a4f2c', '#8a5a32', '#6e4a2e', '#9a6a3c', '#d8cbb0', '#c9b48e'];
-for (const s of [-1, 1] as const) {
-  const x = s * (AVES[4]! + LINE + 18);
-  ROWS.forEach((row, r) => {
-    if (r >= 5) return;
-    for (const u of [20, 110]) {
-      shop(x, row.top + u, { length: 12, width: 11, eave: 3, roof: 'gable', rise: 2.2, drift: 12, apron: 20, style: 'chalet', color: pick(CHALET_COLORS), front: front(s > 0 ? 'W' : 'E', 0) });
+K.useFrame(null);
+let signals = 0;
+for (const s of streets) {
+  for (const [i, g] of RINGS.entries()) {
+    if (s.from > g.r - 1 || i === 3) continue;
+    for (const [side, out_] of [[-1, -1], [1, 1]] as const) {
+      const r = ringR(i, s.theta) + out_ * (g.width / 2 + 2);
+      const t = streetAt(s, r) + (side * (s.width / 2 + 1.5)) / r / DEG;
+      const p = polar(t, r);
+      if (!free(p.x as number, p.z as number, 1, 6)) continue;
+      const kind = s.main ? 'trafficLight' : K.pick(['stopSign', 'yieldSign', 'noParking']);
+      out.decor.push({ kind, points: [p], heading: r1(streetAt(s, r) + (out_ > 0 ? 180 : 0)) });
+      signals++;
     }
-  });
-  decor.push({ kind: 'pine', area: { x: r1(s * 292), z: -600, width: 12, length: 1100 }, count: 60, seed: 500 + decor.length, minScale: 0.8, maxScale: 1.4, solid: true });
-}
-
-// Scenery past the edges: houses up the hillsides, the old town above the top, towers past the bottom.
-const scenery = random(77);
-for (const s of [-1, 1] as const) {
-  for (let d = -60; d < END + 60; d += 34) {
-    const x = s * (WIDTH / 2 + 30 + scenery() * 50);
-    const len = 12 + scenery() * 6;
-    highrise(x, d, len, 12 + scenery() * 6, d > SQUARE.top - 200 ? 18 + scenery() * 30 : 4 + scenery() * 4, d > SQUARE.top - 200 ? 'block' : 'block', pick(d > SQUARE.top - 200 ? BLOCK_COLORS : CHALET_COLORS), s > 0 ? 'W' : 'E');
   }
 }
-for (let x = -WIDTH / 2 + 30; x < WIDTH / 2 - 20; x += 46) {
-  highrise(x + scenery() * 10, -44 - scenery() * 20, 14, 18, 5 + scenery() * 3, 'block', pick(CHALET_COLORS), 'S');
+
+// The elevated line round the rail quarter, above the third ring's outer edge, pillars every 24 m.
+{
+  const pts: Json[] = [];
+  const r = (theta: number): number => ringR(2, theta) + RINGS[2]!.width / 2 - 1.5;
+  for (let a = 52; a <= 128; a += (24 / RINGS[2]!.r) / DEG) pts.push(polar(a, r(a)));
+  out.decor.push({ kind: 'elevated', points: pts, height: 7.5 });
 }
-for (const [x, h] of [[-250, 140], [-170, 96], [-90, 160], [-10, 124], [70, 178], [150, 110], [230, 150], [300, 90]] as const) {
-  highrise(x, END + 30 + scenery() * 40, 30, 30, h, 'tower', pick(TOWER_COLORS), 'N');
+// The funicular up the old town's northeast side: tracks along the street's edge from the plaza to the boulevard.
+{
+  const s = mainStreet(135);
+  const pts: Json[] = [];
+  for (let r = PLAZA + 12; r <= RINGS[3]!.r - 12; r += 15) pts.push(polar(streetAt(s, r) - (s.width / 2 - 1.2) / r / DEG, r));
+  out.decor.push({ kind: 'funicular', points: pts });
 }
-decor.push({ kind: 'pine', area: { x: -440, z: -800, width: 120, length: 1900 }, count: 900, seed: 41, minScale: 0.9, maxScale: 1.6 });
-decor.push({ kind: 'pine', area: { x: 440, z: -800, width: 120, length: 1900 }, count: 900, seed: 42, minScale: 0.9, maxScale: 1.6 });
-
-// ---------------------------------------------------------------- start, square, flags, runs
-features.unshift({ type: 'start', style: 'deck', x: 0, z: -16, heading: 0, height: 0.6 });
-// The square: a big tree, the finish arch over Main Street, the finish line across the whole city.
-decor.push({ kind: 'pine', spots: [xz(-60, 1636), xz(60, 1636)], seed: 9, minScale: 2.6, maxScale: 3, solid: true });
-const finish = { x: 0, z: -(SQUARE.top + 40), heading: 0, width: WIDTH - 30, length: 70, arch: { x: 0, z: -(SQUARE.top + 12), width: 30 } };
-
-// A flag across each avenue at the top of every row.
-for (const X of AVES) for (const row of ROWS) flags.push({ ...xz(X, row.top + 2), heading: 0, width: 20 });
-
-// A run down each column of blocks, through every block's open line (its
-// stair street, courtyard, plaza, alley or tower plaza), crossing over at
-// each cross street: the headless rider's check of the blocks themselves.
-const BLOCK_RUNS = ['Blocks: West', 'Blocks: Middle west', 'Blocks: Middle east', 'Blocks: East'];
-const lineAt = (line: Line, row: Row): [number, number][] => (typeof line === 'number' ? [[line, 2], [line, row.bottom - row.top - 2]] : line);
-COLS.forEach((_, c) => {
-  const pts: Json[] = [xz(lineAt(LINES[0]![c]!, ROWS[0]!)[0]![0], CROSS[0]! + STREET / 2)];
-  ROWS.forEach((row, r) => {
-    const way = lineAt(LINES[r]![c]!, row);
-    for (const [x, d] of way) pts.push(xz(x, row.top + d));
-    const next = r + 1 < ROWS.length ? lineAt(LINES[r + 1]![c]!, ROWS[r + 1]!)[0]![0] : undefined;
-    if (next !== undefined) pts.push(xz(next, row.bottom + STREET / 2));
-  });
-  const last = lineAt(LINES[ROWS.length - 1]![c]!, ROWS[ROWS.length - 1]!);
-  pts.push(xz(last[last.length - 1]![0], SQUARE.top + 60));
-  runs.push({ name: BLOCK_RUNS[c], points: pts, clear: 3 });
-});
-
-for (const [i, X] of AVES.entries()) {
-  const pts = [xz(X, 52)];
-  for (let d = 200; d < SQUARE.top + 60; d += 200) pts.push(xz(X, d));
-  pts.push(xz(X, SQUARE.top + 60));
-  runs.push({ name: AVE_NAMES[i], points: pts, clear: 10 });
+// A skybridge downtown between the two closest tall towers across a street.
+{
+  const towers = out.features.filter((f) => f.type === 'building' && (f.style === 'tower' || f.style === 'deco' || f.style === 'twist') && (f.eave as number) > 40);
+  const mid = (f: Json): [number, number] => {
+    const a = (f.yaw as number) * DEG;
+    return [(f.x as number) - (Math.sin(a) * (f.length as number)) / 2, (f.z as number) - (Math.cos(a) * (f.length as number)) / 2];
+  };
+  let best: [Json, Json, number] | null = null;
+  for (let i = 0; i < towers.length; i++) {
+    for (let j = i + 1; j < towers.length; j++) {
+      const [ax, az] = mid(towers[i]!);
+      const [bx, bz] = mid(towers[j]!);
+      const gap = Math.hypot(bx - ax, bz - az) - ((towers[i]!.width as number) + (towers[j]!.width as number)) / 2;
+      if (gap > 10 && gap < 40 && (!best || gap < best[2])) best = [towers[i]!, towers[j]!, gap];
+    }
+  }
+  if (best) {
+    const [ax, az] = mid(best[0]);
+    const [bx, bz] = mid(best[1]);
+    const len = Math.hypot(bx - ax, bz - az);
+    const ux = (bx - ax) / len;
+    const uz = (bz - az) / len;
+    const ha = (best[0].width as number) / 2;
+    const hb = (best[1].width as number) / 2;
+    out.decor.push({ kind: 'skybridge', points: [{ x: r1(ax + ux * ha), z: r1(az + uz * ha) }, { x: r1(bx - ux * hb), z: r1(bz - uz * hb) }], height: 32 });
+    out.notes.push(`skybridge: ${r1(best[2])} m between towers ${r1(ax)},${r1(az)} and ${r1(bx)},${r1(bz)}`);
+  }
 }
+out.notes.push(`street life: ${vehicles} vehicles, ${furniture} pieces of furniture, ${people} people, ${signals} signals and signs`);
 
 // ---------------------------------------------------------------- decoration
-// Street lamps down every avenue every 25 m on alternate sides, and along
-// every cross street; a sign at the top naming the avenues.
-for (const X of AVES) {
-  const west: Json[] = [];
-  const east: Json[] = [];
-  let i = 0;
-  for (let d = 50; d < SQUARE.top; d += 25, i++) (i % 2 === 0 ? west : east).push(xz(X - (LINE - 1), d));
-  for (const p of east) p.x = r1((p.x as number) + 2 * (LINE - 1));
-  decor.push({ kind: 'streetLamp', points: west, heading: -90, color: '#2f7de1' });
-  decor.push({ kind: 'streetLamp', points: east, heading: 90, color: '#ff7a1a' });
+// Street lamps along the ring roads and down the main streets.
+const lamp = (theta: number, r: number, heading: number, color: string): void => {
+  const p = polar(theta, r);
+  // Never on a building, a drift, or in a feature's way.
+  if (K.insideBuilding(p.x as number, p.z as number, 1) || K.inKeep(p.x as number, p.z as number, 1.5)) return;
+  out.decor.push({ kind: 'streetLamp', points: [p], heading: r1(heading), color });
+};
+RINGS.forEach((g, i) => {
+  for (let a = 0, k = 0; a < 360; a += (32 / ringR(i, a)) / DEG, k++) {
+    const s = k % 2 === 0 ? -1 : 1;
+    lamp(a, ringR(i, a) + s * (g.width / 2 + 1), a + (s > 0 ? 180 : 0), i === 3 ? '#ff7a1a' : '#33c26a');
+  }
+});
+for (const s of streets.filter((t) => t.main)) {
+  let k = 0;
+  for (let r = PLAZA + 14; r < RINGS[3]!.r - 10; r += 25, k++) {
+    const side = k % 2 === 0 ? 1 : -1;
+    const t = streetAt(s, r) + (side * (s.width / 2 + 1)) / r / DEG;
+    lamp(t, r, streetAt(s, r) + side * 90, '#2f7de1');
+  }
 }
-for (const c of CROSS) {
-  const pts: Json[] = [];
-  for (let x = -WIDTH / 2 + 30; x < WIDTH / 2 - 20; x += 40) if (AVES.every((X) => Math.abs(x - X) > LINE + 4)) pts.push(xz(x, c + STREET - 1));
-  decor.push({ kind: 'streetLamp', points: pts, heading: 0, color: '#33c26a' });
+out.decor.push({ kind: 'sign', x: -12, z: 18, heading: 0, header: 'City', lines: Object.values(FACES).map((f) => ({ text: f.name, level: 'blue', arrow: f.heading === 0 ? 0 : f.heading === 90 ? -1 : f.heading === -90 ? 1 : 0 })) });
+
+// ---------------------------------------------------------------- report and checks
+const count = (t: string): number => out.features.filter((f) => f.type === t).length;
+console.log(`City: ${out.features.length} features (${count('building')} buildings, ${count('terrace')} terraces, ${count('rail')} rails, ${count('box')} boxes, ${count('kicker')} kickers, ${count('landing')} banks, ${count('quarter')} wallrides), ${out.gaps.length} named gaps, ${flags.length} flags, ${runs.length} runs, ${blocks.length} blocks`);
+for (const [id, f] of Object.entries(FACES)) {
+  const p = polar(f.heading, FOOT);
+  console.log(`${id} ${f.name}: drop to the square ${(SUMMIT - gw(p.x as number, p.z as number)).toFixed(0)} m`);
 }
-for (const X of AVES) for (const c of [CROSS[1]!, CROSS[3]!, CROSS[5]!]) decor.push({ kind: 'bunting', points: [xz(X - AVE.half, c + 6), xz(X + AVE.half, c + 6)] });
-// Beside the start deck, out of the way of riders dropping in.
-decor.push({ kind: 'sign', ...xz(-12, 30), heading: 0, header: 'City', lines: AVE_NAMES.map((name, i) => ({ text: name, level: 'blue', arrow: Math.sign(AVES[i]!) })) });
+for (const n of out.notes) console.log(n);
+let clashes = 0;
+for (const f of out.features) {
+  if (f.type !== 'rail' && f.type !== 'box' && f.type !== 'kicker' && f.type !== 'quarter' && f.type !== 'terrace') continue;
+  const pts = (f.points as { x: number; z: number }[] | undefined) ?? [{ x: f.x as number, z: f.z as number }];
+  for (const p of pts) {
+    if (K.insideBuilding(p.x, p.z)) {
+      clashes++;
+      if (clashes <= 12) console.log(`clash: ${f.type} ${String(f.style ?? '')} at (${p.x}, ${p.z})`);
+      break;
+    }
+  }
+}
+// Buildings on the roads.
+let onRoad = 0;
+for (const f of out.features) {
+  if (f.type !== 'building') continue;
+  const x = f.x as number;
+  const z = f.z as number;
+  const r = Math.hypot(x, z);
+  const a = Math.atan2(-x, -z) / DEG;
+  for (const [i, g] of RINGS.entries()) if (Math.abs(r - ringR(i, a)) < g.width / 2 + 2) onRoad++;
+}
+let blocked = 0;
+for (const r of K.keeps.all) {
+  // The middle of the zone's first stretch and its far end.
+  for (const [u, v] of [[(r.u0 + r.u1) / 2, (r.v0 + r.v1) / 2], [r.u1 - 2, (r.v0 + r.v1) / 2], [r.u0 + 2, (r.v0 + r.v1) / 2]] as const) {
+    const px = r.x + r.dirX * u - r.dirZ * v;
+    const pz = r.z + r.dirZ * u + r.dirX * v;
+    const hit = K.insideBuilding(px, pz, -0.2);
+    if (hit && hit.what.startsWith('building') && !(r.what === 'wallride')) {
+      blocked++;
+      if (blocked <= 10) console.log(`blocked: ${r.what} at (${r1(px)}, ${r1(pz)}) by a ${hit.what}`);
+      break;
+    }
+  }
+}
+console.log(`${clashes} features inside a building, ${onRoad} building corners on a ring road, ${blocked} clear zones with a building in them`);
 
 // ---------------------------------------------------------------- the map
 const map = {
   name: 'City',
   terrain,
-  features,
-  spawn,
+  features: out.features,
+  spawn: { x: 0, z: 8, heading: 0 },
   flags,
-  finishes: [finish],
-  decor,
+  finishes,
+  decor: out.decor,
   runs,
-  gaps,
+  gaps: out.gaps,
   colors: { sky: '#8fb6e0', fog: '#d6e2ef' },
   peaks: { seed: 16, count: 13, rings: 3, distance: [7000, 22000], base: -500, height: [900, 2400], snowLine: 300 },
 };
-
-// ---------------------------------------------------------------- report
 const t0 = performance.now();
 const built = buildMap(parseMap(map));
-const ms = performance.now() - t0;
-const count = (t: string): number => features.filter((f) => f.type === t).length;
-console.log(`City: ${features.length} features (${count('building')} buildings, ${count('terrace')} terraces, ${count('rail')} rails, ${count('box')} boxes, ${count('kicker')} kickers, ${count('landing')} banks, ${count('quarter')} wallrides), ${gaps.length} named gaps, ${flags.length} flags, ${runs.length} runs`);
-console.log(`built in ${ms.toFixed(0)} ms: ${built.hf.cols}x${built.hf.rows} cells, ${built.hf.shapes?.length ?? 0} shapes, ${built.course.rails.length} rails, ${built.decor.scatter.length} scatter`);
-console.log(`drop top to square: ${(gy(0, 0) - gy(0, SQUARE.top)).toFixed(0)} m`);
-for (const n of notes) console.log(n);
-
-// Rails, boxes, kickers, banks and wallrides must stand clear of every building.
-const inside = (x: number, d: number, pad = 0.3): Footprint | undefined => footprints.find((f) => x > f.x0 - pad && x < f.x1 + pad && d > f.d0 - pad && d < f.d1 + pad);
-let clashes = 0;
-for (const f of features) {
-  if (f.type !== 'rail' && f.type !== 'box' && f.type !== 'kicker' && f.type !== 'quarter') continue;
-  const pts = (f.points as { x: number; z: number }[] | undefined) ?? [{ x: f.x as number, z: f.z as number }];
-  for (const p of pts) {
-    const hit = inside(p.x, -p.z);
-    if (hit) {
-      clashes++;
-      if (clashes <= 12) console.log(`clash: ${f.type} ${String(f.style ?? '')} at (${p.x}, d ${-p.z}) inside a building ${hit.x0.toFixed(0)}..${hit.x1.toFixed(0)}, d ${hit.d0.toFixed(0)}..${hit.d1.toFixed(0)}`);
-      break;
-    }
-  }
-}
-console.log(`${clashes} features inside a building`);
-
+console.log(`built in ${(performance.now() - t0).toFixed(0)} ms: ${built.hf.cols}x${built.hf.rows} cells, ${built.hf.shapes?.length ?? 0} shapes, ${built.course.rails.length} rails`);
+void r2;
 writeFileSync('src/maps/city.json', `${JSON.stringify(map)}\n`);
 console.log('wrote src/maps/city.json');

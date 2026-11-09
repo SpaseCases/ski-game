@@ -4,6 +4,7 @@ import { hash2 } from '../maps/terrain.ts';
 import type { Heightfield, RailShape } from '../maps/types.ts';
 import { railFrame, railUp } from '../sim/rails.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
+import { emitModel, propModel } from './propModels.ts';
 import { TriBuilder } from './triBuilder.ts';
 import { litByPools } from './lightPools.ts';
 
@@ -142,10 +143,37 @@ export function createRailMesh(rails: readonly RailShape[], hf: Heightfield): Gr
         addBands(near, r);
         break;
       case 'car':
-        addCar(near, r, hf, CAR_COLORS[i % CAR_COLORS.length]!);
+        if (!addModelBox(near, r, hf, CAR_MODELS[i % CAR_MODELS.length]!)) addCar(near, r, hf, CAR_COLORS[i % CAR_COLORS.length]!);
         break;
       case 'dumpster':
-        addBox(near, r, hf, DUMPSTER_LID, DUMPSTER, 0);
+        if (!addModelBox(near, r, hf, 'dumpster')) addBox(near, r, hf, DUMPSTER_LID, DUMPSTER, 0);
+        break;
+      case 'hydrant':
+        if (!addModelBox(near, r, hf, 'hydrant', 0.02)) addBox(near, r, hf, SNOW, BARRIER_BAND, 0);
+        break;
+      case 'bin':
+        if (!addModelBox(near, r, hf, 'trashBin', 0.02)) addBox(near, r, hf, SNOW, DUMPSTER, 0);
+        break;
+      case 'newsBox':
+        addNewsBox(near, r, hf, i);
+        break;
+      case 'bollards':
+        addBollards(near, r, hf);
+        break;
+      case 'bikeRack':
+        addBikeRack(near, r, hf);
+        break;
+      case 'shelter':
+        addShelter(near, r, hf);
+        break;
+      case 'bus':
+        addCoach(near, r, hf, BUS_PAINT, BUS_BAND, false);
+        break;
+      case 'tram':
+        addCoach(near, r, hf, TRAM_PAINT, TRAM_CREAM, true);
+        break;
+      case 'plow':
+        addPlow(near, r, hf);
         break;
     }
   });
@@ -787,4 +815,165 @@ function beam(b: TriBuilder, a: Vector3, e: Vector3, w: number, color: Color): v
 
 function point(r: RailShape, k: number): Vector3 {
   return new Vector3(r.points[k * 3], r.points[k * 3 + 1], r.points[k * 3 + 2]);
+}
+
+// ---------------------------------------------------------------- the City's street props (milestone 16, city on a hill)
+
+/** The cars a 'car' box is drawn as, from the converted model packs (render/propModels.ts). */
+const CAR_MODELS = ['carSedan', 'carHatchback', 'carWagon', 'carTaxi', 'carSedan', 'carWagon', 'carHatchback', 'carPolice'];
+
+/**
+ * A box's own frame: from its first point to its last, level across, its
+ * snow line straight between the snow at its two ends. `at` gives the world
+ * point `u` m along, `v` m to the right and `h` m above that line.
+ */
+function boxFrame(r: RailShape, hf: Heightfield) {
+  const a = point(r, 0);
+  const e = point(r, r.dist.length - 1);
+  const along = new Vector3(e.x - a.x, 0, e.z - a.z);
+  const length = Math.max(0.01, along.length());
+  along.multiplyScalar(1 / length);
+  const right = new Vector3(-along.z, 0, along.x);
+  const y0 = drawnHeightAt(hf, a.x, a.z);
+  const y1 = drawnHeightAt(hf, e.x, e.z);
+  let top = 0;
+  for (let k = 0; k < r.dist.length; k++) top = Math.max(top, r.points[k * 3 + 1]! - drawnHeightAt(hf, r.points[k * 3]!, r.points[k * 3 + 2]!));
+  const at = (u: number, v: number, h: number, out = new Vector3()): Vector3 =>
+    out.set(a.x + along.x * u + right.x * v, y0 + ((y1 - y0) * u) / length + h, a.z + along.z * u + right.z * v);
+  return { a, along, right, length, top, at };
+}
+type BoxFrame = ReturnType<typeof boxFrame>;
+
+const FACE_N = new Vector3();
+const EDGE_1 = new Vector3();
+const EDGE_2 = new Vector3();
+/** A triangle facing whichever way its own winding says (a model's triangles). */
+function rawTri(b: TriBuilder, p: Vector3, q: Vector3, s: Vector3, color: Color): void {
+  EDGE_1.subVectors(q, p);
+  EDGE_2.subVectors(s, p);
+  FACE_N.crossVectors(EDGE_1, EDGE_2);
+  b.tri(p, q, s, color, FACE_N);
+}
+
+/** A converted model stretched over a box: its length along the box, its width across, its height to the box top. */
+function addModelBox(near: Near, r: RailShape, hf: Heightfield, id: string, sink = 0.05): boolean {
+  const m = propModel(id);
+  if (!m) return false;
+  const f = boxFrame(r, hf);
+  const b = near(f.a.x, f.a.z);
+  const sx = (2 * r.halfWidth) / m.size[0];
+  const sy = (f.top + sink) / m.size[1];
+  const sz = f.length / m.size[2];
+  // Model z runs from its nose (-z) to its tail; the box starts at its first point.
+  emitModel(m, sx, sy, sz, (x, y, z, out) => f.at(z + f.length / 2, x, y - sink, out), (p, q, s, c) => rawTri(b, p, q, s, c));
+  return true;
+}
+
+/** A cuboid in a box frame: u0..u1 along, v0..v1 across, h0..h1 up; its top, sides and ends in their colors. */
+function cuboid(b: TriBuilder, f: BoxFrame, u0: number, u1: number, v0: number, v1: number, h0: number, h1: number, top: Color, side: Color, end: Color = side): void {
+  const p = (u: number, v: number, h: number): Vector3 => f.at(u, v, h);
+  b.quad(p(u0, v0, h1), p(u1, v0, h1), p(u1, v1, h1), p(u0, v1, h1), top, UP);
+  b.quad(p(u0, v1, h0), p(u1, v1, h0), p(u1, v1, h1), p(u0, v1, h1), side, f.right);
+  b.quad(p(u0, v0, h0), p(u1, v0, h0), p(u1, v0, h1), p(u0, v0, h1), side, f.right.clone().negate());
+  b.quad(p(u0, v0, h0), p(u0, v1, h0), p(u0, v1, h1), p(u0, v0, h1), end, f.along.clone().negate());
+  b.quad(p(u1, v0, h0), p(u1, v1, h0), p(u1, v1, h1), p(u1, v0, h1), end, f.along);
+}
+
+const BUS_PAINT = new Color('#d8a52a');
+const BUS_BAND = new Color('#2f3a44');
+const TRAM_PAINT = new Color('#b8483a');
+const TRAM_CREAM = new Color('#e8dcc0');
+const PLOW_PAINT = new Color('#e8862a');
+const PLOW_BLADE = new Color('#c9c2b0');
+const GLASS = new Color('#2a3c52');
+const GLASS_PALE = new Color('#8fb0c8');
+const NEWS = [new Color('#2f6fb0'), new Color('#c8402e'), new Color('#2f8a52'), new Color('#e0b84a')];
+const STEEL = new Color('#4a535c');
+
+/** A bus or a tram, snowed over: a long body, a band of windows down each side and across both ends, a snow roof. */
+function addCoach(near: Near, r: RailShape, hf: Heightfield, paint: Color, band: Color, tram: boolean): void {
+  const f = boxFrame(r, hf);
+  const b = near(f.a.x, f.a.z);
+  const w = r.halfWidth;
+  const top = f.top;
+  const L = f.length;
+  cuboid(b, f, 0, L, -w, w, -BURY, top * 0.42, band, band);
+  cuboid(b, f, 0, L, -w, w, top * 0.42, top - 0.05, SNOW, paint);
+  const g0 = top * 0.5;
+  const g1 = top * 0.86;
+  for (const s of [-1, 1]) {
+    const v = s * (w + 0.02);
+    for (let u = 0.6; u + 1.3 < L - 0.4; u += 1.6) {
+      b.quad(f.at(u, v, g0), f.at(u + 1.3, v, g0), f.at(u + 1.3, v, g1), f.at(u, v, g1), GLASS, f.right.clone().multiplyScalar(s));
+    }
+  }
+  for (const [u, n] of [[-0.02, -1], [L + 0.02, 1]] as const) {
+    b.quad(f.at(u, -w + 0.2, g0 - 0.2), f.at(u, w - 0.2, g0 - 0.2), f.at(u, w - 0.2, g1), f.at(u, -w + 0.2, g1), GLASS_PALE, f.along.clone().multiplyScalar(n));
+  }
+  // A drift heaped on the roof.
+  cuboid(b, f, 0.4, L - 0.4, -w + 0.15, w - 0.15, top - 0.05, top, SNOW, SNOW);
+  if (tram) {
+    // The pantograph on the roof.
+    cuboid(b, f, L / 2 - 1.2, L / 2 + 1.2, -0.5, 0.5, top, top + 0.12, STEEL, STEEL);
+    b.quad(f.at(L / 2 - 0.9, -0.05, top + 0.12), f.at(L / 2 + 0.2, -0.05, top + 1.3), f.at(L / 2 + 0.2, 0.05, top + 1.3), f.at(L / 2 - 0.9, 0.05, top + 0.12), STEEL, f.right);
+    cuboid(b, f, L / 2 - 0.1, L / 2 + 0.5, -0.8, 0.8, top + 1.25, top + 1.32, STEEL, STEEL);
+  }
+}
+
+/** A plow truck: a blade, the cab and a sander box behind it (the line heights are its shape). */
+function addPlow(near: Near, r: RailShape, hf: Heightfield): void {
+  const f = boxFrame(r, hf);
+  const b = near(f.a.x, f.a.z);
+  const w = r.halfWidth;
+  const L = f.length;
+  b.quad(f.at(0, -w - 0.4, -0.1), f.at(0.6, w + 0.4, -0.1), f.at(0.4, w + 0.4, 0.9), f.at(-0.2, -w - 0.4, 0.9), PLOW_BLADE, f.along.clone().negate());
+  cuboid(b, f, 0.9, 3.4, -w, w, -BURY, 1.2, PLOW_PAINT, PLOW_PAINT);
+  cuboid(b, f, 1.4, 3.4, -w + 0.1, w - 0.1, 1.2, 2.8, SNOW, PLOW_PAINT);
+  b.quad(f.at(1.38, -w + 0.3, 1.6), f.at(1.38, w - 0.3, 1.6), f.at(1.38, w - 0.3, 2.5), f.at(1.38, -w + 0.3, 2.5), GLASS, f.along.clone().negate());
+  cuboid(b, f, 3.5, L, -w, w, -BURY, 2.4, SNOW, PLOW_PAINT, BUS_BAND);
+  for (const s of [-1, 1]) cuboid(b, f, 2.2, 2.5, s * 0.6 - 0.15, s * 0.6 + 0.15, 2.8, 3.0, PLOW_PAINT, PLOW_PAINT);
+}
+
+/** A bus shelter: posts, a glass back, a snowy roof slab (the box top) to slide. */
+function addShelter(near: Near, r: RailShape, hf: Heightfield): void {
+  const f = boxFrame(r, hf);
+  const b = near(f.a.x, f.a.z);
+  const w = r.halfWidth;
+  const L = f.length;
+  for (const u of [0.1, L - 0.1]) for (const v of [-w + 0.1, w - 0.1]) cuboid(b, f, u - 0.06, u + 0.06, v - 0.06, v + 0.06, -BURY, f.top - 0.15, STEEL, STEEL);
+  b.quad(f.at(0.1, w - 0.1, 0.25), f.at(L - 0.1, w - 0.1, 0.25), f.at(L - 0.1, w - 0.1, f.top - 0.2), f.at(0.1, w - 0.1, f.top - 0.2), GLASS_PALE, f.right);
+  cuboid(b, f, -0.2, L + 0.2, -w - 0.2, w + 0.2, f.top - 0.15, f.top, SNOW, STEEL);
+  cuboid(b, f, 0.6, L - 0.6, w - 0.6, w - 0.2, 0.42, 0.5, BENCH, BENCH);
+}
+
+/** A newspaper box: a small painted cabinet with a window, snow on top. */
+function addNewsBox(near: Near, r: RailShape, hf: Heightfield, i: number): void {
+  const f = boxFrame(r, hf);
+  const b = near(f.a.x, f.a.z);
+  const w = r.halfWidth;
+  const paint = NEWS[i % NEWS.length]!;
+  cuboid(b, f, 0, f.length, -w, w, -BURY, f.top, SNOW, paint);
+  b.quad(f.at(-0.01, -w + 0.08, f.top * 0.55), f.at(-0.01, w - 0.08, f.top * 0.55), f.at(-0.01, w - 0.08, f.top * 0.85), f.at(-0.01, -w + 0.08, f.top * 0.85), GLASS_PALE, f.along.clone().negate());
+}
+
+/** Bollards: short posts every 1.4 m along the line, snow capped (slid along their tops). */
+function addBollards(near: Near, r: RailShape, hf: Heightfield): void {
+  const f = boxFrame(r, hf);
+  const b = near(f.a.x, f.a.z);
+  for (let u = 0.15; u <= f.length - 0.1; u += 1.4) {
+    cuboid(b, f, u - 0.12, u + 0.12, -0.12, 0.12, -BURY, f.top - 0.06, STEEL, STEEL);
+    cuboid(b, f, u - 0.13, u + 0.13, -0.13, 0.13, f.top - 0.06, f.top, SNOW, SNOW);
+  }
+}
+
+/** A bike rack: steel hoops across the line, a bar along their tops. */
+function addBikeRack(near: Near, r: RailShape, hf: Heightfield): void {
+  const f = boxFrame(r, hf);
+  const b = near(f.a.x, f.a.z);
+  const w = r.halfWidth;
+  for (let u = 0.2; u <= f.length - 0.1; u += 0.8) {
+    for (const v of [-w, w]) cuboid(b, f, u - 0.03, u + 0.03, v - 0.03, v + 0.03, -BURY, f.top, STEEL, STEEL);
+    cuboid(b, f, u - 0.03, u + 0.03, -w, w, f.top - 0.06, f.top, SNOW, STEEL);
+  }
+  cuboid(b, f, 0, f.length, -0.04, 0.04, f.top - 0.05, f.top, STEEL, STEEL);
 }

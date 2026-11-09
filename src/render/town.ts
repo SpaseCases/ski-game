@@ -3,6 +3,7 @@ import { chimneySpot, EDGE, framePoint, roofHeight, stairRun, townFrame, WALL_IN
 import type { BuildingFeature, Feature, Heightfield, TerraceFeature } from '../maps/types.ts';
 import { drawText, textWidth } from './font.ts';
 import type { MeshKit, TiledKit } from './meshKit.ts';
+import { drawLandmark, LANDMARK_STYLES } from './cityStructures.ts';
 import { renderedHeightAt } from './terrainMesh.ts';
 
 // The town's buildings and terraces, drawn around the parts the rider
@@ -128,6 +129,10 @@ class Drawer {
 function drawBuilding(b: BuildingFeature, hf: Heightfield, kits: TiledKit, glows: TiledKit): void {
   if (b.style === 'block' || b.style === 'tower') {
     drawHighrise(b, hf, kits, glows);
+    return;
+  }
+  if (LANDMARK_STYLES.has(b.style)) {
+    drawLandmark(b, hf, kits, glows);
     return;
   }
   const t = townFrame(b);
@@ -306,9 +311,23 @@ function drawHighrise(b: BuildingFeature, hf: Heightfield, kits: TiledKit, glows
         (lit ? glow : d).levelPanel(...span(half), y0, y0 + tall, w.out, lit ? GLASS_LIT : tower ? TOWER_GLASS : GLASS);
       }
     }
-    if (isFront && b.sign !== '' && !tower) shopSign(d, b, (w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2, w.out, 3.4);
+    if (isFront && b.sign !== '' && !tower) {
+      shopSign(d, b, (w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2, w.out, 3.4);
+      awning(d, w.a, w.b, w.out, seed);
+    }
+    if (!tower) {
+      // A string course over the ground floor and a cornice under the roof, a little proud of the wall.
+      const ou = w.out.dot(d.dir(1, 0)) * 0.12;
+      const ov = w.out.dot(d.dir(0, 1)) * 0.12;
+      const gMid = d.ground((w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2);
+      d.levelPanel(w.a[0] + ou, w.a[1] + ov, w.b[0] + ou, w.b[1] + ov, gMid + BLOCK.upper - 0.05, gMid + BLOCK.upper + 0.25, w.out, CORNICE, 0.02);
+      const roofY = (u: number, v: number): number => d.ground(u, v) + roofHeight(b, u) - FASCIA_DEPTH;
+      const r0 = Math.min(roofY(w.a[0], w.a[1]), roofY(w.b[0], w.b[1]));
+      d.levelPanel(w.a[0] + ou * 2, w.a[1] + ov * 2, w.b[0] + ou * 2, w.b[1] + ov * 2, r0 - 0.9, r0 - 0.35, w.out, CORNICE, 0.02);
+    }
   }
   roofTrim(d, b);
+  if (!tower) roofDetails(d, b, mid, seed);
   if (tower) {
     // A plant room on the roof, and a mast on the tallest.
     const g = d.ground(b.length / 2, 0);
@@ -316,6 +335,71 @@ function drawHighrise(b: BuildingFeature, hf: Heightfield, kits: TiledKit, glows
     d.k.at(mid.x, roof, mid.z, Math.atan2(t.dirX, t.dirZ));
     d.k.box(0, 1.6, 0, b.width * 0.45, 3.2, b.length * 0.35, ROOF_BOX);
     if (b.eave > 60) d.k.box(0, 3.2 + 7, 0, 0.35, 14, 0.35, MAST);
+  }
+}
+
+const CORNICE = c('#e6dfd0');
+const AWNINGS = ['#b8483a', '#2f6b45', '#3f6fa8', '#c99a3a', '#7a4f8a'].map(c);
+const VENT = c('#8a9096');
+const TANK = c('#6e5440');
+const TANK_BAND = c('#4a3a2c');
+const SHRUB = c('#2f5a3c');
+
+/** A striped awning over a shop front's ground floor, from a to b along the wall facing `out`. */
+function awning(d: Drawer, a: [number, number], b: [number, number], out: Vector3, seed: number): void {
+  const color = AWNINGS[seed % AWNINGS.length]!;
+  const g = d.ground((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+  const o = out.clone().normalize();
+  const inset = 0.15;
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const pieces = Math.max(1, Math.floor(len / 1.4));
+  for (let i = 0; i < pieces; i++) {
+    const s0 = (i + inset) / pieces;
+    const s1 = (i + 1 - inset) / pieces;
+    const u0 = a[0] + (b[0] - a[0]) * s0;
+    const v0 = a[1] + (b[1] - a[1]) * s0;
+    const u1 = a[0] + (b[0] - a[0]) * s1;
+    const v1 = a[1] + (b[1] - a[1]) * s1;
+    const top0 = d.level(u0, v0, g + 2.6);
+    const top1 = d.level(u1, v1, g + 2.6);
+    const low0 = top0.clone().addScaledVector(o, 1.2).setY(g + 2.0);
+    const low1 = top1.clone().addScaledVector(o, 1.2).setY(g + 2.0);
+    d.k.quad(top0, top1, low1, low0, i % 2 ? color : CORNICE, new Vector3(o.x, 1, o.z));
+  }
+}
+
+/** On a mid-rise's level roof: a stair bulkhead, vents, and a wooden water tank on a stand or a rooftop garden. */
+function roofDetails(d: Drawer, b: BuildingFeature, mid: { x: number; z: number }, seed: number): void {
+  const roof = d.ground(b.length / 2, 0) + roofHeight(b, b.length / 2);
+  const t = d.t;
+  d.k.at(mid.x, roof, mid.z, Math.atan2(t.dirX, t.dirZ));
+  const L = b.length;
+  const W = b.width;
+  const r = (n: number): number => ((seed * 7 + n * 13) % 97) / 97;
+  // The stair bulkhead, off center.
+  const bx = (r(1) - 0.5) * (W - 5);
+  const bz = (r(2) - 0.5) * (L - 5);
+  d.k.box(bx, 1.2, bz, 2.6, 2.6, 3, new Color(b.color).multiplyScalar(0.85));
+  d.k.box(bx, 2.55, bz, 2.9, 0.12, 3.3, CORNICE);
+  // Vents.
+  for (let i = 0; i < 2; i++) d.k.box(-bx * 0.6 + i * 1.6, 0.4, -bz * 0.5 - i * 1.2, 1.2, 0.8, 0.9, VENT);
+  if (r(3) < 0.35 && W > 10) {
+    // A wooden water tank on a steel stand.
+    const tx = -bx * 0.5;
+    const tz = bz * -0.8;
+    for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) d.k.beam(tx + x, 0, tz + z, tx + x * 0.9, 3, tz + z * 0.9, 0.12, VENT);
+    d.k.prism(tx, tz, 3, 6, 1.6, 1.6, 8, TANK);
+    d.k.prism(tx, tz, 4.4, 4.6, 1.65, 1.65, 8, TANK_BAND);
+    d.k.prism(tx, tz, 6, 7.2, 1.7, 0, 8, c('#f1f5fa'));
+  } else if (r(3) > 0.75 && W > 10 && L > 14) {
+    // A rooftop garden: planters along the parapet with small snowy evergreens.
+    for (let i = 0; i < 4; i++) {
+      const z = -L / 2 + 3 + (i * (L - 6)) / 3;
+      const x = (i % 2 ? 1 : -1) * (W / 2 - 1.8);
+      d.k.box(x, 0.35, z, 1.4, 0.7, 2.4, PLINTH);
+      d.k.prism(x, z, 0.7, 2.6, 0.7, 0, 6, SHRUB);
+      d.k.prism(x, z, 2.0, 2.7, 0.3, 0, 6, c('#e8eef5'));
+    }
   }
 }
 

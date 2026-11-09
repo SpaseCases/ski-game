@@ -11,6 +11,7 @@
 // - building: up its drift (or at its uphill wall) along its length, with and without a pop at the top.
 // - terrace: across it and off its front: down the stairs, off the wall beside them, and popped onto each handrail
 //   (with no stairs or handrails: off the middle of its front and beside it).
+// - handrail (only when named): popped onto a handrail of its own (not a terrace's), along its run-on at the top.
 // - jib (only when named): ridden onto every ride-on rail and box (one starting at the snow) along its
 //   first stretch; reports whether it caught, how long it slid, and the landing off its end. Loops and
 //   corkscrews need more speed than these runs carry: tools/sim/loop.ts rides them.
@@ -193,8 +194,35 @@ sim.map.features.forEach((f: Feature, i) => {
     rideQuarter(f, i);
   } else if ((f.type === 'rail' || f.type === 'box') && (f.type === 'box' || (f.style !== 'log' && f.ups.length === 0)) && f.points[0]!.height < 0.15 && want('jib')) {
     rideJib(f, i);
+  } else if (f.type === 'rail' && f.style === 'handrail' && f.points[0]!.height > 0.5 && kinds.includes('handrail')) {
+    rideHandrail(f, i);
   }
 });
+
+/**
+ * Popped onto a handrail of its own (the City's, down a stair set: its
+ * first stretch runs along the plaza at the top), from 10 m back along that
+ * stretch, letting go of the pop half a second before reaching it. Only
+ * when named: `handrail`.
+ */
+function rideHandrail(f: RailFeature, i: number): void {
+  const a = f.points[0]!;
+  const b = f.points[1]!;
+  const yaw = Math.atan2(-(b.x - a.x), -(b.z - a.z)) / DEG;
+  const len = f.points.reduce((sum, p, k, all) => (k === 0 ? 0 : sum + Math.hypot(p.x - all[k - 1]!.x, p.z - all[k - 1]!.z)), 0);
+  const back = 10;
+  const results: string[] = [];
+  for (const v of speeds([7, 10, 13])) {
+    const x = a.x + Math.sin(yaw * DEG) * back;
+    const z = a.z + Math.cos(yaw * DEG) * back;
+    // Let go of the pop half a second before the rail (as a terrace's handrails are ridden).
+    const popAt = back + 0.5 - v * 0.5;
+    const o = ride(x, z, yaw, v, (along) => along > back + len + 20, (along) => along > popAt - v * 0.35 && along < popAt);
+    if (!o.caught && !o.crash) problems++;
+    results.push(`${v}: ${o.caught ? verdict(o) : o.crash ? verdict(o) : 'MISSED'}`);
+  }
+  report(`handrail ${i} ${where(a)} ${len.toFixed(0)} m`, results);
+}
 
 /**
  * Onto a ride-on rail or box along its first stretch, until 1.5 s after

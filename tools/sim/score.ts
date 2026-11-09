@@ -596,7 +596,8 @@ if (sim.map.name === 'Park') {
 // wooden face scores "Wallride" when the skis leave it.
 if (sim.map.name === 'Park') {
   const city = loadMap('src/maps/city.json');
-  const walls = city.map.features.filter((f) => f.type === 'quarter' && f.style === 'wood');
+  // Since the city on a hill, the City's wallrides are drawn as their buildings' walls (style 'wall').
+  const walls = city.map.features.filter((f) => f.type === 'quarter' && (f.style === 'wood' || f.style === 'wall'));
   console.log(`milestone 16 wallrides on the City (${walls.length}), at 12 m/s, 25° into each:`);
   let scored = 0;
   for (const q of walls) {

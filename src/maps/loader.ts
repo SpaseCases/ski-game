@@ -35,14 +35,14 @@ import type {
 } from './types.ts';
 
 const SCATTER_KINDS: readonly ScatterKind[] = ['pine', 'aspen', 'snag', 'rock', 'boulder', 'crag', 'deadfall'];
-const LINE_KINDS: readonly LineKind[] = ['fence', 'netting', 'barrier', 'dyeLine', 'bunting', 'chairlift', 'snowFence', 'ropeLine', 'markers'];
-const PROP_KINDS: readonly PropKind[] = ['lightPole', 'floodlight', 'banner', 'flag', 'groomer', 'streetLamp', 'hut', 'snowmobile', 'skier', 'skiRack', 'cabin', 'mast'];
+const LINE_KINDS: readonly LineKind[] = ['fence', 'netting', 'barrier', 'dyeLine', 'bunting', 'chairlift', 'snowFence', 'ropeLine', 'markers', 'viaduct', 'elevated', 'skybridge', 'funicular', 'tramTracks', 'scaffold'];
+const PROP_KINDS: readonly PropKind[] = ['lightPole', 'floodlight', 'banner', 'flag', 'groomer', 'streetLamp', 'hut', 'snowmobile', 'skier', 'skiRack', 'cabin', 'mast', 'trafficLight', 'stopSign', 'noParking', 'yieldSign', 'waterTower', 'person', 'statue', 'crane', 'fountain'];
 const START_STYLES: readonly StartStyle[] = ['deck', 'tower', 'ridge', 'race'];
 const RAIL_STYLES: readonly RailStyle[] = ['metal', 'handrail', 'log', 'tube', 'loop', 'corkscrew'];
-const BOX_STYLES: readonly BoxStyle[] = ['wood', 'ledge', 'bench', 'rock', 'stump', 'table', 'barrels', 'spool', 'planter', 'barrier', 'car', 'dumpster'];
-const QUARTER_STYLES: readonly QuarterStyle[] = ['snow', 'wood'];
+const BOX_STYLES: readonly BoxStyle[] = ['wood', 'ledge', 'bench', 'rock', 'stump', 'table', 'barrels', 'spool', 'planter', 'barrier', 'car', 'dumpster', 'hydrant', 'bin', 'newsBox', 'bollards', 'bikeRack', 'shelter', 'bus', 'tram', 'plow', 'parapet'];
+const QUARTER_STYLES: readonly QuarterStyle[] = ['snow', 'wood', 'wall'];
 const ROOF_STYLES: readonly RoofStyle[] = ['gable', 'shed', 'flat'];
-const BUILDING_STYLES: readonly BuildingStyle[] = ['chalet', 'shop', 'lodge', 'station', 'block', 'tower'];
+const BUILDING_STYLES: readonly BuildingStyle[] = ['chalet', 'shop', 'lodge', 'station', 'block', 'tower', 'church', 'clock', 'civic', 'deco', 'twist', 'depot', 'garage', 'site', 'rampart', 'turret'];
 const RUN_LEVELS: readonly RunLevel[] = ['green', 'blue', 'black', 'double'];
 const GATE_KINDS: readonly GateKind[] = ['slalom', 'giant'];
 
@@ -496,6 +496,7 @@ function parseFeature(raw: unknown, path: string): Feature {
         back: n('back', 5),
         taper: n('taper', 5),
         style: f.style === undefined ? 'snow' : oneOf(f.style, QUARTER_STYLES, `${path}.style`),
+        color: f.color === undefined ? '#9a8f84' : str(f.color, `${path}.color`),
       };
     }
     case 'slalom':
@@ -641,7 +642,7 @@ function parseDecor(raw: unknown, path: string): DecorDef {
     };
   }
   if ((LINE_KINDS as readonly string[]).includes(kind)) {
-    return { kind: kind as LineKind, points: xzPoints(d.points, `${path}.points`, 2) };
+    return { kind: kind as LineKind, points: xzPoints(d.points, `${path}.points`, 2), height: d.height === undefined ? 0 : num(d.height, `${path}.height`) };
   }
   if ((PROP_KINDS as readonly string[]).includes(kind)) {
     return {

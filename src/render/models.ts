@@ -2,6 +2,8 @@ import { type BufferGeometry, Color, IcosahedronGeometry, Vector3 } from 'three'
 import { DECOR_SIZE } from '../maps/decor.ts';
 import { hash2 } from '../maps/terrain.ts';
 import { MeshKit } from './meshKit.ts';
+import { propModel } from './propModels.ts';
+import { crane, fountain } from './cityStructures.ts';
 
 // Low-poly decoration models, all original. Scatter models (trees, snags,
 // rocks) are built once as geometry for instancing. Props are drawn into a
@@ -291,6 +293,28 @@ export function drawProp(k: MeshKit, kind: string, color: Color, glow: MeshKit, 
     case 'snowmobile':
       snowmobile(k, color);
       break;
+    case 'trafficLight':
+    case 'stopSign':
+    case 'noParking':
+    case 'yieldSign':
+    case 'waterTower': {
+      const m = propModel(kind);
+      if (m) k.model(m);
+      else k.prism(0, 0, -0.3, 2.6, 0.06, 0.06, 6, PALETTE.post);
+      break;
+    }
+    case 'person':
+      person(k, color, index);
+      break;
+    case 'statue':
+      statue(k, index);
+      break;
+    case 'crane':
+      crane(k);
+      break;
+    case 'fountain':
+      fountain(k);
+      break;
     case 'skier':
       standingSkier(k, color, index);
       break;
@@ -460,4 +484,47 @@ function groomer(k: MeshKit): void {
   k.beam(-0.6, 1.0, -L / 2 + 0.2, -0.6, 0.9, -L / 2 - 0.2, 0.15, PALETTE.metalDark);
   k.beam(0.6, 1.0, -L / 2 + 0.2, 0.6, 0.9, -L / 2 - 0.2, 0.15, PALETTE.metalDark);
   k.box(0, 0.4, L / 2 + 0.55, W, 0.5, 1.0, PALETTE.metalDark);
+}
+
+/** Coat colors for the City's people. */
+const COATS = ['#b8483a', '#3f6fa8', '#2f3a44', '#6a8f5a', '#c99a3a', '#7a4f8a', '#d9d4c8', '#2f6b45', '#a65f3a'].map((c) => new Color(c));
+const SKIN = ['#e8c4a0', '#c99a72', '#8a5a3c', '#f0d2b8', '#6e4630'].map((c) => new Color(c));
+const HATS = ['#2f3a44', '#b8483a', '#e8e0d0', '#3f6fa8', '#c99a3a'].map((c) => new Color(c));
+
+/** A person on the sidewalk facing -Z: legs, a winter coat, a scarf, a head with a hat; some carry a bag, some point. */
+function person(k: MeshKit, _color: Color, index: number): void {
+  const r = (n: number): number => 0.5 + 0.5 * hash2(index, n, 71);
+  const coat = COATS[index % COATS.length]!;
+  const skin = SKIN[Math.floor(r(1) * SKIN.length) % SKIN.length]!;
+  const hat = HATS[Math.floor(r(2) * HATS.length) % HATS.length]!;
+  const tall = 1.55 + r(3) * 0.3;
+  const leg = tall * 0.46;
+  const stride = (r(4) - 0.5) * 0.3;
+  for (const s of [-1, 1]) k.beam(s * 0.09, 0, stride * s, s * 0.09, leg, 0, 0.12, PALETTE.dark);
+  k.box(0, leg + tall * 0.17, 0, 0.42, tall * 0.36, 0.26, coat);
+  k.box(0, leg + tall * 0.36, 0, 0.3, 0.08, 0.24, hat);
+  k.box(0, tall - 0.12, 0, 0.2, 0.22, 0.2, skin);
+  k.box(0, tall + 0.02, 0, 0.23, 0.1, 0.23, hat);
+  // Arms: down at the sides, or one raised, pointing up the hill.
+  const raise = r(5) > 0.8;
+  k.beam(-0.25, leg + tall * 0.33, 0, -0.27, leg + tall * 0.05, 0.05, 0.09, coat);
+  if (raise) k.beam(0.25, leg + tall * 0.33, 0, 0.3, leg + tall * 0.55, -0.35, 0.09, coat);
+  else k.beam(0.25, leg + tall * 0.33, 0, 0.27, leg + tall * 0.05, -0.05, 0.09, coat);
+  if (r(6) > 0.6) k.box(0.32, leg - 0.05, 0, 0.12, 0.3, 0.3, PALETTE.woodDark);
+}
+
+/** A bronze figure on a stone plinth (a square's statue), snow on its head and shoulders. */
+function statue(k: MeshKit, index: number): void {
+  const stone = PALETTE.rockDark;
+  const bronze = new Color('#4a5a4c');
+  k.box(0, 0.6, 0, 2.2, 1.2, 2.2, stone);
+  k.box(0, 1.25, 0, 2.4, 0.1, 2.4, PALETTE.snow);
+  k.box(0, 1.9, 0, 0.7, 1.2, 0.5, bronze);
+  k.box(0, 2.8, 0, 0.9, 0.7, 0.55, bronze);
+  k.box(0, 3.2, 0, 0.92, 0.08, 0.57, PALETTE.snow);
+  k.box(0, 3.45, 0, 0.36, 0.4, 0.36, bronze);
+  k.box(0, 3.68, 0, 0.38, 0.06, 0.38, PALETTE.snow);
+  // An arm raised (a hat in hand), or holding a book.
+  if (index % 2 === 0) k.beam(0.45, 3.0, 0, 0.6, 3.75, -0.2, 0.16, bronze);
+  else k.box(0.45, 2.55, -0.25, 0.4, 0.3, 0.12, bronze);
 }

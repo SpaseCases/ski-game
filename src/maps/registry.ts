@@ -34,7 +34,7 @@ export const MAPS: readonly MapEntry[] = [
   {
     id: 'city',
     name: 'City',
-    blurb: 'A snowed-in city down a steep hill: ride any street, alley or rooftop down into the towers of downtown. Stair sets and handrails, ledges, wallrides, bonks and rooftop gaps.',
+    blurb: 'A snowed-in city on a hill: drop out of the walled old town and ride any side down, by street, alley, stairs or rooftop, to downtown, the rail yards, the old town or the hillside homes. Stair sets and handrails, ledges, wallrides, bonks and rooftop gaps.',
     load: () => import('./city.json').then((m) => m.default),
   },
   {

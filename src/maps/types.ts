@@ -399,7 +399,31 @@ export interface RailFeature {
  * snowed-over parked car (slid over its hood, roof and trunk: the line's
  * heights give its shape) and a dumpster.
  */
-export type BoxStyle = 'wood' | 'ledge' | 'bench' | 'rock' | 'stump' | 'table' | 'barrels' | 'spool' | 'planter' | 'barrier' | 'car' | 'dumpster';
+export type BoxStyle =
+  | 'wood'
+  | 'ledge'
+  | 'bench'
+  | 'rock'
+  | 'stump'
+  | 'table'
+  | 'barrels'
+  | 'spool'
+  | 'planter'
+  | 'barrier'
+  | 'car'
+  | 'dumpster'
+  // The City on its hill (milestone 16): street furniture and vehicles to bonk and slide, every one snowed over.
+  | 'hydrant'
+  | 'bin'
+  | 'newsBox'
+  | 'bollards'
+  | 'bikeRack'
+  | 'shelter'
+  | 'bus'
+  | 'tram'
+  | 'plow'
+  // A viaduct's stone parapet: drawn by the viaduct itself (render/cityStructures.ts), so nothing of its own.
+  | 'parapet';
 
 /** A box: a wide deck along a polyline, like a rail. */
 export interface BoxFeature {
@@ -494,7 +518,27 @@ export type RoofStyle = 'gable' | 'shed' | 'flat';
  * and a glass tower. Mid-rises and towers draw their floors level, so they
  * suit a shed roof turned to stand level on a slope.
  */
-export type BuildingStyle = 'chalet' | 'shop' | 'lodge' | 'station' | 'block' | 'tower';
+export type BuildingStyle =
+  | 'chalet'
+  | 'shop'
+  | 'lodge'
+  | 'station'
+  | 'block'
+  | 'tower'
+  // The City's landmarks (milestone 16, city on a hill): a cathedral, a clock tower, a domed civic hall, an art-deco
+  // tower with setbacks, a twisted glass tower, a train station under an arched roof, a brutalist parking garage and
+  // a half-built building on a construction site. Drawn by render/cityStructures.ts.
+  | 'church'
+  | 'clock'
+  | 'civic'
+  | 'deco'
+  | 'twist'
+  | 'depot'
+  | 'garage'
+  | 'site'
+  // The citadel round the summit plaza: a stretch of its wall, and a round turret at a gate.
+  | 'rampart'
+  | 'turret';
 
 /**
  * A building whose snowy roof can be ridden: up a snow drift against its
@@ -584,7 +628,8 @@ export interface HalfpipeFeature {
 }
 
 /** What a quarter's face is: snow (a quarterpipe) or wooden boards (a wallride). */
-export type QuarterStyle = 'snow' | 'wood';
+/** A quarter's look: snow, a wooden wallride, or (the City) a wallride drawn as a building's own wall, its face in `color`. */
+export type QuarterStyle = 'snow' | 'wood' | 'wall';
 
 /**
  * One wall standing on its own: a quarterpipe to air out of, or a wallride
@@ -614,6 +659,8 @@ export interface QuarterFeature {
   /** Length over which the wall grows from nothing at each end. */
   taper: number;
   style: QuarterStyle;
+  /** The wall's color (style 'wall'). */
+  color: string;
 }
 
 /** One gate: the rider must pass between its two sides. */
@@ -729,9 +776,49 @@ export interface FinishDef {
 /** Things scattered over an area. */
 export type ScatterKind = 'pine' | 'aspen' | 'snag' | 'rock' | 'boulder' | 'crag' | 'deadfall';
 /** Things built along a line. */
-export type LineKind = 'fence' | 'netting' | 'barrier' | 'dyeLine' | 'bunting' | 'chairlift' | 'snowFence' | 'ropeLine' | 'markers';
+export type LineKind =
+  | 'fence'
+  | 'netting'
+  | 'barrier'
+  | 'dyeLine'
+  | 'bunting'
+  | 'chairlift'
+  | 'snowFence'
+  | 'ropeLine'
+  | 'markers'
+  // The City on its hill: an arched stone viaduct (its deck straight from end to end, a pier at every inner point),
+  // the elevated rail line on pillars (its deck `height` above the ground at each point), a skybridge between two
+  // towers (straight, `height` up), the funicular up the hill, tram tracks in the street, and scaffolding.
+  | 'viaduct'
+  | 'elevated'
+  | 'skybridge'
+  | 'funicular'
+  | 'tramTracks'
+  | 'scaffold';
 /** Single props, one at each point. */
-export type PropKind = 'lightPole' | 'floodlight' | 'banner' | 'flag' | 'groomer' | 'streetLamp' | 'hut' | 'snowmobile' | 'skier' | 'skiRack' | 'cabin' | 'mast';
+export type PropKind =
+  | 'lightPole'
+  | 'floodlight'
+  | 'banner'
+  | 'flag'
+  | 'groomer'
+  | 'streetLamp'
+  | 'hut'
+  | 'snowmobile'
+  | 'skier'
+  | 'skiRack'
+  | 'cabin'
+  | 'mast'
+  // The City on its hill: traffic lights, signs, a water tower, people on the sidewalks, statues, a tower crane, the park's frozen fountain.
+  | 'trafficLight'
+  | 'stopSign'
+  | 'noParking'
+  | 'yieldSign'
+  | 'waterTower'
+  | 'person'
+  | 'statue'
+  | 'crane'
+  | 'fountain';
 
 /** A run's difficulty, for trail signs: easy, intermediate, advanced, expert. */
 export type RunLevel = 'green' | 'blue' | 'black' | 'double';
@@ -781,6 +868,8 @@ export interface ScatterDecor {
 export interface LineDecor {
   kind: LineKind;
   points: XZ[];
+  /** How high (m) a viaduct's ends, an elevated line or a skybridge stands above the ground; 0 for the others. */
+  height: number;
 }
 
 export interface PropDecor {
@@ -1084,8 +1173,10 @@ export interface QuarterShape {
   back: number;
   length: number;
   taper: number;
-  /** A wooden face (a wallride). */
+  /** A wallride's face (wooden, or a building's wall): ridden, it scores "Wallride". */
   wood: boolean;
+  /** Drawn as a building's wall in this color (style 'wall'), or '' for wooden boards. */
+  wall: string;
   minX: number;
   maxX: number;
   minZ: number;

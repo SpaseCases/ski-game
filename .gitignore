@@ -10,7 +10,9 @@ Thumbs.db
 # Local Claude Code state. The Three.js skills are third-party reference
 # docs with no license, so they stay local and out of the public repo.
 .claude/settings.local.json
-.claude/skills/
+.claude/skills/*
+# Our own project skill is checked in.
+!.claude/skills/map-authoring/
 
 # Private reference data (the owner's GPS archive for milestone 19): never
 # commit or deploy it; only derived results go into the repo.

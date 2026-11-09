@@ -1,4 +1,5 @@
 import { BufferAttribute, BufferGeometry, Color, Mesh, type Material, Vector3 } from 'three';
+import { emitModel, type PropModel } from './propModels.ts';
 import { TriBuilder } from './triBuilder.ts';
 
 const NO_SWAY = [0, 0, 0, 0] as const;
@@ -43,6 +44,24 @@ export class MeshKit {
   /** A triangle in world space, facing `out`. */
   tri(a: Vector3, b: Vector3, c: Vector3, color: Color, out: Vector3): this {
     this.tris.tri(a, b, c, color, out);
+    return this;
+  }
+
+  /** A converted model (render/propModels.ts) in local space, stretched by sx, sy, sz. */
+  model(m: PropModel, sx = 1, sy = sx, sz = sx): this {
+    const n = new Vector3();
+    const e = new Vector3();
+    emitModel(
+      m,
+      sx,
+      sy,
+      sz,
+      (x, y, z, out) => out.copy(this.p(x, y, z)),
+      (a, b, c, color) => {
+        n.subVectors(b, a).cross(e.subVectors(c, a));
+        this.tris.tri(a, b, c, color, n);
+      },
+    );
     return this;
   }
 

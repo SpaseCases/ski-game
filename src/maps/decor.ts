@@ -18,6 +18,9 @@ import type {
   XZ,
 } from './types.ts';
 
+/** The City's props (milestone 16, city on a hill): their spots keep scatter off. */
+const CITY_PROPS: ReadonlySet<string> = new Set(['trafficLight', 'stopSign', 'noParking', 'yieldSign', 'waterTower', 'person', 'statue', 'crane', 'fountain']);
+
 // Decoration: map data expanded into placed things. Scatter sets become
 // trees and rocks at jittered grid spots (deterministic, so every load looks
 // the same), kept off features, rails, gates and runs. Area sets fill a
@@ -271,8 +274,8 @@ function keepOutZones(map: MapDef): KeepOut {
       const last = d.points[d.points.length - 1]!;
       zones.add(first.x, first.z, 14);
       zones.add(last.x, last.z, 14);
-    } else if ((d.kind === 'streetLamp' || d.kind === 'hut' || d.kind === 'snowmobile' || d.kind === 'skier' || d.kind === 'skiRack' || d.kind === 'cabin' || d.kind === 'mast') && 'points' in d) {
-      for (const p of d.points) zones.add(p.x, p.z, d.kind === 'hut' ? 5 : d.kind === 'cabin' ? 9 : 2.5);
+    } else if ((d.kind === 'streetLamp' || d.kind === 'hut' || d.kind === 'snowmobile' || d.kind === 'skier' || d.kind === 'skiRack' || d.kind === 'cabin' || d.kind === 'mast' || CITY_PROPS.has(d.kind)) && 'points' in d) {
+      for (const p of d.points) zones.add(p.x, p.z, d.kind === 'hut' ? 5 : d.kind === 'cabin' ? 9 : d.kind === 'waterTower' ? 5 : 2.5);
     }
   }
   return zones;
@@ -414,6 +417,8 @@ export function decorObstacles(layout: DecorLayout): ObstacleDef[] {
     post(t, solid.radius * t.scale, solid.height * t.scale);
   }
   for (const l of layout.lines) {
+    // A viaduct's piers and the elevated line's pillars stand at its inner points.
+    if (l.kind === 'viaduct' || l.kind === 'elevated') for (const p of l.points.slice(1, -1)) post(p, l.kind === 'viaduct' ? 2 : 0.8, 12);
     const height =
       l.kind === 'fence' ? S.fenceHeight : l.kind === 'netting' ? S.nettingHeight : l.kind === 'barrier' ? S.barrierHeight : l.kind === 'snowFence' ? S.snowFenceHeight : 0;
     if (height > 0) {
@@ -455,7 +460,12 @@ export function decorObstacles(layout: DecorLayout): ObstacleDef[] {
         const half = c.length / 2 - (c.depth + c.deck) / 2;
         out.push({ ax: at.x + fx - rx * half, az: at.z + fz - rz * half, bx: at.x + fx + rx * half, bz: at.z + fz + rz * half, radius: (c.depth + c.deck) / 2, height: c.height });
       }
-      else if (p.kind === 'skier') post(at, 0.35, 1.8);
+      else if (p.kind === 'skier' || p.kind === 'person') post(at, 0.35, 1.8);
+      else if (p.kind === 'trafficLight' || p.kind === 'stopSign' || p.kind === 'noParking' || p.kind === 'yieldSign') post(at, 0.1, 2.6);
+      else if (p.kind === 'waterTower') post(at, 2.4, 7);
+      else if (p.kind === 'statue') post(at, 1.2, 4);
+      else if (p.kind === 'crane') post(at, 1.3, 40);
+      else if (p.kind === 'fountain') post(at, 1.6, 3.5);
       else if (p.kind === 'snowmobile' || p.kind === 'skiRack') {
         // Along its length: a snowmobile points along its heading, a rack stands across it.
         const along = p.kind === 'snowmobile';
