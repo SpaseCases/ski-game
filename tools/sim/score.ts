@@ -63,7 +63,7 @@ function report(r: Rider): void {
 /** Steps the rider and the scoring together, the way the game's loop does. */
 function step(r: Rider, keys: Action[]): void {
   r.step(keys);
-  stepScore(score, r.prev, r.s, r.sim.course.rails, r.sim.gaps, DT);
+  stepScore(score, r.prev, r.s, r.sim.course.rails, r.sim.gaps, r.sim.hf, DT);
   report(r);
 }
 
@@ -589,4 +589,37 @@ if (sim.map.name === 'Park') {
   rideNamedGaps('src/maps/freeride.json', 'milestone 15 named gaps on Freeride', [14, 18, 22]);
   // From the takeoff roof itself: further back, the hops between roofs come first.
   rideNamedGaps('src/maps/city.json', 'milestone 16 named roof gaps on the City', [12, 16, 20], 12);
+}
+
+// The City's wallrides (milestone 16): into each one at 25° from 6 m out,
+// aiming for its middle (as features.ts does), at 12 m/s; a ride on its
+// wooden face scores "Wallride" when the skis leave it.
+if (sim.map.name === 'Park') {
+  const city = loadMap('src/maps/city.json');
+  const walls = city.map.features.filter((f) => f.type === 'quarter' && f.style === 'wood');
+  console.log(`milestone 16 wallrides on the City (${walls.length}), at 12 m/s, 25° into each:`);
+  let scored = 0;
+  for (const q of walls) {
+    if (q.type !== 'quarter') continue;
+    const h = q.yaw * DEG;
+    const out = 6;
+    const u0 = q.length / 2 - out / Math.tan(25 * DEG);
+    const x = q.x - Math.sin(h) * u0 - Math.cos(h) * q.side * out;
+    const z = q.z - Math.cos(h) * u0 + Math.sin(h) * q.side * out;
+    const before = score.seq;
+    const rw = new Rider(city);
+    rw.t = r.t;
+    rw.place(x, z, q.yaw - q.side * 25, 12);
+    for (let i = 0; i < 4 / DT && !rw.s.bailed; i++) step(rw, []);
+    endCombo(score, rw.s);
+    let name = '';
+    for (let k = before; k < score.seq; k++) {
+      const ev = scoreEvent(score, k);
+      if (ev?.kind === 'trick' && ev.name === 'Wallride') name = `${ev.name} ${ev.meters.toFixed(1)} m, ${ev.points}`;
+    }
+    if (name) scored++;
+    console.log(`  (${q.x.toFixed(0)}, ${q.z.toFixed(0)}): ${rw.s.bailed ? `crashed (${rw.s.bailReason}) ` : ''}${name || 'no wallride'}`);
+    r.t = rw.t;
+  }
+  console.log(`${scored} of ${walls.length} wallrides scored`);
 }

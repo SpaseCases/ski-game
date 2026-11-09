@@ -12,7 +12,7 @@ import { SmokeView } from './smoke.ts';
 import { SnowFx } from './snowFx.ts';
 import { CheckpointView } from './checkpointMeshes.ts';
 import { DistanceCuller } from './culling.ts';
-import { createDecor } from './decor.ts';
+import { createDecor, setWindowGlow } from './decor.ts';
 import { compileShaders } from './scene.ts';
 import { createFeatureMeshes } from './features.ts';
 import { SlalomView } from './slalomView.ts';
@@ -79,6 +79,7 @@ export class WorldView {
     this.look = look;
     this.snow.setWeather(look.def.fx);
     this.lights.setStrength(look.def.lamps);
+    setWindowGlow(look.def.windows);
   }
 
   /** Redraws for another quality preset: the decoration's density, far trees if it sees past CONFIG.quality.treeDetail, and the snow effects' budget. */

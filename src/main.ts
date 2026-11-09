@@ -1023,7 +1023,7 @@ startLoop(
     stepSkier(skier, keys, built.course, dt);
     sound.step(skierPrev, skier, built.course.rails);
     const event = updateRun(run, built.map, skierPrev.position, skier);
-    if (scoring()) stepScore(score, skierPrev, skier, built.course.rails, built.gaps, dt);
+    if (scoring()) stepScore(score, skierPrev, skier, built.course.rails, built.gaps, built.hf, dt);
     if (race && built.race) {
       const raceEvent = stepRace(race, built.race, skierPrev.position, skier, dt);
       if (raceEvent === 'missed') toast.show('Missed gate');

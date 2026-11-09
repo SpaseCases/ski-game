@@ -1,7 +1,8 @@
 import { Quaternion, Vector3 } from 'three';
 import { CONFIG } from '../config.ts';
 import { GRAB_ACTIONS } from '../core/input.ts';
-import type { BoxStyle, RailShape, RailStyle } from '../maps/types.ts';
+import { shapeSurfaceAt, SURFACE } from '../maps/shapes.ts';
+import type { BoxStyle, Heightfield, RailShape, RailStyle } from '../maps/types.ts';
 import { clearsZone, crossesFence, type Gaps } from './gaps.ts';
 import { wrapAngle, type SkierState } from './skier.ts';
 import { anyCheat, configChanged, TUNING } from './tuning.ts';
@@ -120,6 +121,13 @@ interface ButterTrack {
   readonly runs: Runs;
 }
 
+/** A wallride in progress: meters ridden on the wooden face, and points so far. */
+interface WallTrack {
+  active: boolean;
+  meters: number;
+  points: number;
+}
+
 interface RailTrack {
   active: boolean;
   rail: number;
@@ -151,6 +159,7 @@ export interface ScoreState {
   readonly air: AirTrack;
   readonly rail: RailTrack;
   readonly butter: ButterTrack;
+  readonly wall: WallTrack;
 }
 
 export function createScore(): ScoreState {
@@ -188,6 +197,7 @@ export function createScore(): ScoreState {
     },
     rail: { active: false, rail: -1, meters: 0, sideMeters: 0, switchMeters: 0, points: 0, turn: 0 },
     butter: { active: false, end: 0, time: 0, turn: 0, runs: createRuns() },
+    wall: { active: false, meters: 0, points: 0 },
   };
 }
 
@@ -317,7 +327,7 @@ const SIDEWAYS = 0.7;
  * airs and rails, scores what ended, and runs the combo timer. `rails` and
  * `gaps` are the map's (BuiltMap.course.rails, BuiltMap.gaps).
  */
-export function stepScore(sc: ScoreState, prev: SkierState, s: SkierState, rails: readonly RailShape[], gaps: Gaps, dt: number): void {
+export function stepScore(sc: ScoreState, prev: SkierState, s: SkierState, rails: readonly RailShape[], gaps: Gaps, hf: Heightfield, dt: number): void {
   const C = CONFIG.score;
   if (s.bailed) {
     if (!prev.bailed) {
@@ -335,6 +345,10 @@ export function stepScore(sc: ScoreState, prev: SkierState, s: SkierState, rails
   if (pressing && sc.butter.active && s.butter !== sc.butter.end) endButter(sc);
   if (pressing) trackButter(sc.butter, prev, s, dt);
   else if (sc.butter.active) endButter(sc);
+  // A wallride: on a wallride's wooden face, steep; it scores when the skis leave it.
+  const onWall = s.grounded && s.rail < 0 && s.normal.y < Math.cos((C.wallrideAngle * Math.PI) / 180) && shapeSurfaceAt(hf, s.position.x, s.position.z) === SURFACE.wood;
+  if (onWall) trackWall(sc.wall, s, dt);
+  else if (sc.wall.active) endWall(sc);
   const wasAir = !prev.grounded;
   const inAir = !s.grounded;
   if (inAir && !wasAir) beginAir(sc, prev);
@@ -397,6 +411,7 @@ function clearTracks(sc: ScoreState): void {
   sc.air.active = false;
   sc.rail.active = false;
   sc.butter.active = false;
+  sc.wall.active = false;
 }
 
 /** True when the skis are going backwards (switch), from the body's heading and the velocity. */
@@ -627,6 +642,8 @@ const LOOK_NAMES: Record<RailStyle | BoxStyle, string> = {
   spool: 'spool',
   planter: 'planter',
   barrier: 'barrier',
+  car: 'car',
+  dumpster: 'dumpster',
   loop: 'rail',
   corkscrew: 'rail',
 };
@@ -650,6 +667,31 @@ function endRail(sc: ScoreState, rails: readonly RailShape[]): void {
     if (shape.look === 'corkscrew') addGap(sc, 'Corkscrew', C.corkscrewPoints, false);
     else addGap(sc, 'Loop', C.loopPoints, false);
   }
+}
+
+function trackWall(w: WallTrack, s: SkierState, dt: number): void {
+  const C = CONFIG.score;
+  if (!w.active) {
+    w.active = true;
+    w.meters = 0;
+    w.points = 0;
+  }
+  const m = s.velocity.length() * dt;
+  w.points += Math.max(0, Math.min(m, C.wallrideMax - w.meters)) * C.wallridePoints;
+  w.meters += m;
+}
+
+/** Off a wallride's face: "Wallride" if it rode far enough. */
+function endWall(sc: ScoreState): void {
+  const w = sc.wall;
+  w.active = false;
+  if (w.meters < CONFIG.score.wallrideMin) return;
+  const ev = nextEvent(sc);
+  ev.grabCount = 0;
+  addTrick(sc, ev, 'Wallride', 'Wallride', w.points, true);
+  ev.meters = w.meters;
+  ev.landing = '';
+  ev.switchOut = false;
 }
 
 function trackButter(b: ButterTrack, prev: SkierState, s: SkierState, dt: number): void {

@@ -18,7 +18,7 @@ import { cablePoint, CABLE_ARM, liftLine } from './chairlifts.ts';
 import { clothMaterial } from './cloth.ts';
 import { drawSign } from './signs.ts';
 import { drawnHeightAt, renderedHeightAt } from './terrainMesh.ts';
-import { drawTown } from './town.ts';
+import { drawTown, GLASS, GLASS_LIT } from './town.ts';
 import { litByPools } from './lightPools.ts';
 
 // Draws a map's decoration: trees, snags and rocks as instanced meshes (one
@@ -54,6 +54,18 @@ const material = litByPools(new MeshLambertMaterial({ vertexColors: true, flatSh
 const scatterMaterial = litByPools(new MeshLambertMaterial({ vertexColors: true, flatShading: true }));
 /** Lamp faces ignore lighting, so they look lit. */
 const glowMaterial = new MeshBasicMaterial({ vertexColors: true });
+/** What the glow material multiplies its colors by when nothing is lit: turns a lit window's color into plain glass. */
+const WHITE = new Color(1, 1, 1);
+const GLOW_OFF = new Color(GLASS.r / GLASS_LIT.r, GLASS.g / GLASS_LIT.g, GLASS.b / GLASS_LIT.b);
+
+/**
+ * How lit the lit windows and lamp globes look (milestone 16): 0 plain
+ * glass (a clear day), 1 fully lit (night), per CONFIG.weather's `windows`.
+ */
+export function setWindowGlow(amount: number): void {
+  const t = Math.min(1, Math.max(0, amount));
+  glowMaterial.color.copy(GLOW_OFF).lerp(WHITE, t);
+}
 /** Lines dyed into the snow sit right on it; draw them on top. */
 const decalMaterial = litByPools(
   new MeshLambertMaterial({

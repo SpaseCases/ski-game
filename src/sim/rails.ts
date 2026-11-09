@@ -112,6 +112,55 @@ function upright(r: RailShape, k: number): boolean {
   return (u[k * 3 + 1] ?? 0) >= min && (u[k * 3 + 4] ?? 0) >= min;
 }
 
+/**
+ * A grid over a map's rails (milestone 16: the City has 400), so a lookup
+ * visits only the rails near a point: each RAIL_CELL m cell lists, in index
+ * order, every rail whose bounding box comes within RAIL_GRID_REACH of it.
+ * Visiting those in that order finds exactly what scanning them all would,
+ * for any reach up to RAIL_GRID_REACH less how far a push can move the point
+ * (a bigger reach, from the tuning panel, scans them all). Built on first use.
+ */
+const RAIL_CELL = 16;
+const RAIL_GRID_REACH = 4;
+/** The most a lookup's reach can be and still use the grid (a push in collideRails moves the point at most about one reach). */
+const RAIL_GRID_SAFE = RAIL_GRID_REACH / 2;
+interface RailGrid {
+  cells: Map<number, Int32Array>;
+}
+const grids = new WeakMap<readonly RailShape[], RailGrid>();
+const NONE = new Int32Array(0);
+const cellKey = (i: number, j: number): number => (i + 32768) * 65536 + (j + 32768);
+
+function railGrid(rails: readonly RailShape[]): RailGrid {
+  let g = grids.get(rails);
+  if (g) return g;
+  const lists = new Map<number, number[]>();
+  rails.forEach((r, n) => {
+    const pad = r.halfWidth + RAIL_GRID_REACH;
+    const i0 = Math.floor((r.minX - pad) / RAIL_CELL);
+    const i1 = Math.floor((r.maxX + pad) / RAIL_CELL);
+    const j0 = Math.floor((r.minZ - pad) / RAIL_CELL);
+    const j1 = Math.floor((r.maxZ + pad) / RAIL_CELL);
+    for (let i = i0; i <= i1; i++) {
+      for (let j = j0; j <= j1; j++) {
+        const key = cellKey(i, j);
+        let list = lists.get(key);
+        if (!list) lists.set(key, (list = []));
+        list.push(n);
+      }
+    }
+  });
+  g = { cells: new Map([...lists].map(([k, v]) => [k, Int32Array.from(v)])) };
+  grids.set(rails, g);
+  return g;
+}
+
+/** The rails to visit for a lookup at (x, z) with this reach beyond their edges: the grid's list there, or null to visit them all. */
+function railsNear(rails: readonly RailShape[], x: number, z: number, reach: number): Int32Array | null {
+  if (reach > RAIL_GRID_SAFE) return null;
+  return railGrid(rails).cells.get(cellKey(Math.floor(x / RAIL_CELL), Math.floor(z / RAIL_CELL))) ?? NONE;
+}
+
 /** True when (x, z) is more than `reach` beyond a rail's bounding box. */
 function farFrom(r: RailShape, x: number, z: number, reach: number): boolean {
   return x < r.minX - reach || x > r.maxX + reach || z < r.minZ - reach || z > r.maxZ + reach;
@@ -154,7 +203,10 @@ function segment(r: RailShape, k: number): void {
  */
 export function railUnder(rails: readonly RailShape[], x: number, z: number, reach: number, out: RailSpot): boolean {
   let best = Infinity;
-  for (let i = 0; i < rails.length; i++) {
+  const near = railsNear(rails, x, z, reach);
+  const count = near ? near.length : rails.length;
+  for (let n = 0; n < count; n++) {
+    const i = near ? near[n]! : n;
     const r = rails[i]!;
     if (farFrom(r, x, z, r.halfWidth + reach)) continue;
     const segs = r.dist.length - 1;
@@ -280,7 +332,10 @@ export function collideRails(rails: readonly RailShape[], p: Vec3Like, v: Vec3Li
   const R = TUNING.rails;
   const radius = R.bodyRadius;
   let hit = -1;
-  for (let i = 0; i < rails.length; i++) {
+  const near = railsNear(rails, p.x, p.z, radius);
+  const count = near ? near.length : rails.length;
+  for (let n = 0; n < count; n++) {
+    const i = near ? near[n]! : n;
     const r = rails[i]!;
     if (farFrom(r, p.x, p.z, r.halfWidth + radius)) continue;
     const segs = r.dist.length - 1;

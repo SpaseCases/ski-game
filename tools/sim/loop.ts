@@ -72,7 +72,7 @@ sim.course.rails.forEach((rail, i) => {
         }
       }
       r.step([]);
-      stepScore(score, r.prev, r.s, sim.course.rails, sim.gaps, DT);
+      stepScore(score, r.prev, r.s, sim.course.rails, sim.gaps, sim.hf, DT);
       for (; seen < score.seq; seen++) {
         const e = scoreEvent(score, seen);
         if (e && e.kind === 'trick') names.push(e.name);

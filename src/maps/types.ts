@@ -395,9 +395,11 @@ export interface RailFeature {
  * barrels lying across the line (slid along their tops), or a wooden cable
  * spool standing on end (slid or bonked across its round top). The City
  * (milestone 16) adds a concrete planter with a snowy top and a street
- * barrier (a concrete crash barrier, wider at its foot, striped).
+ * barrier (a concrete crash barrier, wider at its foot, striped), a
+ * snowed-over parked car (slid over its hood, roof and trunk: the line's
+ * heights give its shape) and a dumpster.
  */
-export type BoxStyle = 'wood' | 'ledge' | 'bench' | 'rock' | 'stump' | 'table' | 'barrels' | 'spool' | 'planter' | 'barrier';
+export type BoxStyle = 'wood' | 'ledge' | 'bench' | 'rock' | 'stump' | 'table' | 'barrels' | 'spool' | 'planter' | 'barrier' | 'car' | 'dumpster';
 
 /** A box: a wide deck along a polyline, like a rail. */
 export interface BoxFeature {

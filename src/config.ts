@@ -338,6 +338,15 @@ export const CONFIG = {
     railSideways: 1.5,
     railSwitch: 1.25,
     /**
+     * Wallrides (milestone 16): riding a wallride's wooden face steeper than
+     * wallrideAngle degrees scores "Wallride" at wallridePoints per meter
+     * (from wallrideMin m, up to wallrideMax m), when the skis leave it.
+     */
+    wallrideAngle: 25,
+    wallrideMin: 2,
+    wallrideMax: 30,
+    wallridePoints: 30,
+    /**
      * Butters (pressing the tips or tails on the snow, butterAmount past
      * butterMin): a pivot scores butterSpinPoints per 180° turned (counted
      * like a spin, spinShort short), plus butterPressPoints per second
@@ -754,6 +763,8 @@ export const CONFIG = {
       fx: { snowfall: 0, ridgeSnow: 1, wind: 1, gust: 0.3 },
       fxTint: '#ffffff',
       glow: 0,
+      /** How lit the lit windows and lamp globes look (milestone 16): 0 plain glass by day, 1 fully lit. */
+      windows: 0,
       lamps: 0,
       stars: 0,
     },
@@ -775,6 +786,7 @@ export const CONFIG = {
       fx: { snowfall: 0, ridgeSnow: 1.4, wind: 1.4, gust: 0.4 },
       fxTint: '#e8ebef',
       glow: 0,
+      windows: 0.5,
       lamps: 0,
       stars: 0,
     },
@@ -795,6 +807,7 @@ export const CONFIG = {
       fx: { snowfall: 1, ridgeSnow: 3, wind: 2.6, gust: 0.9 },
       fxTint: '#f2f4f7',
       glow: 0,
+      windows: 0.6,
       lamps: 0,
       stars: 0,
     },
@@ -815,6 +828,7 @@ export const CONFIG = {
       fx: { snowfall: 0, ridgeSnow: 1, wind: 1, gust: 0.3 },
       fxTint: '#4a5878',
       glow: 1,
+      windows: 1,
       lamps: 1,
       stars: 1,
     },

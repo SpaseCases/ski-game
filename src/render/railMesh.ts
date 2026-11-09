@@ -46,6 +46,13 @@ const PLANTER_SIDE = new Color('#a3968a');
 const BARRIER_TOP = new Color('#c4c6c4');
 const BARRIER_SIDE = new Color('#a9aba9');
 const BARRIER_BAND = new Color('#e8622a');
+const CAR_COLORS = [new Color('#b8483a'), new Color('#3f6fa8'), new Color('#d9d4c8'), new Color('#2f3a44'), new Color('#6a8f5a'), new Color('#c99a3a')];
+const CAR_GLASS = new Color('#2a3c52');
+const TYRE = new Color('#1d2126');
+const DUMPSTER = new Color('#2f6b45');
+const DUMPSTER_LID = new Color('#24382c');
+/** A car's wheels: how far in from each end, their half width along it, and their height. */
+const WHEEL = { inset: 0.85, half: 0.33, tall: 0.62 };
 /** A barrier's flare (m out at its foot each side) and its reflective band (m below its top, and tall). */
 const BARRIER_FLARE = 0.14;
 const BARRIER_BAND_AT = 0.16;
@@ -134,6 +141,12 @@ export function createRailMesh(rails: readonly RailShape[], hf: Heightfield): Gr
         addBox(near, r, hf, BARRIER_TOP, BARRIER_SIDE, BARRIER_FLARE, BARRIER_SIDE);
         addBands(near, r);
         break;
+      case 'car':
+        addCar(near, r, hf, CAR_COLORS[i % CAR_COLORS.length]!);
+        break;
+      case 'dumpster':
+        addBox(near, r, hf, DUMPSTER_LID, DUMPSTER, 0);
+        break;
     }
   });
   const group = new Group();
@@ -188,6 +201,49 @@ function addBox(near: Near, r: RailShape, hf: Heightfield, deck: Color, side: Co
     b.quad(aL, eL, eLb, aLb, rockShade, right.clone().negate());
     if (k === 0) b.quad(aL, aR, aRb, aLb, side, along.clone().negate());
     if (k === segs - 1) b.quad(eL, eR, eRb, eLb, rockShade, along);
+  }
+}
+
+/**
+ * A parked car snowed over: a box along its line (whose heights are its
+ * hood, windshield, roof and trunk) with snow on top and its paint down the
+ * sides, side windows along the roof, and wheels.
+ */
+function addCar(near: Near, r: RailShape, hf: Heightfield, paint: Color): void {
+  addBox(near, r, hf, SNOW, paint, 0);
+  const w = r.halfWidth + 0.02;
+  // Heights above the snow: the roof is the stretch at the top.
+  const above = (k: number): number => r.points[k * 3 + 1]! - drawnHeightAt(hf, r.points[k * 3]!, r.points[k * 3 + 2]!);
+  let top = -Infinity;
+  for (let k = 0; k < r.dist.length; k++) top = Math.max(top, above(k));
+  for (let k = 0; k < r.dist.length - 1; k++) {
+    const a = point(r, k);
+    const e = point(r, k + 1);
+    const b = near(a.x, a.z);
+    const along = new Vector3(e.x - a.x, 0, e.z - a.z).normalize();
+    const right = new Vector3(-along.z, 0, along.x);
+    // Side windows along the roof, a little in from its ends.
+    if (top - above(k) < 0.08 && top - above(k + 1) < 0.08) {
+      for (const side of [-1, 1]) {
+        const at = (q: Vector3, inset: number, y: number): Vector3 => q.clone().addScaledVector(right, side * w).addScaledVector(along, inset).setY(q.y - y);
+        b.quad(at(a, 0.15, 0.45), at(e, -0.15, 0.45), at(e, -0.15, 0.1), at(a, 0.15, 0.1), CAR_GLASS, right.clone().multiplyScalar(side));
+      }
+    }
+  }
+  // Wheels near both ends, each side.
+  const pos = new Vector3();
+  const dir = new Vector3();
+  for (const u of [WHEEL.inset, r.length - WHEEL.inset]) {
+    railFrame(r, Math.min(r.length, Math.max(0, u)), pos, dir);
+    const right = new Vector3(-dir.z, 0, dir.x).normalize();
+    const along = new Vector3(dir.x, 0, dir.z).normalize();
+    const g = drawnHeightAt(hf, pos.x, pos.z);
+    for (const side of [-1, 1]) {
+      const c = pos.clone().addScaledVector(right, side * (w + 0.01)).setY(g);
+      const p0 = c.clone().addScaledVector(along, -WHEEL.half);
+      const p1 = c.clone().addScaledVector(along, WHEEL.half);
+      near(pos.x, pos.z).quad(p0, p1, p1.clone().setY(g + WHEEL.tall), p0.clone().setY(g + WHEEL.tall), TYRE, right.clone().multiplyScalar(side));
+    }
   }
 }
 

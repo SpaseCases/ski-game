@@ -105,7 +105,8 @@ const terrain = {
   bermHeight: 5,
   noise: 0.06,
   seed: 16,
-  margin: 170,
+  // Wide, so the far stand-in of the ground (render/backdrop.ts, round the heightfield's middle) reaches the whole city: the skyline stands on it.
+  margin: 600,
   hills: { amplitude: 4, wavelength: 160 },
 };
 const spawn = { x: 0, z: -16, heading: 0 };
@@ -201,8 +202,8 @@ function bank(x: number, d: number, yaw: number, width: number, o: { height?: nu
     natural: true,
   });
 }
-/** A plow bank along a curb: 0.9 m of snow, an eased back from the street, a short top, its face toward the sidewalk. */
-const BANK = { height: 0.9, back: 2.4, top: 0.6, angle: 22, knuckle: 0.6, transition: 1.5, side: 4, from: 6.5 };
+/** A plow bank along a curb: 1.3 m of snow (tall enough to read as a bank from the street), an eased back from the street, a short top, its face toward the sidewalk. */
+const BANK = { height: 1.3, back: 2.6, top: 0.8, angle: 26, knuckle: 0.6, transition: 1.5, side: 4, from: 6.5 };
 
 // ---------------------------------------------------------------- street furniture and small features
 // Each maker lays one feature (or a small set) with its top end at (x, d) and
@@ -216,11 +217,16 @@ type Maker = (x: number, d: number) => number;
  */
 const OFF = 2.5;
 let sideFlip = 1;
-const side = (): number => (sideFlip = -sideFlip);
+/** Set: every bonk goes to this side of its strip (an avenue's lane: toward the street's middle, off the curb banks). */
+let towardSide: number | null = null;
+const side = (): number => towardSide ?? (sideFlip = -sideFlip);
 
 const BENCH = { width: 0.5, height: 0.45, length: 2.4 };
 const PLANTER = { width: 1.2, height: 0.6, length: 3.2 };
 const BARRIER = { width: 0.6, height: 0.8, length: 10 };
+/** A parked car: its width, length, the gap to the next one, and its shape as [m along, height above the snow]: hood, windshield, roof, back window, trunk. */
+const CAR = { width: 1.8, length: 4.3, gap: 0.4, shape: [[0, 0.9], [1.0, 0.95], [1.5, 1.45], [2.9, 1.45], [3.4, 0.95], [4.3, 0.9]] as [number, number][] };
+const DUMPSTER = { width: 1.6, height: 1.3, length: 2.2 };
 /** A ledge, and how far either side of a strip's middle the pair stands (clear of a stair set's handrails below, 2.7 m out). */
 const LEDGE = { width: 0.6, height: 0.5, length: 11, off: 4 };
 /** A kicker onto a rail: the kicker's lip, angle and size. */
@@ -261,6 +267,17 @@ const makers: Record<string, Maker> = {
     box('barrier', BARRIER.width, [[x + v, d, BARRIER.height], [x + v, d + BARRIER.length, BARRIER.height]]);
     return BARRIER.length;
   },
+  cars: (x, d) => {
+    // Two cars parked bumper to bumper, snowed over: slide the hoods, roofs and trunks.
+    const v = OFF * side();
+    for (const at of [0, CAR.length + CAR.gap]) box('car', CAR.width, CAR.shape.map(([u, h]) => [x + v, d + at + u, h] as [number, number, number]));
+    return 2 * CAR.length + CAR.gap;
+  },
+  dumpster: (x, d) => {
+    const v = OFF * side();
+    box('dumpster', DUMPSTER.width, [[x + v, d, DUMPSTER.height], [x + v, d + DUMPSTER.length, DUMPSTER.height]]);
+    return DUMPSTER.length;
+  },
   barrels: (x, d) => {
     const v = OFF * side();
     box('barrels', 1.4, [[x + v, d, 0.6], [x + v, d + 3, 0.6]]);
@@ -272,7 +289,7 @@ const makers: Record<string, Maker> = {
   },
   kickerRail: (x, d) => {
     const lipAt = (2 * KICK.lip) / Math.tan(KICK.angle * DEG);
-    features.push({ type: 'kicker', ...xz(x, d), yaw: 0, width: KICK.width, sideWidth: KICK.side, lipHeight: KICK.lip, lipAngle: KICK.angle });
+    features.push({ type: 'kicker', ...xz(x, d), yaw: 0, width: KICK.width, sideWidth: KICK.side, lipHeight: KICK.lip, lipAngle: KICK.angle, natural: true });
     const a = d + lipAt + 1;
     rail([[x, a, KICK.lip], [x, a + 12, KICK.lip]]);
     return lipAt + 13;
@@ -300,7 +317,7 @@ const makers: Record<string, Maker> = {
 };
 
 /** Makers that lay something to pop onto (its end stands above the snow), which a rider must not meet straight off the feature before. */
-const POP_ON = new Set(['planters', 'benches', 'barriers', 'barrels', 'ledges']);
+const POP_ON = new Set(['planters', 'benches', 'barriers', 'barrels', 'ledges', 'cars', 'dumpster']);
 /** Clear snow (m) before something to pop onto: a rider off a stair set, a drop or a rail lands and rides this far before needing to steer. */
 const CLEAR_BEFORE = 26;
 
@@ -382,7 +399,7 @@ function wallrides(segments: [number, number][], wallX: number, side: 1 | -1, mo
  * kicking over the cross street onto a plow pile. Mid-rises down the other
  * edge, and a courtyard of features between.
  */
-function rooftops(b: Block, edge: 'W' | 'E', o: { alleyGap?: string; streetGap?: boolean }): void {
+function rooftops(b: Block, edge: 'W' | 'E', o: { alleyGap?: string; streetGap?: boolean }): number {
   const { row } = b;
   const w = 14;
   const x = edge === 'W' ? b.x0 + w / 2 : b.x1 - w / 2;
@@ -428,6 +445,7 @@ function rooftops(b: Block, edge: 'W' | 'E', o: { alleyGap?: string; streetGap?:
   ]));
   // A wallride on the mid-rises' wall facing the courtyard.
   wallrides(column, edge === 'W' ? b.x1 - 26 : b.x0 + 26, edge === 'W' ? 1 : -1, 1, 1);
+  return cx;
 }
 /** The named roof gaps' sizes and points. */
 const ROOF_GAP = { alley: 5, alleyPoints: 250 };
@@ -452,7 +470,7 @@ function wallride(wallX: number, side: 1 | -1, d: number, length = WALLRIDE.leng
 const WALLRIDE = { length: 18, radius: 3.4, angle: 80, deck: 0.6, back: 2, taper: 3.5, off: 3.4 * Math.sin(80 * DEG) + 0.6 + 0.9, before: 6, past: 14 };
 
 /** A stair street: a pedestrian street of stair sets and handrails down the block's middle, mid-rises either side. */
-function stairStreet(b: Block): void {
+function stairStreet(b: Block): number {
   const { row } = b;
   const cx = (b.x0 + b.x1) / 2;
   buildingColumn(b, b.x0, b.x0 + 28, row.top + 4, row.bottom - 4, 'W', { shops: true });
@@ -461,10 +479,11 @@ function stairStreet(b: Block): void {
     ['stairs', 'planters', 'bigStairs', 'ledges', 'stairs', 'benches', 'stairs', 'kinkedRail'],
     ['bigStairs', 'ledges', 'stairs', 'planters', 'bigStairs', 'barriers', 'stairs'],
   ]), 6);
+  return cx;
 }
 
 /** A plaza: an open block of trees, benches, planters, rails and a drop onto a bank; mid-rises at its two bottom corners. */
-function plaza(b: Block): void {
+function plaza(b: Block): number {
   const { row } = b;
   const cx = (b.x0 + b.x1) / 2;
   highrise(b.x0 + 11, row.bottom - 46, 40, 22, tallFor(row), 'block', pick(BLOCK_COLORS), 'W', pick(SHOP_SIGNS));
@@ -477,10 +496,11 @@ function plaza(b: Block): void {
     const d = row.top + 30 + k * 60;
     decor.push({ kind: 'pine', area: { x: r1(cx), z: r1(-(d + 12)), width: 8, length: 22 }, count: 6, seed: 300 + decor.length, minScale: 0.7, maxScale: 1.1, solid: true });
   }
+  return cx - 14;
 }
 
 /** An alley: two rows of mid-rises with a wide alley between, wallrides on both walls, barriers, barrels, rails. */
-function alley(b: Block): void {
+function alley(b: Block): number {
   const { row } = b;
   const w = 32;
   const west = buildingColumn(b, b.x0, b.x0 + w, row.top + 4, row.bottom - 4, 'W', { gap: 8, min: 40, max: 56, shops: true });
@@ -488,7 +508,8 @@ function alley(b: Block): void {
   wallrides(west, b.x0 + w, -1, 2);
   wallrides(east, b.x1 - w, 1, 1, 1);
   const cx = (b.x0 + b.x1) / 2;
-  strip(cx, row.top + 40, row.bottom - 6, pick([['barriers', 'poleJam', 'kinkedRail'], ['barrels', 'downRail', 'barriers']]), 22);
+  strip(cx, row.top + 40, row.bottom - 6, pick([['barriers', 'poleJam', 'kinkedRail'], ['dumpster', 'downRail', 'barriers']]), 22);
+  return cx;
 }
 
 /**
@@ -496,7 +517,7 @@ function alley(b: Block): void {
  * (stairs and handrails down its front, ledges and planters on it), a
  * mid-rise in the other corner.
  */
-function towerBlock(b: Block, side: 'W' | 'E', height: number): void {
+function towerBlock(b: Block, side: 'W' | 'E', height: number): number {
   const { row } = b;
   const tw = 34;
   const tx = side === 'W' ? b.x0 + tw / 2 + 2 : b.x1 - tw / 2 - 2;
@@ -510,6 +531,8 @@ function towerBlock(b: Block, side: 'W' | 'E', height: number): void {
   const below = row.top + 58 + 26 + h / Math.tan(22 * DEG) + 6;
   strip(px, below, row.bottom - 6, pick([['kinkedRail', 'planters', 'barriers'], ['ledges', 'benches', 'downRail']]), 7, true);
   strip((b.x0 + b.x1) / 2, row.top + 10, row.top + 54, ['benches', 'planters']);
+  // The open middle: the corner mid-rise stands above the plaza.
+  return (b.x0 + b.x1) / 2;
 }
 
 /**
@@ -517,7 +540,7 @@ function towerBlock(b: Block, side: 'W' | 'E', height: number): void {
  * uphill end, a flat roof and a lip, a gap over an alley onto a lower
  * building's roof that slopes down to a landing drift.
  */
-function garageBlock(b: Block): void {
+function garageBlock(b: Block): Line {
   const { row } = b;
   const cx = (b.x0 + b.x1) / 2;
   const g = TOWER_GAP;
@@ -531,7 +554,9 @@ function garageBlock(b: Block): void {
   // Towers either side of it.
   highrise(b.x0 + 16, row.top + 20, 36, 28, 46 + rand() * 20, 'tower', pick(TOWER_COLORS), 'E');
   highrise(b.x1 - 16, row.top + 100, 40, 28, 52 + rand() * 24, 'tower', pick(TOWER_COLORS), 'W');
-  strip(cx, land + g.lower + g.apron + 8, row.bottom - 6, ['planters', 'kinkedRail', 'benches']);
+  strip(cx, land + g.lower + g.apron + 8, row.bottom - 6, ['kinkedRail', 'planters', 'benches']);
+  // Round the garage's east side, then back to the middle below its landing drift (the tower lower down stands east).
+  return [[cx + 20, 2], [cx + 20, d - row.top + g.drift + g.roof + g.gap + g.lower - 4], [cx, land - row.top + g.lower + g.apron + 6], [cx, row.bottom - row.top - 2]];
 }
 /** The Tower gap's garage: its drift and roof (m), roof width and eave, lip; the gap; the lower roof (length, eave, shed rise) and its landing drift. */
 const TOWER_GAP = { drift: 34, roof: 26, width: 18, eave: 7.5, lip: 0.6, gap: 8, lower: 22, lowEave: 3.2, lowRise: 1.2, apron: 16, points: 600 };
@@ -540,7 +565,9 @@ const TOWER_GAP = { drift: 34, roof: 26, width: 18, eave: 7.5, lip: 0.6, gap: 8,
 const COLS: [number, number][] = [];
 for (let i = 0; i + 1 < AVES.length; i++) COLS.push([AVES[i]! + LINE, AVES[i + 1]! - LINE]);
 
-type Template = (b: Block) => void;
+/** A block's open line: straight down at x, or waypoints [x, m down from the row's top]. */
+type Line = number | [number, number][];
+type Template = (b: Block) => Line;
 const GRID: Template[][] = [
   [(b) => rooftops(b, 'W', { alleyGap: 'Old town alley gap' }), plaza, stairStreet, alley],
   [stairStreet, alley, (b) => rooftops(b, 'E', { alleyGap: 'Market alley gap' }), plaza],
@@ -551,7 +578,8 @@ const GRID: Template[][] = [
   [(b) => towerBlock(b, 'W', 92), garageBlock, (b) => towerBlock(b, 'E', 108), (b) => towerBlock(b, 'W', 74)],
   [(b) => towerBlock(b, 'E', 64), (b) => towerBlock(b, 'W', 118), (b) => towerBlock(b, 'E', 86), (b) => towerBlock(b, 'W', 58)],
 ];
-ROWS.forEach((row, r) => COLS.forEach(([x0, x1], c) => GRID[r]![c]!({ x0, x1, row, col: c })));
+/** Each block's open line (x) down it, by row and column, for the block runs. */
+const LINES: Line[][] = ROWS.map((row, r) => COLS.map(([x0, x1], c) => GRID[r]![c]!({ x0, x1, row, col: c })));
 
 // ---------------------------------------------------------------- the avenues
 // Plow banks along both curbs (open at every cross street and wherever an
@@ -571,10 +599,35 @@ AVES.forEach((X, a) => {
     // Street features: on alternate sides of the clear middle.
     const s = (a + r) % 2 === 0 ? 1 : -1;
     const lane = X + s * LANE;
-    const list = row.index >= 5 ? ['ledges', 'barriers'] : pick([['barriers', 'kinkedRail'], ['ledges', 'barrels', 'downRail'], ['kickerRail', 'benches'], ['planters', 'aFrame']]);
+    const list = row.index >= 5 ? ['ledges', 'cars'] : pick([['barriers', 'kinkedRail'], ['ledges', 'cars', 'downRail'], ['kickerRail', 'benches'], ['planters', 'aFrame']]);
+    towardSide = -s;
     strip(lane, row.top + 14, row.bottom - 20, list, 40);
+    towardSide = null;
   });
 });
+
+// ---------------------------------------------------------------- the top of town
+// Small shops and houses round the start plaza, between the avenues' heads
+// (a square kept open round the start deck), their doors on the top cross
+// street; benches and planters on the plaza, cars parked on the street.
+const TOP_SQUARE = 30;
+const top = random(91);
+const topPick = <T>(list: readonly T[]): T => list[Math.floor(top() * list.length)]!;
+for (const [c0, c1] of COLS) {
+  const x0 = c0 > 0 ? Math.max(c0, TOP_SQUARE) : c0;
+  const x1 = c1 < 0 ? Math.min(c1, -TOP_SQUARE) : c1;
+  const n = (x1 - x0) > 60 ? 3 : 2;
+  const gap = 6;
+  const w = (x1 - x0 - gap * (n - 1)) / n;
+  for (let i = 0; i < n; i++) {
+    const x = x0 + w / 2 + i * (w + gap);
+    highrise(x, 4, 26, w, 5.5 + top() * 3, 'block', topPick(BLOCK_COLORS), 'S', top() < 0.7 ? topPick(SHOP_SIGNS) : '');
+  }
+}
+box('planter', PLANTER.width, [[-9, 5, PLANTER.height], [-9, 5 + PLANTER.length, PLANTER.height]]);
+box('planter', PLANTER.width, [[9, 5, PLANTER.height], [9, 5 + PLANTER.length, PLANTER.height]]);
+box('bench', BENCH.width, [[10, 24, BENCH.height], [10, 24 + BENCH.length, BENCH.height]]);
+for (const x of [-180, -62, 62, 180]) makers.cars!(x, CROSS[0]! + 4);
 
 // ---------------------------------------------------------------- the outskirts
 // Both edges past the outer avenues: small houses whose gable roofs ride
@@ -618,6 +671,24 @@ const finish = { x: 0, z: -(SQUARE.top + 40), heading: 0, width: WIDTH - 30, len
 
 // A flag across each avenue at the top of every row.
 for (const X of AVES) for (const row of ROWS) flags.push({ ...xz(X, row.top + 2), heading: 0, width: 20 });
+
+// A run down each column of blocks, through every block's open line (its
+// stair street, courtyard, plaza, alley or tower plaza), crossing over at
+// each cross street: the headless rider's check of the blocks themselves.
+const BLOCK_RUNS = ['Blocks: West', 'Blocks: Middle west', 'Blocks: Middle east', 'Blocks: East'];
+const lineAt = (line: Line, row: Row): [number, number][] => (typeof line === 'number' ? [[line, 2], [line, row.bottom - row.top - 2]] : line);
+COLS.forEach((_, c) => {
+  const pts: Json[] = [xz(lineAt(LINES[0]![c]!, ROWS[0]!)[0]![0], CROSS[0]! + STREET / 2)];
+  ROWS.forEach((row, r) => {
+    const way = lineAt(LINES[r]![c]!, row);
+    for (const [x, d] of way) pts.push(xz(x, row.top + d));
+    const next = r + 1 < ROWS.length ? lineAt(LINES[r + 1]![c]!, ROWS[r + 1]!)[0]![0] : undefined;
+    if (next !== undefined) pts.push(xz(next, row.bottom + STREET / 2));
+  });
+  const last = lineAt(LINES[ROWS.length - 1]![c]!, ROWS[ROWS.length - 1]!);
+  pts.push(xz(last[last.length - 1]![0], SQUARE.top + 60));
+  runs.push({ name: BLOCK_RUNS[c], points: pts, clear: 3 });
+});
 
 for (const [i, X] of AVES.entries()) {
   const pts = [xz(X, 52)];

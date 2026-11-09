@@ -4,6 +4,7 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
+  DoubleSide,
   DirectionalLight,
   Fog,
   Group,
@@ -23,8 +24,10 @@ import {
 import { CONFIG } from '../config.ts';
 import type { ScatterItem } from '../maps/decor.ts';
 import { fbm } from '../maps/peak.ts';
+import { framePoint, roofHeight, townFrame } from '../maps/town.ts';
 import { hash2, smoothstep } from '../maps/terrain.ts';
-import type { Heightfield, MapDef, PeaksDef, SkyAt } from '../maps/types.ts';
+import type { BuildingFeature, Heightfield, MapDef, PeaksDef, SkyAt } from '../maps/types.ts';
+import { terrainHeightAt } from '../sim/terrain.ts';
 import { boundsDistance, insideBounds } from '../sim/bounds.ts';
 import { weatherLook, type WeatherLook } from './weather.ts';
 
@@ -40,6 +43,11 @@ import { weatherLook, type WeatherLook } from './weather.ts';
 // haze as the world in front, so the mountain carries on into the distance
 // instead of ending in a wall of fog. On Low the fog ends at the far plane,
 // and the stand-in is just the fog's color.
+//
+// A skyline (milestone 16): every tower and tall mid-rise as a plain box,
+// so the City's downtown shows from the top of the run past the far plane
+// (the real buildings take over nearer). Lit like the far ground, so it
+// shows only where that's lit (Medium and High) and fades with the haze.
 //
 // The weather colors it all (setWeather): the sky and haze, the lights on
 // the lit ground, and the far ranges, relit from colors kept per facet. On a
@@ -100,6 +108,22 @@ const SNOW = new Color('#f5f8fc');
 const SNOW_SHADE = new Color('#c4d3e6');
 const ROCK = new Color('#7a8189');
 const FOREST = new Color('#2f4a3a');
+/** Buildings at least this tall (eave, m) stand on the skyline; a tower's walls are this much glass. */
+const SKYLINE_EAVE = 12;
+/** The skyline's bands, as the real buildings draw them (render/town.ts): floor heights, band heights, the first band's height, colors, and how far proud of the wall and in from its corners. */
+const SKYLINE = {
+  towerFloor: 3.6,
+  towerBand: 2.4,
+  lobby: 5,
+  blockFloor: 3.2,
+  blockBand: 1.5,
+  first: 3.6,
+  proud: 0.15,
+  inset: 0.8,
+  towerGlass: new Color('#34506e'),
+  windows: new Color('#2a3c52'),
+  plant: new Color('#9aa0a6'),
+};
 /** Far forests on the stand-in: trees per cell where a stand starts to show and where it's full, and how much lighter (snow-laden crowns) a facet can be. */
 const FAR_FOREST = { from: 1.5, full: 3.5, speckle: 0.45 };
 
@@ -107,6 +131,7 @@ const skyMaterial = new MeshBasicMaterial({ vertexColors: true, side: BackSide, 
 const peaksMaterial = new MeshBasicMaterial({ vertexColors: true, fog: false });
 const fogMaterial = new MeshBasicMaterial({ color: '#ffffff', fog: false });
 const groundMaterial = new MeshLambertMaterial({ vertexColors: true, flatShading: true });
+const skylineMaterial = new MeshLambertMaterial({ vertexColors: true, flatShading: true, side: DoubleSide });
 const starMaterial = new PointsMaterial({ vertexColors: true, size: 2, sizeAttenuation: false, fog: false, transparent: true, depthWrite: false });
 const moonMaterial = new MeshBasicMaterial({ vertexColors: true, fog: false, depthWrite: false });
 const haloMaterial = new MeshBasicMaterial({ vertexColors: true, fog: false, transparent: true, depthWrite: false, blending: AdditiveBlending });
@@ -150,6 +175,7 @@ export class Backdrop {
   private clear = true;
   private standIn: Mesh | null = null;
   private plain: Mesh | null = null;
+  private skyline: Mesh | null = null;
   /** What the stand-in is built from, so a change of preset can rebuild it. */
   private source: { map: MapDef; hf: Heightfield; trees: readonly ScatterItem[] } | null = null;
   /** Whether the far ground is drawn lit (the haze reaches past the far plane). */
@@ -240,7 +266,7 @@ export class Backdrop {
     this.fog.near = start;
     this.fog.far = end;
     this.clear = clear;
-    for (const m of [this.peaks, this.standIn, this.plain]) if (m) m.visible = clear;
+    for (const m of [this.peaks, this.standIn, this.plain, this.skyline]) if (m) m.visible = clear;
     if (!clear) return;
     const lit = end > far * 1.2;
     if (lit !== this.lit) {
@@ -269,9 +295,9 @@ export class Backdrop {
     renderer.render(this.scene, c);
   }
 
-  /** (Re)builds the stand-in for the map's mountain, and the valley plain round it when lit. */
+  /** (Re)builds the stand-in for the map's mountain, the valley plain round it when lit, and the skyline. */
   private buildGround(): void {
-    for (const m of [this.standIn, this.plain]) {
+    for (const m of [this.standIn, this.plain, this.skyline]) {
       if (!m) continue;
       this.scene.remove(m);
       m.geometry.dispose();
@@ -279,8 +305,16 @@ export class Backdrop {
     this.standIn = null;
     this.plain = null;
     this.plainColors = null;
+    this.skyline = null;
     const src = this.source;
     if (!src || !src.map.peaks) return;
+    const skyline = skylineGeometry(src.map, src.hf);
+    if (skyline) {
+      this.skyline = new Mesh(skyline, skylineMaterial);
+      this.skyline.matrixAutoUpdate = false;
+      this.skyline.visible = this.clear;
+      this.scene.add(this.skyline);
+    }
     this.standIn = this.lit ? new Mesh(litGroundGeometry(src.hf, src.trees), groundMaterial) : new Mesh(fogGroundGeometry(src.hf), fogMaterial);
     if (this.lit) {
       this.plainColors = plainGeometry(src.hf, src.map.peaks);
@@ -674,6 +708,93 @@ function hang(meshes: readonly Mesh[], dir: Vector3, dist: number): void {
 }
 
 /** The map's own ground in the fog's color, coarse and sunk a little, to hide the far ranges behind it. */
+/**
+ * Every building at least SKYLINE_EAVE tall as it looks from afar: its
+ * walls in its own color, a band of glass along every floor (a tower's
+ * tall, a mid-rise's a strip of windows), its snowy roof and a tower's
+ * plant room. Floors count up from the lowest ground at its walls, as the
+ * real buildings' do (render/town.ts), so the bands line up when the real
+ * ones take over nearer. Only buildings standing on the stand-in ground
+ * (inside its ring). Null if the map has none.
+ */
+function skylineGeometry(map: MapDef, hf: Heightfield): BufferGeometry | null {
+  // Only where the stand-in ground is drawn (inside its ring): elsewhere the far plain's haze lies there, and a building would float over it.
+  const ring = plainRing(hf);
+  const tall = map.features.filter((f): f is BuildingFeature => {
+    if (f.type !== 'building' || f.eave < SKYLINE_EAVE) return false;
+    const mid = framePoint(townFrame(f), f.length / 2, 0);
+    return Math.hypot(mid.x - ring.cx, mid.z - ring.cz) + Math.hypot(f.length, f.width) / 2 < ring.inner + STAND_IN_CLIP;
+  });
+  if (tall.length === 0) return null;
+  const pos: number[] = [];
+  const col: number[] = [];
+  const wall = new Color();
+  const roof = new Color(SNOW);
+  const quad = (a: readonly number[], b: readonly number[], c: readonly number[], d: readonly number[], color: Color): void => {
+    for (const v of [a, b, c, a, c, d]) {
+      pos.push(v[0]!, v[1]!, v[2]!);
+      col.push(color.r, color.g, color.b);
+    }
+  };
+  /** A box from y0 to y1 over a footprint of four corners (sides and top). */
+  const box = (corners: readonly { x: number; z: number }[], y0: number, y1: number, side: Color, top: Color): void => {
+    for (let i = 0; i < 4; i++) {
+      const a = corners[i]!;
+      const c = corners[(i + 1) % 4]!;
+      quad([a.x, y0, a.z], [c.x, y0, c.z], [c.x, y1, c.z], [a.x, y1, a.z], side);
+    }
+    quad([corners[0]!.x, y1, corners[0]!.z], [corners[1]!.x, y1, corners[1]!.z], [corners[2]!.x, y1, corners[2]!.z], [corners[3]!.x, y1, corners[3]!.z], top);
+  };
+  for (const b of tall) {
+    const t = townFrame(b);
+    const tower = b.style === 'tower';
+    const corners = [framePoint(t, 0, -b.width / 2), framePoint(t, 0, b.width / 2), framePoint(t, b.length, b.width / 2), framePoint(t, b.length, -b.width / 2)];
+    let low = Infinity;
+    let top = -Infinity;
+    for (const [i, c] of corners.entries()) {
+      const g = terrainHeightAt(hf, c.x, c.z);
+      low = Math.min(low, g);
+      top = Math.max(top, g + roofHeight(b, i < 2 ? 0 : b.length));
+    }
+    wall.set(b.color);
+    box(corners, low - 2, top, wall, roof);
+    // The glass bands, a little proud of each wall.
+    const mx = (corners[0]!.x + corners[2]!.x) / 2;
+    const mz = (corners[0]!.z + corners[2]!.z) / 2;
+    const glass = tower ? SKYLINE.towerGlass : SKYLINE.windows;
+    const step = tower ? SKYLINE.towerFloor : SKYLINE.blockFloor;
+    const tallBand = tower ? SKYLINE.towerBand : SKYLINE.blockBand;
+    for (let i = 0; i < 4; i++) {
+      const a = corners[i]!;
+      const c = corners[(i + 1) % 4]!;
+      const len = Math.hypot(c.x - a.x, c.z - a.z);
+      const ex = (c.x - a.x) / len;
+      const ez = (c.z - a.z) / len;
+      let ox = (a.x + c.x) / 2 - mx;
+      let oz = (a.z + c.z) / 2 - mz;
+      const ol = Math.hypot(ox, oz);
+      ox = (ox / ol) * SKYLINE.proud;
+      oz = (oz / ol) * SKYLINE.proud;
+      const inset = Math.min(SKYLINE.inset, len / 4);
+      const p0 = [a.x + ex * inset + ox, a.z + ez * inset + oz];
+      const p1 = [c.x - ex * inset + ox, c.z - ez * inset + oz];
+      for (let y = low + (tower ? SKYLINE.lobby : SKYLINE.first); y + tallBand < top - 0.6; y += step) {
+        quad([p0[0]!, y, p0[1]!], [p1[0]!, y, p1[1]!], [p1[0]!, y + tallBand, p1[1]!], [p0[0]!, y + tallBand, p0[1]!], glass);
+      }
+    }
+    if (tower) {
+      // The plant room on its roof.
+      const shrink = (k: number): { x: number; z: number } => ({ x: mx + (corners[k]!.x - mx) * 0.4, z: mz + (corners[k]!.z - mz) * 0.4 });
+      box([shrink(0), shrink(1), shrink(2), shrink(3)], top, top + 3.2, SKYLINE.plant, SKYLINE.plant);
+    }
+  }
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
+  geometry.setAttribute('color', new BufferAttribute(new Float32Array(col), 3));
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
 function fogGroundGeometry(hf: Heightfield): BufferGeometry {
   const step = STAND_IN_STEP_FOG;
   const nc = Math.floor((hf.cols - 1) / step);
