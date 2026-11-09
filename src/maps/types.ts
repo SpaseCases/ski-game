@@ -823,7 +823,7 @@ export type PropKind =
 /** A run's difficulty, for trail signs: easy, intermediate, advanced, expert. */
 export type RunLevel = 'green' | 'blue' | 'black' | 'double';
 
-/** One board on a trail sign: a run's name, its difficulty, and which way it goes (-1 left, 0 ahead, 1 right). */
+/** One board on a trail sign: a run's name, its difficulty, and which way it goes (-1 left, 0 ahead, 1 right, 2 back). */
 export interface SignLine {
   text: string;
   level: RunLevel;

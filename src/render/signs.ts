@@ -93,12 +93,12 @@ function level(k: MeshKit, lv: RunLevel, x: number, y: number, z: number): void 
   }
 }
 
-/** An arrow centered at local (x, y) on the plane z: -1 left, 0 straight on (up the board), 1 right. */
+/** An arrow centered at local (x, y) on the plane z: -1 left, 0 straight on (up the board), 1 right, 2 back (down the board). */
 function arrow(k: MeshKit, x: number, y: number, z: number, dir: number): void {
   const out = k.p(0, 0, z + 1).sub(k.p(0, 0, z));
   // Along the arrow and across it, in the board's plane.
-  const ax = dir === 0 ? 0 : dir;
-  const ay = dir === 0 ? 1 : 0;
+  const ax = dir === 0 || dir === 2 ? 0 : dir;
+  const ay = dir === 0 ? 1 : dir === 2 ? -1 : 0;
   const px = -ay;
   const py = ax;
   const p = (along: number, across: number): Vector3 => k.p(x + ax * along + px * across, y + ay * along + py * across, z);

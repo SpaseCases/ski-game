@@ -864,8 +864,9 @@ function addModelBox(near: Near, r: RailShape, hf: Heightfield, id: string, sink
   const sx = (2 * r.halfWidth) / m.size[0];
   const sy = (f.top + sink) / m.size[1];
   const sz = f.length / m.size[2];
-  // Model z runs from its nose (-z) to its tail; the box starts at its first point.
-  emitModel(m, sx, sy, sz, (x, y, z, out) => f.at(z + f.length / 2, x, y - sink, out), (p, q, s, c) => rawTri(b, p, q, s, c));
+  // Model z runs from its nose (-z) to its tail; the box starts at its first point. The frame's `right`
+  // is the model's -x (right × up = -along), so x flips to keep the model unmirrored (and its faces outward).
+  emitModel(m, sx, sy, sz, (x, y, z, out) => f.at(z + f.length / 2, -x, y - sink, out), (p, q, s, c) => rawTri(b, p, q, s, c));
   return true;
 }
 

@@ -836,11 +836,11 @@ const ringFrame = (i: number): K.Frame => (x, d) => {
 const ringD = (i: number, theta: number): number => -theta * DEG * RINGS[i]!.r;
 
 /** A vehicle (a box along the line from d to d + length, x out) with a plow pile at its uphill-most end, up to its roof. */
-function vehicle(style: string, x: number, d: number, length: number, width: number, shape: [number, number][]): boolean {
+function vehicle(style: string, x: number, d: number, length: number, width: number, shape: [number, number][], run = 7): boolean {
   const pts = shape.map(([u, h]) => [x, d + u * length, h] as [number, number, number]);
   for (const [px, pd] of [[x, d - 9], [x, d], [x, d + length / 2], [x, d + length]] as const) {
     const [wx, wz] = K.W(px, pd);
-    if (!free(wx, wz, 1.5, 7)) return false;
+    if (!free(wx, wz, 1.5, run)) return false;
   }
   const top = Math.max(...shape.map(([, h]) => h));
   K.bank(x, d - 8.6, 0, width + 0.6, { height: top + 0.15, back: 7.5, top: 1.2, angle: 40, side: 1.5 });
@@ -868,11 +868,11 @@ for (const [ring, theta] of [[0, 33.75], [0, 213.75], [0, 123.75], [2, -33.75], 
     if (free(wx, wz, 1, 3)) K.box('shelter', 1.6, [[x + 4.2, d + 3, 2.5], [x + 4.2, d + 7, 2.5]]);
   }
 }
-// A plow truck on each face's main street, near the top of town, at the side of the street.
+// A plow truck on each face's main street, near the top of town, at the curb (5 m off the run down its middle).
 for (const f of Object.values(FACES)) {
   const s = mainStreet(f.heading);
   K.useFrame(streetFrame(s, 100));
-  if (vehicle('plow', 4.6, 0, 8, 2.5, PLOW_SHAPE)) vehicles++;
+  if (vehicle('plow', s.width / 2 - 1.8, 0, 8, 2.5, PLOW_SHAPE, 5)) vehicles++;
 }
 K.useFrame(null);
 
@@ -993,7 +993,134 @@ for (const s of streets.filter((t) => t.main)) {
     lamp(t, r, streetAt(s, r) + side * 90, '#2f7de1');
   }
 }
-out.decor.push({ kind: 'sign', x: -12, z: 18, heading: 0, header: 'City', lines: Object.values(FACES).map((f) => ({ text: f.name, level: 'blue', arrow: f.heading === 0 ? 0 : f.heading === 90 ? -1 : f.heading === -90 ? 1 : 0 })) });
+// The trail sign ahead of the start deck (the start faces -z), boards toward the rider: downtown ahead, the rail quarter left, the homes right, the old town back past the clock tower.
+out.decor.push({ kind: 'sign', x: -5, z: -14, heading: 0, header: 'City', lines: Object.values(FACES).map((f) => ({ text: f.name, level: 'blue', arrow: f.heading === 0 ? 0 : f.heading === 90 ? -1 : f.heading === -90 ? 1 : 2 })) });
+
+// ---------------------------------------------------------------- parked cars and the finish squares
+// After the lamps (cars keep clear of them) with their own random, so nothing above re-rolls.
+const thetaOf = (x: number, z: number): number => Math.atan2(-x, -z) / DEG;
+/** Is (x, z) on a street, or within `pad` m of its edge (down to the boulevard)? */
+const onStreet = (x: number, z: number, pad: number): boolean => {
+  const r = Math.hypot(x, z);
+  if (r > RINGS[3]!.r + 12) return false;
+  const theta = thetaOf(x, z);
+  return streets.some((s) => r > s.from - pad && angleOff(theta, streetAt(s, r)) * DEG * r < s.width / 2 + pad);
+};
+const BOUNDS = boundsPolygon() as { x: number; z: number }[];
+const inBounds = (x: number, z: number): boolean => {
+  let inside = false;
+  for (let i = 0, j = BOUNDS.length - 1; i < BOUNDS.length; j = i++) {
+    const a = BOUNDS[i]!;
+    const b = BOUNDS[j]!;
+    if (a.z > z !== b.z > z && x < ((b.x - a.x) * (z - a.z)) / (b.z - a.z) + a.x) inside = !inside;
+  }
+  return inside;
+};
+const SQUARE_HALF = 19; // degrees each side of a face's heading: its finish square (and the boulevard through it)
+const inSquare = (x: number, z: number): boolean => Object.values(FACES).some((f) => angleOff(thetaOf(x, z), f.heading) < SQUARE_HALF) && Math.hypot(x, z) > RINGS[3]!.r - 60;
+/** A car box in world coordinates, from (x, z) along unit (ux, uz). */
+const carAt = (x: number, z: number, ux: number, uz: number): void => {
+  K.pushWorld({ type: 'box', style: 'car', width: K.CAR.width, points: K.CAR.shape.map(([u, h]) => ({ x: r2(x + ux * u), z: r2(z + uz * u), height: h })) });
+};
+K.useRandom(5150);
+let parked = 0;
+// Rows of two to four cars nose to tail at the ring roads' curbs, laid the way the road falls (riders meet the first coming along it).
+for (const [i, g] of RINGS.entries()) {
+  K.useFrame(ringFrame(i));
+  const circ = 2 * Math.PI * g.r;
+  for (let d = 30 * K.rand(); d < circ - 30; d += 85 + K.rand() * 80) {
+    const side = K.rand() < 0.5 ? -1 : 1;
+    const n = 2 + Math.floor(K.rand() * 3);
+    const len = n * K.CAR.length + (n - 1) * K.CAR.gap;
+    const x = side * (g.width / 2 - 2.2);
+    let ok = true;
+    for (let u = -5; u <= len + 5 && ok; u += 2) {
+      for (const dx of [-1.3, 1.3]) {
+        const [wx, wz] = K.W(x + dx, d + u);
+        if (K.insideBuilding(wx, wz, 1) || K.inKeep(wx, wz, 0.5) || nearRun(wx, wz) < 6 || onStreet(wx, wz, 3) || inSquare(wx, wz)) ok = false;
+      }
+    }
+    if (!ok) continue;
+    const [ax, az] = K.W(x, d);
+    const [bx, bz] = K.W(x, d + len);
+    const [sx, sz, ex, ez] = gw(ax, az) >= gw(bx, bz) ? [ax, az, bx, bz] : [bx, bz, ax, az];
+    const ux = (ex - sx) / len;
+    const uz = (ez - sz) / len;
+    for (let j = 0; j < n; j++) {
+      const u0 = j * (K.CAR.length + K.CAR.gap);
+      carAt(sx + ux * u0, sz + uz * u0, ux, uz);
+      parked++;
+    }
+  }
+}
+K.useFrame(null);
+
+// Each finish square: lamps and a car park past the boulevard either side of the way through the arch,
+// a crowd at the arch, the square's name, two big spruces past it, and a row of buildings along the bank
+// round it (outside the play area, looking down on the square).
+let rimBuildings = 0;
+let crowd = 0;
+for (const [id, f] of Object.entries(FACES) as [FaceId, { heading: number; name: string }][]) {
+  const h = f.heading;
+  const edge = ringR(3, h) + RINGS[3]!.width / 2;
+  const rCar = edge + 8;
+  // A car park: one row of cars nose out, 2.8 m apart, each side of the arch's way, with lamps along its front.
+  for (const side of [-1, 1]) {
+    for (let x = 30; x <= 80; x += 25) lamp(h + (side * x) / (edge + 3) / DEG, edge + 3, h + 180, '#2f7de1');
+    const spots: { x: number; z: number; ux: number; uz: number }[] = [];
+    for (let k = 0; k < 12; k++) {
+      const t = h + (side * (32 + k * 2.8)) / rCar / DEG;
+      const a = polar(t, rCar);
+      const b = polar(t, rCar + K.CAR.length);
+      const ax = a.x as number;
+      const az = a.z as number;
+      const bx = b.x as number;
+      const bz = b.z as number;
+      if ([[ax, az], [bx, bz], [(ax + bx) / 2, (az + bz) / 2]].some(([px, pz]) => K.insideBuilding(px!, pz!, 1) || K.inKeep(px!, pz!, 0.5) || nearRun(px!, pz!) < 5)) continue;
+      spots.push({ x: ax, z: az, ux: (bx - ax) / K.CAR.length, uz: (bz - az) / K.CAR.length });
+    }
+    for (const s of spots) {
+      carAt(s.x, s.z, s.ux, s.uz);
+      parked++;
+    }
+  }
+  // The crowd either side of the arch, behind its posts.
+  const arch = FOOT - 40;
+  for (const side of [-1, 1]) {
+    for (let k = 0; k < 9; k++) {
+      const x = side * (16 + K.rand() * 9);
+      const r = arch - 8 + K.rand() * 16;
+      const p = polar(h + x / r / DEG, r);
+      if (!free(p.x as number, p.z as number, 0.5, 4)) continue;
+      out.decor.push({ kind: 'person', points: [p], heading: r1(h + 90 * side + (K.rand() - 0.5) * 50) });
+      crowd++;
+    }
+  }
+  out.decor.push({ kind: 'sign', ...polar(h - 14 / (arch - 4) / DEG, arch - 4), heading: h, header: `${f.name} square`, lines: [] });
+  // Past the finish zone's clear snow (it runs 90 m out from the square's middle), just inside the play area.
+  out.decor.push({ kind: 'pine', spots: [polar(h - 5, FOOT + 53), polar(h + 5, FOOT + 53)], seed: 300 + Math.round(h), minScale: 2.2, maxScale: 2.6, solid: true });
+  // The buildings along the foot of the bank: their fronts toward the square, outside the play area.
+  const g0 = gw(polar(h, FOOT).x as number, polar(h, FOOT).z as number);
+  const colors = STYLE_COLORS[id];
+  let across = -SQUARE_HALF * DEG * 650;
+  while (across < SQUARE_HALF * DEG * 650) {
+    const width = 13 + K.rand() * 9;
+    const t = h + (across + width / 2) / 650 / DEG;
+    across += width + 2 + K.rand() * 5;
+    let r = FOOT;
+    while (r < 760 && (gw(polar(t, r).x as number, polar(t, r).z as number) < g0 + 4 || inBounds(polar(t, r - 2).x as number, polar(t, r - 2).z as number))) r += 2;
+    const length = 14 + K.rand() * 4;
+    // A frame from the building's back (d 0, uphill) toward the square (+d): x across.
+    const o = polar(t, r + length);
+    const ix = -(o.x as number) / (r + length);
+    const iz = -(o.z as number) / (r + length);
+    K.useFrame((x, d) => [(o.x as number) + ix * d - iz * x, (o.z as number) + iz * d + ix * x]);
+    K.highrise(0, 0, length, width, 7 + K.rand() * 8, 'block', K.pick(colors), 'S', K.rand() < 0.5 ? K.pick(K.SHOP_SIGNS) : '');
+    rimBuildings++;
+  }
+  K.useFrame(null);
+}
+out.notes.push(`parked cars: ${parked}; finish squares: ${crowd} people at the arches, ${rimBuildings} buildings round them`);
 
 // ---------------------------------------------------------------- report and checks
 const count = (t: string): number => out.features.filter((f) => f.type === t).length;

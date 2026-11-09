@@ -115,24 +115,19 @@ function lancets(k: MeshKit, glow: MeshKit, len: number, y0: number, y1: number,
 
 /** A cathedral: a stone nave with a pitched slate roof, lower aisles, buttresses, tall windows, two towers with spires over its front, a rose window. */
 function church(k: MeshKit, glow: MeshKit, W: number, L: number, top: number, wall: Color, front: number): void {
+  // A hall church: the aisles as tall as the nave, so the flat snowy roof the rider meets (the building's
+  // level roof) lies on stone everywhere, with the nave's pitched roof standing on it.
   const nave = W * 0.56;
-  const aisle = (W - nave) / 2;
-  const aisleTop = top * 0.6;
-  k.box(0, (top - 2) / 2, 0, nave, top + 2, L, wall);
+  // Up to just under the roof's snow (which is drawn as the building's roof), not level with it.
+  k.box(0, (top - 2.15) / 2, 0, W, top + 1.85, L, wall);
   for (const s of [-1, 1]) {
-    k.box(s * (nave / 2 + aisle / 2), (aisleTop - 2) / 2, 0, aisle, aisleTop + 2, L * 0.92, wall);
-    // The aisle's lean-to roof.
-    const x0 = s * nave / 2;
-    const x1 = s * (W / 2 + 0.3);
-    k.quad(k.p(x0, aisleTop + 2, -L * 0.46), k.p(x0, aisleTop + 2, L * 0.46), k.p(x1, aisleTop - 0.2, L * 0.46), k.p(x1, aisleTop - 0.2, -L * 0.46), SLATE, new Vector3(0, 1, 0));
-    // Buttresses along the aisle.
-    for (let z = -L * 0.4; z <= L * 0.4; z += L / 6) k.box(s * (W / 2 + 0.4), aisleTop / 2, z, 0.9, aisleTop, 1.1, STONE_DARK);
-    lancets(k, glow, L * 0.8, aisleTop + 2.5, top - 1.5, (z) => [s * (nave / 2 + 0.05), z], k.p(s, 0, 0).sub(k.p(0, 0, 0)), 6, s > 0 ? 1 : 3);
-    lancets(k, glow, L * 0.8, 1.5, aisleTop - 1.5, (z) => [s * (W / 2 + 0.05), z], k.p(s, 0, 0).sub(k.p(0, 0, 0)), 6, s > 0 ? 2 : 0);
+    // Buttresses along each side, and tall lancet windows between them.
+    for (let z = -L * 0.4; z <= L * 0.4; z += L / 6) k.box(s * (W / 2 + 0.4), (top * 0.7) / 2, z, 0.9, top * 0.7, 1.1, STONE_DARK);
+    lancets(k, glow, L * 0.8, 1.5, top - 2, (z) => [s * (W / 2 + 0.05), z], k.p(s, 0, 0).sub(k.p(0, 0, 0)), 6, s > 0 ? 2 : 0);
   }
-  // The nave's pitched roof, ridge along its length, and its gable ends.
+  // The nave's pitched roof on the snow, ridge along its length, and its gable ends.
   const ridge = top + nave * 0.45;
-  for (const s of [-1, 1]) k.quad(k.p(s * (nave / 2 + 0.4), top - 0.3, -L / 2), k.p(s * (nave / 2 + 0.4), top - 0.3, L / 2), k.p(0, ridge, L / 2), k.p(0, ridge, -L / 2), SLATE, k.p(s, 1, 0).sub(k.p(0, 0, 0)));
+  for (const s of [-1, 1]) k.quad(k.p(s * (nave / 2 + 0.4), top, -L / 2), k.p(s * (nave / 2 + 0.4), top, L / 2), k.p(0, ridge, L / 2), k.p(0, ridge, -L / 2), SLATE, k.p(s, 1, 0).sub(k.p(0, 0, 0)));
   for (const z of [-L / 2, L / 2]) k.tri(k.p(-nave / 2, top, z), k.p(nave / 2, top, z), k.p(0, ridge, z), wall, k.p(0, 0, Math.sign(z)).sub(k.p(0, 0, 0)));
   // Two towers over the front, their spires.
   const tw = Math.min(W * 0.26, 9);
@@ -172,7 +167,7 @@ function church(k: MeshKit, glow: MeshKit, W: number, L: number, top: number, wa
 /** A clock tower: stone shaft, a clock face on each side near the top, an open belfry, a copper pyramid roof. */
 function clockTower(k: MeshKit, W: number, L: number, top: number, wall: Color): void {
   const s = Math.min(W, L);
-  k.box(0, (top - 2) / 2, 0, s, top + 2, s, wall);
+  k.box(0, (top - 2.15) / 2, 0, s, top + 1.85, s, wall);
   // Bands of darker stone.
   for (const y of [top * 0.33, top * 0.66]) k.box(0, y, 0, s + 0.3, 0.5, s + 0.3, STONE_DARK);
   const fy = top - s * 0.55;
@@ -206,8 +201,9 @@ function clockTower(k: MeshKit, W: number, L: number, top: number, wall: Color):
 
 /** A domed civic hall: a long stone block, a columned portico and pediment on its front, a drum and a copper dome. */
 function civic(k: MeshKit, glow: MeshKit, W: number, L: number, top: number, wall: Color, front: number): void {
-  k.box(0, (top - 2) / 2, 0, W, top + 2, L, wall);
-  k.box(0, top + 0.4, 0, W + 0.6, 0.8, L + 0.6, STONE_DARK);
+  // Up to just under the roof's snow, a cornice round it under the snow's edge.
+  k.box(0, (top - 2.15) / 2, 0, W, top + 1.85, L, wall);
+  k.box(0, top - 0.55, 0, W + 0.6, 0.8, L + 0.6, STONE_DARK);
   for (const s of [-1, 1]) lancets(k, glow, L * 0.85, 2, top - 2, (z) => [s * (W / 2 + 0.05), z], k.p(s, 0, 0).sub(k.p(0, 0, 0)), 8, s > 0 ? 1 : 2);
   // Portico: six columns out in front, an entablature, a pediment.
   const pw = W * 0.6;
@@ -261,6 +257,8 @@ function deco(k: MeshKit, glow: MeshKit, W: number, L: number, top: number, wall
       }
     }
     k.box(0, y1 + 0.25, 0, w + 0.5, 0.5, l + 0.5, STONE);
+    // Snow on the setback (the tower's level roof is left undrawn: maps/town.ts).
+    k.box(0, y1 + 0.55, 0, w + 0.3, 0.1, l + 0.3, SNOW);
     y0 = y1;
   });
   // A stepped crown and a needle spire.
@@ -475,7 +473,8 @@ function viaduct(line: LineDecor, hf: Heightfield, kits: TiledKit): void {
     const y0 = g(hf, p) - 1;
     const top = deck(p);
     k.at(p.x, y0, p.z, yaw);
-    k.box(0, (top - 1.2 - 0) / 2, 0, width + 0.6, top - 1.2 - y0, 3.6, STONE);
+    // From its foot (local 0, a meter into the snow) up under the deck.
+    k.box(0, (top - 1.2 - y0) / 2, 0, width + 0.6, top - 1.2 - y0, 3.6, STONE);
     k.box(0, 0.6, 0, width + 1.4, 1.2, 4.6, STONE_DARK);
   }
   // Each span: the deck slab, two parapets, the arch's ring under it (in segments).

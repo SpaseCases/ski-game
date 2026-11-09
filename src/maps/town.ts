@@ -138,7 +138,9 @@ function buildingShapes(b: BuildingFeature, out: RampShape[]): void {
     const m = s1 + Math.tan(LIP_ANGLE * DEG);
     roof.to(b.length - k, up + s1 * (b.length - k), s1, s1).to(k, b.eave + b.lip, m, 0);
   } else {
-    roof.to(b.length, b.eave, s1, 0);
+    // A tower that steps in or turns as it rises (the City's art-deco and twisted towers) draws its own top:
+    // its level roof, the full footprint and out of reach, is left undrawn.
+    roof.to(b.length, b.eave, s1, 0, b.style === 'deco' || b.style === 'twist' ? SURFACE.hidden : SURFACE.snow);
   }
   roof.ease(EDGE, 0, ends);
   const o = framePoint(t, -EDGE, 0);
