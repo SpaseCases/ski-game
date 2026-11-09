@@ -10,10 +10,11 @@
   "workers_dev": true,
   "preview_urls": false,
   "observability": { "enabled": true },
+  // ALLOWED_ORIGINS: every Firebase site in firebase.json (web.app and firebaseapp.com) plus GitHub Pages.
   "vars": {
     "PROJECT_ID": "parklaps-3b60f",
     "STORE": "firestore",
-    "ALLOWED_ORIGINS": "https://parklaps.web.app,https://parklaps.firebaseapp.com,https://spasecases.github.io"
+    "ALLOWED_ORIGINS": "https://parklaps.web.app,https://parklaps.firebaseapp.com,https://parklaps-ski.web.app,https://parklaps-ski.firebaseapp.com,https://playparklaps.web.app,https://playparklaps.firebaseapp.com,https://parklapsgame.web.app,https://parklapsgame.firebaseapp.com,https://parklaps-snow.web.app,https://parklaps-snow.firebaseapp.com,https://parklaps-shred.web.app,https://parklaps-shred.firebaseapp.com,https://spasecases.github.io"
   },
   // Per address, per minute. A classroom shares one address, so these are loose.
   "ratelimits": [

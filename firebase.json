@@ -3,23 +3,228 @@
     "database": "(default)",
     "rules": "firestore.rules"
   },
-  "hosting": {
-    "site": "parklaps",
-    "public": "dist",
-    "ignore": ["firebase.json", "**/.*"],
-    "headers": [
-      {
-        "source": "/assets/**",
-        "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
-      },
-      {
-        "source": "/",
-        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
-      },
-      {
-        "source": "**/*.html",
-        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
-      }
-    ]
-  }
+  "hosting": [
+    {
+      "site": "parklaps",
+      "public": "dist",
+      "ignore": [
+        "firebase.json",
+        "**/.*"
+      ],
+      "headers": [
+        {
+          "source": "/assets/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        },
+        {
+          "source": "/",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "**/*.html",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "site": "parklaps-ski",
+      "public": "dist",
+      "ignore": [
+        "firebase.json",
+        "**/.*"
+      ],
+      "headers": [
+        {
+          "source": "/assets/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        },
+        {
+          "source": "/",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "**/*.html",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "site": "playparklaps",
+      "public": "dist",
+      "ignore": [
+        "firebase.json",
+        "**/.*"
+      ],
+      "headers": [
+        {
+          "source": "/assets/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        },
+        {
+          "source": "/",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "**/*.html",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "site": "parklapsgame",
+      "public": "dist",
+      "ignore": [
+        "firebase.json",
+        "**/.*"
+      ],
+      "headers": [
+        {
+          "source": "/assets/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        },
+        {
+          "source": "/",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "**/*.html",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "site": "parklaps-snow",
+      "public": "dist",
+      "ignore": [
+        "firebase.json",
+        "**/.*"
+      ],
+      "headers": [
+        {
+          "source": "/assets/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        },
+        {
+          "source": "/",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "**/*.html",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "site": "parklaps-shred",
+      "public": "dist",
+      "ignore": [
+        "firebase.json",
+        "**/.*"
+      ],
+      "headers": [
+        {
+          "source": "/assets/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        },
+        {
+          "source": "/",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "**/*.html",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }
