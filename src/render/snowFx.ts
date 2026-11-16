@@ -20,6 +20,7 @@ import { CONFIG } from '../config.ts';
 import type { SnowBudget } from '../core/settings.ts';
 import type { BuiltMap } from '../maps/build.ts';
 import type { Heightfield, MapDef, RailShape, XZ } from '../maps/types.ts';
+import { LANE_ACROSS, lanePoint, RUNNING, type Avalanches, type AvalancheZone } from '../sim/avalanche.ts';
 import { insideBounds } from '../sim/bounds.ts';
 import { inPowder, type PowderArea } from '../sim/powder.ts';
 import type { SkierState } from '../sim/skier.ts';
@@ -195,6 +196,12 @@ export class SnowFx {
   private lastPoleTime = Infinity;
   private skateCarry = 0;
   private powder = false;
+  /** The map's avalanches (M21): emission carried over per zone, and the releases already puffed along the crack. */
+  private readonly slides: Avalanches | undefined;
+  private readonly slideCarry: Float32Array;
+  private readonly slideSeen: Int32Array;
+  private readonly lane = { x: 0, z: 0 };
+  private readonly lane2 = { x: 0, z: 0 };
   private powderX = Infinity;
   private powderZ = Infinity;
 
@@ -337,6 +344,11 @@ export class SnowFx {
     this.trackMesh.renderOrder = 1;
     this.trackMesh.visible = false;
     this.group.add(this.trackMesh);
+
+    this.slides = built.course.avalanches;
+    const nz = this.slides?.zones.length ?? 0;
+    this.slideCarry = new Float32Array(nz);
+    this.slideSeen = Int32Array.from({ length: nz }, (_, i) => this.slides!.zones[i]!.releases);
   }
 
   /** The weather's part in the effects: falling snow, ridge snow and wind (see SnowWeather). */
@@ -391,6 +403,7 @@ export class SnowFx {
     this.checkPowder(pose.position);
     this.emitSkier(pose, sim, dt, skate);
     this.emitRidges(dt, cam);
+    this.emitSlides(dt, cam);
     this.lastLandTime = sim.landTime;
     this.wasBailed = sim.bailed;
     this.lastPoleTime = sim.poleTime;
@@ -701,6 +714,92 @@ export class SnowFx {
         this.spawn(this.at, dx * v, 0.3 + 1.2 * Math.random(), dz * v, r.life * (0.6 + 0.4 * Math.random()), r.size0, r.size1 * (0.7 + 0.6 * Math.random()), 0.05, 0.8, WISP);
       }
       this.ecarry[i] = carry;
+    }
+  }
+
+  /**
+   * Avalanches (M21): a puff along the crack when a zone breaks, then while
+   * its slide runs, chunks of snow tumbling off its front and a powder cloud
+   * billowing over it, from the same pool, near the camera only.
+   */
+  private emitSlides(dt: number, cam: Vector3): void {
+    const av = this.slides;
+    if (!av) return;
+    const A = CONFIG.snowFx.avalanche;
+    for (let zi = 0; zi < av.zones.length; zi++) {
+      const zone = av.zones[zi]!;
+      if (zone.releases !== this.slideSeen[zi]) {
+        this.slideSeen[zi] = zone.releases;
+        this.crackPuff(zone, cam);
+      }
+      if (zone.phase !== RUNNING) {
+        this.slideCarry[zi] = 0;
+        continue;
+      }
+      const width = (zone.hi - zone.lo) * LANE_ACROSS;
+      lanePoint(zone, (zone.lo + zone.hi) >> 1, zone.front, this.lane);
+      const reach = A.range + width / 2;
+      if ((this.lane.x - cam.x) ** 2 + (this.lane.z - cam.z) ** 2 > reach * reach) {
+        this.slideCarry[zi] = 0;
+        continue;
+      }
+      // Thicker as it gets going.
+      const going = Math.min(1, 0.25 + zone.frontSpeed / 8);
+      let carry = this.slideCarry[zi]! + (A.chunks + A.cloud) * width * going * this.budget.rate * dt;
+      const chunkShare = A.chunks / (A.chunks + A.cloud);
+      while (carry >= 1) {
+        carry -= 1;
+        // A spot on the front, a little behind or ahead of it.
+        const u = zone.lo + Math.random() * Math.max(1e-3, zone.hi - zone.lo);
+        const l = Math.min(zone.hi - 1, Math.floor(u));
+        const t = u - l;
+        const d = zone.front + (Math.random() - 0.7) * 5;
+        lanePoint(zone, Math.max(zone.lo, l), d, this.lane);
+        lanePoint(zone, Math.min(zone.hi, l + 1), d, this.lane2);
+        const x = this.lane.x + (this.lane2.x - this.lane.x) * t;
+        const z = this.lane.z + (this.lane2.z - this.lane.z) * t;
+        if ((x - cam.x) ** 2 + (z - cam.z) ** 2 > A.range * A.range) continue;
+        // Down the lane, along the snow: where the same lane is 2 m on.
+        lanePoint(zone, Math.max(zone.lo, l), d + 2, this.lane2);
+        let dx = this.lane2.x - this.lane.x;
+        let dz = this.lane2.z - this.lane.z;
+        const n = Math.hypot(dx, dz) || 1;
+        dx /= n;
+        dz /= n;
+        const y = drawnHeightAt(this.hf, x, z);
+        const dy = (drawnHeightAt(this.hf, x + dx * 2, z + dz * 2) - y) / 2;
+        const v = zone.frontSpeed;
+        if (Math.random() < chunkShare) {
+          const size = A.chunkSize.min + (A.chunkSize.max - A.chunkSize.min) * Math.random();
+          const k = v * (0.75 + 0.4 * Math.random());
+          this.at.set(x, y + Math.random() * zone.depth * 0.8, z);
+          this.spawn(this.at, dx * k, dy * k + 1 + 3 * Math.random(), dz * k, A.chunkLife * (0.6 + 0.6 * Math.random()), size, size * 0.5, 0.9, 0.4, SNOW);
+        } else {
+          const k = v * (0.4 + 0.3 * Math.random());
+          this.at.set(x, y + 0.4 + 1.6 * Math.random(), z);
+          const s0 = A.cloudSize.min * (0.7 + 0.6 * Math.random());
+          this.spawn(this.at, dx * k, dy * k + 1.5 + 2 * Math.random(), dz * k, A.cloudLife * (0.7 + 0.5 * Math.random()), s0, A.cloudSize.max * (0.7 + 0.6 * Math.random()), -0.05, 0.9, WISP);
+        }
+      }
+      this.slideCarry[zi] = carry;
+    }
+  }
+
+  /** The slab breaking: a line of small puffs along its crack. */
+  private crackPuff(zone: AvalancheZone, cam: Vector3): void {
+    const A = CONFIG.snowFx.avalanche;
+    const count = Math.round((zone.hi - zone.lo) * LANE_ACROSS * A.crack * this.budget.rate);
+    for (let i = 0; i < count; i++) {
+      const u = zone.lo + Math.random() * Math.max(1e-3, zone.hi - zone.lo);
+      const l = Math.min(zone.hi - 1, Math.floor(u));
+      lanePoint(zone, Math.max(zone.lo, l), zone.crack, this.lane);
+      lanePoint(zone, Math.min(zone.hi, l + 1), zone.crack, this.lane2);
+      const t = u - l;
+      const x = this.lane.x + (this.lane2.x - this.lane.x) * t;
+      const z = this.lane.z + (this.lane2.z - this.lane.z) * t;
+      if ((x - cam.x) ** 2 + (z - cam.z) ** 2 > CONFIG.snowFx.avalanche.range ** 2) continue;
+      this.at.set(x, drawnHeightAt(this.hf, x, z) + 0.2, z);
+      this.spawn(this.at, (Math.random() - 0.5) * 1.5, 0.6 + Math.random(), (Math.random() - 0.5) * 1.5, 1.4 * (0.7 + 0.6 * Math.random()), 0.3, 1.2, 0.02, 1.2, WISP);
     }
   }
 

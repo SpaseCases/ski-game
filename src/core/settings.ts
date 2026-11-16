@@ -40,6 +40,8 @@ export interface Settings {
   camera: CameraView;
   /** What first person does in the air. */
   firstAir: FirstAir;
+  /** The small trail map in the HUD's corner (milestone 21): shown, or hidden with the trail-map key. */
+  cornerMap: boolean;
   /** The rung of CONFIG.quality.auto.rungs that Auto settled on (0 = the best); the next visit tries one better. */
   autoRung: number;
   /** The name scores post under on the online leaderboards (see core/playerName.ts), or '' for none: then nothing posts. */
@@ -56,7 +58,7 @@ function isQuality(value: unknown): value is Quality {
 }
 
 export function defaultSettings(): Settings {
-  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, popWith: 'pop', camera: 'chase', firstAir: 'head', autoRung: 0, name: '', bindings: { ...DEFAULT_BINDINGS } };
+  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, popWith: 'pop', camera: 'chase', firstAir: 'head', cornerMap: true, autoRung: 0, name: '', bindings: { ...DEFAULT_BINDINGS } };
 }
 
 /** The saved settings, or the defaults for anything not saved (or unreadable). */
@@ -80,6 +82,7 @@ export function loadSettings(): Settings {
   if (saved.popWith === 'pop' || saved.popWith === 'up') out.popWith = saved.popWith;
   if (saved.camera === 'chase' || saved.camera === 'first') out.camera = saved.camera;
   if (saved.firstAir === 'head' || saved.firstAir === 'level') out.firstAir = saved.firstAir;
+  if (typeof saved.cornerMap === 'boolean') out.cornerMap = saved.cornerMap;
   if (typeof saved.autoRung === 'number' && Number.isInteger(saved.autoRung)) out.autoRung = clampRung(saved.autoRung);
   if (typeof saved.name === 'string' && nameProblem(saved.name) === null) out.name = saved.name;
   out.bindings = readBindings(saved.bindings);

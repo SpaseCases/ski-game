@@ -12,6 +12,7 @@ export type ShotId =
   | 'landSoft'
   | 'landHard'
   | 'bail'
+  | 'slabCrack'
   | 'pole'
   | 'skate'
   | 'railMetal'
@@ -318,6 +319,18 @@ const SHOTS: Record<ShotId, Recipe> = {
       burst(ctx, out, r, { noise: n.white, decay: 0.008, gain: 0.45, freq: 3300, q: 2 });
       burst(ctx, out, r, { noise: n.white, t: 0.022, decay: 0.008, gain: 0.35, freq: 3000, q: 2 });
       crunch(ctx, out, r, n, 0.01, 0.28, 0.5, 1900);
+    },
+  },
+  // An avalanche's slab breaking (milestone 21): a sharp crack that splits
+  // across the slope, then the deep "whumpf" of the snowpack settling.
+  slabCrack: {
+    seconds: 1.8,
+    build(ctx, out, r, n) {
+      burst(ctx, out, r, { noise: n.white, decay: 0.004, gain: 1, type: 'highpass', freq: 1800 });
+      burst(ctx, out, r, { noise: n.white, t: 0.03, decay: 0.012, gain: 0.6, freq: 2400, q: 1.5 });
+      burst(ctx, out, r, { noise: n.white, t: 0.09, decay: 0.01, gain: 0.4, freq: 1600, q: 1.5 });
+      tone(ctx, out, { f0: 70, f1: 28, glide: 0.5, t: 0.05, attack: 0.03, decay: 0.28, gain: 0.9 });
+      burst(ctx, out, r, { noise: n.brown, t: 0.04, attack: 0.05, decay: 0.35, gain: 0.9, type: 'lowpass', freq: 320, freq1: 90 });
     },
   },
   // A crash, played for laughs: a bone-crack click on impact, a breathy

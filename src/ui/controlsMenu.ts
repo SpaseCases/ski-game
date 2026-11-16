@@ -37,7 +37,7 @@ const OTHER_ROWS: readonly Row[] = [
   { keys: ['lincolnLeft', '/', 'lincolnRight'], ground: '', air: 'Lincoln loop left or right', rail: '' },
   { keys: ['checkpoint'], ground: 'Set your checkpoint', air: '', rail: '' },
   { keys: ['respawn'], ground: 'Back to your last checkpoint (hold 1 s: back to the top)' },
-  { keys: ['trailMap'], ground: 'Trail map (the game waits until you close it)' },
+  { keys: ['trailMap'], ground: 'Corner trail map: show or hide (the full map is in the pause menu)' },
   { keys: ['board'], ground: 'At the finish: hide or show the leaderboard' },
   { keys: ['camera'], ground: 'Switch between the chase camera and first person (also in the air, on rails and on the chairlift)' },
   { keys: ['Esc', '/', 'pause'], ground: 'Pause menu (in fullscreen the browser takes Esc, so use the pause key)' },

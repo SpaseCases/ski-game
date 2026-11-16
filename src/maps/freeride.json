@@ -19188,5 +19188,211 @@
    ],
    "points": 250
   }
+ ],
+ "avalanches": [
+  {
+   "name": "Bowl: north chute",
+   "top": [
+    {
+     "x": 216.9,
+     "z": -201.1
+    },
+    {
+     "x": 214.4,
+     "z": -173.2
+    }
+   ],
+   "length": 127.7,
+   "depth": 1,
+   "speed": 24,
+   "runout": 150
+  },
+  {
+   "name": "Bowl: south chute",
+   "top": [
+    {
+     "x": 182.8,
+     "z": 206.3
+    },
+    {
+     "x": 180.7,
+     "z": 234.2
+    }
+   ],
+   "length": 129.4,
+   "depth": 1,
+   "speed": 24,
+   "runout": 150
+  },
+  {
+   "name": "Steeps: main couloir",
+   "top": [
+    {
+     "x": -12.6,
+     "z": -149.9
+    },
+    {
+     "x": 9.4,
+     "z": -150.1
+    }
+   ],
+   "length": 348,
+   "depth": 1,
+   "speed": 24,
+   "runout": 150
+  },
+  {
+   "name": "Steeps: narrow chute",
+   "top": [
+    {
+     "x": -41.6,
+     "z": -149.6
+    },
+    {
+     "x": -19.6,
+     "z": -149.8
+    }
+   ],
+   "length": 348,
+   "depth": 1,
+   "speed": 24,
+   "runout": 150
+  },
+  {
+   "name": "Steeps: west headwall",
+   "top": [
+    {
+     "x": -202,
+     "z": -165.6
+    },
+    {
+     "x": -52,
+     "z": -167.4
+    }
+   ],
+   "length": 279,
+   "depth": 1,
+   "speed": 24,
+   "runout": 150
+  },
+  {
+   "name": "Steeps: east headwall",
+   "top": [
+    {
+     "x": 20,
+     "z": -168.2
+    },
+    {
+     "x": 198,
+     "z": -170.3
+    }
+   ],
+   "length": 279,
+   "depth": 1,
+   "speed": 24,
+   "runout": 150
+  },
+  {
+   "name": "Steeps: upper face",
+   "top": [
+    {
+     "x": -225.2,
+     "z": -460.9
+    },
+    {
+     "x": 189.6,
+     "z": -474.4
+    }
+   ],
+   "length": 214.5,
+   "depth": 1,
+   "speed": 24,
+   "runout": 150
+  },
+  {
+   "name": "Steeps: lower face",
+   "top": [
+    {
+     "x": -249.1,
+     "z": -690.6
+    },
+    {
+     "x": 170.4,
+     "z": -711.2
+    }
+   ],
+   "length": 348,
+   "depth": 1,
+   "speed": 24,
+   "runout": 150
+  },
+  {
+   "name": "Northwest ridge: north flank",
+   "top": [
+    {
+     "x": -341.9,
+     "z": -483.5
+    },
+    {
+     "x": -255,
+     "z": -486.5
+    }
+   ],
+   "length": 300,
+   "depth": 1,
+   "speed": 24,
+   "runout": 150
+  },
+  {
+   "name": "Northeast ridge: north flank",
+   "top": [
+    {
+     "x": 220.8,
+     "z": -502.9
+    },
+    {
+     "x": 307.7,
+     "z": -505.9
+    }
+   ],
+   "length": 300,
+   "depth": 1,
+   "speed": 24,
+   "runout": 150
+  },
+  {
+   "name": "Bowl: north headwall",
+   "top": [
+    {
+     "x": 169,
+     "z": -151.7
+    },
+    {
+     "x": 157.8,
+     "z": -15.2
+    }
+   ],
+   "length": 211.5,
+   "depth": 1,
+   "speed": 24,
+   "runout": 150
+  },
+  {
+   "name": "Bowl: south headwall",
+   "top": [
+    {
+     "x": 153.2,
+     "z": 40.7
+    },
+    {
+     "x": 142,
+     "z": 177.2
+    }
+   ],
+   "length": 211.5,
+   "depth": 1,
+   "speed": 24,
+   "runout": 150
+  }
  ]
 }

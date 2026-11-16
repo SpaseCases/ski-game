@@ -53,6 +53,7 @@ import {
 } from './sim/checkpoints.ts';
 import { createRace, resetRace, stepRace, type CourseDef, type RaceState } from './sim/race.ts';
 import { createScore, endCombo, resetScore, stepScore, taintCombo } from './sim/score.ts';
+import { placeInAvalanches, stepAvalanches } from './sim/avalanche.ts';
 import { copySkierState, createSkierState, placeSkierAt, stepSkier } from './sim/skier.ts';
 import { heightAt } from './sim/terrain.ts';
 import { anyCheat, CHEATS, configChanged, rebuildTuning, setCheat, setSkiScale, TUNING } from './sim/tuning.ts';
@@ -77,7 +78,8 @@ import { formatTime, missedText, RaceHud } from './ui/raceHud.ts';
 import { RunHud } from './ui/runHud.ts';
 import { ScoreHud } from './ui/scoreHud.ts';
 import { Toast } from './ui/toast.ts';
-import { TrailMap } from './ui/trailMap.ts';
+import { CornerMap } from './ui/cornerMap.ts';
+import { drawMapArt, TrailMap, type MapArt } from './ui/trailMap.ts';
 
 const app = byId('app');
 const hud = byId('hud');
@@ -144,6 +146,9 @@ const scoreHud = new ScoreHud(
   () => sound.combo('lost'),
 );
 const trailMap = new TrailMap(hud, closeTrailMap);
+/** The small trail map in the HUD's corner (milestone 21): the trail-map key shows and hides it, and the game keeps running. */
+const cornerMap = new CornerMap(hud);
+cornerMap.setShown(settings.cornerMap);
 const keyboard = new Keyboard(settings.bindings);
 keyboard.setPopWithUp(settings.popWith === 'up');
 keyboard.attach(window);
@@ -175,6 +180,7 @@ const pauseScreen = new PauseScreen({
     closeMenus();
     backToTop();
   },
+  trailMap: () => openTrailMap(true),
   maps: openMapSelect,
   locker: openLocker,
   settings: openSettings,
@@ -476,7 +482,9 @@ function toggleFinishBoard(): void {
 /** Under a finished timed run's result: the respawn key races the course again. */
 let raceAgainHint = '';
 const pauseButton = hudButton('Pause', openPause);
-const trailButton = hudButton('Trail map', openTrailMap);
+// The full trail map (the trail-map key only shows and hides the corner map now, so the button names no key).
+const trailButton = hudButton('Trail map', () => openTrailMap());
+trailButton.textContent = 'Trail map';
 windowBar.prepend(trailButton, pauseButton);
 syncKeyLabels();
 
@@ -499,6 +507,10 @@ interface Level {
   race: RaceState | null;
 }
 let level: Level | null = null;
+/** The map being ridden's trail-map art (drawn behind "Loading"), shared by the full map and the corner map; null until drawn. */
+let mapArt: MapArt | null = null;
+/** The full trail map was opened from the pause menu, so closing it goes back there. */
+let trailFromPause = false;
 /** True while a new map's shaders compile (see loadMap): no frame is drawn, so none waits on the compiler. */
 let warming = false;
 applyView();
@@ -552,6 +564,8 @@ function respawn(): void {
     respawnSkier(run, skier, built.map, built.hf);
   }
   copySkierState(skierPrev, skier);
+  // Appearing on an avalanche zone isn't riding into it: no roll until the skier leaves it and comes back.
+  if (built.course.avalanches) placeInAvalanches(built.course.avalanches, skier);
   snapView = true;
   fader.reveal();
   auto.hold();
@@ -582,6 +596,8 @@ async function loadMap(entry: MapEntry): Promise<void> {
     // Free the old map before building the new one, to keep peak memory down.
     level?.world.dispose();
     level = null;
+    mapArt = null;
+    cornerMap.setMap(null);
     sound.setMap(null);
     resetScore(score);
     const built = buildMap(map);
@@ -611,6 +627,11 @@ async function loadMap(entry: MapEntry): Promise<void> {
     } finally {
       warming = false;
     }
+    // The trail map's art (the full map and the corner map), in slices so "Loading" keeps painting; never during a ride.
+    const art = await drawMapArt(built, nextTask);
+    if (level?.built !== built) return;
+    mapArt = art;
+    cornerMap.setMap(art);
     // The first frame also uploads every mesh to the GPU: draw it behind "Loading" too.
     await nextPaint();
     mapSelect.setLoading(null);
@@ -629,6 +650,8 @@ function toMainMenu(): void {
   online?.finish.hide();
   level.world.dispose();
   level = null;
+  mapArt = null;
+  cornerMap.setMap(null);
   sound.setMap(null);
   resetScore(score);
   openTitle();
@@ -731,19 +754,34 @@ function closeMenus(): void {
   holdTime = 0;
 }
 
-/** Opens the trail map of the map being ridden; the game waits behind it. */
-function openTrailMap(): void {
-  if (!level || menus.isOpen) return;
+/** Opens the full trail map of the map being ridden (the HUD button, or the pause menu's plank); the game waits behind it. */
+function openTrailMap(fromPause = false): void {
+  if (!level || !mapArt || (menus.isOpen && !fromPause)) return;
+  if (fromPause) menus.close();
+  trailFromPause = fromPause;
   keyboard.setEnabled(false);
-  trailMap.open(level.built, skier.position, skier.yaw, level.run.passed);
+  trailMap.open(mapArt, skier.position, skier.yaw, level.run.passed);
 }
 
 function closeTrailMap(): void {
   if (!trailMap.isOpen) return;
   trailMap.close();
+  if (trailFromPause) {
+    trailFromPause = false;
+    openPause();
+    return;
+  }
   keyboard.setEnabled(true);
   keyboard.sample(keys);
   holdTime = 0;
+}
+
+/** The trail-map key while riding: shows or hides the corner map (saved), mid-air or on a rail alike. */
+function toggleCornerMap(): void {
+  settings.cornerMap = !settings.cornerMap;
+  cornerMap.setShown(settings.cornerMap);
+  saveSettings(settings);
+  if (!settings.cornerMap) toast.show(`Corner map hidden (${mainKey(settings.bindings, 'trailMap')} shows it; the full map is in the pause menu)`);
 }
 
 /** A key pressed while no menu is open (the menus see it first, in Menus). */
@@ -779,7 +817,6 @@ function setBindings(b: Bindings): void {
 function syncKeyLabels(): void {
   const b = settings.bindings;
   setButtonKey(pauseButton, mainKey(b, 'pause'));
-  setButtonKey(trailButton, mainKey(b, 'trailMap'));
   crashHint.setKey(mainKey(b, 'respawn'), settings.crashWait);
   runHud.setKeys(mainKey(b, 'confirm'), mainKey(b, 'respawn'));
   raceAgainHint = `${mainKey(b, 'respawn')}: race it again`;
@@ -953,6 +990,10 @@ if (import.meta.env.DEV) {
       get course() {
         return level?.built.course;
       },
+      /** The whole built map (milestone 21: for timing the trail map's art, drawMapArt). */
+      get built() {
+        return level?.built;
+      },
       get raceDef() {
         return level?.built.race;
       },
@@ -1010,10 +1051,7 @@ startLoop(
     if (!level) return;
     const { built, run, race } = level;
     keyboard.sample(keys);
-    if (keys.trailMap.pressed) {
-      openTrailMap();
-      return;
-    }
+    if (keys.trailMap.pressed) toggleCornerMap();
     // R: back to the checkpoint at once. Holding it keeps the skier there,
     // and after a moment goes back to the top instead.
     if (keys.respawn.pressed) {
@@ -1052,6 +1090,12 @@ startLoop(
 
     copySkierState(skierPrev, skier);
     stepSkier(skier, keys, built.course, dt);
+    // Avalanches (milestone 21): their slides run on the course, after the skier.
+    const slides = built.course.avalanches;
+    if (slides) {
+      if (stepAvalanches(slides, skier, built.hf, dt) > 0) toast.show('Avalanche! Outrun it, or ski out to the side');
+      if (skier.bailed && !skierPrev.bailed && skier.bailReason === 'avalanche') toast.show('Caught in the avalanche');
+    }
     // The chairlift (milestone 17): say what's happening as the skier gets on, and cut straight to the top on a skip.
     if (skier.lift >= 0 && skierPrev.lift < 0) toast.show('Chairlift: the next chair picks you up');
     if (skier.liftChair >= 0 && skierPrev.liftChair < 0) toast.show('Hold Enter to skip the ride');
@@ -1069,7 +1113,9 @@ startLoop(
     if (event === 'flag' && !timedRun()) toast.show(`Checkpoint: flag ${run.flag + 1} of ${built.map.flags.length}`);
     // After a crash, let the tumble play out, then fade and respawn (unless
     // the crash setting says to stay down until the respawn key).
-    if (skier.bailed && !settings.crashWait && skier.bailTime >= CONFIG.bail.respawnDelay && !fader.busy) fader.fadeOut(respawn);
+    // A rider caught by an avalanche is carried along a while longer first.
+    const downFor = skier.bailReason === 'avalanche' ? CONFIG.avalanche.respawnDelay : CONFIG.bail.respawnDelay;
+    if (skier.bailed && !settings.crashWait && skier.bailTime >= downFor && !fader.busy) fader.fadeOut(respawn);
   },
   (alpha, realFrameTime) => {
     // While the game waits, everything that moves by time holds still too.
@@ -1134,6 +1180,7 @@ startLoop(
       if (finished) showFinishBoard();
       else online?.finish.hide();
     }
+    if (level) cornerMap.update(pose.position.x, pose.position.z, pose.yaw, level.run.passed);
     fps.frame(realFrameTime);
     // Auto quality judges riding frames only (it holds off after jumps, loads and menus).
     if (quality === 'auto' && level) {
@@ -1172,6 +1219,11 @@ function setButtonKey(b: HTMLButtonElement, key: string): void {
   const kbd = document.createElement('kbd');
   kbd.textContent = key;
   b.replaceChildren(document.createTextNode(b.dataset.label ?? ''), kbd);
+}
+
+/** Resolves on a fresh task, so a long job in slices lets the page paint between them. */
+function nextTask(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 /** Resolves after the browser has painted, so a status shown just before is on screen during long work. */

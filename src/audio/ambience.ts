@@ -4,6 +4,7 @@ import type { BuiltMap } from '../maps/build.ts';
 import { AudioEngine, Voice } from './engine.ts';
 import type { LoopId } from './synth.ts';
 import { smooth } from './riding.ts';
+import { lanePoint, RUNNING, type Avalanches } from '../sim/avalanche.ts';
 
 // The world's sounds round the skier: the weather (a low bed of wind and a
 // howl that follows the snow effects' gusts), and places that sound and
@@ -24,6 +25,11 @@ export class AmbientSounds {
   private readonly howl: Voice;
   private weather: WeatherId = 'bluebird';
   private readonly voices: Record<PlaceId, Voice | null> = { crowd: null, town: null, lift: null };
+  /** Avalanches (M21): the map's zones, the releases already heard, and the rumble of a running front. */
+  private slides: Avalanches | undefined;
+  private slideSeen = new Int32Array(0);
+  private readonly rumble: Voice;
+  private readonly spot = { x: 0, z: 0 };
 
   // The map's places, flattened for a quick look each frame.
   /** Spectators bunched into cells: middle and head count. */
@@ -46,6 +52,7 @@ export class AmbientSounds {
     const n = engine.noise;
     this.bed = new Voice(ctx, n.get('brown')!, engine.game, 'lowpass', 400, 0.7);
     this.howl = new Voice(ctx, n.get('pink')!, engine.game, 'bandpass', 500, 2);
+    this.rumble = new Voice(ctx, n.get('brown')!, engine.game, 'lowpass', 120, 0.9);
     engine.onLoop((id) => {
       if (id === 'crowd' || id === 'town' || id === 'lift') this.syncVoices();
     });
@@ -91,6 +98,8 @@ export class AmbientSounds {
     this.liftBz = Float32Array.from({ length: ns }, (_, i) => segs[i * 4 + 3]!);
     this.stationX = Float32Array.from({ length: stations.length / 2 }, (_, i) => stations[i * 2]!);
     this.stationZ = Float32Array.from({ length: stations.length / 2 }, (_, i) => stations[i * 2 + 1]!);
+    this.slides = built?.course.avalanches;
+    this.slideSeen = Int32Array.from(this.slides?.zones ?? [], (z) => z.releases);
     this.syncVoices();
   }
 
@@ -114,6 +123,7 @@ export class AmbientSounds {
     this.howl.set(w.howl * Math.max(0, 1 + w.gustGain * g), w.howlFreq * (1 + w.gustFreq * g), pitch, 0, fade);
 
     const pan = a.pan;
+    this.updateSlides(x, z, rx, rz, pitch);
     // The crowd: louder the more spectators stand near, toward where most of them are.
     const crowd = this.voices.crowd;
     if (crowd) {
@@ -213,6 +223,38 @@ export class AmbientSounds {
       const d = this.cableDistance(x, z);
       if (d <= a.cheer.liftRange) this.engine.play(clean ? 'liftCheer' : 'liftJeer', 1 - smooth(a.lift.near, a.cheer.liftRange, d), lift.panner);
     }
+  }
+
+  /** Avalanches: a crack when a zone breaks (by its distance), and the rumble of the nearest running front. */
+  private updateSlides(x: number, z: number, rx: number, rz: number, pitch: number): void {
+    const av = this.slides;
+    const c = CONFIG.audio.avalanche;
+    let loud = 0;
+    let side = 0;
+    if (av) {
+      for (let i = 0; i < av.zones.length; i++) {
+        const zone = av.zones[i]!;
+        if (zone.releases !== this.slideSeen[i]) {
+          this.slideSeen[i] = zone.releases;
+          lanePoint(zone, (zone.lo + zone.hi) >> 1, zone.crack, this.spot);
+          const d = Math.hypot(this.spot.x - x, this.spot.z - z);
+          this.engine.play('slabCrack', c.crack * (1 - smooth(0, c.crackFar, d)));
+        }
+        if (zone.phase !== RUNNING) continue;
+        for (let l = zone.lo; l <= zone.hi; l += 2) {
+          lanePoint(zone, l, zone.front, this.spot);
+          const dx = this.spot.x - x;
+          const dz = this.spot.z - z;
+          const d = Math.hypot(dx, dz);
+          const k = (1 - smooth(c.near, c.far, d)) * Math.min(1, zone.frontSpeed / zone.speed + 0.2);
+          if (k > loud) {
+            loud = k;
+            side = d > 1 ? (dx * rx + dz * rz) / d : 0;
+          }
+        }
+      }
+    }
+    this.rumble.set(c.rumble * loud, c.freqFar + (c.freqNear - c.freqFar) * loud, pitch, CONFIG.audio.pan * side, 0.3);
   }
 
   /** Distance (m, seen from above) from (x, z) to the nearest chairlift cable. */

@@ -12,6 +12,7 @@ import { ACTIONS, createInputState, mirrorPop, type Action } from '../../src/cor
 import { buildMap, type BuiltMap } from '../../src/maps/build.ts';
 import { parseMap } from '../../src/maps/loader.ts';
 import type { JumpFeature } from '../../src/maps/types.ts';
+import { placeInAvalanches, stepAvalanches } from '../../src/sim/avalanche.ts';
 import { createRun, updateRun, type RunState } from '../../src/sim/checkpoints.ts';
 import { createRace, stepRace, type RaceEvent, type RaceState } from '../../src/sim/race.ts';
 import { copySkierState, createSkierState, placeSkierAt, stepSkier } from '../../src/sim/skier.ts';
@@ -54,6 +55,14 @@ export class Rider {
    * 'pop' to crouch and pop, and ↑ only flips.
    */
   popWithUp = true;
+  /**
+   * Avalanches (milestone 21): off unless a tool asks, so every older tool
+   * rides Freeride's steeps exactly as before. On, each step runs the
+   * course's slides after the skier, as the game does.
+   */
+  avalanches = false;
+  /** Zones that cracked on the last step (with avalanches on). */
+  cracked = 0;
   private held = new Set<Action>();
 
   constructor(sim: Sim) {
@@ -67,6 +76,8 @@ export class Rider {
     placeSkierAt(this.s, x, z, (headingDeg * Math.PI) / 180, this.sim.course.hf);
     this.s.velocity.copy(new Vector3(0, 0, -1).applyQuaternion(this.s.orient)).multiplyScalar(speed);
     copySkierState(this.prev, this.s);
+    const av = this.sim.course.avalanches;
+    if (this.avalanches && av) placeInAvalanches(av, this.s);
     this.t = 0;
   }
 
@@ -83,6 +94,8 @@ export class Rider {
     if (this.popWithUp) mirrorPop(this.keys);
     copySkierState(this.prev, this.s);
     stepSkier(this.s, this.keys, this.sim.course, DT);
+    const av = this.sim.course.avalanches;
+    this.cracked = this.avalanches && av ? stepAvalanches(av, this.s, this.sim.course.hf, DT) : 0;
     updateRun(this.run, this.sim.map, this.prev.position, this.s);
     const event = this.race && this.sim.race ? stepRace(this.race, this.sim.race, this.prev.position, this.s, DT) : 'none';
     this.t += DT;

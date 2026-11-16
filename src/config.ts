@@ -250,6 +250,36 @@ export const CONFIG = {
     skipHold: 0.6,
   },
 
+  /**
+   * Avalanches (milestone 21, `sim/avalanche.ts`; a map's `avalanches`
+   * zones, Freeride's steeps). Read straight from here, not TUNING.
+   */
+  avalanche: {
+    /** Odds that riding into a loaded zone (onto its snow) cracks it. */
+    chance: 0.5,
+    /** Seed of the rolls' random numbers (each map build starts from it). */
+    seed: 2121,
+    /** Seconds from the crack (line and sound) until the slab moves. */
+    warning: 1,
+    /** Seconds after a release before the slope can slide again (a respawn doesn't reset it). */
+    reload: 120,
+    /** The crack breaks this far (m, down the fall line) above the rider, across this half-width (m) either side. */
+    above: 25,
+    halfWidth: 50,
+    /** Time constant (s) the front's speed builds toward the zone's speed with. */
+    build: 2,
+    /** The moving snow behind the front (m, down the fall line) that catches; behind that it has slowed to debris. */
+    body: 30,
+    /** A rider in the air more than this (m) over the snow, plus the slab's depth, is passed under. */
+    clearance: 1.2,
+    /** Being caught: carried along at this share of the front's speed, easing in over carryEase s, and the fade to respawn waits this long (s). */
+    carry: 0.75,
+    carryEase: 0.35,
+    respawnDelay: 3,
+    /** The crack line stays drawn this long (s) after its release. */
+    crackShow: 90,
+  },
+
   rails: {
     /** Radius (m) of a round rail. */
     radius: 0.045,
@@ -779,6 +809,13 @@ export const CONFIG = {
     /** Sparks off metal rails (not boxes or logs): full at speedFull m/s along the rail, and (1 + brake) times as many at full brake. */
     sparks: { speedMin: 1.5, speedFull: 10, rate: 150, life: 0.35, brake: 2 },
     /**
+     * A running avalanche (M21): chunks of snow tumbling off its front and a
+     * powder cloud billowing over it, both per meter of front a second (times
+     * the preset's rate), only within `range` m of the camera; a puff along
+     * the crack when it breaks (`crack` per meter).
+     */
+    avalanche: { chunks: 2.2, chunkSize: { min: 0.25, max: 0.7 }, chunkLife: 0.9, cloud: 0.6, cloudSize: { min: 1.6, max: 5.5 }, cloudLife: 2.6, crack: 0.5, range: 380 },
+    /**
      * Snow blowing off ridges, wind lips and cornices (Freeride): an emitter
      * every `spacing` m along each, gusting; `rate` per emitter at the top
      * of a gust.
@@ -1117,6 +1154,7 @@ export const CONFIG = {
       landSoft: { gain: 0.55, spread: 0.1 },
       landHard: { gain: 0.8, spread: 0.08 },
       bail: { gain: 0.55, spread: 0.06 },
+      slabCrack: { gain: 0.75, spread: 0.05 },
       pole: { gain: 0.18, spread: 0.12 },
       skate: { gain: 0.3, spread: 0.1 },
       railMetal: { gain: 0.45, spread: 0.06 },
@@ -1184,6 +1222,8 @@ export const CONFIG = {
      * chairlift when it happens within `liftRange` m of its cable (seen from above).
      */
     cheer: { range: 70, minAir: 0.8, liftRange: 30 },
+    /** Avalanches (M21): the crack heard out to crackFar m; the rumble of a running front, loudest within near m and gone past far, its low-pass opening up close. */
+    avalanche: { crack: 1, crackFar: 700, rumble: 0.5, near: 20, far: 450, freqFar: 90, freqNear: 420 },
     /** Menus: a soft click when something is picked; focus moving ticks (this quiet) unless the mouse just clicked. */
     tickAfterPointer: 0.4,
   },

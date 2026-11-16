@@ -1,5 +1,6 @@
 import type {
   AreaDef,
+  AvalancheDef,
   BoxStyle,
   BuildingStyle,
   DecorDef,
@@ -79,7 +80,23 @@ export function parseMap(raw: unknown): MapDef {
     weather: map.weather === undefined ? undefined : parseWeather(map.weather),
     sky: map.sky === undefined ? undefined : parseSky(map.sky),
     gaps: map.gaps === undefined ? undefined : arr(map.gaps, 'gaps').map((g, i) => parseGap(g, `gaps[${i}]`)),
+    avalanches: map.avalanches === undefined ? undefined : arr(map.avalanches, 'avalanches').map((a, i) => parseAvalanche(a, `avalanches[${i}]`)),
   };
+}
+
+function parseAvalanche(raw: unknown, path: string): AvalancheDef {
+  const o = obj(raw, path);
+  const n = reader(o, path);
+  const out: AvalancheDef = {
+    name: str(o.name, `${path}.name`),
+    top: xzPoints(o.top, `${path}.top`, 2),
+    length: n('length'),
+    depth: n('depth', 1),
+    speed: n('speed', 24),
+    runout: n('runout', 150),
+  };
+  if (out.length <= 0 || out.depth <= 0 || out.speed <= 0 || out.runout < 0) throw new Error(`Map: ${path} needs a positive length, depth and speed`);
+  return out;
 }
 
 /** Where the sun and moon hang (see MapDef.sky). */

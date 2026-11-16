@@ -18,8 +18,8 @@ import JavaScriptObfuscator from 'javascript-obfuscator';
 
 /** Modules to obfuscate (paths with forward slashes). */
 const INCLUDE = /\/src\/(boot\.ts$|main\.ts$|poses\.ts$|ui\/.+\.ts$|online\/.+\.ts$|core\/.+\.ts$)/;
-/** Read on every frame or every key: left minified only. */
-const EXCLUDE = /\/src\/core\/(loop|input)\.ts$/;
+/** Read on every frame or every key (the corner map moves every frame): left minified only. */
+const EXCLUDE = /\/src\/(core\/(loop|input)|ui\/cornerMap)\.ts$/;
 
 /** @type {import('javascript-obfuscator').ObfuscatorOptions} */
 const OPTIONS = {

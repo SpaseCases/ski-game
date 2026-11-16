@@ -50,7 +50,7 @@ import { groundAt, heightAt } from './terrain.ts';
 // skis on round its bends only while they're fast enough.
 
 /** Why the last landing was a crash ('' if it was clean). */
-export type BailReason = '' | 'pitch' | 'edge' | 'sideways' | 'impact' | 'head' | 'obstacle';
+export type BailReason = '' | 'pitch' | 'edge' | 'sideways' | 'impact' | 'head' | 'obstacle' | 'avalanche';
 
 export interface SkierState {
   /** Feet position on the snow. */
@@ -1250,6 +1250,21 @@ function crash(s: SkierState, reason: BailReason): void {
   s.railExit = false;
   s.press = 0;
   s.center.copy(s.position).addScaledVector(n, b.centerHeight);
+}
+
+/**
+ * Caught by an avalanche (milestone 21, sim/avalanche.ts): a crash where
+ * the skier is, on the snow under them, carried along at (vx, vz) m/s.
+ */
+export function buryInSlide(s: SkierState, hf: Heightfield, vx: number, vz: number): void {
+  s.position.y = groundAt(hf, s.position.x, s.position.z, contactNormal);
+  s.velocity.set(vx, 0, vz);
+  crash(s, 'avalanche');
+  // crash() kept the speed along the snow less its impact loss: the slide sets it.
+  const n = contactNormal;
+  s.velocity.set(vx, 0, vz);
+  s.velocity.addScaledVector(n, -s.velocity.dot(n));
+  s.airTime = 0;
 }
 
 /** Crash: the body rolls and slides to a stop. The game decides when to respawn. */

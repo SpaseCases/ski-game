@@ -23,6 +23,7 @@
 // heights.
 
 import { writeFileSync } from 'node:fs';
+import { LANE_STEP, zoneCell, zoneOutline } from '../../src/sim/avalanche.ts';
 import { buildMap, generateTerrain } from '../../src/maps/build.ts';
 import { parseMap } from '../../src/maps/loader.ts';
 import type { Heightfield } from '../../src/maps/types.ts';
@@ -145,6 +146,18 @@ const xzh = (p: XZ, height: number): Json => ({ x: r1(p.x), z: r1(p.z), height }
 const elements: Json[] = [];
 /** The East bowl's right-hand chute, down its middle (laid out with the Bowl below), for the Chutes run. */
 const EAST_CHUTE: XZ[] = [];
+/**
+ * Avalanche zones (milestone 21): slopes that can slide when a rider rides
+ * into them, each the ground swept by the fall lines from its `top` (left to
+ * right facing down) for `length` m. The East chutes' are laid with the
+ * chutes; the rest after the terrain (see AVALANCHE below).
+ */
+const avalanches: Json[] = [];
+/** A slab's depth (m), its front's top speed (m/s) and how far (m) it runs past a zone's foot. */
+const SLAB = { depth: 1, speed: 24, runout: 150 };
+function avalanche(name: string, top: XZ[], length: number, o: Partial<typeof SLAB> = {}): void {
+  avalanches.push({ name, top: top.map(xz), length: r1(length), ...SLAB, ...o });
+}
 
 /** The broad shape's settings, shared by the map's terrain and groundSoFar. */
 const SUMMIT = 3150;
@@ -362,6 +375,8 @@ elements.push({ type: 'bowl', ...xz(P('east', 82)), heading: r1(angle('east', 82
     const lip = Math.hypot(end.x - ch.top.x, end.z - ch.top.z);
     const at = (d: number, v = 0): XZ => rightOf({ x: ch.top.x - Math.sin(heading * DEG) * d, z: ch.top.z - Math.cos(heading * DEG) * d }, heading, v);
     if (ch.side > 0) for (let d = 0; d <= lip + 40; d += 20) EAST_CHUTE.push(at(d));
+    // The chute is avalanche terrain from its top to just past its air (milestone 21).
+    avalanche(ch.side < 0 ? 'Bowl: north chute' : 'Bowl: south chute', [at(0, -14), at(0, 14)], lip + 15);
     // Ribs either side, highest partway down, gone by the air.
     for (const v of [-19, 19]) {
       const pts = [[0, 1], [30, 6], [lip - 40, 8], [lip - 5, 3], [lip + 15, 0]].map(([d, h]) => xzh(at(d!, v), h!));
@@ -381,6 +396,23 @@ elements.push({ type: 'bowl', ...xz(P('east', 82)), heading: r1(angle('east', 82
   }
 }
 cliffs('east', 520, [[40, 0], [60, 3], [85, 4], [105, 3], [125, 0]]);
+// Avalanche zones (milestone 21), each `top` across the slope at r and `length` m down it. North: the two couloirs
+// down to their airs; the headwall either side of them down to band 1; the 42° face from band 1 to band 2, then on
+// over band 3; and the face's outer edges under each ridge. East: the headwall either side of the Entrance, through
+// its band (the chutes' are laid with them above).
+{
+  const across = (s: SpokeId, r: number, a0: number, a1: number): XZ[] => [P(s, r, a0), P(s, r, a1)];
+  avalanche('Steeps: main couloir', across('north', 100, -11, 11), (332 - 100) * K);
+  avalanche('Steeps: narrow chute', across('north', 100, -40, -18), (332 - 100) * K);
+  avalanche('Steeps: west headwall', across('north', 112, -200, -50), (298 - 112) * K);
+  avalanche('Steeps: east headwall', across('north', 112, 22, 200), (298 - 112) * K);
+  avalanche('Steeps: upper face', across('north', 312, -210, 205), (455 - 312) * K);
+  avalanche('Steeps: lower face', across('north', 468, -215, 205), (700 - 468) * K);
+  avalanche('Northwest ridge: north flank', across('north', 330, -325, -238), 300);
+  avalanche('Northeast ridge: north flank', across('north', 330, 238, 325), 300);
+  avalanche('Bowl: north headwall', across('east', 104, -165, -28), (245 - 104) * K);
+  avalanche('Bowl: south headwall', across('east', 104, 28, 165), (245 - 104) * K);
+}
 pillows('east', 915, -40, 240, 200, 40, [4, 8], [1.5, 4], 9);
 bumps('east', 1250, 0, 300, 1.4, 50, 11);
 // Lower down: a smaller pillow cluster and a little rock band.
@@ -1374,6 +1406,7 @@ function mapJson(): Json {
     // Off the named runs the mountain is powder; the town is groomed.
     powder: { groomed: [{ ...xz(T(TOWN.length / 2)), heading: r1(TH), width: TOWN.width, length: TOWN.length }] },
     gaps,
+    avalanches,
   };
 }
 
@@ -1437,6 +1470,32 @@ trackLines.forEach((line, k) => {
   console.log(`  ${TRACKS[k]!.face} cat track: ${line.length * TRACK.step} m, from ${g0.toFixed(0)} to ${g1.toFixed(0)} m (${((Math.atan((g0 - g1) / (line.length * TRACK.step)) * 180) / Math.PI).toFixed(1)}° on average)`);
 });
 warnings.push(...trackNotes);
+// Avalanche zones: their size and steepness, and which spots a rider respawns at (flags, finishes, the start) are on one.
+const DEGR = 180 / Math.PI;
+for (const z of built.course.avalanches?.zones ?? []) {
+  let sum = 0;
+  let n = 0;
+  let steepest = 0;
+  for (let l = 0; l < z.lanes; l++) {
+    for (let k = 0; k + 3 < Math.min(z.steps, z.length / LANE_STEP); k += 3) {
+      const a = l * z.steps + k;
+      const drop = h({ x: z.x[a]!, z: z.z[a]! }) - h({ x: z.x[a + 3]!, z: z.z[a + 3]! });
+      const deg = Math.atan(drop / (3 * LANE_STEP)) * DEGR;
+      sum += deg;
+      n++;
+      steepest = Math.max(steepest, deg);
+    }
+  }
+  const outline = zoneOutline(z);
+  console.log(`  avalanche ${z.name}: ${z.lanes} lanes, ${z.length.toFixed(0)} m + ${(z.end - z.length).toFixed(0)} m run-out, ${(sum / Math.max(1, n)).toFixed(0)}° on average (steepest ${steepest.toFixed(0)}°)`);
+  if (outline.some((p) => !insideBounds(hf.bounds, p.x, p.z))) warnings.push(`avalanche ${z.name} reaches outside the play area`);
+  const spots: [string, XZ][] = [['the start', built.map.spawn], ...built.map.flags.map((f, i): [string, XZ] => [`flag ${i + 1}`, f]), ...built.map.finishes.map((f, i): [string, XZ] => [`finish ${i + 1}`, f])];
+  for (const [what, p] of spots) {
+    const c = zoneCell(z, p.x, p.z);
+    // Respawning there never sets it off (placeInAvalanches), but a slide already running can still reach it.
+    if (c >= 0) console.log(`    ${what} is on its path (${z.cellStep[c]! * LANE_STEP <= z.length ? 'in the zone' : 'in the run-out'})`);
+  }
+}
 for (const w of warnings) console.log(`WARNING: ${w}`);
 writeFileSync('src/maps/freeride.json', JSON.stringify(map, null, 1) + '\n');
 console.log('wrote src/maps/freeride.json');

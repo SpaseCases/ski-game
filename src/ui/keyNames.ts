@@ -63,7 +63,7 @@ export const ACTION_NAMES: Record<Action, string> = {
   checkpoint: 'Set checkpoint',
   respawn: 'Respawn (hold for top)',
   confirm: 'Back to top at the finish',
-  trailMap: 'Trail map',
+  trailMap: 'Corner map',
   board: 'Leaderboard at the finish',
   camera: 'Camera: chase or first person',
   pause: 'Pause',

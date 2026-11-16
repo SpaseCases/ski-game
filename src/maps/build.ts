@@ -1,3 +1,4 @@
+import { buildAvalanches } from '../sim/avalanche.ts';
 import { buildGaps, type Gaps } from '../sim/gaps.ts';
 import { buildLifts } from '../sim/lift.ts';
 import { buildObstacles, type Course } from '../sim/obstacles.ts';
@@ -41,6 +42,8 @@ export function buildMap(map: MapDef): BuiltMap {
   const course: Course = { hf, rails, obstacles, powder: powderArea(map) };
   const lifts = buildLifts(decor.lines, hf);
   if (lifts) course.lifts = lifts;
+  const avalanches = buildAvalanches(map.avalanches, hf);
+  if (avalanches) course.avalanches = avalanches;
   return { map, hf, starts, course, race: buildRace(map.features, map.finishes, hf), decor, gaps: buildGaps(map) };
 }
 

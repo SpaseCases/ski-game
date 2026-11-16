@@ -1,6 +1,7 @@
 import { TUNING } from './tuning.ts';
 import type { Heightfield, ObstacleDef, RailShape } from '../maps/types.ts';
 import type { Lifts } from './lift.ts';
+import type { Avalanches } from './avalanche.ts';
 import type { PowderArea } from './powder.ts';
 import { heightAt, type Vec3Like } from './terrain.ts';
 
@@ -44,6 +45,8 @@ export interface Course {
   powder: PowderArea | null;
   /** Chairlifts riders can take (milestone 17), with their clock; absent on a map with none. */
   lifts?: Lifts;
+  /** Avalanche zones and their slides (milestone 21); absent on a map with none. Only stepAvalanches moves them. */
+  avalanches?: Avalanches;
 }
 
 const CELL = 8;

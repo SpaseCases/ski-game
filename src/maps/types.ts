@@ -1023,6 +1023,26 @@ export interface MapDef {
   sky?: { sun?: SkyAt; moon?: SkyAt };
   /** Named gaps for scoring (the Cat gap). Open gap jumps, rail transfers and fence hops score on their own. */
   gaps?: GapDef[];
+  /** Slopes that can slide when a rider rides into them (Freeride, milestone 21); none on a map without. */
+  avalanches?: AvalancheDef[];
+}
+
+/**
+ * An avalanche zone (milestone 21). Its outline is the ground swept by the
+ * fall lines from `top` (a line across the slope's top, left to right
+ * facing down) for `length` m, measured from above; riding into it can
+ * crack a slab above the rider, which slides down those fall lines,
+ * building to `speed` m/s, and runs on `runout` m past the zone's foot,
+ * slowing to a stop. `depth` (m) is the slab's thickness: a rider higher
+ * than that over the snow (in the air) is passed under.
+ */
+export interface AvalancheDef {
+  name: string;
+  top: XZ[];
+  length: number;
+  depth: number;
+  speed: number;
+  runout: number;
 }
 
 /**

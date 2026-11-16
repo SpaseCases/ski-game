@@ -150,6 +150,8 @@ export interface PauseActions {
   settings: () => void;
   cheats: () => void;
   leaderboards: () => void;
+  /** The full trail map (milestone 21: the trail-map key only shows and hides the corner map). */
+  trailMap: () => void;
   /** Leaves the map for the title. */
   mainMenu: () => void;
   /** The weather picked, and picking another (it changes behind the menu at once). */
@@ -171,6 +173,7 @@ export class PauseScreen extends PlankScreen {
     this.resume = this.addItem('Resume', actions.resume);
     this.respawn = this.addItem('Respawn', actions.respawn);
     this.addItem('Back to top', actions.backToTop);
+    this.addItem('Trail map', actions.trailMap);
     // Enter steps to the next weather, and left and right step either way.
     this.weather = this.addItem('Weather', () => this.stepWeather(1));
     this.weather.classList.add('weather-plank');

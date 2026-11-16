@@ -5,6 +5,7 @@ import type { BuiltMap } from '../maps/build.ts';
 import { thinDecor } from '../maps/decor.ts';
 import type { RunState } from '../sim/checkpoints.ts';
 import type { RaceState } from '../sim/race.ts';
+import { AvalancheView } from './avalancheView.ts';
 import { ChairliftView } from './chairlifts.ts';
 import { ExpressLiftView } from './expressLift.ts';
 import { LightPools } from './lightPools.ts';
@@ -39,6 +40,8 @@ export class WorldView {
   /** The chairlift riders can take (milestone 17), or null. */
   private readonly express: ExpressLiftView | null;
   private readonly smoke: SmokeView;
+  /** Avalanches' crack lines and running fronts (milestone 21), or null on a map without zones. */
+  private readonly avalanches: AvalancheView | null;
   /** Spray, tracks, sparks and blowing snow (see render/snowFx.ts); rebuilt for another quality preset. */
   snow: SnowFx;
   /** Night lights: the lamps' and headlamp's pools of light, and the lamps' halos. */
@@ -73,6 +76,8 @@ export class WorldView {
     if (this.express) this.group.add(this.express.group);
     this.smoke = new SmokeView(map.features, hf);
     if (this.smoke.mesh) this.group.add(this.smoke.mesh);
+    this.avalanches = course.avalanches ? new AvalancheView(course.avalanches, hf) : null;
+    if (this.avalanches) this.group.add(this.avalanches.group);
     this.snow = new SnowFx(built, fx);
     this.group.add(this.snow.group);
     this.lights = new LightPools(built.decor, hf);
@@ -137,6 +142,7 @@ export class WorldView {
     this.lifts.update(frameTime, this.camX, this.camZ, this.range);
     this.express?.update(alpha, this.camX, this.camZ, this.range);
     this.smoke.update(frameTime, this.camX, this.camZ, this.range);
+    this.avalanches?.update(frameTime);
     clothTime.value += frameTime;
   }
 
