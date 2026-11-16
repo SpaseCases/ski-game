@@ -29,6 +29,8 @@ const qAxis = new Quaternion();
 const inverse = new Quaternion();
 const headUp = new Vector3();
 const DOWN = new Vector3(0, -1, 0);
+/** Grabs (GRAB_ACTIONS indices) that read only with the legs drawn while looking down: both japans and the spread eagle. */
+const LEG_GRABS: readonly number[] = [2, 6, 13];
 const heading = new Vector3();
 const grabView = new Quaternion();
 const chasePos = new Vector3();
@@ -63,8 +65,9 @@ export class FirstPerson {
   private readonly takeoffHead = new Quaternion();
   private readonly takeoffView = new Quaternion();
   private roll = 0;
-  /** How far the view has turned to look down at the skis for a grab (0..1). */
+  /** How far the view has turned to look down at the skis for a grab (0..1), and the grab it last looked at (kept while easing back up). */
   grabLook = 0;
+  lastGrab = -1;
   private lookYaw = 0;
   private lookPitch = 0;
   private sinceDrag = Infinity;
@@ -117,6 +120,7 @@ export class FirstPerson {
 
     // A grab or style move held in the air looks down at the skis, so the grab shows.
     const grabTo = flying && pose.grab >= 0 ? 1 : 0;
+    if (pose.grab >= 0) this.lastGrab = pose.grab;
     this.grabLook += (grabTo - this.grabLook) * (snap ? 1 : smoothing(c.firstGrabRate, frameTime));
 
     // Drag to look: right looks right, down looks down (the chase camera's orbit turns the same way).
@@ -261,7 +265,8 @@ export class GameCamera {
     // looking down at a grab, all but the mittens, poles, boots and skis (the rest would fill the view from inches away).
     const atEye = cam.position.distanceToSquared(first.eye) < c.firstHideRange * c.firstHideRange;
     const flying = !pose.grounded && !pose.bailed && !pose.onRail;
-    rig.setHidden(atEye, atEye && flying && this.firstAir === 'level', atEye && first.grabLook > 0.2);
+    const grab = !atEye || first.grabLook <= 0.2 ? 0 : LEG_GRABS.includes(first.lastGrab) ? 2 : 1;
+    rig.setHidden(atEye, atEye && flying && this.firstAir === 'level', grab);
   }
 }
 

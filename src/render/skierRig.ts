@@ -146,7 +146,7 @@ export class SkierRig {
   /** First person: the head is hidden; the body below the neck is hidden too (all but the boots and skis). See setHidden. */
   private headHidden = false;
   private bodyHidden = false;
-  private grabHidden = false;
+  private grabHidden: 0 | 1 | 2 = 0;
 
   constructor(outfit: Outfit = DEFAULT_OUTFIT) {
     this.outfit = { ...outfit };
@@ -253,28 +253,30 @@ export class SkierRig {
   /**
    * First person (milestone 18): hides the head (with the helmet or hat, the
    * goggles, the strap, the hood and the hat's and the pumpkin's child
-   * meshes); with `grab` everything but the forearms (mittens), poles,
+   * meshes); with `grab` 1 everything but the forearms (mittens), poles,
    * boots and skis (looking straight down at a grab, the jacket and legs
-   * would fill the view from inches away); with `body` everything but the
-   * boots and skis. Only visibility changes, so nothing is rebuilt and no
-   * draw call is added.
+   * would fill the view from inches away), and with 2 the legs stay too (a
+   * japan or a spread eagle reads only with them); with `body` everything
+   * but the boots and skis. Only visibility changes, so nothing is rebuilt
+   * and no draw call is added.
    */
-  setHidden(head: boolean, body: boolean, grab = false): void {
+  setHidden(head: boolean, body: boolean, grab: 0 | 1 | 2 = 0): void {
     if (head === this.headHidden && body === this.bodyHidden && grab === this.grabHidden) return;
     this.headHidden = head;
     this.bodyHidden = body;
     this.grabHidden = grab;
     this.head.visible = !head;
     const shown = !body;
-    const bodyShown = shown && !grab;
-    this.pelvis.visible = bodyShown;
+    const bodyShown = shown && grab === 0;
+    const legsShown = shown && grab !== 1;
+    this.pelvis.visible = legsShown;
     this.torso.visible = bodyShown;
     this.hem.mesh.visible = bodyShown;
     for (let i = 0; i < 2; i++) {
       this.upperArms[i]!.visible = bodyShown;
       this.forearms[i]!.visible = shown;
-      this.thighs[i]!.visible = bodyShown;
-      this.shins[i]!.visible = bodyShown;
+      this.thighs[i]!.visible = legsShown;
+      this.shins[i]!.visible = legsShown;
     }
     this.setPoles();
   }
