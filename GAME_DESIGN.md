@@ -24,7 +24,7 @@ The right hand works the arrow keys. The left hand handles grabs, pole push, and
 | Q / E | — | Lincoln loop left / right | — |
 | Tab | Set personal checkpoint | — | — |
 | R | Respawn at last checkpoint (hold 1s: back to top) | same | same |
-| M | Show or hide the corner trail map (saved; the game keeps running). The full trail map is in the pause menu or behind the HUD's Trail map button; M or Esc closes it | same | same |
+| M | Show or hide the corner trail map on Freeride and the City (saved; the game keeps running; the lane maps have no corner map). The full trail map is in the pause menu or behind the HUD's Trail map button; M or Esc closes it | same | same |
 | H | Switch between the chase camera and first person (saved; also on the chairlift) | same | same |
 | Esc or P | Pause menu (P also works in fullscreen, where the browser takes Esc) | same | same |
 

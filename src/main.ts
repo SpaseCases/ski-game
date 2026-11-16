@@ -631,7 +631,8 @@ async function loadMap(entry: MapEntry): Promise<void> {
     const art = await drawMapArt(built, nextTask);
     if (level?.built !== built) return;
     mapArt = art;
-    cornerMap.setMap(art);
+    // Only the open maps (Freeride, the City) show the corner map; the lane maps leave the corner clear.
+    cornerMap.setMap(entry.cornerMap ? art : null);
     // The first frame also uploads every mesh to the GPU: draw it behind "Loading" too.
     await nextPaint();
     mapSelect.setLoading(null);
@@ -778,6 +779,8 @@ function closeTrailMap(): void {
 
 /** The trail-map key while riding: shows or hides the corner map (saved), mid-air or on a rail alike. */
 function toggleCornerMap(): void {
+  // A lane map has no corner map (the full map is in the pause menu): the key does nothing there.
+  if (!mapEntry(level?.id ?? null)?.cornerMap) return;
   settings.cornerMap = !settings.cornerMap;
   cornerMap.setShown(settings.cornerMap);
   saveSettings(settings);

@@ -10,6 +10,13 @@ export interface MapEntry {
   blurb: string;
   /** Fetches the map file's JSON. Absent: not built yet. */
   load?: () => Promise<unknown>;
+  /**
+   * Shows the corner trail map while riding (milestone 21). Only the open
+   * maps, where you can ride any direction, need one: on a lane map the
+   * way down is plain, so the corner stays clear (the full map is still in
+   * the pause menu). The trail-map key does nothing on a map without it.
+   */
+  cornerMap?: boolean;
 }
 
 export const MAPS: readonly MapEntry[] = [
@@ -36,12 +43,14 @@ export const MAPS: readonly MapEntry[] = [
     name: 'Freeride',
     blurb: 'Start on the summit and ride down any side: steep couloirs and cliffs, a corniced bowl, glades, and a long gully.',
     load: () => import('./freeride.json').then((m) => m.default),
+    cornerMap: true,
   },
   {
     id: 'city',
     name: 'City',
     blurb: 'A snowed-in city on a hill: drop out of the walled old town and ride any side down, by street, alley, stairs or rooftop, to downtown, the rail yards, the old town or the hillside homes. Stair sets and handrails, ledges, wallrides, bonks and rooftop gaps.',
     load: () => import('./city.json').then((m) => m.default),
+    cornerMap: true,
   },
   {
     id: 'slalom',
