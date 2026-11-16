@@ -28,6 +28,9 @@ const qStep = new Quaternion();
 const qAxis = new Quaternion();
 const inverse = new Quaternion();
 const headUp = new Vector3();
+const DOWN = new Vector3(0, -1, 0);
+const heading = new Vector3();
+const grabView = new Quaternion();
 const chasePos = new Vector3();
 const chaseQ = new Quaternion();
 const chaseUp = new Vector3();
@@ -60,6 +63,8 @@ export class FirstPerson {
   private readonly takeoffHead = new Quaternion();
   private readonly takeoffView = new Quaternion();
   private roll = 0;
+  /** How far the view has turned to look down at the skis for a grab (0..1). */
+  grabLook = 0;
   private lookYaw = 0;
   private lookPitch = 0;
   private sinceDrag = Infinity;
@@ -75,6 +80,7 @@ export class FirstPerson {
       this.lookYaw = 0;
       this.lookPitch = 0;
       this.roll = 0;
+      this.grabLook = 0;
       this.locked = false;
       this.sinceDrag = Infinity;
     }
@@ -109,6 +115,10 @@ export class FirstPerson {
     const rollTo = carving ? pose.lean * c.firstLeanShare * facing : 0;
     this.roll += (rollTo - this.roll) * (snap ? 1 : smoothing(c.firstLeanRate, frameTime));
 
+    // A grab or style move held in the air looks down at the skis, so the grab shows.
+    const grabTo = flying && pose.grab >= 0 ? 1 : 0;
+    this.grabLook += (grabTo - this.grabLook) * (snap ? 1 : smoothing(c.firstGrabRate, frameTime));
+
     // Drag to look: right looks right, down looks down (the chase camera's orbit turns the same way).
     this.lookYaw = clamp(this.lookYaw - drag.x * c.orbitSensitivity, -c.firstLookYawMax, c.firstLookYawMax);
     this.lookPitch = clamp(this.lookPitch - drag.y * c.orbitSensitivity, c.firstLookPitchMin, c.firstLookPitchMax);
@@ -125,6 +135,17 @@ export class FirstPerson {
     if (this.lookYaw !== 0) q.premultiply(qAxis.setFromAxisAngle(this.up, this.lookYaw));
     if (this.roll !== 0) q.multiply(qAxis.setFromAxisAngle(Z_AXIS, this.roll));
     if (this.lookPitch !== 0) q.multiply(qAxis.setFromAxisAngle(X_AXIS, this.lookPitch));
+    if (this.grabLook > 0.001) {
+      // Panned straight down at the snow below, keeping the view's heading at the top of the screen (no roll).
+      heading.set(0, 0, -1).applyQuaternion(q);
+      heading.y = 0;
+      if (heading.lengthSq() < 1e-4) heading.set(0, 1, 0).applyQuaternion(q).setY(0);
+      if (heading.lengthSq() < 1e-4) heading.set(-Math.sin(pose.yaw), 0, -Math.cos(pose.yaw));
+      look.lookAt(ORIGIN, DOWN, heading.normalize());
+      grabView.setFromRotationMatrix(look);
+      const g = this.grabLook;
+      q.slerp(grabView, g * g * (3 - 2 * g));
+    }
 
     // The eye turns round the head's middle toward where the view looks, as
     // a head turns: looking sideways or back (riding switch, dragging, a
@@ -236,10 +257,11 @@ export class GameCamera {
     // Halfway between, the straight line can cut under a crest: keep it over the snow.
     if (w < 1) cam.position.y = Math.max(cam.position.y, drawnHeightAt(hf, cam.position.x, cam.position.z) + c.firstClearance);
     setFov(cam, CONFIG.render.fov + (c.firstFov - CONFIG.render.fov) * w);
-    // At the eye the head goes (it would fill the view); in the air with "Level" the body too, but for the skis.
+    // At the eye the head goes (it would fill the view); in the air with "Level" the body too, but for the skis;
+    // looking down at a grab, all but the mittens, poles, boots and skis (the rest would fill the view from inches away).
     const atEye = cam.position.distanceToSquared(first.eye) < c.firstHideRange * c.firstHideRange;
     const flying = !pose.grounded && !pose.bailed && !pose.onRail;
-    rig.setHidden(atEye, atEye && flying && this.firstAir === 'level');
+    rig.setHidden(atEye, atEye && flying && this.firstAir === 'level', atEye && first.grabLook > 0.2);
   }
 }
 

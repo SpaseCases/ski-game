@@ -146,6 +146,7 @@ export class SkierRig {
   /** First person: the head is hidden; the body below the neck is hidden too (all but the boots and skis). See setHidden. */
   private headHidden = false;
   private bodyHidden = false;
+  private grabHidden = false;
 
   constructor(outfit: Outfit = DEFAULT_OUTFIT) {
     this.outfit = { ...outfit };
@@ -252,23 +253,28 @@ export class SkierRig {
   /**
    * First person (milestone 18): hides the head (with the helmet or hat, the
    * goggles, the strap, the hood and the hat's and the pumpkin's child
-   * meshes), and with `body` everything else but the boots and skis. Only
-   * visibility changes, so nothing is rebuilt and no draw call is added.
+   * meshes); with `grab` everything but the forearms (mittens), poles,
+   * boots and skis (looking straight down at a grab, the jacket and legs
+   * would fill the view from inches away); with `body` everything but the
+   * boots and skis. Only visibility changes, so nothing is rebuilt and no
+   * draw call is added.
    */
-  setHidden(head: boolean, body: boolean): void {
-    if (head === this.headHidden && body === this.bodyHidden) return;
+  setHidden(head: boolean, body: boolean, grab = false): void {
+    if (head === this.headHidden && body === this.bodyHidden && grab === this.grabHidden) return;
     this.headHidden = head;
     this.bodyHidden = body;
+    this.grabHidden = grab;
     this.head.visible = !head;
     const shown = !body;
-    this.pelvis.visible = shown;
-    this.torso.visible = shown;
-    this.hem.mesh.visible = shown;
+    const bodyShown = shown && !grab;
+    this.pelvis.visible = bodyShown;
+    this.torso.visible = bodyShown;
+    this.hem.mesh.visible = bodyShown;
     for (let i = 0; i < 2; i++) {
-      this.upperArms[i]!.visible = shown;
+      this.upperArms[i]!.visible = bodyShown;
       this.forearms[i]!.visible = shown;
-      this.thighs[i]!.visible = shown;
-      this.shins[i]!.visible = shown;
+      this.thighs[i]!.visible = bodyShown;
+      this.shins[i]!.visible = bodyShown;
     }
     this.setPoles();
   }

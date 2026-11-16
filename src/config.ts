@@ -650,6 +650,13 @@ export const CONFIG = {
     firstBobRate: 1.9,
     /** Lowest the eye goes over the drawn snow (m). */
     firstClearance: 0.3,
+    /**
+     * Holding a grab or style move in the air, the view pans straight down
+     * at the snow below (the way it was heading at the top of the screen),
+     * showing only the mittens, poles, boots and skis, easing in and out at
+     * firstGrabRate per second.
+     */
+    firstGrabRate: 6,
     /** Drag to look: how far (radians) up and down, and either way round. */
     firstLookPitchMin: -1.1,
     firstLookPitchMax: 0.9,
