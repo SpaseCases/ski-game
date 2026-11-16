@@ -143,6 +143,9 @@ export class SkierRig {
   private readonly material = new MeshLambertMaterial({ vertexColors: true, flatShading: true });
   private readonly glowMaterial = new MeshBasicMaterial({ color: FIXED.carvedDark });
   private outfit: Outfit;
+  /** First person: the head is hidden; the body below the neck is hidden too (all but the boots and skis). See setHidden. */
+  private headHidden = false;
+  private bodyHidden = false;
 
   constructor(outfit: Outfit = DEFAULT_OUTFIT) {
     this.outfit = { ...outfit };
@@ -243,7 +246,44 @@ export class SkierRig {
   }
 
   private setPoles(): void {
-    for (const m of this.poles) m.visible = this.outfit.poles;
+    for (const m of this.poles) m.visible = this.outfit.poles && !this.bodyHidden;
+  }
+
+  /**
+   * First person (milestone 18): hides the head (with the helmet or hat, the
+   * goggles, the strap, the hood and the hat's and the pumpkin's child
+   * meshes), and with `body` everything else but the boots and skis. Only
+   * visibility changes, so nothing is rebuilt and no draw call is added.
+   */
+  setHidden(head: boolean, body: boolean): void {
+    if (head === this.headHidden && body === this.bodyHidden) return;
+    this.headHidden = head;
+    this.bodyHidden = body;
+    this.head.visible = !head;
+    const shown = !body;
+    this.pelvis.visible = shown;
+    this.torso.visible = shown;
+    this.hem.mesh.visible = shown;
+    for (let i = 0; i < 2; i++) {
+      this.upperArms[i]!.visible = shown;
+      this.forearms[i]!.visible = shown;
+      this.thighs[i]!.visible = shown;
+      this.shins[i]!.visible = shown;
+    }
+    this.setPoles();
+  }
+
+  /**
+   * The middle of the head at the goggles' height (`middle`) and how the
+   * head is turned (`orientation`), in world space, for the pose last
+   * applied; the eyes are EYE_FORWARD in front of that middle. It brings the
+   * head's world matrix (and its parents') up to date to read them; nothing
+   * allocates.
+   */
+  eye(middle: Vector3, orientation: Quaternion): void {
+    this.head.updateWorldMatrix(true, false);
+    this.head.matrixWorld.decompose(middle, orientation, eyeScale);
+    middle.copy(HEAD_MIDDLE).applyMatrix4(this.head.matrixWorld);
   }
 
   /** How brightly the pumpkin's carved face glows: 0 by day (a dark hollow), 1 at night. */
@@ -983,6 +1023,15 @@ const GOGGLE_DEPTH = 1.12;
 const goggleHalf: AngleFn = (a) => 0.034 + 0.011 * Math.max(0, Math.cos((a * Math.PI) / (2 * GOGGLE_SPAN)));
 const goggleNose: AngleFn = (a) => 0.016 * Math.max(0, 1 - Math.abs(a) / 0.28) ** 2;
 const goggleOuter: AngleFn = (a) => 0.122 - 0.016 * smooth01((Math.abs(a) - 1.1) / 0.5);
+/**
+ * First person (milestone 18): how far the eyes sit in front of the head's
+ * middle, at the goggles' height: just inside the lens. Built from the
+ * goggles' own numbers, so every headwear (the pumpkin too) puts the eye in
+ * the same place. Looking round turns the eye round the head's middle.
+ */
+export const EYE_FORWARD = (goggleOuter(0) - 0.002) * GOGGLE_DEPTH;
+const HEAD_MIDDLE = new Vector3(0, GOGGLE_Y, 0);
+const eyeScale = new Vector3();
 
 // Helmet: a snug, rounded low-profile shell. Across the front its edge
 // rests on the goggle frame; past the lens it sweeps down over the ears and

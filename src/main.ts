@@ -20,6 +20,7 @@ import {
   urlQuality,
   viewRange,
   wantsAntialias,
+  type CameraView,
   type Quality,
   type QualityLevel,
 } from './core/settings.ts';
@@ -31,6 +32,7 @@ import { mapEntry, MAPS, type MapEntry, type MapId } from './maps/registry.ts';
 import type { RailShape } from './maps/types.ts';
 import { CONFIG } from './config.ts';
 import { ChaseCamera, type OrbitDrag } from './render/chaseCamera.ts';
+import { GameCamera } from './render/firstPerson.ts';
 import { clothTime } from './render/cloth.ts';
 import { LockerStage, type Rect } from './render/lockerStage.ts';
 import { AutoQuality } from './render/autoQuality.ts';
@@ -212,6 +214,12 @@ const settingsScreen = new SettingsScreen(
     setPopWith: (key) => {
       settings.popWith = key;
       keyboard.setPopWithUp(key === 'up');
+      saveSettings(settings);
+    },
+    setCamera: (v) => setCameraView(v, false),
+    setFirstAir: (air) => {
+      settings.firstAir = air;
+      gameCamera.firstAir = air;
       saveSettings(settings);
     },
     setBindings,
@@ -499,6 +507,10 @@ applyView();
 const pose = createSkierPose();
 let skierView: SkierView | null = null;
 let chase: ChaseCamera | null = null;
+/** The chase camera or first person (milestone 18), and the ease between them. */
+const gameCamera = new GameCamera(camera);
+gameCamera.view = settings.camera;
+gameCamera.firstAir = settings.firstAir;
 const orbit = new PointerOrbit();
 orbit.attach(renderer.domElement);
 const drag: OrbitDrag = { x: 0, y: 0, active: false };
@@ -683,6 +695,8 @@ function drawLocker(screen: { viewRect(): Rect }, realFrameTime: number): void {
   if (rect.width <= 0 || rect.height <= 0) return;
   lockerStage.turn(realFrameTime);
   clothTime.value += realFrameTime;
+  // The Locker always shows the whole skier, first person or not (the game camera hides the head again next frame).
+  skierView?.rig.setHidden(false, false);
   if (level && skierView) lockerStage.renderWorld(view, rect, pose.center, level.built.hf, level.built.course.obstacles);
   else lockerStage.renderStage(renderer, rect);
 }
@@ -770,6 +784,16 @@ function syncKeyLabels(): void {
   runHud.setKeys(mainKey(b, 'confirm'), mainKey(b, 'respawn'));
   raceAgainHint = `${mainKey(b, 'respawn')}: race it again`;
   online?.finish.setKey(mainKey(b, 'board'));
+}
+
+/** The chase camera or first person: eased into, saved, and (from the camera key) said in a toast. */
+function setCameraView(v: CameraView, announce: boolean): void {
+  settings.camera = v;
+  gameCamera.view = v;
+  saveSettings(settings);
+  if (!announce) return;
+  const key = mainKey(settings.bindings, 'camera');
+  toast.show(v === 'first' ? `First person (${key}: chase camera)` : `Chase camera (${key}: first person)`);
 }
 
 /** Switches to a quality preset (and remembers it): view range, decoration and pixel ratio. */
@@ -949,6 +973,9 @@ if (import.meta.env.DEV) {
         return outfit;
       },
       setOutfit,
+      /** The game camera (milestone 18) and the switch the camera key makes ('chase' or 'first'). */
+      gameCamera,
+      setCameraView: (v: CameraView) => setCameraView(v, true),
       /** Sound: voices() reads each continuous sound's gain; play(id) plays a one-shot; renderWavs() saves every sound into .playwright-mcp/audio/. */
       audio: {
         voices: () => sound.voices(),
@@ -1011,6 +1038,7 @@ startLoop(
       return;
     }
     if (keys.board.pressed && run.finished) toggleFinishBoard();
+    if (keys.camera.pressed) setCameraView(settings.camera === 'first' ? 'chase' : 'first', true);
     if (keys.checkpoint.pressed) {
       if (timedRun()) {
         toast.show('No checkpoints on a timed run');
@@ -1054,14 +1082,15 @@ startLoop(
       const snapped = snapView;
       if (snapView) {
         skierView.snap(pose);
-        chase.snap(pose);
+        gameCamera.snap();
         level.world.snow.snap(skier);
         snapView = false;
       }
-      skierView.update(pose, frameTime);
+      // The Locker always shows the plain pose; first person raises the arms into view.
+      skierView.update(pose, frameTime, stageScreen ? 0 : gameCamera.firstWeight);
       orbit.take(drag);
       drag.active = orbit.dragging;
-      chase.update(pose, frameTime, drag);
+      gameCamera.update(chase, pose, skierView.rig, level.built.hf, frameTime, drag);
       if (freeCamera) {
         camera.position.copy(freeCamera.from);
         camera.lookAt(freeCamera.at);

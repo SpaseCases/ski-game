@@ -1,5 +1,5 @@
 import { DEFAULT_BINDINGS, type Action, type Bindings } from '../core/input.ts';
-import { assignKey, clearSecondKey, KEY_SLOTS, QUALITIES, wantsAntialias, type PopWith, type Quality, type Settings } from '../core/settings.ts';
+import { assignKey, clearSecondKey, KEY_SLOTS, QUALITIES, wantsAntialias, type CameraView, type FirstAir, type PopWith, type Quality, type Settings } from '../core/settings.ts';
 import { CONFIG } from '../config.ts';
 import { ACTION_NAMES, keyName, mainKey } from './keyNames.ts';
 import { addBackButton, board, setHints, type Screen } from './menus.ts';
@@ -36,7 +36,7 @@ const KEY_GROUPS: readonly (readonly [string, readonly Action[]])[] = [
     ],
   ],
   ['Style moves', ['styleSeaman', 'styleDaffy', 'styleIronCross', 'styleSpreadEagle']],
-  ['Run', ['checkpoint', 'respawn', 'confirm', 'trailMap', 'board', 'pause']],
+  ['Run', ['checkpoint', 'respawn', 'confirm', 'trailMap', 'board', 'camera', 'pause']],
 ];
 
 /** Keys that can't be bound: Esc (menus and pause) and the system's own keys. */
@@ -65,6 +65,10 @@ export interface SettingsHooks {
   setCrashWait: (wait: boolean) => void;
   /** Pop with the pop key or with ↑. */
   setPopWith: (key: PopWith) => void;
+  /** The chase camera or first person (the camera key switches too). */
+  setCamera: (view: CameraView) => void;
+  /** First person in the air: head-locked or level. */
+  setFirstAir: (air: FirstAir) => void;
   setBindings: (b: Bindings) => void;
   /** The Controls screen (what every key does, and the key tester). */
   openControls: () => void;
@@ -90,6 +94,9 @@ export class SettingsScreen implements Screen {
   private readonly score: HTMLButtonElement;
   private readonly crashButtons = new Map<boolean, HTMLButtonElement>();
   private readonly crashNote: HTMLElement;
+  private readonly cameraButtons = new Map<CameraView, HTMLButtonElement>();
+  private readonly airButtons = new Map<FirstAir, HTMLButtonElement>();
+  private readonly cameraNote: HTMLElement;
   private readonly popButtons = new Map<PopWith, HTMLButtonElement>();
   private readonly popNote: HTMLElement;
   private readonly slots = new Map<string, HTMLButtonElement>();
@@ -196,6 +203,26 @@ export class SettingsScreen implements Screen {
     this.crashNote.className = 'setting-note';
     crashes.append(labelRow('After a crash', crashGroup), this.crashNote);
 
+    // Camera (milestone 18): chase or first person, and what first person does in the air.
+    const cameraSection = section('Camera');
+    const viewGroup = segmented('Camera', [
+      ['chase', 'Chase'],
+      ['first', 'First person'],
+    ] as const, this.cameraButtons, (v) => {
+      this.hooks.setCamera(v);
+      this.syncCamera();
+    });
+    const airGroup = segmented('First person in the air', [
+      ['head', 'Head-locked'],
+      ['level', 'Level'],
+    ] as const, this.airButtons, (air) => {
+      this.hooks.setFirstAir(air);
+      this.syncCamera();
+    });
+    this.cameraNote = document.createElement('p');
+    this.cameraNote.className = 'setting-note';
+    cameraSection.append(labelRow('View', viewGroup), labelRow('First person in the air', airGroup), this.cameraNote);
+
     // Saved data: erase everything this browser keeps, after a second press to confirm.
     const data = section('Saved data');
     this.wipe = document.createElement('button');
@@ -300,7 +327,7 @@ export class SettingsScreen implements Screen {
     columns.className = 'settings-columns';
     const left = document.createElement('div');
     left.className = 'settings-column';
-    left.append(picture, sound, scoring, crashes, data);
+    left.append(picture, sound, scoring, crashes, cameraSection, data);
     columns.append(left, keys);
     b.body.appendChild(columns);
     setHints(b.foot, [
@@ -410,6 +437,17 @@ export class SettingsScreen implements Screen {
         : `${up} crouches and pops on the snow and on rails, and front-flips once you're in the air. ${pop} does nothing.`;
   }
 
+  private syncCamera(): void {
+    const s = this.hooks.get();
+    for (const [v, btn] of this.cameraButtons) btn.setAttribute('aria-pressed', String(v === s.camera));
+    for (const [air, btn] of this.airButtons) btn.setAttribute('aria-pressed', String(air === s.firstAir));
+    const key = mainKey(s.bindings, 'camera');
+    this.cameraNote.textContent =
+      s.firstAir === 'head'
+        ? `${key} switches while riding. In the air first person turns with your head, so flips and spins turn the world round.`
+        : `${key} switches while riding. In the air first person looks where you're flying with the horizon level, and shows only your skis.`;
+  }
+
   private syncCrash(): void {
     const s = this.hooks.get();
     for (const [wait, btn] of this.crashButtons) btn.setAttribute('aria-pressed', String(wait === s.crashWait));
@@ -456,6 +494,7 @@ export class SettingsScreen implements Screen {
 
   private syncKeys(): void {
     this.syncCrash();
+    this.syncCamera();
     this.syncPop();
     const s = this.hooks.get();
     const b = s.bindings;
@@ -504,6 +543,24 @@ function labelRow(label: string, ...controls: HTMLElement[]): HTMLElement {
   box.append(...controls);
   row.append(name, box);
   return row;
+}
+
+/** A row of segment buttons for one choice, each kept in `buttons` under its value. */
+function segmented<T>(label: string, choices: readonly (readonly [T, string])[], buttons: Map<T, HTMLButtonElement>, pick: (value: T) => void): HTMLElement {
+  const group = document.createElement('div');
+  group.className = 'segmented';
+  group.setAttribute('role', 'group');
+  group.setAttribute('aria-label', label);
+  for (const [value, text] of choices) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'segment';
+    btn.textContent = text;
+    btn.addEventListener('click', () => pick(value));
+    group.appendChild(btn);
+    buttons.set(value, btn);
+  }
+  return group;
 }
 
 function slider(label: string): [HTMLInputElement, HTMLElement] {

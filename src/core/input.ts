@@ -15,6 +15,7 @@ export type Action =
   | 'confirm'
   | 'trailMap'
   | 'board'
+  | 'camera'
   | 'pause'
   | GrabAction;
 
@@ -56,6 +57,7 @@ export const ACTIONS: readonly Action[] = [
   'confirm',
   'trailMap',
   'board',
+  'camera',
   'pause',
   ...GRAB_ACTIONS,
 ];
@@ -78,6 +80,8 @@ export const DEFAULT_BINDINGS: Bindings = {
   trailMap: ['KeyM'],
   // Hides or shows the leaderboard at the finish line.
   board: ['KeyL'],
+  // Switches between the chase camera and first person (milestone 18).
+  camera: ['KeyH'],
   // Esc opens the pause menu too, but it isn't a binding: in fullscreen the browser takes it.
   pause: ['KeyP'],
   grabLeftMute: ['KeyA'],

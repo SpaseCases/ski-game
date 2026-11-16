@@ -221,7 +221,12 @@ export class SkierView {
     this.skateArms = !this.rig.hasPoles && pose.polePhase < 1 ? 1 : 0;
   }
 
-  update(state: SkierPose, frameTime: number): void {
+  /**
+   * `firstArms` (0..1): how far into first person the game camera is
+   * (milestone 18). The hands come up and forward and the poles angle ahead,
+   * so arms and poles show at the bottom of the eye's view.
+   */
+  update(state: SkierPose, frameTime: number, firstArms = 0): void {
     const r = CONFIG.render;
     const ease = 1 - Math.exp(-r.tiltSmoothing * frameTime);
 
@@ -332,6 +337,7 @@ export class SkierView {
     // down the hill, and a little against each turn.
     const counter = -swing * r.brakeCounter - leanTotal * r.turnCounter * onSnow * (1 - deep);
     angulate(p, bodyLean, leanTotal - bodyLean, counter, onSnow, deep);
+    if (firstArms > 0) raiseArms(p, firstArms * live, deep);
     this.rig.apply(p);
     // On a rail the skis rest on the rail, not the snow.
     this.sitOnDrawnSnow(onSnow * (1 - this.railWeight) * (state.sitting ? 0 : 1));
@@ -427,6 +433,37 @@ function angulate(p: PoseBuffer, bodyLean: number, legLean: number, counter: num
     turnY(h.at, c, s, p.pelvis[0], p.pelvis[2]);
     turnY(h.pole, c, s, 0, 0);
     turnY(h.elbow, c, s, 0, 0);
+  }
+}
+
+/**
+ * First person: how far the hands move from where the pose put them (skier
+ * space, left hand; the right mirrors x), and how far the poles turn: up and
+ * forward into the eye's view. Offsets, so a crouch, a tuck and the pole
+ * stroke still move them.
+ */
+const FIRST_HAND_SHIFT: readonly [number, number, number] = [-0.01, 0.34, -0.29];
+const FIRST_POLE_SHIFT: readonly [number, number, number] = [-0.07, 0.02, -1.05];
+
+/**
+ * Brings the hands (and poles) into the eye's view, by `w`, leaving a
+ * grabbing hand on its grab. Folded into a crouch or tuck (`deep`) the head
+ * is already down by the hands, so they rise less (else they'd fill the view).
+ */
+function raiseArms(p: PoseBuffer, w: number, deep: number): void {
+  const rise = 1 - 0.6 * deep;
+  const turn = 1 - 0.85 * deep;
+  for (let i = 0; i < 2; i++) {
+    const h = p.hands[i === 0 ? 0 : 1];
+    const k = w * (h.grab !== undefined ? 1 - h.weight : 1);
+    if (k <= 0) continue;
+    const sx = i === 0 ? 1 : -1;
+    h.at[0] += FIRST_HAND_SHIFT[0] * sx * k;
+    h.at[1] += FIRST_HAND_SHIFT[1] * k * rise;
+    h.at[2] += FIRST_HAND_SHIFT[2] * k * rise;
+    h.pole[0] += FIRST_POLE_SHIFT[0] * sx * k * turn;
+    h.pole[1] += FIRST_POLE_SHIFT[1] * k * turn;
+    h.pole[2] += FIRST_POLE_SHIFT[2] * k * turn;
   }
 }
 

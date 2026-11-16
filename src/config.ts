@@ -622,6 +622,42 @@ export const CONFIG = {
      */
     rollRate: 9,
     rollBlend: 0.5,
+    /**
+     * First person (milestone 18, the camera key). The eye is the rig's own:
+     * at the goggles, wherever the pose puts the head. On the snow and on
+     * rails it looks along the travel (blended toward where the skis point
+     * below travelFullSpeed, like the chase heading), firstLookDown radians
+     * below it, turning toward that at firstTurnRate per second. In the air
+     * it is head-locked (the view turns exactly as the head turns since
+     * takeoff) or, with Settings' "Level", looks along the flight path with
+     * the horizon held level (pitch kept within firstAirPitchMin..Max).
+     */
+    firstFov: 70,
+    firstLookDown: 0.2,
+    firstTurnRate: 9,
+    firstAirPitchMin: -0.8,
+    firstAirPitchMax: 0.3,
+    /** Share of the body's turn lean the view rolls with on the snow, eased at firstLeanRate per second. */
+    firstLeanShare: 0.33,
+    firstLeanRate: 8,
+    /**
+     * Bob on the snow: firstBob meters up and down at full speed (from
+     * firstBobSpeed m/s), firstBobRate radians of its wave per meter ridden.
+     * The rig's own head already dips on landings and in a crouch.
+     */
+    firstBob: 0.014,
+    firstBobSpeed: 14,
+    firstBobRate: 1.9,
+    /** Lowest the eye goes over the drawn snow (m). */
+    firstClearance: 0.3,
+    /** Drag to look: how far (radians) up and down, and either way round. */
+    firstLookPitchMin: -1.1,
+    firstLookPitchMax: 0.9,
+    firstLookYawMax: 2.6,
+    /** Seconds to ease between the chase camera and first person (a switch, a crash, a respawn snaps). */
+    firstBlend: 0.45,
+    /** The head is hidden once the camera is this close (m) to the eye, so it never pops out of view mid-blend. */
+    firstHideRange: 0.5,
   },
 
   render: {

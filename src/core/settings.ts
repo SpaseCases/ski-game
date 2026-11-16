@@ -16,6 +16,11 @@ export type Preset = Exclude<Quality, 'auto'>;
 /** "Pop with": the pop action's own key, or the up key. */
 export type PopWith = 'pop' | 'up';
 
+/** The game camera (milestone 18): the chase camera, or first person from the skier's eye. */
+export type CameraView = 'chase' | 'first';
+/** First person in the air: the view locked to the head (it turns as the body does), or level along the flight path. */
+export type FirstAir = 'head' | 'level';
+
 /** Keys per action: a main key and an optional second one. */
 export const KEY_SLOTS = 2;
 
@@ -31,6 +36,10 @@ export interface Settings {
   crashWait: boolean;
   /** Which key crouches and pops: the pop action's key (Space), or ↑, which then also front-flips (see Keyboard.setPopWithUp). */
   popWith: PopWith;
+  /** Chase camera or first person (the camera key switches, and it's remembered). */
+  camera: CameraView;
+  /** What first person does in the air. */
+  firstAir: FirstAir;
   /** The rung of CONFIG.quality.auto.rungs that Auto settled on (0 = the best); the next visit tries one better. */
   autoRung: number;
   /** The name scores post under on the online leaderboards (see core/playerName.ts), or '' for none: then nothing posts. */
@@ -47,7 +56,7 @@ function isQuality(value: unknown): value is Quality {
 }
 
 export function defaultSettings(): Settings {
-  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, popWith: 'pop', autoRung: 0, name: '', bindings: { ...DEFAULT_BINDINGS } };
+  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, popWith: 'pop', camera: 'chase', firstAir: 'head', autoRung: 0, name: '', bindings: { ...DEFAULT_BINDINGS } };
 }
 
 /** The saved settings, or the defaults for anything not saved (or unreadable). */
@@ -69,6 +78,8 @@ export function loadSettings(): Settings {
   if (typeof saved.score === 'boolean') out.score = saved.score;
   if (typeof saved.crashWait === 'boolean') out.crashWait = saved.crashWait;
   if (saved.popWith === 'pop' || saved.popWith === 'up') out.popWith = saved.popWith;
+  if (saved.camera === 'chase' || saved.camera === 'first') out.camera = saved.camera;
+  if (saved.firstAir === 'head' || saved.firstAir === 'level') out.firstAir = saved.firstAir;
   if (typeof saved.autoRung === 'number' && Number.isInteger(saved.autoRung)) out.autoRung = clampRung(saved.autoRung);
   if (typeof saved.name === 'string' && nameProblem(saved.name) === null) out.name = saved.name;
   out.bindings = readBindings(saved.bindings);
