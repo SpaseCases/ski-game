@@ -624,3 +624,35 @@ if (sim.map.name === 'Park') {
   }
   console.log(`${scored} of ${walls.length} wallrides scored`);
 }
+
+// Proving Ground (milestone 17): its named gaps (from 16 m before each
+// takeoff area's middle: the Slot's decks and the Hip's spine are short), then
+// tricks landed on an airbag, which score like a sketchy landing ("Airbag").
+if (sim.map.name === 'Park') {
+  rideNamedGaps('src/maps/proving.json', 'milestone 17 named gaps on Proving Ground', [12, 16, 20], 16);
+  const pg = loadMap('src/maps/proving.json');
+  const bags = pg.map.features.filter((f) => f.type === 'airbag');
+  console.log(`milestone 17 airbag landings on Proving Ground (${bags.length} lanes), tucked with a pop, a back flip held all the way down:`);
+  for (const bag of bags) {
+    if (bag.type !== 'airbag') continue;
+    const kicker = pg.map.features.find((f) => f.type === 'kicker' && Math.abs(f.x - bag.x) < 1 && f.z > bag.z && f.z - bag.z < 40);
+    if (kicker?.type !== 'kicker') continue;
+    const lipZ = kicker.z - (2 * kicker.lipHeight) / Math.tan(kicker.lipAngle * DEG);
+    const rb = new Rider(pg);
+    rb.t = r.t;
+    rb.place(bag.x, kicker.z + 40, 0, 6);
+    console.log(`lane at x ${bag.x}:`);
+    let flew = false;
+    for (let i = 0; i < 20 / DT && !rb.s.bailed; i++) {
+      const before = rb.s.position.z - lipZ;
+      const keys: Action[] = rb.s.grounded ? (flew ? ['down'] : before > 0.25 && before < 14 ? ['up'] : ['pole']) : ['down'];
+      step(rb, keys);
+      if (!rb.s.grounded) flew = true;
+      if (flew && rb.s.grounded && !score.active && rb.speed < 0.5) break;
+    }
+    if (rb.s.bailed) console.log(`  crashed (${rb.s.bailReason})`);
+    endCombo(score, rb.s);
+    report(rb);
+    r.t = rb.t;
+  }
+}

@@ -14,7 +14,7 @@ import { wrapAngle, type SkierState } from '../sim/skier.ts';
 import { groundAt } from '../sim/terrain.ts';
 import { TUNING } from '../sim/tuning.ts';
 import { addPoseDelta, createPoseBuffer, setPose, type PoseBuffer } from './poseBlend.ts';
-import { CROUCH, GRABS, NOSE_PRESS, STANCE, STANCE_HALF_WIDTH, TAIL_PRESS, TUCK, TUMBLE, TUMBLE_CENTER } from './skierPoses.ts';
+import { CHAIR, CROUCH, GRABS, NOSE_PRESS, STANCE, STANCE_HALF_WIDTH, TAIL_PRESS, TUCK, TUMBLE, TUMBLE_CENTER } from './skierPoses.ts';
 import { DEFAULT_OUTFIT, type Outfit } from '../core/outfit.ts';
 import { SkierRig } from './skierRig.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
@@ -49,6 +49,8 @@ export interface SkierPose {
   onRail: boolean;
   /** Sliding a 3D rail (a loop or a corkscrew): `normal` is its up, which can point any way, and the body follows `orient`. */
   rail3d: boolean;
+  /** Sitting on a chairlift's chair (milestone 17): off the snow, though `grounded`. */
+  sitting: boolean;
 }
 
 export function createSkierPose(): SkierPose {
@@ -75,6 +77,7 @@ export function createSkierPose(): SkierPose {
     bailTime: 0,
     onRail: false,
     rail3d: false,
+    sitting: false,
   };
 }
 
@@ -108,6 +111,7 @@ export function interpolateSkier(out: SkierPose, prev: SkierState, curr: SkierSt
   out.bailTime = curr.bailTime;
   out.onRail = curr.rail >= 0;
   out.rail3d = curr.rail3d;
+  out.sitting = curr.lift >= 0 && curr.liftChair >= 0;
 }
 
 const UP = new Vector3(0, 1, 0);
@@ -153,6 +157,8 @@ export class SkierView {
   private readonly grabWeights = new Float32Array(GRABS.length);
   private bailWeight = 0;
   private railWeight = 0;
+  /** Sitting on a chairlift's chair (milestone 17). */
+  private sitWeight = 0;
   /** Butter presses: on the tips, on the tails. */
   private noseWeight = 0;
   private tailWeight = 0;
@@ -208,6 +214,7 @@ export class SkierView {
     this.grabWeights.fill(0);
     this.bailWeight = pose.bailed ? 1 : 0;
     this.railWeight = pose.onRail ? 1 : 0;
+    this.sitWeight = pose.sitting ? 1 : 0;
     this.noseWeight = pose.butter === 1 ? pose.butterAmount : 0;
     this.tailWeight = pose.butter === -1 ? pose.butterAmount : 0;
     this.lastPolePhase = pose.polePhase;
@@ -243,6 +250,8 @@ export class SkierView {
     this.airWeight = approach(this.airWeight, state.grounded ? 0 : 1, frameTime / r.grabBlendTime);
     this.bailWeight = approach(this.bailWeight, state.bailed ? 1 : 0, frameTime / r.bailBlendTime);
     this.railWeight = approach(this.railWeight, state.onRail ? 1 : 0, frameTime / r.railBlendTime);
+    // Onto a chair: sitting down as it scoops the skier up, standing as they slide off.
+    this.sitWeight = approach(this.sitWeight, state.sitting ? 1 : 0, frameTime / 0.35);
     // The sim eases a press in and out on the snow but drops it at takeoff; ease that out here.
     this.noseWeight = approach(this.noseWeight, state.butter === 1 ? state.butterAmount : 0, frameTime / r.grabBlendTime);
     this.tailWeight = approach(this.tailWeight, state.butter === -1 ? state.butterAmount : 0, frameTime / r.grabBlendTime);
@@ -252,7 +261,8 @@ export class SkierView {
       this.grabWeights[i] = w;
       grabTotal += w;
     }
-    const live = 1 - this.bailWeight;
+    const sit = this.sitWeight;
+    const live = (1 - this.bailWeight) * (1 - sit);
     // Switching grabs briefly overlaps two; keep the total at most 1.
     const grabScale = grabTotal > 1 ? live / grabTotal : live;
     const free = live - Math.min(grabTotal, 1) * live;
@@ -303,6 +313,7 @@ export class SkierView {
       if (w > 0) addPoseDelta(p, STANCE, GRABS[i]!, w);
     }
     addPoseDelta(p, STANCE, TUMBLE, bw);
+    addPoseDelta(p, STANCE, CHAIR, sit);
     // Each new push (the phase starting over) skates off the other leg.
     if (state.polePhase < this.lastPolePhase) this.skateLeg = this.skateLeg > 0 ? -1 : 1;
     this.lastPolePhase = state.polePhase;
@@ -310,7 +321,7 @@ export class SkierView {
     // Quick to drop the arms when a push starts, slower to lift them back after the last one.
     const armsTo = this.skateSide !== 0 ? 1 : 0;
     this.skateArms += (armsTo - this.skateArms) * (1 - Math.exp(-frameTime / (armsTo > this.skateArms ? 0.15 : 0.45)));
-    if (!state.bailed) {
+    if (!state.bailed && sit < 0.5) {
       if (this.rig.hasPoles) poleStroke(p, state.polePhase);
       else {
         if (this.skateSide !== 0) skateStroke(p, state.polePhase, this.skateSide, onSnow);
@@ -323,7 +334,7 @@ export class SkierView {
     angulate(p, bodyLean, leanTotal - bodyLean, counter, onSnow, deep);
     this.rig.apply(p);
     // On a rail the skis rest on the rail, not the snow.
-    this.sitOnDrawnSnow(onSnow * (1 - this.railWeight));
+    this.sitOnDrawnSnow(onSnow * (1 - this.railWeight) * (state.sitting ? 0 : 1));
 
     // Shadow sits on the drawn snow under the body and fades as it rises.
     const pos = state.center;

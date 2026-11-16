@@ -356,8 +356,9 @@ export function collideRails(rails: readonly RailShape[], p: Vec3Like, v: Vec3Li
       if (Math.abs(side) >= reach) continue;
       const t = seg.lenH > 1e-6 ? Math.min(1, Math.max(0, u / seg.lenH)) : 0;
       if (p.y > seg.ay + t * (seg.by - seg.ay) - R.stepTolerance) continue;
-      // A viaduct's parapet (the City) stands on its deck high over the street: solid only near its top.
-      if (r.look === 'parapet' && p.y < seg.ay + t * (seg.by - seg.ay) - PARAPET_DEPTH) continue;
+      // A viaduct's parapet (the City) stands on its deck high over the street, and a rail can span a gap high over
+      // the snow (Proving Ground's slot): solid only near the top, so riders pass under.
+      if (p.y < seg.ay + t * (seg.by - seg.ay) - PARAPET_DEPTH) continue;
 
       // Out the nearest way: off a side, or off either end of the whole line.
       const sign = side < 0 ? -1 : 1;

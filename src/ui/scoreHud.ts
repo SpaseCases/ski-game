@@ -220,7 +220,7 @@ export class ScoreHud {
       line.name.textContent = trickText(ev);
       line.points.textContent = `+${pointsText(ev.points)}`;
       line.tags.textContent = trickTags(ev);
-      line.el.classList.toggle('is-sketchy', ev.landing === 'sketchy');
+      line.el.classList.toggle('is-sketchy', ev.landing === 'sketchy' || ev.landing === 'airbag');
       line.age = 0;
       line.el.classList.remove('is-gone', 'is-new');
       void line.el.offsetWidth; // restart the pop-in

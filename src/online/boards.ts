@@ -25,6 +25,7 @@ export interface BoardDef {
 export const BOARDS: readonly BoardDef[] = [
   { id: 'park', map: 'park', course: -1, title: 'Park', kind: 'combo' },
   { id: 'jampark', map: 'jampark', course: -1, title: 'Jam Park', kind: 'combo' },
+  { id: 'proving', map: 'proving', course: -1, title: 'Proving Ground', kind: 'combo' },
   { id: 'freeride', map: 'freeride', course: -1, title: 'Freeride', kind: 'combo' },
   { id: 'city', map: 'city', course: -1, title: 'City', kind: 'combo' },
   // slalom.json's courses: 0 is the slalom, 1 the giant slalom.

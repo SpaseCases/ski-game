@@ -58,6 +58,22 @@ const ART: Record<MapId, string> = {
     `<path d="M112 80 Q132 79 138 62 L160 62 L160 90 L112 90Z" fill="#fff" stroke="${SHADE}"/>` +
     `<path d="M138 62 L144 62" stroke="${LIP}" stroke-width="2.6"/>` +
     `<path d="M36 62 h10 M100 60 h10" stroke="#ff7a1a" stroke-width="2"/>`,
+  proving:
+    sky('proving', '#5f9add', '#d6e7f6') +
+    `<path d="M0 44 L24 26 L44 36 L70 14 L96 34 L122 20 L160 40 L160 90 L0 90Z" fill="#bfd2e6"/>` +
+    `<path d="M0 56 Q80 40 160 54 L160 90 L0 90Z" fill="${SNOW}"/>` +
+    // The chairlift: its cable over two towers, three chairs.
+    `<path d="M0 30 L60 16 L122 8 L160 4" fill="none" stroke="${POST}" stroke-width="0.9"/>` +
+    `<path d="M60 16 v36 M56 16 h8 M122 8 v40 M118 8 h8" stroke="${POST}" stroke-width="1.6"/>` +
+    `<path d="M22 25 v8 M18 33 h8 v3 h-8Z M88 12.4 v8 M84 20.4 h8 v3 h-8Z M144 6 v8 M140 14 h8 v3 h-8Z" stroke="#1d2630" stroke-width="1" fill="#d8572a"/>` +
+    pine(8, 62, 1) + pine(17, 66, 1.3) + pine(27, 61, 0.9) + pine(150, 60, 1.1) + pine(140, 64, 1.3) +
+    // A kicker, a rider upside down over it, and the striped airbag it lands on.
+    `<path d="M36 84 Q56 82 64 66 L70 66 L70 86 L36 86Z" fill="#fff" stroke="${SHADE}"/>` +
+    `<path d="M64 66 L70 66" stroke="${LIP}" stroke-width="2.6"/>` +
+    rider(92, 40, 168) +
+    `<path d="M72 68 L104 68 L134 84 L72 84Z" fill="#c8331f"/>` +
+    `<path d="M80 68 L80 84 M96 68 L96 84 M111 71.7 L111 84 M124 78.6 L124 84" stroke="#ffc21f" stroke-width="4"/>` +
+    `<path d="M72 68 L104 68 L134 84" fill="none" stroke="#1b2430" stroke-width="1.2"/>`,
   freeride:
     sky('freeride', '#5d93d1', '#cfe1f3') +
     `<path d="M0 46 L22 22 L34 32 L56 6 L72 26 L84 16 L104 38 L124 14 L144 34 L160 26 L160 90 L0 90Z" fill="${SNOW}"/>` +

@@ -359,6 +359,25 @@ function parseFeature(raw: unknown, path: string): Feature {
   const f = obj(raw, path);
   const n = reader(f, path);
   switch (f.type) {
+    case 'airbag': {
+      const height = n('height');
+      return {
+        type: 'airbag',
+        x: n('x'),
+        z: n('z'),
+        yaw: n('yaw', 0),
+        width: n('width'),
+        sideWidth: n('sideWidth', 0.8),
+        height,
+        back: n('back', 0.8),
+        top: n('top'),
+        angle: n('angle'),
+        knuckle: n('knuckle', 3),
+        transition: n('transition', 5),
+        color: f.color === undefined ? '#2f6fe0' : str(f.color, `${path}.color`),
+        accent: f.accent === undefined ? '#ffc21f' : str(f.accent, `${path}.accent`),
+      };
+    }
     case 'box':
       return {
         type: 'box',
@@ -622,6 +641,7 @@ function parseDecor(raw: unknown, path: string): DecorDef {
     return {
       kind: kind as ScatterKind,
       spots: xzPoints(d.spots, `${path}.spots`, 1),
+      anywhere: d.anywhere === undefined ? false : bool(d.anywhere, `${path}.anywhere`),
       seed: n('seed', 1),
       minScale: n('minScale', 0.8),
       maxScale: n('maxScale', 1.2),
@@ -642,7 +662,12 @@ function parseDecor(raw: unknown, path: string): DecorDef {
     };
   }
   if ((LINE_KINDS as readonly string[]).includes(kind)) {
-    return { kind: kind as LineKind, points: xzPoints(d.points, `${path}.points`, 2), height: d.height === undefined ? 0 : num(d.height, `${path}.height`) };
+    return {
+      kind: kind as LineKind,
+      points: xzPoints(d.points, `${path}.points`, 2),
+      height: d.height === undefined ? 0 : num(d.height, `${path}.height`),
+      ride: d.ride === undefined ? false : bool(d.ride, `${path}.ride`),
+    };
   }
   if ((PROP_KINDS as readonly string[]).includes(kind)) {
     return {

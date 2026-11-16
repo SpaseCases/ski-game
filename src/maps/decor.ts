@@ -1,4 +1,6 @@
+import { CONFIG } from '../config.ts';
 import { boundsDistance, insideBounds } from '../sim/bounds.ts';
+import { LIFT } from '../sim/lift.ts';
 import { fbm } from './peak.ts';
 import { topShape, type ShapeSample } from './shapes.ts';
 import { startFrames } from './startGates.ts';
@@ -233,6 +235,9 @@ function keepOutZones(map: MapDef): KeepOut {
       // The run-up, the feature, and the landing below it (natural kickers land on the slope).
       const length = f.type === 'jump' ? f.gap + 2 * f.lipHeight + 20 : f.type === 'kicker' ? (2 * f.lipHeight) / Math.tan((f.lipAngle * Math.PI) / 180) : f.back + f.top + 15;
       runway(f.x, f.z, f.yaw, -18, length + 55, f.width / 2 + f.sideWidth + 5);
+    } else if (f.type === 'airbag') {
+      // The pad, its sides and the snow riders slide off onto.
+      runway(f.x, f.z, f.yaw, -4, f.top + f.height / Math.tan((f.angle * Math.PI) / 180) + 30, f.width / 2 + f.sideWidth + 5);
     } else if (f.type === 'quarter') {
       // The wall, the bank behind it and the snow riders swing in on.
       runway(f.x, f.z, f.yaw, -15, f.length + 15, f.radius + f.deckWidth + f.back + 8);
@@ -285,7 +290,7 @@ function keepOutZones(map: MapDef): KeepOut {
 /** Places a spots set: one item at each spot that's on the map and clear. */
 function spotsSet(d: SpotsDecor, hf: Heightfield, keepOut: KeepOut, out: ScatterItem[]): void {
   d.spots.forEach((p, i) => {
-    if (!onMap(hf, p.x, p.z) || !clear(p.x, p.z, hf, keepOut)) return;
+    if (!onMap(hf, p.x, p.z) || (!d.anywhere && !clear(p.x, p.z, hf, keepOut))) return;
     const r = (k: number): number => 0.5 + 0.5 * hash2(i * 7 + k, k * 3, d.seed);
     out.push({ kind: d.kind, x: p.x, z: p.z, yaw: r(3) * Math.PI * 2, scale: d.minScale + (d.maxScale - d.minScale) * r(4), tint: r(5), solid: d.solid, rank: r(0) });
   });
@@ -427,6 +432,16 @@ export function decorObstacles(layout: DecorLayout): ObstacleDef[] {
         const b = l.points[i]!;
         out.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, radius: 0.08, height, follow: true });
       }
+    } else if (l.kind === 'chairlift' && l.ride) {
+      // A lift riders take (milestone 17): its towers, and each open station's pillars (riders ski in under it).
+      const a = l.points[0]!;
+      const b = l.points[l.points.length - 1]!;
+      const len = Math.hypot(b.x - a.x, b.z - a.z);
+      const dx = (b.x - a.x) / len;
+      const dz = (b.z - a.z) / len;
+      const spans = Math.max(2, Math.round(len / LIFT.spacing));
+      for (let i = 1; i < spans; i++) post({ x: a.x + (dx * len * i) / spans, z: a.z + (dz * len * i) / spans }, 0.5, CONFIG.lift.towerHeight);
+      for (const end of [a, b]) for (const u of LIFT.pillars) post({ x: end.x + dx * u, z: end.z + dz * u }, 0.45, 6);
     } else if (l.kind === 'chairlift') {
       const towers = alongLine(l.points, S.chairliftSpacing);
       for (const p of towers.slice(1, -1)) post(p, 0.4, S.chairliftHeight);

@@ -1,4 +1,5 @@
 import type {
+  AirbagFeature,
   Feature,
   HalfpipeFeature,
   Heightfield,
@@ -34,8 +35,8 @@ const LANDING_TOP = 1.5;
 /** Side (m) of the cells shapes are sorted into for sampling. */
 const SHAPE_CELL = 32;
 
-/** What a stretch of a ramp is: snow, wooden boards (a start deck), or drawn by its structure instead (stairs). */
-export const SURFACE = { snow: 0, wood: 1, hidden: 2 } as const;
+/** What a stretch of a ramp is: snow, wooden boards (a start deck), drawn by its structure instead (stairs), or an airbag's pad. */
+export const SURFACE = { snow: 0, wood: 1, hidden: 2, airbag: 3 } as const;
 
 /** Builds a ramp profile knot by knot. */
 export class ProfileBuilder {
@@ -96,7 +97,7 @@ export class ProfileBuilder {
   }
 
   /** Rounded knuckle, straight face at `angle` degrees, rounded transition back to the slope. */
-  landing(angle: number, knuckle: number, transition: number): this {
+  landing(angle: number, knuckle: number, transition: number, surface: number = SURFACE.snow): this {
     const H = this.height;
     const s = Math.tan(angle * DEG);
     let k = knuckle;
@@ -109,9 +110,9 @@ export class ProfileBuilder {
       t *= f;
       face = 0;
     }
-    this.to(k, H - (s * k) / 2, -s);
-    if (face > 0) this.to(face, (s * t) / 2, -s);
-    return this.to(t, 0, 0);
+    this.to(k, H - (s * k) / 2, -s, -s, surface);
+    if (face > 0) this.to(face, (s * t) / 2, -s, -s, surface);
+    return this.to(t, 0, 0, 0, surface);
   }
 }
 
@@ -180,8 +181,19 @@ export function buildShapes(features: readonly Feature[]): TerrainShape[] {
     else if (f.type === 'landing') shapes.push(landingShape(f));
     else if (f.type === 'halfpipe') shapes.push(pipeShape(f));
     else if (f.type === 'quarter') shapes.push(quarterShape(f));
+    else if (f.type === 'airbag') shapes.push(airbagShape(f));
   }
   return shapes;
+}
+
+/** An airbag: a steep uphill wall, a flat top, then a landing's knuckle, face and transition, all of it pad. */
+function airbagShape(a: AirbagFeature): RampShape {
+  const pad = SURFACE.airbag;
+  // The wall curves up from the snow (a parabola, like a takeoff's) to a crease at the top's edge.
+  const p = new ProfileBuilder().to(a.back, a.height, (2 * a.height) / a.back, 0, pad).flat(a.top, pad).landing(a.angle, a.knuckle, a.transition, pad);
+  const r = makeRamp(a.x, a.z, a.yaw, a.width, a.sideWidth, p);
+  r.airbag = { color: a.color, accent: a.accent };
+  return r;
 }
 
 function jumpShape(j: JumpFeature): RampShape {
@@ -301,6 +313,7 @@ export function pipeHalfWidth(s: PipeShape): number {
  */
 export function setShapes(hf: Heightfield, shapes: TerrainShape[]): void {
   hf.shapes = shapes;
+  hf.airbags = shapes.some((s) => s.kind === 'ramp' && s.airbag !== undefined);
   const cols = Math.ceil(((hf.cols - 1) * hf.cellSize) / SHAPE_CELL) + 1;
   const rows = Math.ceil(((hf.rows - 1) * hf.cellSize) / SHAPE_CELL) + 1;
   const cell = (v: number, origin: number, n: number): number => Math.min(n - 1, Math.max(0, Math.floor((v - origin) / SHAPE_CELL)));
@@ -385,6 +398,11 @@ export function shapeSurfaceAt(hf: Heightfield, x: number, z: number): number {
   return surface;
 }
 
+/** True where the top of the shapes at (x, z) is an airbag's pad. Costs nothing on a map with no airbag. */
+export function onAirbag(hf: Heightfield, x: number, z: number): boolean {
+  return hf.airbags === true && shapeSurfaceAt(hf, x, z) === SURFACE.airbag;
+}
+
 /** A wallride's face is wood up to its coping; its deck and bank, and a quarterpipe, are snow. */
 function quarterSurface(q: QuarterShape, x: number, z: number): number {
   if (!q.wood) return SURFACE.snow;
@@ -394,6 +412,7 @@ function quarterSurface(q: QuarterShape, x: number, z: number): number {
 
 /** The surface of ramp `r` at (x, z), already known to be on it. */
 function rampSurface(r: RampShape, x: number, z: number): number {
+  if (r.airbag) return SURFACE.airbag;
   const dx = x - r.x;
   const dz = z - r.z;
   const u = dx * r.dirX + dz * r.dirZ;

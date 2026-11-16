@@ -32,6 +32,11 @@ Maps are data written by a generator script. The checks ride the real sim, so a 
 | Check footprints: no rail, box, kicker or quarter inside a building (keep a `clashes` check in the script). | |
 | Kicker-fed rails: start at the lip's height, ~1 m gap, 12+ m long. Rails catch only on the way down. | |
 | New named gaps go at the **end** of `tools/sim/score.ts`'s last section. | Older output lines stay identical. |
+| **A named gap's takeoff area must hold the lip itself** (takeoff start to lip + 3 m), and its landing area starts where slow riders land (the landing's flat top), not at the knuckle. | The air starts at the lip: an area that stops short of it never scores. |
+| **A generated slope's profile needs one more section past the map's end, falling away.** | The land beyond otherwise carries the last pitch on for good: a stop rise becomes a wall across the valley. |
+| **An airbag's pad must reach past the longest flight** (tucked, full pop) by 5 m or more: check with `tools/sim/airbag.ts`, not by estimate. Its wall starts `back` m before the kicker's lip, so its top begins at the lip. | A pop adds half a second of air; the first pads were 8 m short. |
+| Trees inside a play area are `solid: true` and laid in islands whose edges only wander **inward**. Trees a jump flies over are `spots` with `anywhere: true`. | Solid trees pushed out into a trail are crashes; a jump's keep-out clears ordinary scatter out of its gap. |
+| A rail may span a gap high over riders: rails are solid only 2.5 m under their tops. | |
 
 ## The checkers' geometry is a layout rule
 The tools ride from fixed distances; lay features so those starts and run-outs are clear:
@@ -40,11 +45,19 @@ The tools ride from fixed distances; lay features so those starts and run-outs a
 - Pass kinds as separate args: `features.ts map.json handrail jib`. `handrail,jib` silently runs nothing and prints "no problems".
 - Take gap zones and wallride lines from the building **as laid** (world coordinates), not from a street or column line: a curving edge splays away from the straight buildings on it.
 
+## Big shapes from terrain lanes (Proving Ground pattern)
+A `generated` slope's lane that climbs (a pitch flatter than the slope, or uphill), runs with the slope, then drops is a mound, and its `blend` banks are landings: height H over a blend B has a mean bank of atan(H / B), steepest 1.5 H / B in the middle. Two mounds a few meters apart make a slot; one narrow lane with wide banks is a hip's spine (kickers angled 30 to 36° off its deck, each lip on the deck's edge); a rib under a tree island is a low wide lane. Give the last section no pitch so it solves back level. Lanes add where they overlap. Easy trails get character from a lane that steps: benches (9°) and short pitches (25°) in turn.
+
+Riders reach a deck slower than they left the slope (the climb costs v² = 2 g H): size what's on it for that speed, and put what needs speed further along the deck. A transfer across a slot wants its kickers angled 60° off the fall line, so riders keep the speed the deck gives.
+
+## A chairlift riders take
+A `chairlift` line with `ride: true`, bottom point first. Riders board from the **outside** of the up cable (the right-hand side looking up the line), so fence off the uphill side of the loading point and leave the outside open; keep 12 m clear at the top's outside, where the half circle off the chair ends. Its towers stand every ~55 m: run the line through a tree island, not down a trail. Check with `tools/sim/lift.ts`.
+
 ## Packing a dense map (City pattern)
 Record every building's outline (with drift and landing drift) and every feature's clear zone as oriented rectangles in a grid (`cityKit.ts` `footprints`/`keeps`). Everything placed afterwards (columns, infill, trees, lamps, vehicles, people) keeps off both; report "clear zones with a building in them" at the end. Give each area its own seeded random so one change doesn't re-roll the map.
 
 ## Adding or renaming a map
-`registry.ts` (`MapId`, `MAPS`), `ui/mapArt.ts` (`ART`), the generator. With a leaderboard: `online/limits.ts` + `online/boards.ts`, then a Worker redeploy (ask first).
+`registry.ts` (`MapId`, `MAPS`), `ui/mapArt.ts` (`ART`), the generator, and its named gaps at the end of `tools/sim/score.ts`. With a leaderboard: `online/limits.ts` + `online/boards.ts`, then a Worker redeploy (ask first).
 
 ## Performance budget (Low preset)
 Flat-shaded vertex colors, no textures. Static geometry merges into tiles (props 64 m, glow and rails 128 m); instanced trees. Aim for ≤ ~120 draw calls in view at Low 4× CPU and frame time near Freeride's town. Count triangles for any new kit piece; the skyline/backdrop shows tall buildings past the far plane only inside `plainRing`.

@@ -1024,6 +1024,10 @@ startLoop(
 
     copySkierState(skierPrev, skier);
     stepSkier(skier, keys, built.course, dt);
+    // The chairlift (milestone 17): say what's happening as the skier gets on, and cut straight to the top on a skip.
+    if (skier.lift >= 0 && skierPrev.lift < 0) toast.show('Chairlift: the next chair picks you up');
+    if (skier.liftChair >= 0 && skierPrev.liftChair < 0) toast.show('Hold Enter to skip the ride');
+    if (skier.liftChair === -2 && skierPrev.liftChair >= 0 && skier.liftT > 0.5) snapView = true;
     sound.step(skierPrev, skier, built.course.rails);
     const event = updateRun(run, built.map, skierPrev.position, skier);
     if (scoring()) stepScore(score, skierPrev, skier, built.course.rails, built.gaps, built.hf, dt);
@@ -1064,7 +1068,7 @@ startLoop(
       }
       level.world.view(camera.position.x, camera.position.z, camera.far, snapped || rebuildView, freeCamera !== null);
       rebuildView = false;
-      level.world.update(level.run, level.race, frameTime);
+      level.world.update(level.run, level.race, frameTime, alpha);
       level.world.snow.update(pose, skier, frameTime, camera.position, skierView.skateSide);
       const fog = scene.fog as { near: number; far: number };
       const pxPerM = renderer.getDrawingBufferSize(bufferSize).y / (2 * Math.tan((camera.fov * Math.PI) / 360));

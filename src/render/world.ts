@@ -6,6 +6,7 @@ import { thinDecor } from '../maps/decor.ts';
 import type { RunState } from '../sim/checkpoints.ts';
 import type { RaceState } from '../sim/race.ts';
 import { ChairliftView } from './chairlifts.ts';
+import { ExpressLiftView } from './expressLift.ts';
 import { LightPools } from './lightPools.ts';
 import { clothTime } from './cloth.ts';
 import { SmokeView } from './smoke.ts';
@@ -35,6 +36,8 @@ export class WorldView {
   private readonly slalomView: SlalomView | null;
   private readonly checkpointView: CheckpointView;
   private readonly lifts: ChairliftView;
+  /** The chairlift riders can take (milestone 17), or null. */
+  private readonly express: ExpressLiftView | null;
   private readonly smoke: SmokeView;
   /** Spray, tracks, sparks and blowing snow (see render/snowFx.ts); rebuilt for another quality preset. */
   snow: SnowFx;
@@ -66,6 +69,8 @@ export class WorldView {
     this.group.add(this.checkpointView.group);
     this.lifts = new ChairliftView(built.decor.lines, hf);
     this.group.add(this.lifts.group);
+    this.express = course.lifts ? new ExpressLiftView(course.lifts, hf) : null;
+    if (this.express) this.group.add(this.express.group);
     this.smoke = new SmokeView(map.features, hf);
     if (this.smoke.mesh) this.group.add(this.smoke.mesh);
     this.snow = new SnowFx(built, fx);
@@ -124,11 +129,13 @@ export class WorldView {
     return compileShaders(renderer, scene, camera);
   }
 
-  update(run: RunState, race: RaceState | null, frameTime: number): void {
+  /** `alpha`: how far through the sim's last step this frame is drawn (the lift's chairs move with the sim's clock). */
+  update(run: RunState, race: RaceState | null, frameTime: number, alpha = 1): void {
     this.startView.update(this.built.race, race);
     this.slalomView?.update(race);
     this.checkpointView.update(run, this.built.hf, frameTime);
     this.lifts.update(frameTime, this.camX, this.camZ, this.range);
+    this.express?.update(alpha, this.camX, this.camZ, this.range);
     this.smoke.update(frameTime, this.camX, this.camZ, this.range);
     clothTime.value += frameTime;
   }

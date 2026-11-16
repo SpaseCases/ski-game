@@ -141,21 +141,23 @@ export class RidingSounds {
     } else if (prev.rail < 0 && s.rail >= 0) {
       this.railOn(s, rails);
     }
-    if (s.poleTime < prev.poleTime && s.grounded && s.rail < 0) e.play(this.poles ? 'pole' : 'skate');
+    if (s.poleTime < prev.poleTime && s.grounded && s.rail < 0 && s.lift < 0) e.play(this.poles ? 'pole' : 'skate');
   }
 
   /** Sets the continuous sounds from the skier's state `s` now (at game speed `pitch`, in powder or not). */
   update(s: SkierState, rails: readonly RailShape[], powder: boolean, pitch: number): void {
     const t = this.t;
     const speed = s.velocity.length();
-    const onSnow = s.grounded && s.rail < 0 && !s.bailed;
+    // On a chairlift's chair (milestone 17) the skis are off the snow: only the wind is heard.
+    const sitting = s.lift >= 0 && s.liftChair >= 0;
+    const onSnow = s.grounded && s.rail < 0 && !s.bailed && !sitting;
     if (onSnow) carveTarget(speed, s.lean, powder, t);
     else if (s.bailed) slideTarget(speed, t);
     else t.gain = 0;
     this.carve.set(t.gain, t.freq, pitch);
     brakeTarget(speed, onSnow ? s.brake : 0, t);
     this.brake.set(t.gain, t.freq, pitch);
-    windTarget(speed, !s.grounded && !s.bailed, t);
+    windTarget(speed, (!s.grounded || sitting) && !s.bailed, t);
     this.wind.set(t.gain, t.freq, pitch, 0, 0.15);
     const rail = s.rail >= 0 ? rails[s.rail] : undefined;
     const metal = rail !== undefined && ringsMetal(rail);

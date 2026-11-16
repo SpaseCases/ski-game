@@ -420,7 +420,7 @@ export class SnowFx {
   private skierFrame(pose: SkierPose): void {
     const n = pose.normal;
     this.qTilt.setFromUnitVectors(UP, n);
-    const swing = pose.grounded && !pose.bailed && !pose.onRail ? pose.brake * CONFIG.render.brakeTwist * pose.brakeSide : 0;
+    const swing = pose.grounded && !pose.bailed && !pose.onRail && !pose.sitting ? pose.brake * CONFIG.render.brakeTwist * pose.brakeSide : 0;
     this.fwd.set(-Math.sin(pose.yaw), 0, -Math.cos(pose.yaw)).applyQuaternion(this.qTilt);
     this.left.crossVectors(n, this.fwd);
     this.skiFwd.set(-Math.sin(pose.yaw + swing), 0, -Math.cos(pose.yaw + swing)).applyQuaternion(this.qTilt);
@@ -446,10 +446,10 @@ export class SnowFx {
     const powder = this.powder;
     const P = f.powder;
     const n = pose.normal;
-    const riding = pose.grounded && !pose.bailed && !pose.onRail;
+    const riding = pose.grounded && !pose.bailed && !pose.onRail && !pose.sitting;
 
     // Landing: a puff spreading over the snow, bigger the harder it hit.
-    if (sim.landTime < this.lastLandTime && sim.rail < 0 && !sim.bailed && sim.landImpact > f.landing.impactMin) {
+    if (sim.landTime < this.lastLandTime && sim.rail < 0 && !sim.bailed && !sim.landSoft && sim.landImpact > f.landing.impactMin) {
       const k = smoothstep(f.landing.impactMin, f.landing.impactFull, sim.landImpact);
       const count = Math.round(f.landing.count * (0.25 + 0.75 * k) * rate * (powder ? 1.5 : 1));
       const grow = powder ? 1.6 : 1;
@@ -957,7 +957,7 @@ export class SnowFx {
   /** Lays the tracks under the skis while they ride the snow; in the air, on a rail or in a crash they break. */
   private layTracks(pose: SkierPose): void {
     const f = CONFIG.snowFx;
-    if (!pose.grounded || pose.onRail || pose.bailed) {
+    if (!pose.grounded || pose.onRail || pose.bailed || pose.sitting) {
       this.breakTrack(0);
       this.breakTrack(1);
       return;

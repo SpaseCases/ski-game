@@ -81,6 +81,11 @@ export function respawnSkier(run: RunState, s: SkierState, map: MapDef, hf: Heig
  */
 export function updateRun(run: RunState, map: MapDef, prev: Vector3, s: SkierState): RunEvent {
   if (s.bailed) return 'none';
+  // Taking the chairlift (milestone 17) starts a fresh run: nothing is saved or finished on the way up.
+  if (s.lift >= 0) {
+    resetRun(run);
+    return 'none';
+  }
   for (let i = 0; i < map.flags.length; i++) {
     if (run.kind === 'flag' && run.flag === i) continue;
     if (crossedGate(map.flags[i]!, prev, s.position)) {

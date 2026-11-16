@@ -178,7 +178,90 @@ function straight(r: RampShape, k: number): boolean {
   return Math.abs((r.kOut[k - 1] ?? 0) - m) < 1e-3 && Math.abs((r.kIn[k] ?? 0) - m) < 1e-3;
 }
 
+/** An airbag's colors: parsed once per color. */
+const BAG_COLORS = new Map<string, Color>();
+const bagColor = (hex: string): Color => {
+  let c = BAG_COLORS.get(hex);
+  if (!c) BAG_COLORS.set(hex, (c = new Color(hex)));
+  return c;
+};
+/** Width (m) of an airbag's stripes down its length, and of the seam along each edge of its top. */
+const BAG_STRIPE = 2.4;
+const BAG_SEAM = 0.5;
+const BAG_SIDE = new Color('#1b2430');
+const BAG_SEAM_COLOR = new Color('#f4f6fa');
+const FAN_BODY = new Color('#d9482b');
+const FAN_DARK = new Color('#2a2f38');
+
+/** A box standing on the snow at (x, z), `along` m long down the frame's direction, into `out`. */
+function pushBox(out: Tris, frame: GridFrame, hf: Heightfield, x: number, z: number, along: number, across: number, height: number, color: Color): void {
+  const y0 = renderedHeightAt(hf, x, z) - 0.1;
+  const y1 = y0 + height + 0.1;
+  const corner = (a: number, b: number, y: number): [number, number, number] => [x + frame.dirX * a + frame.rightX * b, y, z + frame.dirZ * a + frame.rightZ * b];
+  const ha = along / 2;
+  const hb = across / 2;
+  // Corners: index bit 0 along, bit 1 across, bit 2 up.
+  const c = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => corner(i & 1 ? ha : -ha, i & 2 ? hb : -hb, i & 4 ? y1 : y0));
+  // Faces as quads, each wound clockwise seen from outside as listed, so the triangles below turn them round.
+  const quads = [
+    [4, 5, 7, 6], // top
+    [0, 1, 5, 4], // left (across -)
+    [3, 2, 6, 7], // right
+    [2, 0, 4, 6], // uphill end
+    [1, 3, 7, 5], // downhill end
+  ];
+  const shade = [1, 0.8, 0.8, 0.66, 0.9];
+  quads.forEach((q, f) => {
+    for (const k of [0, 2, 1, 0, 3, 2]) {
+      const v = c[q[k]!]!;
+      out.positions.push(v[0], v[1], v[2]);
+      out.colors.push(color.r * shade[f]!, color.g * shade[f]!, color.b * shade[f]!);
+    }
+  });
+}
+
+/** An airbag: the pad striped across in its two colors with a pale seam down each edge, dark bulging walls, and its fan beside the uphill end. */
+function createAirbag(r: RampShape, hf: Heightfield, out: Tris): void {
+  const bag = r.airbag!;
+  const main = bagColor(bag.color);
+  const accent = bagColor(bag.accent);
+  const us = [r.ku[0] ?? 0];
+  for (let k = 1; k < r.ku.length; k++) steps(us, r.ku[k - 1] ?? 0, r.ku[k] ?? 0, straight(r, k) ? BAG_STRIPE / 2 : RAMP_STEP);
+  const edge = r.halfWidth + r.sideWidth;
+  const vs = [-edge];
+  steps(vs, -edge, -r.halfWidth, r.sideWidth / 3);
+  vs.push(-r.halfWidth + BAG_SEAM);
+  steps(vs, -r.halfWidth + BAG_SEAM, r.halfWidth - BAG_SEAM, 3);
+  vs.push(r.halfWidth);
+  steps(vs, r.halfWidth, edge, r.sideWidth / 3);
+  const wallEnd = r.ku[1] ?? 0;
+  gridMesh(
+    r,
+    hf,
+    us,
+    vs,
+    (a, b, _tri, color) => {
+      const uMid = ((us[a] ?? 0) + (us[a + 1] ?? 0)) / 2;
+      const vMid = Math.abs(((vs[b] ?? 0) + (vs[b + 1] ?? 0)) / 2);
+      if (vMid > r.halfWidth || uMid < wallEnd) color.copy(BAG_SIDE).lerp(main, 0.35);
+      else if (vMid > r.halfWidth - BAG_SEAM) color.copy(BAG_SEAM_COLOR);
+      else color.copy(Math.floor((uMid - wallEnd) / BAG_STRIPE) % 2 === 0 ? main : accent);
+      return true;
+    },
+    out,
+  );
+  // The fan that keeps it up: a box with a dark grille end beside the uphill corner, and its hose to the wall.
+  const fx = r.x + r.rightX * (edge + 1.6) + r.dirX * 1.2;
+  const fz = r.z + r.rightZ * (edge + 1.6) + r.dirZ * 1.2;
+  pushBox(out, r, hf, fx, fz, 1.5, 1.1, 1.1, FAN_BODY);
+  pushBox(out, r, hf, fx - r.rightX * 0.95, fz - r.rightZ * 0.95, 0.6, 0.9, 0.55, FAN_DARK);
+}
+
 function createRamp(r: RampShape, hf: Heightfield, seed: number, out: Tris): void {
+  if (r.airbag) {
+    createAirbag(r, hf, out);
+    return;
+  }
   // Grid lines land exactly on every knot, so a lip stays a sharp edge.
   const us = [r.ku[0] ?? 0];
   for (let k = 1; k < r.ku.length; k++) {

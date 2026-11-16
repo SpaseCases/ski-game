@@ -1,0 +1,13135 @@
+{
+ "name": "Proving Ground",
+ "terrain": {
+  "type": "generated",
+  "width": 440,
+  "length": 1770,
+  "cellSize": 3,
+  "bermWidth": 14,
+  "bermHeight": 6,
+  "noise": 0.18,
+  "seed": 17,
+  "margin": 70,
+  "profile": [
+   {
+    "length": 70,
+    "pitch": 6,
+    "ease": 20
+   },
+   {
+    "length": 480,
+    "pitch": 13,
+    "ease": 30
+   },
+   {
+    "length": 70,
+    "pitch": 4,
+    "ease": 24
+   },
+   {
+    "length": 190,
+    "pitch": 12,
+    "ease": 24
+   },
+   {
+    "length": 70,
+    "pitch": 4,
+    "ease": 24
+   },
+   {
+    "length": 620,
+    "pitch": 15,
+    "ease": 30
+   },
+   {
+    "length": 100,
+    "pitch": 9,
+    "ease": 30
+   },
+   {
+    "length": 100,
+    "pitch": 2,
+    "ease": 40
+   },
+   {
+    "length": 70,
+    "pitch": -6,
+    "ease": 40
+   },
+   {
+    "length": 400,
+    "pitch": 5,
+    "ease": 60
+   }
+  ],
+  "lanes": [
+   {
+    "x": 23,
+    "width": 22,
+    "blend": 4,
+    "start": 985,
+    "endEase": 20,
+    "sections": [
+     {
+      "length": 22,
+      "pitch": -5,
+      "ease": 8
+     },
+     {
+      "length": 42,
+      "pitch": 15,
+      "ease": 8
+     },
+     {
+      "length": 28,
+      "pitch": 30,
+      "ease": 8
+     },
+     {
+      "length": 30,
+      "ease": 20
+     }
+    ]
+   },
+   {
+    "x": 57,
+    "width": 22,
+    "blend": 4,
+    "start": 985,
+    "endEase": 20,
+    "sections": [
+     {
+      "length": 22,
+      "pitch": -5,
+      "ease": 8
+     },
+     {
+      "length": 42,
+      "pitch": 15,
+      "ease": 8
+     },
+     {
+      "length": 28,
+      "pitch": 30,
+      "ease": 8
+     },
+     {
+      "length": 30,
+      "ease": 20
+     }
+    ]
+   },
+   {
+    "x": 40,
+    "width": 12,
+    "blend": 26,
+    "start": 1150,
+    "endEase": 24,
+    "sections": [
+     {
+      "length": 32,
+      "pitch": -7,
+      "ease": 8
+     },
+     {
+      "length": 84,
+      "pitch": 15,
+      "ease": 8
+     },
+     {
+      "length": 34,
+      "pitch": 31,
+      "ease": 8
+     },
+     {
+      "length": 36,
+      "ease": 24
+     }
+    ]
+   },
+   {
+    "x": -140,
+    "width": 34,
+    "blend": 26,
+    "start": 1112.80627923868,
+    "endEase": 30,
+    "sections": [
+     {
+      "length": 30,
+      "pitch": -12,
+      "ease": 8
+     },
+     {
+      "length": 16,
+      "pitch": 4,
+      "ease": 8
+     },
+     {
+      "length": 40,
+      "pitch": 26,
+      "ease": 20
+     },
+     {
+      "length": 28,
+      "pitch": 2,
+      "ease": 16
+     },
+     {
+      "length": 36,
+      "pitch": 46,
+      "ease": 10
+     },
+     {
+      "length": 24,
+      "pitch": 54,
+      "ease": 14
+     },
+     {
+      "length": 14,
+      "pitch": 38,
+      "ease": 16
+     },
+     {
+      "length": 40,
+      "pitch": 6,
+      "ease": 40
+     },
+     {
+      "length": 153.19372076132004,
+      "ease": 30
+     }
+    ]
+   },
+   {
+    "x": 166,
+    "width": 46,
+    "blend": 10,
+    "start": 896,
+    "endEase": 30,
+    "sections": [
+     {
+      "length": 78,
+      "pitch": 9,
+      "ease": 18
+     },
+     {
+      "length": 42,
+      "pitch": 25,
+      "ease": 18
+     },
+     {
+      "length": 78,
+      "pitch": 9,
+      "ease": 18
+     },
+     {
+      "length": 42,
+      "pitch": 25,
+      "ease": 18
+     },
+     {
+      "length": 78,
+      "pitch": 9,
+      "ease": 18
+     },
+     {
+      "length": 42,
+      "pitch": 25,
+      "ease": 18
+     },
+     {
+      "length": 78,
+      "pitch": 9,
+      "ease": 18
+     },
+     {
+      "length": 42,
+      "pitch": 25,
+      "ease": 18
+     },
+     {
+      "length": 104,
+      "ease": 30
+     }
+    ]
+   },
+   {
+    "x": -65,
+    "width": 18,
+    "blend": 10,
+    "start": 94,
+    "endEase": 16,
+    "sections": [
+     {
+      "length": 40,
+      "pitch": 6.75,
+      "ease": 16
+     },
+     {
+      "length": 360,
+      "pitch": 13,
+      "ease": 16
+     },
+     {
+      "length": 48,
+      "ease": 16
+     }
+    ]
+   },
+   {
+    "x": -65,
+    "width": 18,
+    "blend": 10,
+    "start": 628,
+    "endEase": 16,
+    "sections": [
+     {
+      "length": 40,
+      "pitch": 5.71,
+      "ease": 16
+     },
+     {
+      "length": 86,
+      "pitch": 12,
+      "ease": 16
+     },
+     {
+      "length": 48,
+      "ease": 16
+     }
+    ]
+   },
+   {
+    "x": -65,
+    "width": 18,
+    "blend": 10,
+    "start": 890,
+    "endEase": 16,
+    "sections": [
+     {
+      "length": 40,
+      "pitch": 8.84,
+      "ease": 16
+     },
+     {
+      "length": 496,
+      "pitch": 15,
+      "ease": 16
+     },
+     {
+      "length": 48,
+      "ease": 16
+     }
+    ]
+   },
+   {
+    "x": 81,
+    "width": 6,
+    "blend": 8,
+    "start": 94,
+    "endEase": 16,
+    "sections": [
+     {
+      "length": 40,
+      "pitch": 8.16,
+      "ease": 16
+     },
+     {
+      "length": 360,
+      "pitch": 13,
+      "ease": 16
+     },
+     {
+      "length": 48,
+      "ease": 16
+     }
+    ]
+   },
+   {
+    "x": 82,
+    "width": 4,
+    "blend": 8,
+    "start": 628,
+    "endEase": 16,
+    "sections": [
+     {
+      "length": 40,
+      "pitch": 7.83,
+      "ease": 16
+     },
+     {
+      "length": 86,
+      "pitch": 12,
+      "ease": 16
+     },
+     {
+      "length": 48,
+      "ease": 16
+     }
+    ]
+   },
+   {
+    "x": 130,
+    "width": 4,
+    "blend": 6,
+    "start": 890,
+    "endEase": 16,
+    "sections": [
+     {
+      "length": 40,
+      "pitch": 10.92,
+      "ease": 16
+     },
+     {
+      "length": 496,
+      "pitch": 15,
+      "ease": 16
+     },
+     {
+      "length": 48,
+      "ease": 16
+     }
+    ]
+   }
+  ],
+  "hills": {
+   "amplitude": 20,
+   "wavelength": 200
+  }
+ },
+ "features": [
+  {
+   "type": "start",
+   "style": "deck",
+   "x": 0,
+   "z": -16,
+   "heading": 0,
+   "height": 0.6
+  },
+  {
+   "type": "kicker",
+   "x": 104,
+   "z": -92,
+   "width": 5,
+   "sideWidth": 2,
+   "lipHeight": 1,
+   "lipAngle": 18,
+   "back": 1
+  },
+  {
+   "type": "airbag",
+   "x": 104,
+   "z": -97.36,
+   "width": 8,
+   "sideWidth": 0.8,
+   "height": 0.88,
+   "back": 0.8,
+   "top": 6,
+   "angle": 4.5,
+   "knuckle": 3,
+   "transition": 5,
+   "color": "#33c26a",
+   "accent": "#f4f6fa"
+  },
+  {
+   "type": "kicker",
+   "x": 130,
+   "z": -116,
+   "width": 7,
+   "sideWidth": 2,
+   "lipHeight": 1.8,
+   "lipAngle": 22,
+   "back": 1
+  },
+  {
+   "type": "airbag",
+   "x": 130,
+   "z": -124.11,
+   "width": 10,
+   "sideWidth": 0.8,
+   "height": 1.58,
+   "back": 0.8,
+   "top": 8,
+   "angle": 5.5,
+   "knuckle": 3,
+   "transition": 5,
+   "color": "#2f6fe0",
+   "accent": "#f4f6fa"
+  },
+  {
+   "type": "kicker",
+   "x": 158,
+   "z": -142,
+   "width": 9,
+   "sideWidth": 2,
+   "lipHeight": 2.8,
+   "lipAngle": 26,
+   "back": 1
+  },
+  {
+   "type": "airbag",
+   "x": 158,
+   "z": -152.68,
+   "width": 12,
+   "sideWidth": 0.8,
+   "height": 2.46,
+   "back": 0.8,
+   "top": 12,
+   "angle": 6.5,
+   "knuckle": 3,
+   "transition": 5,
+   "color": "#1b2430",
+   "accent": "#ffc21f"
+  },
+  {
+   "type": "kicker",
+   "x": 190,
+   "z": -178,
+   "width": 11,
+   "sideWidth": 2,
+   "lipHeight": 4,
+   "lipAngle": 32,
+   "back": 1
+  },
+  {
+   "type": "airbag",
+   "x": 190,
+   "z": -190,
+   "width": 14,
+   "sideWidth": 0.8,
+   "height": 3.52,
+   "back": 0.8,
+   "top": 19,
+   "angle": 7,
+   "knuckle": 3,
+   "transition": 5,
+   "color": "#c8331f",
+   "accent": "#ffc21f"
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -37,
+     "z": -92,
+     "height": 0
+    },
+    {
+     "x": -37,
+     "z": -95.5,
+     "height": 0.3
+    },
+    {
+     "x": -37,
+     "z": -104,
+     "height": 0.3
+    }
+   ],
+   "width": 0.9
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -23,
+     "z": -92,
+     "height": 0
+    },
+    {
+     "x": -23,
+     "z": -95.5,
+     "height": 0.35
+    },
+    {
+     "x": -23,
+     "z": -104,
+     "height": 0.35
+    }
+   ]
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -30,
+     "z": -113,
+     "height": 0
+    },
+    {
+     "x": -30,
+     "z": -116.5,
+     "height": 0.35
+    },
+    {
+     "x": -30,
+     "z": -120.7,
+     "height": 0.5
+    },
+    {
+     "x": -30,
+     "z": -127,
+     "height": 0.18
+    }
+   ],
+   "width": 0.7
+  },
+  {
+   "type": "kicker",
+   "x": -30,
+   "z": -136,
+   "width": 3,
+   "sideWidth": 1.5,
+   "lipHeight": 0.6,
+   "lipAngle": 10,
+   "back": 1.2
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -30,
+     "z": -143.81,
+     "height": 0.65
+    },
+    {
+     "x": -30,
+     "z": -157.81,
+     "height": 0.65
+    }
+   ]
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -37,
+     "z": -166.81,
+     "height": 0
+    },
+    {
+     "x": -37,
+     "z": -170.31,
+     "height": 0.45
+    },
+    {
+     "x": -37,
+     "z": -175.06,
+     "height": 0.6
+    },
+    {
+     "x": -37,
+     "z": -181.81,
+     "height": 0.23
+    }
+   ]
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -23,
+     "z": -166.81,
+     "height": 0
+    },
+    {
+     "x": -23,
+     "z": -170.31,
+     "height": 0.4
+    },
+    {
+     "x": -23,
+     "z": -180.81,
+     "height": 0.4
+    }
+   ],
+   "width": 1
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -30,
+     "z": -190.81,
+     "height": 0
+    },
+    {
+     "x": -30,
+     "z": -192.06,
+     "height": 0.49
+    },
+    {
+     "x": -30,
+     "z": -193.31,
+     "height": 0.65
+    },
+    {
+     "x": -30,
+     "z": -194.56,
+     "height": 0.76
+    },
+    {
+     "x": -30,
+     "z": -195.81,
+     "height": 0.8
+    },
+    {
+     "x": -30,
+     "z": -197.06,
+     "height": 0.76
+    },
+    {
+     "x": -30,
+     "z": -198.31,
+     "height": 0.65
+    },
+    {
+     "x": -30,
+     "z": -199.56,
+     "height": 0.49
+    },
+    {
+     "x": -30,
+     "z": -200.81,
+     "height": 0.3
+    }
+   ],
+   "width": 0.8
+  },
+  {
+   "type": "kicker",
+   "x": -30,
+   "z": -209.81,
+   "width": 3.5,
+   "sideWidth": 1.5,
+   "lipHeight": 0.6,
+   "lipAngle": 10,
+   "back": 1.2
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -30,
+     "z": -217.61,
+     "height": 0.65
+    },
+    {
+     "x": -30,
+     "z": -230.61,
+     "height": 0.65
+    }
+   ],
+   "width": 0.8
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -37,
+     "z": -239.61,
+     "height": 0
+    },
+    {
+     "x": -37,
+     "z": -243.11,
+     "height": 0.45
+    },
+    {
+     "x": -37,
+     "z": -245.56,
+     "height": 0.27
+    },
+    {
+     "x": -37,
+     "z": -249.81,
+     "height": 0.9
+    },
+    {
+     "x": -37,
+     "z": -256.61,
+     "height": 0.32
+    }
+   ]
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -23,
+     "z": -239.61,
+     "height": 0
+    },
+    {
+     "x": -23,
+     "z": -243.11,
+     "height": 0.4
+    },
+    {
+     "x": -23,
+     "z": -247.86,
+     "height": 0.55
+    },
+    {
+     "x": -23,
+     "z": -254.61,
+     "height": 0.2
+    }
+   ],
+   "width": 0.8
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -30,
+     "z": -265.61,
+     "height": 0
+    },
+    {
+     "x": -30,
+     "z": -269.11,
+     "height": 0.7
+    },
+    {
+     "x": -30,
+     "z": -279.61,
+     "height": 0.7
+    }
+   ],
+   "style": "tube"
+  },
+  {
+   "type": "kicker",
+   "x": -30,
+   "z": -288.61,
+   "width": 3.5,
+   "sideWidth": 1.5,
+   "lipHeight": 0.85,
+   "lipAngle": 6,
+   "back": 1.2
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -30,
+     "z": -306.09,
+     "height": 0.75
+    },
+    {
+     "x": -30,
+     "z": -309.69,
+     "height": 0.75
+    }
+   ],
+   "width": 0.8,
+   "style": "table"
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -37,
+     "z": -318.69,
+     "height": 0
+    },
+    {
+     "x": -37,
+     "z": -322.19,
+     "height": 0.5
+    },
+    {
+     "x": -37,
+     "z": -327.69,
+     "height": 0.5
+    },
+    {
+     "x": -38,
+     "z": -332.69,
+     "height": 0.5
+    },
+    {
+     "x": -39,
+     "z": -338.69,
+     "height": 0.35
+    }
+   ]
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -23,
+     "z": -318.69,
+     "height": 0
+    },
+    {
+     "x": -23,
+     "z": -322.19,
+     "height": 0.4
+    },
+    {
+     "x": -23,
+     "z": -324.99,
+     "height": 0.24
+    },
+    {
+     "x": -23,
+     "z": -329.49,
+     "height": 0.85
+    },
+    {
+     "x": -23,
+     "z": -336.69,
+     "height": 0.28
+    }
+   ],
+   "width": 0.8
+  },
+  {
+   "type": "kicker",
+   "x": -30,
+   "z": -347.69,
+   "width": 3,
+   "sideWidth": 1.5,
+   "lipHeight": 0.6,
+   "lipAngle": 10,
+   "back": 1.2
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -30,
+     "z": -355.49,
+     "height": 0.75
+    },
+    {
+     "x": -30,
+     "z": -370.49,
+     "height": 0.75
+    }
+   ],
+   "style": "tube"
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -30,
+     "z": -379.49,
+     "height": 0
+    },
+    {
+     "x": -30,
+     "z": -382.99,
+     "height": 0.5
+    },
+    {
+     "x": -30,
+     "z": -399.49,
+     "height": 0.5
+    }
+   ]
+  },
+  {
+   "type": "kicker",
+   "x": -30,
+   "z": -408.49,
+   "width": 3.5,
+   "sideWidth": 1.5,
+   "lipHeight": 0.72,
+   "lipAngle": 6,
+   "back": 1.2
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -30,
+     "z": -423.49,
+     "height": 0.62
+    },
+    {
+     "x": -30,
+     "z": -427.21,
+     "height": 0.62
+    }
+   ],
+   "width": 0.9,
+   "style": "barrels"
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -37,
+     "z": -436.21,
+     "height": 0
+    },
+    {
+     "x": -37,
+     "z": -439.71,
+     "height": 0.5
+    },
+    {
+     "x": -37,
+     "z": -442.51,
+     "height": 0.3
+    },
+    {
+     "x": -37,
+     "z": -447.01,
+     "height": 0.95
+    },
+    {
+     "x": -37,
+     "z": -454.21,
+     "height": 0.35
+    }
+   ]
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -23,
+     "z": -436.21,
+     "height": 0
+    },
+    {
+     "x": -23,
+     "z": -437.84,
+     "height": 0.93
+    },
+    {
+     "x": -23,
+     "z": -439.46,
+     "height": 1.12
+    },
+    {
+     "x": -23,
+     "z": -441.09,
+     "height": 1.25
+    },
+    {
+     "x": -23,
+     "z": -442.71,
+     "height": 1.3
+    },
+    {
+     "x": -23,
+     "z": -444.34,
+     "height": 1.25
+    },
+    {
+     "x": -23,
+     "z": -445.96,
+     "height": 1.12
+    },
+    {
+     "x": -23,
+     "z": -447.59,
+     "height": 0.93
+    },
+    {
+     "x": -23,
+     "z": -449.21,
+     "height": 0.7
+    }
+   ],
+   "style": "tube"
+  },
+  {
+   "type": "kicker",
+   "x": -30,
+   "z": -463.21,
+   "width": 3.5,
+   "sideWidth": 1.5,
+   "lipHeight": 0.6,
+   "lipAngle": 10,
+   "back": 1.2
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -30,
+     "z": -471.02,
+     "height": 0.65
+    },
+    {
+     "x": -30,
+     "z": -478.02,
+     "height": 1
+    },
+    {
+     "x": -30,
+     "z": -486.02,
+     "height": 0.45
+    }
+   ],
+   "width": 0.8
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -30,
+     "z": -495.02,
+     "height": 0
+    },
+    {
+     "x": -30,
+     "z": -498.52,
+     "height": 0.5
+    },
+    {
+     "x": -29.97,
+     "z": -499.77,
+     "height": 0.5
+    },
+    {
+     "x": -29.88,
+     "z": -501.02,
+     "height": 0.5
+    },
+    {
+     "x": -29.74,
+     "z": -502.27,
+     "height": 0.5
+    },
+    {
+     "x": -29.58,
+     "z": -503.52,
+     "height": 0.5
+    },
+    {
+     "x": -29.4,
+     "z": -504.77,
+     "height": 0.5
+    },
+    {
+     "x": -29.22,
+     "z": -506.02,
+     "height": 0.5
+    },
+    {
+     "x": -29.06,
+     "z": -507.27,
+     "height": 0.5
+    },
+    {
+     "x": -28.92,
+     "z": -508.52,
+     "height": 0.5
+    },
+    {
+     "x": -28.83,
+     "z": -509.77,
+     "height": 0.5
+    },
+    {
+     "x": -28.8,
+     "z": -511.02,
+     "height": 0.5
+    }
+   ]
+  },
+  {
+   "type": "jump",
+   "x": 6,
+   "z": -84,
+   "width": 8,
+   "sideWidth": 2.5,
+   "lipHeight": 1.3,
+   "lipAngle": 16,
+   "gap": 5,
+   "deck": true,
+   "landingAngle": 13,
+   "knuckle": 3,
+   "transition": 6
+  },
+  {
+   "type": "jump",
+   "x": 6,
+   "z": -119.2,
+   "width": 8,
+   "sideWidth": 2.5,
+   "lipHeight": 1.6,
+   "lipAngle": 17,
+   "gap": 7,
+   "deck": true,
+   "landingAngle": 13,
+   "knuckle": 3,
+   "transition": 6
+  },
+  {
+   "type": "jump",
+   "x": 6,
+   "z": -159.1,
+   "width": 8,
+   "sideWidth": 2.5,
+   "lipHeight": 1.8,
+   "lipAngle": 18,
+   "gap": 8,
+   "deck": true,
+   "landingAngle": 13,
+   "knuckle": 3,
+   "transition": 6
+  },
+  {
+   "type": "jump",
+   "x": 6,
+   "z": -201.47,
+   "width": 9,
+   "sideWidth": 2.5,
+   "lipHeight": 2,
+   "lipAngle": 19,
+   "gap": 9,
+   "deck": true,
+   "landingAngle": 13,
+   "knuckle": 3,
+   "transition": 6
+  },
+  {
+   "type": "jump",
+   "x": 6,
+   "z": -246.25,
+   "width": 9,
+   "sideWidth": 2.5,
+   "lipHeight": 2,
+   "lipAngle": 20,
+   "gap": 6,
+   "deck": false,
+   "landingAngle": 13,
+   "knuckle": 3,
+   "transition": 6,
+   "landingHeight": 2.8
+  },
+  {
+   "type": "jump",
+   "x": 6,
+   "z": -290.87,
+   "width": 9,
+   "sideWidth": 2.5,
+   "lipHeight": 2.2,
+   "lipAngle": 20,
+   "gap": 9,
+   "deck": true,
+   "landingAngle": 14,
+   "knuckle": 3,
+   "transition": 6
+  },
+  {
+   "type": "jump",
+   "x": 6,
+   "z": -336.28,
+   "width": 9,
+   "sideWidth": 2.5,
+   "lipHeight": 2.4,
+   "lipAngle": 20,
+   "gap": 10,
+   "deck": true,
+   "landingAngle": 14,
+   "knuckle": 3,
+   "transition": 6
+  },
+  {
+   "type": "jump",
+   "x": 6,
+   "z": -384.6,
+   "width": 9,
+   "sideWidth": 2.5,
+   "lipHeight": 2.4,
+   "lipAngle": 21,
+   "gap": 7,
+   "deck": false,
+   "landingAngle": 13,
+   "knuckle": 3,
+   "transition": 6,
+   "landingHeight": 1.6
+  },
+  {
+   "type": "jump",
+   "x": 6,
+   "z": -436.53,
+   "width": 10,
+   "sideWidth": 2.5,
+   "lipHeight": 2.6,
+   "lipAngle": 21,
+   "gap": 11,
+   "deck": true,
+   "landingAngle": 14,
+   "knuckle": 3,
+   "transition": 6
+  },
+  {
+   "type": "kicker",
+   "x": 34,
+   "z": -90,
+   "yaw": -32,
+   "width": 5,
+   "sideWidth": 2,
+   "lipHeight": 1.4,
+   "lipAngle": 24,
+   "back": 1.5
+  },
+  {
+   "type": "landing",
+   "x": 46,
+   "z": -88,
+   "width": 12,
+   "sideWidth": 3,
+   "height": 2.2,
+   "angle": 16,
+   "back": 9,
+   "top": 3
+  },
+  {
+   "type": "jump",
+   "x": 46,
+   "z": -121.67,
+   "width": 8,
+   "sideWidth": 2.5,
+   "lipHeight": 1.4,
+   "lipAngle": 18,
+   "gap": 7,
+   "deck": true,
+   "landingAngle": 13,
+   "knuckle": 3,
+   "transition": 6
+  },
+  {
+   "type": "halfpipe",
+   "x": 46,
+   "z": -205,
+   "yaw": 0,
+   "length": 170,
+   "floorWidth": 11,
+   "radius": 4.2,
+   "wallAngle": 80,
+   "deckWidth": 3,
+   "outerWidth": 5,
+   "dropIn": 6,
+   "entry": 12,
+   "back": 24,
+   "exit": 12
+  },
+  {
+   "type": "jump",
+   "x": 46,
+   "z": -391,
+   "width": 9,
+   "sideWidth": 2.5,
+   "lipHeight": 2,
+   "lipAngle": 19,
+   "gap": 9,
+   "deck": true,
+   "landingAngle": 14,
+   "knuckle": 3,
+   "transition": 6
+  },
+  {
+   "type": "kicker",
+   "x": 58,
+   "z": -450.14,
+   "yaw": 32,
+   "width": 5,
+   "sideWidth": 2,
+   "lipHeight": 1.54,
+   "lipAngle": 24,
+   "back": 1.65
+  },
+  {
+   "type": "landing",
+   "x": 46,
+   "z": -448.14,
+   "width": 12,
+   "sideWidth": 3,
+   "height": 2.42,
+   "angle": 16,
+   "back": 9.9,
+   "top": 3
+  },
+  {
+   "type": "quarter",
+   "x": 53.07,
+   "z": -483.48,
+   "yaw": 45,
+   "side": 1,
+   "length": 40,
+   "radius": 4,
+   "wallAngle": 82,
+   "deckWidth": 2,
+   "back": 5,
+   "taper": 8
+  },
+  {
+   "type": "jump",
+   "x": -102,
+   "z": -100,
+   "width": 10,
+   "sideWidth": 2.5,
+   "lipHeight": 2.4,
+   "lipAngle": 20,
+   "gap": 11,
+   "deck": true,
+   "landingAngle": 14,
+   "knuckle": 3,
+   "transition": 6
+  },
+  {
+   "type": "jump",
+   "x": -102,
+   "z": -150.31,
+   "width": 10,
+   "sideWidth": 2.5,
+   "lipHeight": 2.6,
+   "lipAngle": 20,
+   "gap": 12,
+   "deck": true,
+   "landingAngle": 14,
+   "knuckle": 3,
+   "transition": 6
+  },
+  {
+   "type": "jump",
+   "x": -102,
+   "z": -203.53,
+   "width": 11,
+   "sideWidth": 2.5,
+   "lipHeight": 2.8,
+   "lipAngle": 21,
+   "gap": 13,
+   "deck": true,
+   "landingAngle": 14,
+   "knuckle": 3,
+   "transition": 6
+  },
+  {
+   "type": "jump",
+   "x": -102,
+   "z": -258.85,
+   "width": 11,
+   "sideWidth": 2.5,
+   "lipHeight": 3,
+   "lipAngle": 22,
+   "gap": 14,
+   "deck": true,
+   "landingAngle": 14,
+   "knuckle": 3,
+   "transition": 6
+  },
+  {
+   "type": "jump",
+   "x": -102,
+   "z": -316.23,
+   "width": 11,
+   "sideWidth": 2.5,
+   "lipHeight": 3,
+   "lipAngle": 20,
+   "gap": 9,
+   "deck": false,
+   "landingAngle": 13,
+   "knuckle": 3,
+   "transition": 6,
+   "landingHeight": 1.8
+  },
+  {
+   "type": "jump",
+   "x": -102,
+   "z": -378.01,
+   "width": 11,
+   "sideWidth": 2.5,
+   "lipHeight": 3,
+   "lipAngle": 22,
+   "gap": 14,
+   "deck": true,
+   "landingAngle": 14,
+   "knuckle": 3,
+   "transition": 6
+  },
+  {
+   "type": "jump",
+   "x": -102,
+   "z": -435.39,
+   "width": 12,
+   "sideWidth": 2.5,
+   "lipHeight": 3.2,
+   "lipAngle": 22,
+   "gap": 15,
+   "deck": true,
+   "landingAngle": 14,
+   "knuckle": 3,
+   "transition": 6
+  },
+  {
+   "type": "halfpipe",
+   "x": -152,
+   "z": -150,
+   "yaw": 0,
+   "length": 220,
+   "floorWidth": 17,
+   "radius": 6.5,
+   "wallAngle": 84,
+   "deckWidth": 4,
+   "outerWidth": 8,
+   "dropIn": 8,
+   "entry": 16,
+   "back": 34,
+   "exit": 16
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -160,
+     "z": -394,
+     "height": 0
+    },
+    {
+     "x": -160,
+     "z": -397.5,
+     "height": 0.5
+    },
+    {
+     "x": -160,
+     "z": -402.4,
+     "height": 0.3
+    },
+    {
+     "x": -160,
+     "z": -408.4,
+     "height": 0.95
+    },
+    {
+     "x": -160,
+     "z": -418,
+     "height": 0.35
+    }
+   ]
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -144,
+     "z": -394,
+     "height": 0
+    },
+    {
+     "x": -144,
+     "z": -397.5,
+     "height": 0.45
+    },
+    {
+     "x": -144,
+     "z": -414,
+     "height": 0.45
+    }
+   ],
+   "width": 1
+  },
+  {
+   "type": "kicker",
+   "x": -152,
+   "z": -428,
+   "width": 3,
+   "sideWidth": 1.5,
+   "lipHeight": 0.6,
+   "lipAngle": 10,
+   "back": 1.2
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -152,
+     "z": -435.81,
+     "height": 0.65
+    },
+    {
+     "x": -152,
+     "z": -453.81,
+     "height": 0.65
+    }
+   ]
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -152,
+     "z": -463.81,
+     "height": 0
+    },
+    {
+     "x": -152,
+     "z": -467.31,
+     "height": 0.75
+    },
+    {
+     "x": -152,
+     "z": -485.81,
+     "height": 0.75
+    }
+   ],
+   "style": "tube"
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -160,
+     "z": -495.81,
+     "height": 0
+    },
+    {
+     "x": -160,
+     "z": -497.21,
+     "height": 0.62
+    },
+    {
+     "x": -160,
+     "z": -498.61,
+     "height": 0.81
+    },
+    {
+     "x": -160,
+     "z": -500.01,
+     "height": 0.97
+    },
+    {
+     "x": -160,
+     "z": -501.41,
+     "height": 1.07
+    },
+    {
+     "x": -160,
+     "z": -502.81,
+     "height": 1.1
+    },
+    {
+     "x": -160,
+     "z": -504.21,
+     "height": 1.07
+    },
+    {
+     "x": -160,
+     "z": -505.61,
+     "height": 0.97
+    },
+    {
+     "x": -160,
+     "z": -507.01,
+     "height": 0.81
+    },
+    {
+     "x": -160,
+     "z": -508.41,
+     "height": 0.62
+    },
+    {
+     "x": -160,
+     "z": -509.81,
+     "height": 0.4
+    }
+   ],
+   "width": 1
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -144,
+     "z": -495.81,
+     "height": 0
+    },
+    {
+     "x": -144,
+     "z": -499.31,
+     "height": 0.5
+    },
+    {
+     "x": -144,
+     "z": -505.71,
+     "height": 0.5
+    },
+    {
+     "x": -143,
+     "z": -511.21,
+     "height": 0.5
+    },
+    {
+     "x": -142,
+     "z": -517.81,
+     "height": 0.35
+    }
+   ]
+  },
+  {
+   "type": "kicker",
+   "x": 128,
+   "z": -345,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.7,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "kicker",
+   "x": 150,
+   "z": -345,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.8,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "kicker",
+   "x": 172,
+   "z": -345,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.7,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "jump",
+   "x": 132,
+   "z": -372.1,
+   "width": 7,
+   "sideWidth": 2.5,
+   "lipHeight": 0.8,
+   "lipAngle": 12,
+   "gap": 3,
+   "deck": true,
+   "landingAngle": 10,
+   "knuckle": 2,
+   "transition": 4
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": 164,
+     "z": -372.1,
+     "height": 0
+    },
+    {
+     "x": 164,
+     "z": -375.6,
+     "height": 0.25
+    },
+    {
+     "x": 164,
+     "z": -382.1,
+     "height": 0.25
+    }
+   ],
+   "width": 1.2
+  },
+  {
+   "type": "kicker",
+   "x": 130,
+   "z": -400.17,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.6,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "kicker",
+   "x": 170,
+   "z": -400.17,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.6,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": 132,
+     "z": -424.74,
+     "height": 0
+    },
+    {
+     "x": 132,
+     "z": -428.24,
+     "height": 0.3
+    },
+    {
+     "x": 132,
+     "z": -436.74,
+     "height": 0.3
+    }
+   ],
+   "width": 1.2
+  },
+  {
+   "type": "jump",
+   "x": 166,
+   "z": -424.74,
+   "width": 7,
+   "sideWidth": 2.5,
+   "lipHeight": 1,
+   "lipAngle": 14,
+   "gap": 4,
+   "deck": true,
+   "landingAngle": 11,
+   "knuckle": 2,
+   "transition": 4
+  },
+  {
+   "type": "kicker",
+   "x": 128,
+   "z": -454.91,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.7,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "kicker",
+   "x": 150,
+   "z": -454.91,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.9,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "kicker",
+   "x": 172,
+   "z": -454.91,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.7,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "jump",
+   "x": 134,
+   "z": -483.27,
+   "width": 7,
+   "sideWidth": 2.5,
+   "lipHeight": 1.1,
+   "lipAngle": 15,
+   "gap": 4.5,
+   "deck": false,
+   "landingAngle": 11,
+   "knuckle": 2,
+   "transition": 4,
+   "landingHeight": 1.1
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 168,
+     "z": -483.27,
+     "height": 0
+    },
+    {
+     "x": 168,
+     "z": -486.77,
+     "height": 0.3
+    },
+    {
+     "x": 168,
+     "z": -493.27,
+     "height": 0.3
+    }
+   ]
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -24,
+     "z": -628,
+     "height": 0
+    },
+    {
+     "x": -24.02,
+     "z": -629,
+     "height": 0.13
+    },
+    {
+     "x": -24.07,
+     "z": -630,
+     "height": 0.26
+    },
+    {
+     "x": -24.15,
+     "z": -631,
+     "height": 0.39
+    },
+    {
+     "x": -24.26,
+     "z": -631.99,
+     "height": 0.45
+    },
+    {
+     "x": -24.41,
+     "z": -632.98,
+     "height": 0.45
+    },
+    {
+     "x": -24.59,
+     "z": -633.96,
+     "height": 0.45
+    },
+    {
+     "x": -24.8,
+     "z": -634.94,
+     "height": 0.45
+    },
+    {
+     "x": -25.04,
+     "z": -635.91,
+     "height": 0.45
+    },
+    {
+     "x": -25.32,
+     "z": -636.87,
+     "height": 0.45
+    },
+    {
+     "x": -25.62,
+     "z": -637.82,
+     "height": 0.45
+    },
+    {
+     "x": -25.96,
+     "z": -638.76,
+     "height": 0.45
+    },
+    {
+     "x": -26.33,
+     "z": -639.69,
+     "height": 0.45
+    },
+    {
+     "x": -26.72,
+     "z": -640.61,
+     "height": 0.45
+    },
+    {
+     "x": -27.15,
+     "z": -641.52,
+     "height": 0.45
+    },
+    {
+     "x": -27.61,
+     "z": -642.4,
+     "height": 0.45
+    },
+    {
+     "x": -28.09,
+     "z": -643.28,
+     "height": 0.45
+    }
+   ]
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -9,
+     "z": -628,
+     "height": 0
+    },
+    {
+     "x": -9,
+     "z": -631.5,
+     "height": 0.7
+    },
+    {
+     "x": -9,
+     "z": -642,
+     "height": 0.7
+    }
+   ],
+   "style": "tube"
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": 6,
+     "z": -628,
+     "height": 0
+    },
+    {
+     "x": 6,
+     "z": -631.5,
+     "height": 0.35
+    },
+    {
+     "x": 6,
+     "z": -634.3,
+     "height": 0.21
+    },
+    {
+     "x": 6,
+     "z": -638.8,
+     "height": 0.8
+    },
+    {
+     "x": 6,
+     "z": -646,
+     "height": 0.24
+    }
+   ],
+   "width": 0.8
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 21,
+     "z": -628,
+     "height": 0
+    },
+    {
+     "x": 21,
+     "z": -629.5,
+     "height": 0.63
+    },
+    {
+     "x": 21,
+     "z": -631,
+     "height": 0.82
+    },
+    {
+     "x": 21,
+     "z": -632.5,
+     "height": 0.95
+    },
+    {
+     "x": 21,
+     "z": -634,
+     "height": 1
+    },
+    {
+     "x": 21,
+     "z": -635.5,
+     "height": 0.95
+    },
+    {
+     "x": 21,
+     "z": -637,
+     "height": 0.82
+    },
+    {
+     "x": 21,
+     "z": -638.5,
+     "height": 0.63
+    },
+    {
+     "x": 21,
+     "z": -640,
+     "height": 0.4
+    }
+   ]
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 36,
+     "z": -628,
+     "height": 0
+    },
+    {
+     "x": 36.02,
+     "z": -629,
+     "height": 0.13
+    },
+    {
+     "x": 36.07,
+     "z": -630,
+     "height": 0.26
+    },
+    {
+     "x": 36.15,
+     "z": -631,
+     "height": 0.39
+    },
+    {
+     "x": 36.26,
+     "z": -631.99,
+     "height": 0.45
+    },
+    {
+     "x": 36.41,
+     "z": -632.98,
+     "height": 0.45
+    },
+    {
+     "x": 36.59,
+     "z": -633.96,
+     "height": 0.45
+    },
+    {
+     "x": 36.8,
+     "z": -634.94,
+     "height": 0.45
+    },
+    {
+     "x": 37.04,
+     "z": -635.91,
+     "height": 0.45
+    },
+    {
+     "x": 37.32,
+     "z": -636.87,
+     "height": 0.45
+    },
+    {
+     "x": 37.62,
+     "z": -637.82,
+     "height": 0.45
+    },
+    {
+     "x": 37.96,
+     "z": -638.76,
+     "height": 0.45
+    },
+    {
+     "x": 38.33,
+     "z": -639.69,
+     "height": 0.45
+    },
+    {
+     "x": 38.72,
+     "z": -640.61,
+     "height": 0.45
+    },
+    {
+     "x": 39.15,
+     "z": -641.52,
+     "height": 0.45
+    },
+    {
+     "x": 39.61,
+     "z": -642.4,
+     "height": 0.45
+    },
+    {
+     "x": 40.09,
+     "z": -643.28,
+     "height": 0.45
+    }
+   ]
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -16,
+     "z": -656,
+     "height": 0
+    },
+    {
+     "x": -16,
+     "z": -659.5,
+     "height": 0.5
+    },
+    {
+     "x": -16,
+     "z": -664.1,
+     "height": 0.5
+    },
+    {
+     "x": -17,
+     "z": -668.6,
+     "height": 0.5
+    },
+    {
+     "x": -18,
+     "z": -674,
+     "height": 0.35
+    }
+   ]
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -1,
+     "z": -656,
+     "height": 0
+    },
+    {
+     "x": -1,
+     "z": -659.5,
+     "height": 0.4
+    },
+    {
+     "x": -1,
+     "z": -672,
+     "height": 0.4
+    }
+   ],
+   "width": 0.6
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 14,
+     "z": -656,
+     "height": 0
+    },
+    {
+     "x": 14,
+     "z": -659.5,
+     "height": 0.5
+    },
+    {
+     "x": 14,
+     "z": -662.3,
+     "height": 0.3
+    },
+    {
+     "x": 14,
+     "z": -666.8,
+     "height": 0.95
+    },
+    {
+     "x": 14,
+     "z": -674,
+     "height": 0.35
+    }
+   ]
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": 29,
+     "z": -656,
+     "height": 0
+    },
+    {
+     "x": 29,
+     "z": -657.37,
+     "height": 0.53
+    },
+    {
+     "x": 29,
+     "z": -658.75,
+     "height": 0.72
+    },
+    {
+     "x": 29,
+     "z": -660.12,
+     "height": 0.85
+    },
+    {
+     "x": 29,
+     "z": -661.5,
+     "height": 0.9
+    },
+    {
+     "x": 29,
+     "z": -662.87,
+     "height": 0.85
+    },
+    {
+     "x": 29,
+     "z": -664.25,
+     "height": 0.72
+    },
+    {
+     "x": 29,
+     "z": -665.62,
+     "height": 0.53
+    },
+    {
+     "x": 29,
+     "z": -667,
+     "height": 0.3
+    }
+   ],
+   "width": 1
+  },
+  {
+   "type": "kicker",
+   "x": -24,
+   "z": -684,
+   "width": 3.5,
+   "sideWidth": 1.5,
+   "lipHeight": 0.85,
+   "lipAngle": 6,
+   "back": 1.2
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -24,
+     "z": -701.47,
+     "height": 0.75
+    },
+    {
+     "x": -24,
+     "z": -705.07,
+     "height": 0.75
+    }
+   ],
+   "width": 0.8,
+   "style": "table"
+  },
+  {
+   "type": "kicker",
+   "x": -5,
+   "z": -684,
+   "width": 3.5,
+   "sideWidth": 1.5,
+   "lipHeight": 0.72,
+   "lipAngle": 6,
+   "back": 1.2
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -5,
+     "z": -699,
+     "height": 0.62
+    },
+    {
+     "x": -5,
+     "z": -702.72,
+     "height": 0.62
+    }
+   ],
+   "width": 0.9,
+   "style": "barrels"
+  },
+  {
+   "type": "kicker",
+   "x": 17,
+   "z": -684,
+   "width": 3.5,
+   "sideWidth": 1.5,
+   "lipHeight": 1.1,
+   "lipAngle": 7,
+   "back": 1.2
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": 17,
+     "z": -703.22,
+     "height": 1
+    },
+    {
+     "x": 17,
+     "z": -704.82,
+     "height": 1
+    }
+   ],
+   "width": 1.6,
+   "style": "spool"
+  },
+  {
+   "type": "kicker",
+   "x": 36,
+   "z": -684,
+   "width": 3.5,
+   "sideWidth": 1.5,
+   "lipHeight": 0.85,
+   "lipAngle": 6,
+   "back": 1.2
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": 36,
+     "z": -701.47,
+     "height": 0.75
+    },
+    {
+     "x": 36,
+     "z": -705.47,
+     "height": 0.75
+    }
+   ],
+   "width": 0.8,
+   "style": "table"
+  },
+  {
+   "type": "quarter",
+   "x": -30,
+   "z": -715.47,
+   "yaw": 0,
+   "side": -1,
+   "length": 18,
+   "radius": 3.4,
+   "wallAngle": 84,
+   "deckWidth": 0.6,
+   "back": 3.5,
+   "taper": 3.5,
+   "style": "wood"
+  },
+  {
+   "type": "quarter",
+   "x": 42,
+   "z": -715.47,
+   "yaw": 0,
+   "side": 1,
+   "length": 18,
+   "radius": 3.4,
+   "wallAngle": 84,
+   "deckWidth": 0.6,
+   "back": 3.5,
+   "taper": 3.5,
+   "style": "wood"
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -16,
+     "z": -743.47,
+     "height": 0
+    },
+    {
+     "x": -16,
+     "z": -746.97,
+     "height": 0.45
+    },
+    {
+     "x": -16,
+     "z": -761.47,
+     "height": 0.45
+    }
+   ]
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -1,
+     "z": -743.47,
+     "height": 0
+    },
+    {
+     "x": -1,
+     "z": -744.97,
+     "height": 0.58
+    },
+    {
+     "x": -1,
+     "z": -746.47,
+     "height": 0.77
+    },
+    {
+     "x": -1,
+     "z": -747.97,
+     "height": 0.9
+    },
+    {
+     "x": -1,
+     "z": -749.47,
+     "height": 0.95
+    },
+    {
+     "x": -1,
+     "z": -750.97,
+     "height": 0.9
+    },
+    {
+     "x": -1,
+     "z": -752.47,
+     "height": 0.77
+    },
+    {
+     "x": -1,
+     "z": -753.97,
+     "height": 0.58
+    },
+    {
+     "x": -1,
+     "z": -755.47,
+     "height": 0.35
+    }
+   ],
+   "width": 1
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 14,
+     "z": -743.47,
+     "height": 0
+    },
+    {
+     "x": 14,
+     "z": -746.97,
+     "height": 0.5
+    },
+    {
+     "x": 14,
+     "z": -750.67,
+     "height": 0.5
+    },
+    {
+     "x": 15.5,
+     "z": -754.27,
+     "height": 0.5
+    },
+    {
+     "x": 15.5,
+     "z": -761.47,
+     "height": 0.35
+    }
+   ]
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": 29,
+     "z": -743.47,
+     "height": 0
+    },
+    {
+     "x": 29,
+     "z": -746.97,
+     "height": 0.4
+    },
+    {
+     "x": 29,
+     "z": -759.47,
+     "height": 0.4
+    }
+   ],
+   "width": 0.8
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -22,
+     "z": -771.47,
+     "height": 0
+    },
+    {
+     "x": -22,
+     "z": -774.97,
+     "height": 0.35
+    },
+    {
+     "x": -22,
+     "z": -785.47,
+     "height": 0.35
+    }
+   ],
+   "width": 1
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -4,
+     "z": -771.47,
+     "height": 0
+    },
+    {
+     "x": -4,
+     "z": -772.97,
+     "height": 0.63
+    },
+    {
+     "x": -4,
+     "z": -774.47,
+     "height": 0.82
+    },
+    {
+     "x": -4,
+     "z": -775.97,
+     "height": 0.95
+    },
+    {
+     "x": -4,
+     "z": -777.47,
+     "height": 1
+    },
+    {
+     "x": -4,
+     "z": -778.97,
+     "height": 0.95
+    },
+    {
+     "x": -4,
+     "z": -780.47,
+     "height": 0.82
+    },
+    {
+     "x": -4,
+     "z": -781.97,
+     "height": 0.63
+    },
+    {
+     "x": -4,
+     "z": -783.47,
+     "height": 0.4
+    }
+   ]
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": 16,
+     "z": -771.47,
+     "height": 0
+    },
+    {
+     "x": 16,
+     "z": -774.97,
+     "height": 0.35
+    },
+    {
+     "x": 16,
+     "z": -777.77,
+     "height": 0.21
+    },
+    {
+     "x": 16,
+     "z": -782.27,
+     "height": 0.8
+    },
+    {
+     "x": 16,
+     "z": -789.47,
+     "height": 0.24
+    }
+   ],
+   "width": 0.9
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 34,
+     "z": -771.47,
+     "height": 0
+    },
+    {
+     "x": 34,
+     "z": -774.97,
+     "height": 0.4
+    },
+    {
+     "x": 34,
+     "z": -785.47,
+     "height": 0.4
+    }
+   ]
+  },
+  {
+   "type": "kicker",
+   "x": -142,
+   "z": -630,
+   "yaw": -32,
+   "width": 5,
+   "sideWidth": 2,
+   "lipHeight": 2.1,
+   "lipAngle": 24,
+   "back": 2.25
+  },
+  {
+   "type": "landing",
+   "x": -130,
+   "z": -628,
+   "width": 12,
+   "sideWidth": 3,
+   "height": 3.3,
+   "angle": 16,
+   "back": 13.5,
+   "top": 3
+  },
+  {
+   "type": "quarter",
+   "x": -120,
+   "z": -641.5,
+   "yaw": 0,
+   "side": 1,
+   "length": 24,
+   "radius": 4.4,
+   "wallAngle": 84,
+   "deckWidth": 0.6,
+   "back": 3.5,
+   "taper": 4,
+   "style": "wood"
+  },
+  {
+   "type": "jump",
+   "x": -130,
+   "z": -690.01,
+   "width": 11,
+   "sideWidth": 2.5,
+   "lipHeight": 2.8,
+   "lipAngle": 21,
+   "gap": 13,
+   "deck": true,
+   "landingAngle": 14,
+   "knuckle": 3,
+   "transition": 6
+  },
+  {
+   "type": "kicker",
+   "x": -130,
+   "z": -747.33,
+   "width": 3,
+   "sideWidth": 1.5,
+   "lipHeight": 0.6,
+   "lipAngle": 10,
+   "back": 1.2
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -130,
+     "z": -755.13,
+     "height": 0.65
+    },
+    {
+     "x": -130,
+     "z": -763.23,
+     "height": 1.1
+    },
+    {
+     "x": -130,
+     "z": -773.13,
+     "height": 0.45
+    }
+   ]
+  },
+  {
+   "type": "kicker",
+   "x": 130,
+   "z": -630,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.7,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "kicker",
+   "x": 150,
+   "z": -630,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.9,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "kicker",
+   "x": 170,
+   "z": -630,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.7,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": 134,
+     "z": -660.36,
+     "height": 0
+    },
+    {
+     "x": 134,
+     "z": -663.86,
+     "height": 0.3
+    },
+    {
+     "x": 134,
+     "z": -672.36,
+     "height": 0.3
+    }
+   ],
+   "width": 1.2
+  },
+  {
+   "type": "jump",
+   "x": 166,
+   "z": -660.36,
+   "width": 7,
+   "sideWidth": 2.5,
+   "lipHeight": 1,
+   "lipAngle": 14,
+   "gap": 4,
+   "deck": true,
+   "landingAngle": 11,
+   "knuckle": 2,
+   "transition": 4
+  },
+  {
+   "type": "kicker",
+   "x": 130,
+   "z": -692.53,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.6,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "kicker",
+   "x": 150,
+   "z": -692.53,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.7,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "kicker",
+   "x": 170,
+   "z": -692.53,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.6,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "jump",
+   "x": 136,
+   "z": -720.37,
+   "width": 8,
+   "sideWidth": 2.5,
+   "lipHeight": 1.2,
+   "lipAngle": 15,
+   "gap": 5,
+   "deck": true,
+   "landingAngle": 12,
+   "knuckle": 2,
+   "transition": 4
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": 166,
+     "z": -720.37,
+     "height": 0
+    },
+    {
+     "x": 166,
+     "z": -721.5,
+     "height": 0.4
+    },
+    {
+     "x": 166,
+     "z": -722.62,
+     "height": 0.53
+    },
+    {
+     "x": 166,
+     "z": -723.75,
+     "height": 0.62
+    },
+    {
+     "x": 166,
+     "z": -724.87,
+     "height": 0.65
+    },
+    {
+     "x": 166,
+     "z": -726,
+     "height": 0.62
+    },
+    {
+     "x": 166,
+     "z": -727.12,
+     "height": 0.53
+    },
+    {
+     "x": 166,
+     "z": -728.25,
+     "height": 0.4
+    },
+    {
+     "x": 166,
+     "z": -729.37,
+     "height": 0.25
+    }
+   ],
+   "width": 1.2
+  },
+  {
+   "type": "kicker",
+   "x": 16,
+   "z": -888,
+   "width": 3.5,
+   "sideWidth": 1.5,
+   "lipHeight": 1.1,
+   "lipAngle": 8,
+   "back": 1.2
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": 16,
+     "z": -904.95,
+     "height": 1
+    },
+    {
+     "x": 16,
+     "z": -914.95,
+     "height": 1
+    }
+   ],
+   "width": 1.3,
+   "style": "ledge"
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 32,
+     "z": -888,
+     "height": 0
+    },
+    {
+     "x": 32,
+     "z": -891.5,
+     "height": 0.45
+    },
+    {
+     "x": 32,
+     "z": -902,
+     "height": 0.45
+    }
+   ]
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 48,
+     "z": -888,
+     "height": 0
+    },
+    {
+     "x": 48,
+     "z": -891.5,
+     "height": 0.5
+    },
+    {
+     "x": 48,
+     "z": -894.3,
+     "height": 0.3
+    },
+    {
+     "x": 48,
+     "z": -898.8,
+     "height": 0.95
+    },
+    {
+     "x": 48,
+     "z": -906,
+     "height": 0.35
+    }
+   ]
+  },
+  {
+   "type": "kicker",
+   "x": 64,
+   "z": -888,
+   "width": 3.5,
+   "sideWidth": 1.5,
+   "lipHeight": 0.72,
+   "lipAngle": 6,
+   "back": 1.2
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": 64,
+     "z": -903,
+     "height": 0.62
+    },
+    {
+     "x": 64,
+     "z": -907.34,
+     "height": 0.62
+    }
+   ],
+   "width": 0.9,
+   "style": "barrels"
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": 24,
+     "z": -924.95,
+     "height": 0
+    },
+    {
+     "x": 24,
+     "z": -926.33,
+     "height": 0.53
+    },
+    {
+     "x": 24,
+     "z": -927.7,
+     "height": 0.72
+    },
+    {
+     "x": 24,
+     "z": -929.08,
+     "height": 0.85
+    },
+    {
+     "x": 24,
+     "z": -930.45,
+     "height": 0.9
+    },
+    {
+     "x": 24,
+     "z": -931.83,
+     "height": 0.85
+    },
+    {
+     "x": 24,
+     "z": -933.2,
+     "height": 0.72
+    },
+    {
+     "x": 24,
+     "z": -934.58,
+     "height": 0.53
+    },
+    {
+     "x": 24,
+     "z": -935.95,
+     "height": 0.3
+    }
+   ],
+   "width": 1
+  },
+  {
+   "type": "kicker",
+   "x": 40,
+   "z": -924.95,
+   "width": 3.5,
+   "sideWidth": 1.5,
+   "lipHeight": 1.1,
+   "lipAngle": 7,
+   "back": 1.2
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": 40,
+     "z": -944.17,
+     "height": 1
+    },
+    {
+     "x": 40,
+     "z": -945.77,
+     "height": 1
+    }
+   ],
+   "width": 1.6,
+   "style": "spool"
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 56,
+     "z": -924.95,
+     "height": 0
+    },
+    {
+     "x": 56,
+     "z": -928.45,
+     "height": 0.5
+    },
+    {
+     "x": 56,
+     "z": -933.05,
+     "height": 0.5
+    },
+    {
+     "x": 57,
+     "z": -937.55,
+     "height": 0.5
+    },
+    {
+     "x": 58,
+     "z": -942.95,
+     "height": 0.35
+    }
+   ]
+  },
+  {
+   "type": "kicker",
+   "x": 23,
+   "z": -966,
+   "width": 7,
+   "sideWidth": 2,
+   "lipHeight": 1.8,
+   "lipAngle": 24,
+   "back": 2.2
+  },
+  {
+   "type": "kicker",
+   "x": 19,
+   "z": -1039,
+   "width": 7,
+   "sideWidth": 2,
+   "lipHeight": 1,
+   "lipAngle": 12,
+   "back": 1.4
+  },
+  {
+   "type": "kicker",
+   "x": 57,
+   "z": -966,
+   "width": 7,
+   "sideWidth": 2,
+   "lipHeight": 1.8,
+   "lipAngle": 24,
+   "back": 2.2
+  },
+  {
+   "type": "kicker",
+   "x": 61,
+   "z": -1039,
+   "width": 7,
+   "sideWidth": 2,
+   "lipHeight": 1,
+   "lipAngle": 12,
+   "back": 1.4
+  },
+  {
+   "type": "kicker",
+   "x": 28.36,
+   "z": -1027,
+   "yaw": -60,
+   "width": 5,
+   "sideWidth": 1.5,
+   "lipHeight": 1.2,
+   "lipAngle": 22,
+   "back": 1
+  },
+  {
+   "type": "kicker",
+   "x": 51.64,
+   "z": -1035,
+   "yaw": 60,
+   "width": 5,
+   "sideWidth": 1.5,
+   "lipHeight": 1.2,
+   "lipAngle": 22,
+   "back": 1
+  },
+  {
+   "type": "rail",
+   "style": "tube",
+   "points": [
+    {
+     "x": 25,
+     "z": -1010,
+     "height": 0
+    },
+    {
+     "x": 28.5,
+     "z": -1010,
+     "height": 0.5
+    },
+    {
+     "x": 51.5,
+     "z": -1010,
+     "height": 0.5
+    },
+    {
+     "x": 55,
+     "z": -1010,
+     "height": 0
+    }
+   ]
+  },
+  {
+   "type": "kicker",
+   "x": 40,
+   "z": -1188,
+   "width": 6,
+   "sideWidth": 2,
+   "lipHeight": 1.8,
+   "lipAngle": 20,
+   "back": 2
+  },
+  {
+   "type": "kicker",
+   "x": 38.89,
+   "z": -1206,
+   "yaw": 32,
+   "width": 5.5,
+   "sideWidth": 1.5,
+   "lipHeight": 2.2,
+   "lipAngle": 28,
+   "back": 2
+  },
+  {
+   "type": "kicker",
+   "x": 41.11,
+   "z": -1220,
+   "yaw": -32,
+   "width": 5.5,
+   "sideWidth": 1.5,
+   "lipHeight": 2.2,
+   "lipAngle": 28,
+   "back": 2
+  },
+  {
+   "type": "kicker",
+   "x": 39.03,
+   "z": -1236,
+   "yaw": 36,
+   "width": 5.5,
+   "sideWidth": 1.5,
+   "lipHeight": 2.8,
+   "lipAngle": 36,
+   "back": 2
+  },
+  {
+   "type": "kicker",
+   "x": 40.97,
+   "z": -1250,
+   "yaw": -36,
+   "width": 5.5,
+   "sideWidth": 1.5,
+   "lipHeight": 2.8,
+   "lipAngle": 36,
+   "back": 2
+  },
+  {
+   "type": "quarter",
+   "x": -26,
+   "z": -1216,
+   "yaw": 0,
+   "side": -1,
+   "length": 78,
+   "radius": 7,
+   "wallAngle": 80,
+   "deckWidth": 3,
+   "back": 8,
+   "taper": 10
+  },
+  {
+   "type": "quarter",
+   "x": 106,
+   "z": -1216,
+   "yaw": 0,
+   "side": 1,
+   "length": 78,
+   "radius": 7,
+   "wallAngle": 80,
+   "deckWidth": 3,
+   "back": 8,
+   "taper": 10
+  },
+  {
+   "type": "kicker",
+   "x": 40,
+   "z": -1255,
+   "width": 7,
+   "sideWidth": 2,
+   "lipHeight": 1,
+   "lipAngle": 12,
+   "back": 1.4
+  },
+  {
+   "type": "jump",
+   "x": -140,
+   "z": -890,
+   "width": 11,
+   "sideWidth": 2.5,
+   "lipHeight": 2.6,
+   "lipAngle": 26,
+   "gap": 8,
+   "deck": false,
+   "landingAngle": 16,
+   "knuckle": 3,
+   "transition": 6,
+   "landingHeight": 4.6
+  },
+  {
+   "type": "jump",
+   "x": -140,
+   "z": -955.2,
+   "width": 11,
+   "sideWidth": 2.5,
+   "lipHeight": 2.8,
+   "lipAngle": 22,
+   "gap": 13,
+   "deck": false,
+   "landingAngle": 16,
+   "knuckle": 3,
+   "transition": 6,
+   "landingHeight": 2.8
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -140,
+     "z": -1022.33,
+     "height": 0
+    },
+    {
+     "x": -140,
+     "z": -1024.83,
+     "height": 0.5
+    },
+    {
+     "x": -140,
+     "z": -1033.33,
+     "height": 3
+    }
+   ],
+   "style": "tube",
+   "radius": 0.14
+  },
+  {
+   "type": "landing",
+   "x": -140,
+   "z": -1037.53,
+   "yaw": 0,
+   "width": 9,
+   "sideWidth": 2.5,
+   "height": 1.8,
+   "angle": 16,
+   "back": 2,
+   "top": 3,
+   "knuckle": 2,
+   "transition": 6
+  },
+  {
+   "type": "kicker",
+   "x": -140,
+   "z": -1204.80627923868,
+   "width": 12,
+   "sideWidth": 4,
+   "lipHeight": 3.5,
+   "lipAngle": 30,
+   "back": 3
+  },
+  {
+   "type": "kicker",
+   "x": 154,
+   "z": -922,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.7,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "kicker",
+   "x": 178,
+   "z": -922,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.6,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": 154,
+     "z": -1042,
+     "height": 0
+    },
+    {
+     "x": 154,
+     "z": -1045.5,
+     "height": 0.3
+    },
+    {
+     "x": 154,
+     "z": -1054,
+     "height": 0.3
+    }
+   ],
+   "width": 1.2
+  },
+  {
+   "type": "kicker",
+   "x": 178,
+   "z": -1042,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.9,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "kicker",
+   "x": 154,
+   "z": -1162,
+   "width": 9,
+   "sideWidth": 3,
+   "lipHeight": 0.8,
+   "lipAngle": 9,
+   "back": 7,
+   "natural": true
+  },
+  {
+   "type": "jump",
+   "x": 178,
+   "z": -1162,
+   "width": 7,
+   "sideWidth": 2.5,
+   "lipHeight": 1,
+   "lipAngle": 14,
+   "gap": 4,
+   "deck": true,
+   "landingAngle": 11,
+   "knuckle": 2,
+   "transition": 4
+  },
+  {
+   "type": "jump",
+   "x": 154,
+   "z": -1282,
+   "width": 8,
+   "sideWidth": 2.5,
+   "lipHeight": 1.2,
+   "lipAngle": 15,
+   "gap": 5,
+   "deck": true,
+   "landingAngle": 12,
+   "knuckle": 2,
+   "transition": 4
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": 178,
+     "z": -1282,
+     "height": 0
+    },
+    {
+     "x": 178,
+     "z": -1285.5,
+     "height": 0.3
+    },
+    {
+     "x": 178,
+     "z": -1294,
+     "height": 0.3
+    }
+   ],
+   "width": 1.2
+  },
+  {
+   "type": "quarter",
+   "x": 81.07,
+   "z": -1506,
+   "yaw": 45,
+   "side": 1,
+   "length": 40,
+   "radius": 3.6,
+   "wallAngle": 82,
+   "deckWidth": 2,
+   "back": 5,
+   "taper": 8
+  },
+  {
+   "type": "quarter",
+   "x": -53.07,
+   "z": -1506,
+   "yaw": -45,
+   "side": -1,
+   "length": 40,
+   "radius": 3.6,
+   "wallAngle": 82,
+   "deckWidth": 2,
+   "back": 5,
+   "taper": 8
+  },
+  {
+   "type": "landing",
+   "x": 14,
+   "z": -1522,
+   "width": 7,
+   "sideWidth": 6,
+   "height": 2.6,
+   "angle": 22,
+   "back": 9,
+   "top": 2.4,
+   "knuckle": 2,
+   "transition": 4
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 28,
+     "z": -1550,
+     "height": 0
+    },
+    {
+     "x": 28,
+     "z": -1552.57,
+     "height": 1.2
+    }
+   ],
+   "style": "tube",
+   "radius": 0.1
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 0,
+     "z": -1552,
+     "height": 0
+    },
+    {
+     "x": 0,
+     "z": -1555.5,
+     "height": 0.4
+    },
+    {
+     "x": 0,
+     "z": -1560.75,
+     "height": 1.2
+    },
+    {
+     "x": 0,
+     "z": -1566,
+     "height": 0.4
+    }
+   ]
+  },
+  {
+   "type": "box",
+   "points": [
+    {
+     "x": -140,
+     "z": -1520,
+     "height": 0
+    },
+    {
+     "x": -140,
+     "z": -1523.5,
+     "height": 0.35
+    },
+    {
+     "x": -140,
+     "z": -1534,
+     "height": 0.35
+    }
+   ],
+   "width": 1.2
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": -120,
+     "z": -1520,
+     "height": 0
+    },
+    {
+     "x": -120,
+     "z": -1523.5,
+     "height": 0.6
+    },
+    {
+     "x": -120,
+     "z": -1524.46,
+     "height": 0.81
+    },
+    {
+     "x": -120,
+     "z": -1525.42,
+     "height": 0.83
+    },
+    {
+     "x": -120,
+     "z": -1526.38,
+     "height": 0.66
+    },
+    {
+     "x": -120,
+     "z": -1527.35,
+     "height": 0.43
+    },
+    {
+     "x": -120,
+     "z": -1528.31,
+     "height": 0.35
+    },
+    {
+     "x": -120,
+     "z": -1529.27,
+     "height": 0.48
+    },
+    {
+     "x": -120,
+     "z": -1530.23,
+     "height": 0.72
+    },
+    {
+     "x": -120,
+     "z": -1531.19,
+     "height": 0.85
+    },
+    {
+     "x": -120,
+     "z": -1532.15,
+     "height": 0.77
+    },
+    {
+     "x": -120,
+     "z": -1533.12,
+     "height": 0.54
+    },
+    {
+     "x": -120,
+     "z": -1534.08,
+     "height": 0.37
+    },
+    {
+     "x": -120,
+     "z": -1535.04,
+     "height": 0.39
+    },
+    {
+     "x": -120,
+     "z": -1536,
+     "height": 0.6
+    }
+   ]
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 9,
+     "z": -94.07,
+     "height": 0
+    },
+    {
+     "x": 9,
+     "z": -95.27,
+     "height": 0.35
+    },
+    {
+     "x": 9,
+     "z": -98.07,
+     "height": 0.35
+    }
+   ],
+   "follow": 1
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 3,
+     "z": -130.66,
+     "height": 0
+    },
+    {
+     "x": 3,
+     "z": -131.86,
+     "height": 0.35
+    },
+    {
+     "x": 3,
+     "z": -136.66,
+     "height": 0.35
+    }
+   ],
+   "follow": 1
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 9,
+     "z": -171.17,
+     "height": 0
+    },
+    {
+     "x": 9,
+     "z": -172.37,
+     "height": 0.35
+    },
+    {
+     "x": 9,
+     "z": -178.17,
+     "height": 0.35
+    }
+   ],
+   "follow": 1
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 2.5,
+     "z": -218.09,
+     "height": 0
+    },
+    {
+     "x": 2.5,
+     "z": -219.29,
+     "height": 0.35
+    },
+    {
+     "x": 2.5,
+     "z": -229.25,
+     "height": 0.35
+    }
+   ],
+   "follow": 1
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 9.5,
+     "z": -307.96,
+     "height": 0
+    },
+    {
+     "x": 9.5,
+     "z": -309.16,
+     "height": 0.35
+    },
+    {
+     "x": 9.5,
+     "z": -319.28,
+     "height": 0.35
+    }
+   ],
+   "follow": 1
+  },
+  {
+   "type": "rail",
+   "points": [
+    {
+     "x": 2.5,
+     "z": -355.47,
+     "height": 0
+    },
+    {
+     "x": 2.5,
+     "z": -356.67,
+     "height": 0.35
+    },
+    {
+     "x": 2.5,
+     "z": -367.6,
+     "height": 0.35
+    }
+   ],
+   "follow": 1
+  },
+  {
+   "type": "building",
+   "x": 172,
+   "z": -1636,
+   "yaw": 0,
+   "length": 26,
+   "width": 40,
+   "eave": 5.5,
+   "roof": "gable",
+   "rise": 4,
+   "style": "lodge",
+   "color": "#7a5a3a",
+   "front": "up",
+   "sign": "Lodge",
+   "chimney": true
+  },
+  {
+   "type": "building",
+   "x": 118,
+   "z": -1662,
+   "yaw": 0,
+   "length": 14,
+   "width": 22,
+   "eave": 3.6,
+   "roof": "gable",
+   "rise": 2.6,
+   "style": "shop",
+   "color": "#3d6f9e",
+   "front": "up",
+   "sign": "Rentals"
+  },
+  {
+   "type": "building",
+   "x": -124,
+   "z": -1658,
+   "yaw": 0,
+   "length": 14,
+   "width": 20,
+   "eave": 3.6,
+   "roof": "gable",
+   "rise": 2.6,
+   "style": "chalet",
+   "color": "#a87443",
+   "front": "up",
+   "sign": "Cafe",
+   "chimney": true
+  },
+  {
+   "type": "building",
+   "x": 62,
+   "z": -1666,
+   "yaw": 0,
+   "length": 10,
+   "width": 14,
+   "eave": 3.2,
+   "roof": "gable",
+   "rise": 2.2,
+   "style": "shop",
+   "color": "#b8452f",
+   "front": "up",
+   "sign": "Tickets"
+  },
+  {
+   "type": "rail",
+   "style": "loop",
+   "radius": 0.06,
+   "points": [
+    {
+     "x": -116,
+     "z": -1066.806,
+     "height": 0,
+     "up": [
+      0,
+      0.966,
+      -0.259
+     ]
+    },
+    {
+     "x": -116,
+     "z": -1070.316,
+     "height": 0.518,
+     "up": [
+      0,
+      0.966,
+      -0.259
+     ]
+    },
+    {
+     "x": -116,
+     "z": -1073.697,
+     "height": 0.518,
+     "up": [
+      0,
+      0.966,
+      -0.259
+     ]
+    },
+    {
+     "x": -115.965,
+     "z": -1074.16,
+     "height": 0.556,
+     "up": [
+      0,
+      0.995,
+      -0.105
+     ]
+    },
+    {
+     "x": -115.93,
+     "z": -1074.631,
+     "height": 0.67,
+     "up": [
+      0,
+      0.999,
+      0.052
+     ]
+    },
+    {
+     "x": -115.895,
+     "z": -1075.097,
+     "height": 0.856,
+     "up": [
+      0,
+      0.978,
+      0.208
+     ]
+    },
+    {
+     "x": -115.86,
+     "z": -1075.549,
+     "height": 1.111,
+     "up": [
+      0,
+      0.934,
+      0.358
+     ]
+    },
+    {
+     "x": -115.825,
+     "z": -1075.974,
+     "height": 1.427,
+     "up": [
+      0,
+      0.866,
+      0.5
+     ]
+    },
+    {
+     "x": -115.79,
+     "z": -1076.362,
+     "height": 1.798,
+     "up": [
+      0,
+      0.777,
+      0.629
+     ]
+    },
+    {
+     "x": -115.755,
+     "z": -1076.703,
+     "height": 2.213,
+     "up": [
+      0,
+      0.669,
+      0.743
+     ]
+    },
+    {
+     "x": -115.72,
+     "z": -1076.99,
+     "height": 2.664,
+     "up": [
+      0,
+      0.545,
+      0.839
+     ]
+    },
+    {
+     "x": -115.685,
+     "z": -1077.214,
+     "height": 3.138,
+     "up": [
+      0,
+      0.407,
+      0.914
+     ]
+    },
+    {
+     "x": -115.65,
+     "z": -1077.371,
+     "height": 3.623,
+     "up": [
+      0,
+      0.259,
+      0.966
+     ]
+    },
+    {
+     "x": -115.615,
+     "z": -1077.457,
+     "height": 4.109,
+     "up": [
+      0,
+      0.105,
+      0.995
+     ]
+    },
+    {
+     "x": -115.58,
+     "z": -1077.47,
+     "height": 4.583,
+     "up": [
+      0,
+      -0.052,
+      0.999
+     ]
+    },
+    {
+     "x": -115.545,
+     "z": -1077.408,
+     "height": 5.033,
+     "up": [
+      0,
+      -0.208,
+      0.978
+     ]
+    },
+    {
+     "x": -115.51,
+     "z": -1077.274,
+     "height": 5.449,
+     "up": [
+      0,
+      -0.358,
+      0.934
+     ]
+    },
+    {
+     "x": -115.475,
+     "z": -1077.072,
+     "height": 5.82,
+     "up": [
+      0,
+      -0.5,
+      0.866
+     ]
+    },
+    {
+     "x": -115.44,
+     "z": -1076.805,
+     "height": 6.136,
+     "up": [
+      0,
+      -0.629,
+      0.777
+     ]
+    },
+    {
+     "x": -115.405,
+     "z": -1076.481,
+     "height": 6.391,
+     "up": [
+      0,
+      -0.743,
+      0.669
+     ]
+    },
+    {
+     "x": -115.37,
+     "z": -1076.108,
+     "height": 6.577,
+     "up": [
+      0,
+      -0.839,
+      0.545
+     ]
+    },
+    {
+     "x": -115.335,
+     "z": -1075.694,
+     "height": 6.691,
+     "up": [
+      0,
+      -0.914,
+      0.407
+     ]
+    },
+    {
+     "x": -115.3,
+     "z": -1075.25,
+     "height": 6.729,
+     "up": [
+      0,
+      -0.966,
+      0.259
+     ]
+    },
+    {
+     "x": -115.265,
+     "z": -1074.787,
+     "height": 6.691,
+     "up": [
+      0,
+      -0.995,
+      0.105
+     ]
+    },
+    {
+     "x": -115.23,
+     "z": -1074.317,
+     "height": 6.577,
+     "up": [
+      0,
+      -0.999,
+      -0.052
+     ]
+    },
+    {
+     "x": -115.195,
+     "z": -1073.85,
+     "height": 6.391,
+     "up": [
+      0,
+      -0.978,
+      -0.208
+     ]
+    },
+    {
+     "x": -115.16,
+     "z": -1073.399,
+     "height": 6.136,
+     "up": [
+      0,
+      -0.934,
+      -0.358
+     ]
+    },
+    {
+     "x": -115.125,
+     "z": -1072.974,
+     "height": 5.82,
+     "up": [
+      0,
+      -0.866,
+      -0.5
+     ]
+    },
+    {
+     "x": -115.09,
+     "z": -1072.586,
+     "height": 5.449,
+     "up": [
+      0,
+      -0.777,
+      -0.629
+     ]
+    },
+    {
+     "x": -115.055,
+     "z": -1072.244,
+     "height": 5.033,
+     "up": [
+      0,
+      -0.669,
+      -0.743
+     ]
+    },
+    {
+     "x": -115.02,
+     "z": -1071.958,
+     "height": 4.583,
+     "up": [
+      0,
+      -0.545,
+      -0.839
+     ]
+    },
+    {
+     "x": -114.985,
+     "z": -1071.733,
+     "height": 4.109,
+     "up": [
+      0,
+      -0.407,
+      -0.914
+     ]
+    },
+    {
+     "x": -114.95,
+     "z": -1071.576,
+     "height": 3.623,
+     "up": [
+      0,
+      -0.259,
+      -0.966
+     ]
+    },
+    {
+     "x": -114.915,
+     "z": -1071.49,
+     "height": 3.138,
+     "up": [
+      0,
+      -0.105,
+      -0.995
+     ]
+    },
+    {
+     "x": -114.88,
+     "z": -1071.478,
+     "height": 2.664,
+     "up": [
+      0,
+      0.052,
+      -0.999
+     ]
+    },
+    {
+     "x": -114.845,
+     "z": -1071.539,
+     "height": 2.213,
+     "up": [
+      0,
+      0.208,
+      -0.978
+     ]
+    },
+    {
+     "x": -114.81,
+     "z": -1071.673,
+     "height": 1.798,
+     "up": [
+      0,
+      0.358,
+      -0.934
+     ]
+    },
+    {
+     "x": -114.775,
+     "z": -1071.876,
+     "height": 1.427,
+     "up": [
+      0,
+      0.5,
+      -0.866
+     ]
+    },
+    {
+     "x": -114.74,
+     "z": -1072.142,
+     "height": 1.111,
+     "up": [
+      0,
+      0.629,
+      -0.777
+     ]
+    },
+    {
+     "x": -114.705,
+     "z": -1072.466,
+     "height": 0.856,
+     "up": [
+      0,
+      0.743,
+      -0.669
+     ]
+    },
+    {
+     "x": -114.67,
+     "z": -1072.84,
+     "height": 0.67,
+     "up": [
+      0,
+      0.839,
+      -0.545
+     ]
+    },
+    {
+     "x": -114.635,
+     "z": -1073.253,
+     "height": 0.556,
+     "up": [
+      0,
+      0.914,
+      -0.407
+     ]
+    },
+    {
+     "x": -114.6,
+     "z": -1073.697,
+     "height": 0.518,
+     "up": [
+      0,
+      0.966,
+      -0.259
+     ]
+    },
+    {
+     "x": -114.6,
+     "z": -1077.078,
+     "height": 0.518,
+     "up": [
+      0,
+      0.966,
+      -0.259
+     ]
+    },
+    {
+     "x": -114.6,
+     "z": -1080.329,
+     "height": 0,
+     "up": [
+      0,
+      0.966,
+      -0.259
+     ]
+    }
+   ]
+  }
+ ],
+ "spawn": {
+  "x": 0,
+  "z": -16,
+  "heading": 0
+ },
+ "flags": [
+  {
+   "x": 104,
+   "z": -64,
+   "heading": 0,
+   "width": 18
+  },
+  {
+   "x": 130,
+   "z": -64,
+   "heading": 0,
+   "width": 20
+  },
+  {
+   "x": 158,
+   "z": -64,
+   "heading": 0,
+   "width": 22
+  },
+  {
+   "x": 190,
+   "z": -64,
+   "heading": 0,
+   "width": 24
+  },
+  {
+   "x": -152,
+   "z": -84.24,
+   "heading": 0,
+   "width": 26
+  },
+  {
+   "x": -102,
+   "z": -78.24,
+   "heading": 0,
+   "width": 26
+  },
+  {
+   "x": -30,
+   "z": -69.6,
+   "heading": 0,
+   "width": 26
+  },
+  {
+   "x": 6,
+   "z": -66.72,
+   "heading": 0,
+   "width": 26
+  },
+  {
+   "x": 46,
+   "z": -71.52,
+   "heading": 0,
+   "width": 26
+  },
+  {
+   "x": 150,
+   "z": -330,
+   "heading": 0,
+   "width": 60
+  },
+  {
+   "x": 6,
+   "z": -606,
+   "heading": 0,
+   "width": 60
+  },
+  {
+   "x": -130,
+   "z": -606,
+   "heading": 0,
+   "width": 40
+  },
+  {
+   "x": 150,
+   "z": -606,
+   "heading": 0,
+   "width": 60
+  },
+  {
+   "x": 40,
+   "z": -858,
+   "heading": 0,
+   "width": 70
+  },
+  {
+   "x": 40,
+   "z": -1116,
+   "heading": 0,
+   "width": 80
+  },
+  {
+   "x": -140,
+   "z": -858,
+   "heading": 0,
+   "width": 60
+  },
+  {
+   "x": -140,
+   "z": -1150.80627923868,
+   "heading": 0,
+   "width": 36
+  },
+  {
+   "x": 166,
+   "z": -858,
+   "heading": 0,
+   "width": 50
+  },
+  {
+   "x": 20,
+   "z": -1484,
+   "heading": 0,
+   "width": 120
+  }
+ ],
+ "finishes": [
+  {
+   "x": 20,
+   "z": -1614,
+   "heading": 0,
+   "width": 400,
+   "length": 84,
+   "arch": {
+    "x": 20,
+    "z": -1614,
+    "width": 44
+   }
+  }
+ ],
+ "decor": [
+  {
+   "kind": "sign",
+   "x": 96,
+   "z": -70,
+   "heading": 0,
+   "header": "",
+   "lines": [
+    {
+     "text": "Small",
+     "level": "green",
+     "arrow": 0
+    }
+   ]
+  },
+  {
+   "kind": "sign",
+   "x": 121,
+   "z": -70,
+   "heading": 0,
+   "header": "",
+   "lines": [
+    {
+     "text": "Medium",
+     "level": "blue",
+     "arrow": 0
+    }
+   ]
+  },
+  {
+   "kind": "sign",
+   "x": 148,
+   "z": -70,
+   "heading": 0,
+   "header": "",
+   "lines": [
+    {
+     "text": "Large",
+     "level": "black",
+     "arrow": 0
+    }
+   ]
+  },
+  {
+   "kind": "sign",
+   "x": 179,
+   "z": -70,
+   "heading": 0,
+   "header": "",
+   "lines": [
+    {
+     "text": "XL",
+     "level": "double",
+     "arrow": 0
+    }
+   ]
+  },
+  {
+   "kind": "pine",
+   "spots": [
+    {
+     "x": -107,
+     "z": -337.89
+    },
+    {
+     "x": -104.5,
+     "z": -336.49
+    },
+    {
+     "x": -102,
+     "z": -337.89
+    },
+    {
+     "x": -99.5,
+     "z": -336.49
+    },
+    {
+     "x": -97,
+     "z": -337.89
+    }
+   ],
+   "anywhere": true,
+   "solid": true,
+   "seed": 61,
+   "minScale": 0.34,
+   "maxScale": 0.4
+  },
+  {
+   "kind": "pine",
+   "spots": [
+    {
+     "x": -114,
+     "z": -337.19
+    },
+    {
+     "x": -90,
+     "z": -338.19
+    }
+   ],
+   "anywhere": true,
+   "solid": true,
+   "seed": 62,
+   "minScale": 1.5,
+   "maxScale": 1.8
+  },
+  {
+   "kind": "pine",
+   "spots": [
+    {
+     "x": 130.82,
+     "z": -493.68
+    },
+    {
+     "x": 132.41,
+     "z": -492.28
+    },
+    {
+     "x": 134,
+     "z": -493.68
+    },
+    {
+     "x": 135.59,
+     "z": -492.28
+    },
+    {
+     "x": 137.18,
+     "z": -493.68
+    }
+   ],
+   "anywhere": true,
+   "solid": false,
+   "seed": 71,
+   "minScale": 0.14450000000000002,
+   "maxScale": 0.17
+  },
+  {
+   "kind": "pine",
+   "spots": [
+    {
+     "x": 124,
+     "z": -492.98
+    },
+    {
+     "x": 144,
+     "z": -493.98
+    }
+   ],
+   "anywhere": true,
+   "solid": true,
+   "seed": 72,
+   "minScale": 1.5,
+   "maxScale": 1.8
+  },
+  {
+   "kind": "hut",
+   "points": [
+    {
+     "x": 9,
+     "z": -900
+    }
+   ],
+   "heading": -90
+  },
+  {
+   "kind": "person",
+   "points": [
+    {
+     "x": 12,
+     "z": -904
+    },
+    {
+     "x": 11.5,
+     "z": -908
+    },
+    {
+     "x": 6,
+     "z": -910
+    },
+    {
+     "x": 70,
+     "z": -902
+    },
+    {
+     "x": 71.5,
+     "z": -905
+    }
+   ],
+   "heading": 90
+  },
+  {
+   "kind": "bunting",
+   "points": [
+    {
+     "x": 6,
+     "z": -896
+    },
+    {
+     "x": 18,
+     "z": -894
+    },
+    {
+     "x": 18,
+     "z": -914
+    },
+    {
+     "x": 6,
+     "z": -914
+    }
+   ]
+  },
+  {
+   "kind": "pine",
+   "spots": [
+    {
+     "x": -145,
+     "z": -975.51
+    },
+    {
+     "x": -142.5,
+     "z": -974.11
+    },
+    {
+     "x": -140,
+     "z": -975.51
+    },
+    {
+     "x": -137.5,
+     "z": -974.11
+    },
+    {
+     "x": -135,
+     "z": -975.51
+    }
+   ],
+   "anywhere": true,
+   "solid": true,
+   "seed": 81,
+   "minScale": 0.357,
+   "maxScale": 0.42
+  },
+  {
+   "kind": "pine",
+   "spots": [
+    {
+     "x": -152,
+     "z": -974.81
+    },
+    {
+     "x": -128,
+     "z": -975.81
+    }
+   ],
+   "anywhere": true,
+   "solid": true,
+   "seed": 82,
+   "minScale": 1.5,
+   "maxScale": 1.8
+  },
+  {
+   "kind": "chairlift",
+   "ride": true,
+   "points": [
+    {
+     "x": -64,
+     "z": -1668
+    },
+    {
+     "x": -64,
+     "z": -26
+    }
+   ]
+  },
+  {
+   "kind": "skiRack",
+   "points": [
+    {
+     "x": 150,
+     "z": -1630
+    },
+    {
+     "x": 160,
+     "z": -1630
+    },
+    {
+     "x": 112,
+     "z": -1657
+    },
+    {
+     "x": -130,
+     "z": -1653
+    }
+   ],
+   "heading": 0
+  },
+  {
+   "kind": "person",
+   "points": [
+    {
+     "x": 146,
+     "z": -1632
+    },
+    {
+     "x": 148,
+     "z": -1628
+    },
+    {
+     "x": 165,
+     "z": -1631
+    },
+    {
+     "x": 183,
+     "z": -1632
+    },
+    {
+     "x": 108,
+     "z": -1656
+    },
+    {
+     "x": 124,
+     "z": -1657
+    },
+    {
+     "x": 129,
+     "z": -1655
+    },
+    {
+     "x": -118,
+     "z": -1653
+    },
+    {
+     "x": -128,
+     "z": -1651
+    },
+    {
+     "x": 56,
+     "z": -1660
+    },
+    {
+     "x": 66,
+     "z": -1659
+    },
+    {
+     "x": -8,
+     "z": -1618
+    },
+    {
+     "x": -10,
+     "z": -1621
+    },
+    {
+     "x": 48,
+     "z": -1618
+    },
+    {
+     "x": 52,
+     "z": -1620
+    },
+    {
+     "x": 51,
+     "z": -1616
+    },
+    {
+     "x": -84,
+     "z": -1658
+    },
+    {
+     "x": -86,
+     "z": -1655
+    },
+    {
+     "x": 20,
+     "z": -1654
+    },
+    {
+     "x": 24,
+     "z": -1656
+    },
+    {
+     "x": -30,
+     "z": -1652
+    }
+   ],
+   "heading": 180
+  },
+  {
+   "kind": "skier",
+   "points": [
+    {
+     "x": 90,
+     "z": -1646
+    },
+    {
+     "x": 10,
+     "z": -1650
+    },
+    {
+     "x": -44,
+     "z": -1656
+    },
+    {
+     "x": -96,
+     "z": -1648
+    }
+   ],
+   "heading": 160
+  },
+  {
+   "kind": "groomer",
+   "points": [
+    {
+     "x": 200,
+     "z": -1676
+    }
+   ],
+   "heading": -60
+  },
+  {
+   "kind": "snowmobile",
+   "points": [
+    {
+     "x": -92,
+     "z": -1672
+    },
+    {
+     "x": -95,
+     "z": -1675
+    },
+    {
+     "x": 84,
+     "z": -1664
+    }
+   ],
+   "heading": 30,
+   "color": "#c8331f"
+  },
+  {
+   "kind": "banner",
+   "points": [
+    {
+     "x": -150,
+     "z": -1610
+    },
+    {
+     "x": -110,
+     "z": -1610
+    },
+    {
+     "x": 110,
+     "z": -1610
+    },
+    {
+     "x": 150,
+     "z": -1610
+    }
+   ],
+   "heading": 0,
+   "color": "#ff7a1a"
+  },
+  {
+   "kind": "flag",
+   "points": [
+    {
+     "x": -6,
+     "z": -1612
+    },
+    {
+     "x": 46,
+     "z": -1612
+    },
+    {
+     "x": 96,
+     "z": -1652
+    },
+    {
+     "x": 140,
+     "z": -1652
+    },
+    {
+     "x": -102,
+     "z": -1650
+    }
+   ],
+   "heading": 0
+  },
+  {
+   "kind": "bunting",
+   "points": [
+    {
+     "x": 96,
+     "z": -1652
+    },
+    {
+     "x": 118,
+     "z": -1650
+    },
+    {
+     "x": 140,
+     "z": -1652
+    }
+   ]
+  },
+  {
+   "kind": "streetLamp",
+   "points": [
+    {
+     "x": 100,
+     "z": -1648
+    },
+    {
+     "x": 136,
+     "z": -1628
+    },
+    {
+     "x": 40,
+     "z": -1660
+    },
+    {
+     "x": -100,
+     "z": -1646
+    },
+    {
+     "x": -40,
+     "z": -1664
+    }
+   ],
+   "heading": 0
+  },
+  {
+   "kind": "fence",
+   "points": [
+    {
+     "x": -70.5,
+     "z": -1638
+    },
+    {
+     "x": -70.5,
+     "z": -1660
+    }
+   ]
+  },
+  {
+   "kind": "fence",
+   "points": [
+    {
+     "x": -84,
+     "z": -1674
+    },
+    {
+     "x": -68,
+     "z": -1674
+    }
+   ]
+  },
+  {
+   "kind": "fence",
+   "points": [
+    {
+     "x": -56,
+     "z": -1638
+    },
+    {
+     "x": -56,
+     "z": -1674
+    }
+   ]
+  },
+  {
+   "kind": "bunting",
+   "points": [
+    {
+     "x": -16,
+     "z": -5
+    },
+    {
+     "x": -8,
+     "z": -5
+    },
+    {
+     "x": 8,
+     "z": -5
+    },
+    {
+     "x": 16,
+     "z": -5
+    }
+   ]
+  },
+  {
+   "kind": "flag",
+   "points": [
+    {
+     "x": -10,
+     "z": -6
+    },
+    {
+     "x": 10,
+     "z": -6
+    }
+   ],
+   "heading": 0
+  },
+  {
+   "kind": "hut",
+   "points": [
+    {
+     "x": -48,
+     "z": -12
+    }
+   ],
+   "heading": 180
+  },
+  {
+   "kind": "mast",
+   "points": [
+    {
+     "x": -42,
+     "z": -8
+    }
+   ],
+   "heading": 0
+  },
+  {
+   "kind": "sign",
+   "x": 22,
+   "z": -44,
+   "heading": 0,
+   "header": "Proving Ground",
+   "lines": [
+    {
+     "text": "Superpipe",
+     "level": "black",
+     "arrow": -1
+    },
+    {
+     "text": "Big Line",
+     "level": "black",
+     "arrow": -1
+    },
+    {
+     "text": "Jib Alley",
+     "level": "blue",
+     "arrow": 0
+    },
+    {
+     "text": "Rhythm",
+     "level": "blue",
+     "arrow": 0
+    },
+    {
+     "text": "Mini Pipe",
+     "level": "blue",
+     "arrow": 1
+    },
+    {
+     "text": "School Yard",
+     "level": "green",
+     "arrow": 1
+    }
+   ]
+  },
+  {
+   "kind": "sign",
+   "x": 88,
+   "z": -580,
+   "heading": 0,
+   "header": "The Cut",
+   "lines": [
+    {
+     "text": "Hip and Wall",
+     "level": "black",
+     "arrow": -1
+    },
+    {
+     "text": "The Garden",
+     "level": "blue",
+     "arrow": 0
+    },
+    {
+     "text": "First Tracks",
+     "level": "green",
+     "arrow": 1
+    }
+   ]
+  },
+  {
+   "kind": "sign",
+   "x": 108,
+   "z": -840,
+   "heading": 0,
+   "header": "The Venue",
+   "lines": [
+    {
+     "text": "Gauntlet",
+     "level": "double",
+     "arrow": -1
+    },
+    {
+     "text": "The Slot",
+     "level": "black",
+     "arrow": 0
+    },
+    {
+     "text": "The Hip",
+     "level": "double",
+     "arrow": 0
+    },
+    {
+     "text": "Easy Street",
+     "level": "green",
+     "arrow": 1
+    }
+   ]
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.72,
+    "z": -96,
+    "width": 12.22,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 200,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -64.72,
+    "z": -96,
+    "width": 12.22,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 201,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.45,
+    "z": -112,
+    "width": 24.94,
+    "length": 16
+   },
+   "count": 11,
+   "seed": 202,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.87,
+    "z": -128,
+    "width": 33.65,
+    "length": 16
+   },
+   "count": 15,
+   "seed": 203,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -64.87,
+    "z": -128,
+    "width": 33.65,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 204,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -66.09,
+    "z": -144,
+    "width": 34.99,
+    "length": 16
+   },
+   "count": 16,
+   "seed": 205,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -67.22,
+    "z": -160,
+    "width": 33.21,
+    "length": 16
+   },
+   "count": 15,
+   "seed": 206,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -67.22,
+    "z": -160,
+    "width": 33.21,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 207,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -67.39,
+    "z": -176,
+    "width": 29.68,
+    "length": 16
+   },
+   "count": 13,
+   "seed": 208,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -66.56,
+    "z": -192,
+    "width": 27.66,
+    "length": 16
+   },
+   "count": 12,
+   "seed": 209,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -66.56,
+    "z": -192,
+    "width": 27.66,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 210,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.52,
+    "z": -208,
+    "width": 28.66,
+    "length": 16
+   },
+   "count": 13,
+   "seed": 211,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.02,
+    "z": -224,
+    "width": 30.81,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 212,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -65.02,
+    "z": -224,
+    "width": 30.81,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 213,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.95,
+    "z": -240,
+    "width": 31.19,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 214,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.63,
+    "z": -256,
+    "width": 29.32,
+    "length": 16
+   },
+   "count": 13,
+   "seed": 215,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -64.63,
+    "z": -256,
+    "width": 29.32,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 216,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -63.72,
+    "z": -272,
+    "width": 27.72,
+    "length": 16
+   },
+   "count": 12,
+   "seed": 217,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -62.76,
+    "z": -288,
+    "width": 28.91,
+    "length": 16
+   },
+   "count": 13,
+   "seed": 218,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -62.76,
+    "z": -288,
+    "width": 28.91,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 219,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -62.63,
+    "z": -304,
+    "width": 32.34,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 220,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -63.58,
+    "z": -320,
+    "width": 34.88,
+    "length": 16
+   },
+   "count": 16,
+   "seed": 221,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -63.58,
+    "z": -320,
+    "width": 34.88,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 222,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.9,
+    "z": -336,
+    "width": 34.3,
+    "length": 16
+   },
+   "count": 15,
+   "seed": 223,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.68,
+    "z": -352,
+    "width": 31.78,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 224,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -65.68,
+    "z": -352,
+    "width": 31.78,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 225,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.77,
+    "z": -368,
+    "width": 30.41,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 226,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.81,
+    "z": -384,
+    "width": 31.54,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 227,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -65.81,
+    "z": -384,
+    "width": 31.54,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 228,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -66.33,
+    "z": -400,
+    "width": 33.28,
+    "length": 16
+   },
+   "count": 15,
+   "seed": 229,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -67.05,
+    "z": -416,
+    "width": 32.79,
+    "length": 16
+   },
+   "count": 15,
+   "seed": 230,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -67.05,
+    "z": -416,
+    "width": 32.79,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 231,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -67.12,
+    "z": -432,
+    "width": 29.76,
+    "length": 16
+   },
+   "count": 13,
+   "seed": 232,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -66.14,
+    "z": -448,
+    "width": 26.93,
+    "length": 16
+   },
+   "count": 12,
+   "seed": 233,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -66.14,
+    "z": -448,
+    "width": 26.93,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 234,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.67,
+    "z": -464,
+    "width": 27.04,
+    "length": 16
+   },
+   "count": 12,
+   "seed": 235,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -63.68,
+    "z": -480,
+    "width": 29.73,
+    "length": 16
+   },
+   "count": 13,
+   "seed": 236,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -63.68,
+    "z": -480,
+    "width": 29.73,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 237,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -63.58,
+    "z": -496,
+    "width": 31.99,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 238,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -63.84,
+    "z": -512,
+    "width": 31.67,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 239,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -63.84,
+    "z": -512,
+    "width": 31.67,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 240,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.13,
+    "z": -528,
+    "width": 20.93,
+    "length": 16
+   },
+   "count": 9,
+   "seed": 241,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.5,
+    "z": -542,
+    "width": 8.89,
+    "length": 12
+   },
+   "count": 3,
+   "seed": 242,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -64.5,
+    "z": -542,
+    "width": 8.89,
+    "length": 12
+   },
+   "count": 1,
+   "seed": 243,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -195.01,
+    "z": -96,
+    "width": 4.4,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 244,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.31,
+    "z": -112,
+    "width": 11.86,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 245,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -194.31,
+    "z": -112,
+    "width": 11.86,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 246,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -195.34,
+    "z": -128,
+    "width": 17.08,
+    "length": 16
+   },
+   "count": 8,
+   "seed": 247,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.94,
+    "z": -144,
+    "width": 15.63,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 248,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -196.94,
+    "z": -144,
+    "width": 15.63,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 249,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.7,
+    "z": -160,
+    "width": 12.27,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 250,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.55,
+    "z": -176,
+    "width": 10.59,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 251,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -197.55,
+    "z": -176,
+    "width": 10.59,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 252,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.3,
+    "z": -192,
+    "width": 11.86,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 253,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.56,
+    "z": -208,
+    "width": 13.64,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 254,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -197.56,
+    "z": -208,
+    "width": 13.64,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 255,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.96,
+    "z": -224,
+    "width": 12.85,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 256,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.62,
+    "z": -240,
+    "width": 9.52,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 257,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -197.62,
+    "z": -240,
+    "width": 9.52,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 258,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.22,
+    "z": -256,
+    "width": 6.95,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 259,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.55,
+    "z": -272,
+    "width": 7.93,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 260,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -194.55,
+    "z": -272,
+    "width": 7.93,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 261,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -193.7,
+    "z": -288,
+    "width": 11.55,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 262,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -193.97,
+    "z": -304,
+    "width": 14.18,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 263,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -193.97,
+    "z": -304,
+    "width": 14.18,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 264,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.63,
+    "z": -320,
+    "width": 13.65,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 265,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.88,
+    "z": -336,
+    "width": 11.58,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 266,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -194.88,
+    "z": -336,
+    "width": 11.58,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 267,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.74,
+    "z": -352,
+    "width": 11.33,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 268,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -195.02,
+    "z": -368,
+    "width": 13.89,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 269,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -195.02,
+    "z": -368,
+    "width": 13.89,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 270,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.23,
+    "z": -384,
+    "width": 16.58,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 271,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.83,
+    "z": -400,
+    "width": 16.14,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 272,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -197.83,
+    "z": -400,
+    "width": 16.14,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 273,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -198.7,
+    "z": -416,
+    "width": 12.57,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 274,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -198.32,
+    "z": -432,
+    "width": 9.2,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 275,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -198.32,
+    "z": -432,
+    "width": 9.2,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 276,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.28,
+    "z": -448,
+    "width": 8.99,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 277,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.56,
+    "z": -464,
+    "width": 11.2,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 278,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -196.56,
+    "z": -464,
+    "width": 11.2,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 279,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.43,
+    "z": -480,
+    "width": 12.48,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 280,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.25,
+    "z": -496,
+    "width": 10.9,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 281,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -196.25,
+    "z": -496,
+    "width": 10.9,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 282,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -195.34,
+    "z": -512,
+    "width": 8.31,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 283,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.58,
+    "z": -528,
+    "width": 5.71,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 284,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -194.58,
+    "z": -528,
+    "width": 5.71,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 285,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -195.15,
+    "z": -542,
+    "width": 3.41,
+    "length": 12
+   },
+   "count": 1,
+   "seed": 286,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.44,
+    "z": -308,
+    "width": 2.05,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 287,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 200.44,
+    "z": -308,
+    "width": 2.05,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 288,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.21,
+    "z": -324,
+    "width": 2.26,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 289,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.97,
+    "z": -356,
+    "width": 3.01,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 290,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 201.97,
+    "z": -356,
+    "width": 3.01,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 291,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 202.31,
+    "z": -372,
+    "width": 5.24,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 292,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 202.08,
+    "z": -388,
+    "width": 6.22,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 293,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 202.08,
+    "z": -388,
+    "width": 6.22,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 294,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.81,
+    "z": -404,
+    "width": 5.34,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 295,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.86,
+    "z": -420,
+    "width": 4.27,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 296,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 201.86,
+    "z": -420,
+    "width": 4.27,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 297,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.98,
+    "z": -436,
+    "width": 4.85,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 298,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.64,
+    "z": -452,
+    "width": 6.85,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 299,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 201.64,
+    "z": -452,
+    "width": 6.85,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 300,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.72,
+    "z": -468,
+    "width": 8.14,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 301,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 199.75,
+    "z": -484,
+    "width": 7.17,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 302,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 199.75,
+    "z": -484,
+    "width": 7.17,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 303,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 199.38,
+    "z": -500,
+    "width": 4.75,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 304,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 199.73,
+    "z": -516,
+    "width": 3.21,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 305,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 199.73,
+    "z": -516,
+    "width": 3.21,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 306,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.57,
+    "z": -532,
+    "width": 2.24,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 307,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.08,
+    "z": -630,
+    "width": 12.03,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 308,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -65.08,
+    "z": -630,
+    "width": 12.03,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 309,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.03,
+    "z": -646,
+    "width": 25.09,
+    "length": 16
+   },
+   "count": 11,
+   "seed": 310,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.89,
+    "z": -662,
+    "width": 30.17,
+    "length": 16
+   },
+   "count": 13,
+   "seed": 311,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -64.89,
+    "z": -662,
+    "width": 30.17,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 312,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.17,
+    "z": -678,
+    "width": 28.05,
+    "length": 16
+   },
+   "count": 12,
+   "seed": 313,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -63.1,
+    "z": -694,
+    "width": 27.99,
+    "length": 16
+   },
+   "count": 12,
+   "seed": 314,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -63.1,
+    "z": -694,
+    "width": 27.99,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 315,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -62.53,
+    "z": -710,
+    "width": 30.83,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 316,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -63.08,
+    "z": -726,
+    "width": 34.13,
+    "length": 16
+   },
+   "count": 15,
+   "seed": 317,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -63.08,
+    "z": -726,
+    "width": 34.13,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 318,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.35,
+    "z": -742,
+    "width": 34.86,
+    "length": 16
+   },
+   "count": 15,
+   "seed": 319,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.4,
+    "z": -758,
+    "width": 32.8,
+    "length": 16
+   },
+   "count": 15,
+   "seed": 320,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -65.4,
+    "z": -758,
+    "width": 32.8,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 321,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.72,
+    "z": -774,
+    "width": 30.67,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 322,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.46,
+    "z": -790,
+    "width": 20.09,
+    "length": 16
+   },
+   "count": 9,
+   "seed": 323,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -65.46,
+    "z": -790,
+    "width": 20.09,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 324,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.26,
+    "z": -803,
+    "width": 8.2,
+    "length": 10
+   },
+   "count": 2,
+   "seed": 325,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.74,
+    "z": -630,
+    "width": 3.42,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 326,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -196.74,
+    "z": -630,
+    "width": 3.42,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 327,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.65,
+    "z": -646,
+    "width": 7.82,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 328,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.37,
+    "z": -662,
+    "width": 12.03,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 329,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -196.37,
+    "z": -662,
+    "width": 12.03,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 330,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.32,
+    "z": -678,
+    "width": 12.1,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 331,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -195.86,
+    "z": -694,
+    "width": 9.69,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 332,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -195.86,
+    "z": -694,
+    "width": 9.69,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 333,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.67,
+    "z": -710,
+    "width": 7.87,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 334,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -193.45,
+    "z": -726,
+    "width": 9.38,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 335,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -193.45,
+    "z": -726,
+    "width": 9.38,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 336,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -193.23,
+    "z": -742,
+    "width": 13.36,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 337,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.23,
+    "z": -758,
+    "width": 16.16,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 338,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -194.23,
+    "z": -758,
+    "width": 16.16,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 339,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -195.62,
+    "z": -774,
+    "width": 15.44,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 340,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.27,
+    "z": -790,
+    "width": 8.27,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 341,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -196.27,
+    "z": -790,
+    "width": 8.27,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 342,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.13,
+    "z": -803,
+    "width": 2.88,
+    "length": 10
+   },
+   "count": 1,
+   "seed": 343,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.36,
+    "z": -630,
+    "width": 2.3,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 344,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 200.36,
+    "z": -630,
+    "width": 2.3,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 345,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 199.8,
+    "z": -646,
+    "width": 2.83,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 346,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.09,
+    "z": -662,
+    "width": 3.18,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 347,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 200.09,
+    "z": -662,
+    "width": 3.18,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 348,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.53,
+    "z": -678,
+    "width": 4.46,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 349,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.6,
+    "z": -694,
+    "width": 5.34,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 350,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 200.6,
+    "z": -694,
+    "width": 5.34,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 351,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.68,
+    "z": -710,
+    "width": 4.45,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 352,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.22,
+    "z": -726,
+    "width": 2.73,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 353,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 201.22,
+    "z": -726,
+    "width": 2.73,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 354,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 202.11,
+    "z": -742,
+    "width": 2.37,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 355,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 202.73,
+    "z": -758,
+    "width": 4.21,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 356,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 202.73,
+    "z": -758,
+    "width": 4.21,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 357,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 202.58,
+    "z": -774,
+    "width": 6.67,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 358,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.54,
+    "z": -790,
+    "width": 4.88,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 359,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 201.54,
+    "z": -790,
+    "width": 4.88,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 360,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.33,
+    "z": -892,
+    "width": 13.64,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 361,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.77,
+    "z": -908,
+    "width": 28.35,
+    "length": 16
+   },
+   "count": 13,
+   "seed": 362,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -64.77,
+    "z": -908,
+    "width": 28.35,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 363,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -66,
+    "z": -924,
+    "width": 33.57,
+    "length": 16
+   },
+   "count": 15,
+   "seed": 364,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -66.47,
+    "z": -940,
+    "width": 30.73,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 365,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -66.47,
+    "z": -940,
+    "width": 30.73,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 366,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -66.26,
+    "z": -956,
+    "width": 29.87,
+    "length": 16
+   },
+   "count": 13,
+   "seed": 367,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -66.15,
+    "z": -972,
+    "width": 31.35,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 368,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -66.15,
+    "z": -972,
+    "width": 31.35,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 369,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -66.48,
+    "z": -988,
+    "width": 32.58,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 370,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -66.77,
+    "z": -1004,
+    "width": 31.26,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 371,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -66.77,
+    "z": -1004,
+    "width": 31.26,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 372,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -66.26,
+    "z": -1020,
+    "width": 28.18,
+    "length": 16
+   },
+   "count": 13,
+   "seed": 373,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.9,
+    "z": -1036,
+    "width": 26.47,
+    "length": 16
+   },
+   "count": 12,
+   "seed": 374,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -64.9,
+    "z": -1036,
+    "width": 26.47,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 375,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -63.52,
+    "z": -1052,
+    "width": 28.01,
+    "length": 16
+   },
+   "count": 12,
+   "seed": 376,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -62.99,
+    "z": -1068,
+    "width": 31.25,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 377,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -62.99,
+    "z": -1068,
+    "width": 31.25,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 378,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -63.36,
+    "z": -1084,
+    "width": 32.99,
+    "length": 16
+   },
+   "count": 15,
+   "seed": 379,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -63.89,
+    "z": -1100,
+    "width": 32,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 380,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -63.89,
+    "z": -1100,
+    "width": 32,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 381,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -63.97,
+    "z": -1116,
+    "width": 30.32,
+    "length": 16
+   },
+   "count": 13,
+   "seed": 382,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -63.85,
+    "z": -1132,
+    "width": 30.71,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 383,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -63.85,
+    "z": -1132,
+    "width": 30.71,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 384,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.26,
+    "z": -1148,
+    "width": 33.28,
+    "length": 16
+   },
+   "count": 15,
+   "seed": 385,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.47,
+    "z": -1164,
+    "width": 35.24,
+    "length": 16
+   },
+   "count": 16,
+   "seed": 386,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -65.47,
+    "z": -1164,
+    "width": 35.24,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 387,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -66.82,
+    "z": -1180,
+    "width": 34.14,
+    "length": 16
+   },
+   "count": 15,
+   "seed": 388,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -67.36,
+    "z": -1196,
+    "width": 30.76,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 389,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -67.36,
+    "z": -1196,
+    "width": 30.76,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 390,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -66.85,
+    "z": -1212,
+    "width": 28.29,
+    "length": 16
+   },
+   "count": 13,
+   "seed": 391,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.96,
+    "z": -1228,
+    "width": 28.74,
+    "length": 16
+   },
+   "count": 13,
+   "seed": 392,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -65.96,
+    "z": -1228,
+    "width": 28.74,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 393,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.47,
+    "z": -1244,
+    "width": 30.75,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 394,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.42,
+    "z": -1260,
+    "width": 31.33,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 395,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -65.42,
+    "z": -1260,
+    "width": 31.33,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 396,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.15,
+    "z": -1276,
+    "width": 29.49,
+    "length": 16
+   },
+   "count": 13,
+   "seed": 397,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.2,
+    "z": -1292,
+    "width": 27.44,
+    "length": 16
+   },
+   "count": 12,
+   "seed": 398,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -64.2,
+    "z": -1292,
+    "width": 27.44,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 399,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -63.01,
+    "z": -1308,
+    "width": 27.99,
+    "length": 16
+   },
+   "count": 12,
+   "seed": 400,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -62.51,
+    "z": -1324,
+    "width": 31.22,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 401,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -62.51,
+    "z": -1324,
+    "width": 31.22,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 402,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -63.12,
+    "z": -1340,
+    "width": 34.2,
+    "length": 16
+   },
+   "count": 15,
+   "seed": 403,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -64.31,
+    "z": -1356,
+    "width": 34.32,
+    "length": 16
+   },
+   "count": 15,
+   "seed": 404,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -64.31,
+    "z": -1356,
+    "width": 34.32,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 405,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.15,
+    "z": -1372,
+    "width": 32.13,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 406,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.34,
+    "z": -1388,
+    "width": 30.61,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 407,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -65.34,
+    "z": -1388,
+    "width": 30.61,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 408,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.43,
+    "z": -1404,
+    "width": 31.58,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 409,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -66.03,
+    "z": -1420,
+    "width": 33.57,
+    "length": 16
+   },
+   "count": 15,
+   "seed": 410,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -66.03,
+    "z": -1420,
+    "width": 33.57,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 411,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -66.96,
+    "z": -1436,
+    "width": 33.62,
+    "length": 16
+   },
+   "count": 15,
+   "seed": 412,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -67.15,
+    "z": -1452,
+    "width": 27.74,
+    "length": 16
+   },
+   "count": 12,
+   "seed": 413,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -67.15,
+    "z": -1452,
+    "width": 27.74,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 414,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.86,
+    "z": -1468,
+    "width": 13.79,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 415,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -65.03,
+    "z": -1478,
+    "width": 2.69,
+    "length": 4
+   },
+   "count": 1,
+   "seed": 416,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -65.03,
+    "z": -1478,
+    "width": 2.69,
+    "length": 4
+   },
+   "count": 1,
+   "seed": 417,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.06,
+    "z": -892,
+    "width": 4.11,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 418,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.2,
+    "z": -908,
+    "width": 5.95,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 419,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -197.2,
+    "z": -908,
+    "width": 5.95,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 420,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -195.96,
+    "z": -924,
+    "width": 8.2,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 421,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -195.07,
+    "z": -940,
+    "width": 11.15,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 422,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -195.07,
+    "z": -940,
+    "width": 11.15,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 423,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.99,
+    "z": -956,
+    "width": 12.77,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 424,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.98,
+    "z": -972,
+    "width": 11.5,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 425,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -194.98,
+    "z": -972,
+    "width": 11.5,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 426,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.44,
+    "z": -988,
+    "width": 9.55,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 427,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -193.69,
+    "z": -1004,
+    "width": 10.14,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 428,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -193.69,
+    "z": -1004,
+    "width": 10.14,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 429,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -193.68,
+    "z": -1020,
+    "width": 13.59,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 430,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.85,
+    "z": -1036,
+    "width": 16.75,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 431,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -194.85,
+    "z": -1036,
+    "width": 16.75,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 432,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.55,
+    "z": -1052,
+    "width": 16.51,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 433,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.65,
+    "z": -1068,
+    "width": 13.35,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 434,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -197.65,
+    "z": -1068,
+    "width": 13.35,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 435,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.72,
+    "z": -1084,
+    "width": 10.73,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 436,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.37,
+    "z": -1100,
+    "width": 11.09,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 437,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -197.37,
+    "z": -1100,
+    "width": 11.09,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 438,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.4,
+    "z": -1116,
+    "width": 13.1,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 439,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.82,
+    "z": -1132,
+    "width": 13.4,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 440,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -197.82,
+    "z": -1132,
+    "width": 13.4,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 441,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.78,
+    "z": -1148,
+    "width": 10.71,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 442,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.69,
+    "z": -1164,
+    "width": 7.49,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 443,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -196.69,
+    "z": -1164,
+    "width": 7.49,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 444,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.98,
+    "z": -1180,
+    "width": 7.2,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 445,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -193.78,
+    "z": -1196,
+    "width": 10.31,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 446,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -193.78,
+    "z": -1196,
+    "width": 10.31,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 447,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -193.74,
+    "z": -1212,
+    "width": 13.71,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 448,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.43,
+    "z": -1228,
+    "width": 14.26,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 449,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -194.43,
+    "z": -1228,
+    "width": 14.26,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 450,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.91,
+    "z": -1244,
+    "width": 12.33,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 451,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.86,
+    "z": -1260,
+    "width": 11.13,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 452,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -194.86,
+    "z": -1260,
+    "width": 11.13,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 453,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.92,
+    "z": -1276,
+    "width": 12.84,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 454,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -195.82,
+    "z": -1292,
+    "width": 15.87,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 455,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -195.82,
+    "z": -1292,
+    "width": 15.87,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 456,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.39,
+    "z": -1308,
+    "width": 16.67,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 457,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -198.58,
+    "z": -1324,
+    "width": 13.87,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 458,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -198.58,
+    "z": -1324,
+    "width": 13.87,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 459,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -198.58,
+    "z": -1340,
+    "width": 9.97,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 460,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -197.6,
+    "z": -1356,
+    "width": 8.57,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 461,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -197.6,
+    "z": -1356,
+    "width": 8.57,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 462,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.66,
+    "z": -1372,
+    "width": 10.29,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 463,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.35,
+    "z": -1388,
+    "width": 12.3,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 464,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -196.35,
+    "z": -1388,
+    "width": 12.3,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 465,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -196.28,
+    "z": -1404,
+    "width": 11.72,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 466,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -195.66,
+    "z": -1420,
+    "width": 9.13,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 467,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -195.66,
+    "z": -1420,
+    "width": 9.13,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 468,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.38,
+    "z": -1436,
+    "width": 7.87,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 469,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -193.57,
+    "z": -1452,
+    "width": 9.11,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 470,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -193.57,
+    "z": -1452,
+    "width": 9.11,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 471,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -194.68,
+    "z": -1468,
+    "width": 7.09,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 472,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.34,
+    "z": -908,
+    "width": 3.7,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 473,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 200.34,
+    "z": -908,
+    "width": 3.7,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 474,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.13,
+    "z": -924,
+    "width": 5.74,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 475,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 199.99,
+    "z": -940,
+    "width": 5.24,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 476,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 199.99,
+    "z": -940,
+    "width": 5.24,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 477,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.29,
+    "z": -956,
+    "width": 3.26,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 478,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 202.19,
+    "z": -988,
+    "width": 2.71,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 479,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 202.19,
+    "z": -988,
+    "width": 2.71,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 480,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 202.6,
+    "z": -1004,
+    "width": 5.1,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 481,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 202.29,
+    "z": -1020,
+    "width": 6.72,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 482,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 202.29,
+    "z": -1020,
+    "width": 6.72,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 483,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.75,
+    "z": -1036,
+    "width": 6.3,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 484,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.51,
+    "z": -1052,
+    "width": 4.95,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 485,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 201.51,
+    "z": -1052,
+    "width": 4.95,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 486,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.52,
+    "z": -1068,
+    "width": 4.75,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 487,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.3,
+    "z": -1084,
+    "width": 6.26,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 488,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 201.3,
+    "z": -1084,
+    "width": 6.26,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 489,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.55,
+    "z": -1100,
+    "width": 7.75,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 490,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 199.64,
+    "z": -1116,
+    "width": 7.26,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 491,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 199.64,
+    "z": -1116,
+    "width": 7.26,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 492,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 199.24,
+    "z": -1132,
+    "width": 4.92,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 493,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 199.63,
+    "z": -1148,
+    "width": 2.87,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 494,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 199.63,
+    "z": -1148,
+    "width": 2.87,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 495,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.4,
+    "z": -1164,
+    "width": 2.88,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 496,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.91,
+    "z": -1180,
+    "width": 4.39,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 497,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 200.91,
+    "z": -1180,
+    "width": 4.39,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 498,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.02,
+    "z": -1196,
+    "width": 5.26,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 499,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.13,
+    "z": -1212,
+    "width": 4.36,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 500,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 201.13,
+    "z": -1212,
+    "width": 4.36,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 501,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.65,
+    "z": -1228,
+    "width": 2.88,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 502,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 202.41,
+    "z": -1244,
+    "width": 2.96,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 503,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 202.41,
+    "z": -1244,
+    "width": 2.96,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 504,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 202.76,
+    "z": -1260,
+    "width": 5.06,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 505,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 202.31,
+    "z": -1276,
+    "width": 7.36,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 506,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 202.31,
+    "z": -1276,
+    "width": 7.36,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 507,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.38,
+    "z": -1292,
+    "width": 7.75,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 508,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.65,
+    "z": -1308,
+    "width": 6.2,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 509,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 200.65,
+    "z": -1308,
+    "width": 6.2,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 510,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.44,
+    "z": -1324,
+    "width": 4.71,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 511,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.46,
+    "z": -1340,
+    "width": 4.95,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 512,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 200.46,
+    "z": -1340,
+    "width": 4.95,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 513,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.22,
+    "z": -1356,
+    "width": 6.3,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 514,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 199.69,
+    "z": -1372,
+    "width": 6.65,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 515,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 199.69,
+    "z": -1372,
+    "width": 6.65,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 516,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 199.42,
+    "z": -1388,
+    "width": 4.97,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 517,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 199.87,
+    "z": -1404,
+    "width": 2.62,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 518,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 199.87,
+    "z": -1404,
+    "width": 2.62,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 519,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.77,
+    "z": -1436,
+    "width": 3.34,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 520,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.94,
+    "z": -1452,
+    "width": 4.79,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 521,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 201.94,
+    "z": -1452,
+    "width": 4.79,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 522,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.44,
+    "z": -1468,
+    "width": 2.88,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 523,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 81.09,
+    "z": -96,
+    "width": 5.48,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 524,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 81.09,
+    "z": -96,
+    "width": 5.48,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 525,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 82.01,
+    "z": -112,
+    "width": 10.89,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 526,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 82.91,
+    "z": -128,
+    "width": 15.86,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 527,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 82.91,
+    "z": -128,
+    "width": 15.86,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 528,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 82.68,
+    "z": -144,
+    "width": 18.44,
+    "length": 16
+   },
+   "count": 8,
+   "seed": 529,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 81.88,
+    "z": -160,
+    "width": 19.02,
+    "length": 16
+   },
+   "count": 8,
+   "seed": 530,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 81.88,
+    "z": -160,
+    "width": 19.02,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 531,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 81.21,
+    "z": -176,
+    "width": 17.58,
+    "length": 16
+   },
+   "count": 8,
+   "seed": 532,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 81.01,
+    "z": -192,
+    "width": 16.26,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 533,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 81.01,
+    "z": -192,
+    "width": 16.26,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 534,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 80.94,
+    "z": -208,
+    "width": 16.84,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 535,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 80.48,
+    "z": -224,
+    "width": 18.55,
+    "length": 16
+   },
+   "count": 8,
+   "seed": 536,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 80.48,
+    "z": -224,
+    "width": 18.55,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 537,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 79.65,
+    "z": -240,
+    "width": 19.03,
+    "length": 16
+   },
+   "count": 8,
+   "seed": 538,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 79.08,
+    "z": -256,
+    "width": 17.15,
+    "length": 16
+   },
+   "count": 8,
+   "seed": 539,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 79.08,
+    "z": -256,
+    "width": 17.15,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 540,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 79.35,
+    "z": -272,
+    "width": 14.41,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 541,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 80.3,
+    "z": -288,
+    "width": 13.36,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 542,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 80.3,
+    "z": -288,
+    "width": 13.36,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 543,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 81.22,
+    "z": -304,
+    "width": 14.69,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 544,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 81.58,
+    "z": -320,
+    "width": 16.56,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 545,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 81.58,
+    "z": -320,
+    "width": 16.56,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 546,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 81.56,
+    "z": -336,
+    "width": 16.78,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 547,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 81.74,
+    "z": -352,
+    "width": 15.38,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 548,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 81.74,
+    "z": -352,
+    "width": 15.38,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 549,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 82.3,
+    "z": -368,
+    "width": 14.53,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 550,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 82.74,
+    "z": -384,
+    "width": 15.89,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 551,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 82.74,
+    "z": -384,
+    "width": 15.89,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 552,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 82.46,
+    "z": -400,
+    "width": 18.55,
+    "length": 16
+   },
+   "count": 8,
+   "seed": 553,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 81.44,
+    "z": -416,
+    "width": 19.98,
+    "length": 16
+   },
+   "count": 9,
+   "seed": 554,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 81.44,
+    "z": -416,
+    "width": 19.98,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 555,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 80.37,
+    "z": -432,
+    "width": 18.87,
+    "length": 16
+   },
+   "count": 8,
+   "seed": 556,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 79.89,
+    "z": -448,
+    "width": 16.59,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 557,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 79.89,
+    "z": -448,
+    "width": 16.59,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 558,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 79.99,
+    "z": -464,
+    "width": 15.6,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 559,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 80.11,
+    "z": -480,
+    "width": 16.58,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 560,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 80.11,
+    "z": -480,
+    "width": 16.58,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 561,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 79.88,
+    "z": -496,
+    "width": 17.74,
+    "length": 16
+   },
+   "count": 8,
+   "seed": 562,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 79.6,
+    "z": -512,
+    "width": 17.03,
+    "length": 16
+   },
+   "count": 8,
+   "seed": 563,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 79.6,
+    "z": -512,
+    "width": 17.03,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 564,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 80.21,
+    "z": -528,
+    "width": 10.26,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 565,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 80.96,
+    "z": -542,
+    "width": 3.9,
+    "length": 12
+   },
+   "count": 1,
+   "seed": 566,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 80.96,
+    "z": -542,
+    "width": 3.9,
+    "length": 12
+   },
+   "count": 1,
+   "seed": 567,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 82.66,
+    "z": -630,
+    "width": 5.64,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 568,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 83.22,
+    "z": -646,
+    "width": 13.27,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 569,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 83.22,
+    "z": -646,
+    "width": 13.27,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 570,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 82.68,
+    "z": -662,
+    "width": 18.02,
+    "length": 16
+   },
+   "count": 8,
+   "seed": 571,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 81.73,
+    "z": -678,
+    "width": 17.16,
+    "length": 16
+   },
+   "count": 8,
+   "seed": 572,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 81.73,
+    "z": -678,
+    "width": 17.16,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 573,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 81.26,
+    "z": -694,
+    "width": 15.24,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 574,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 81.28,
+    "z": -710,
+    "width": 14.44,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 575,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 81.28,
+    "z": -710,
+    "width": 14.44,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 576,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 81.28,
+    "z": -726,
+    "width": 15.39,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 577,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 80.95,
+    "z": -742,
+    "width": 16.46,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 578,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 80.95,
+    "z": -742,
+    "width": 16.46,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 579,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 80.56,
+    "z": -758,
+    "width": 15.78,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 580,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 80.71,
+    "z": -774,
+    "width": 13.53,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 581,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 80.71,
+    "z": -774,
+    "width": 13.53,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 582,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 81.72,
+    "z": -790,
+    "width": 7.7,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 583,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 82.15,
+    "z": -803,
+    "width": 3.11,
+    "length": 10
+   },
+   "count": 1,
+   "seed": 584,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 82.15,
+    "z": -803,
+    "width": 3.11,
+    "length": 10
+   },
+   "count": 1,
+   "seed": 585,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -177.21,
+    "z": -1538,
+    "width": 15.53,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 586,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -175.62,
+    "z": -1554,
+    "width": 35.29,
+    "length": 16
+   },
+   "count": 14,
+   "seed": 587,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -175.62,
+    "z": -1554,
+    "width": 35.29,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 588,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -175.45,
+    "z": -1570,
+    "width": 46.64,
+    "length": 16
+   },
+   "count": 19,
+   "seed": 589,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -176.02,
+    "z": -1586,
+    "width": 44.71,
+    "length": 16
+   },
+   "count": 18,
+   "seed": 590,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -176.02,
+    "z": -1586,
+    "width": 44.71,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 591,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -175.83,
+    "z": -1602,
+    "width": 42.06,
+    "length": 16
+   },
+   "count": 17,
+   "seed": 592,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -175.43,
+    "z": -1618,
+    "width": 43.26,
+    "length": 16
+   },
+   "count": 17,
+   "seed": 593,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -175.43,
+    "z": -1618,
+    "width": 43.26,
+    "length": 16
+   },
+   "count": 4,
+   "seed": 594,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -176.11,
+    "z": -1634,
+    "width": 48.09,
+    "length": 16
+   },
+   "count": 19,
+   "seed": 595,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -178.27,
+    "z": -1650,
+    "width": 51.56,
+    "length": 16
+   },
+   "count": 21,
+   "seed": 596,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -178.27,
+    "z": -1650,
+    "width": 51.56,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 597,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -180.56,
+    "z": -1666,
+    "width": 47.17,
+    "length": 16
+   },
+   "count": 19,
+   "seed": 598,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -180.07,
+    "z": -1682,
+    "width": 24.2,
+    "length": 16
+   },
+   "count": 10,
+   "seed": 599,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": -180.07,
+    "z": -1682,
+    "width": 24.2,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 600,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -178.47,
+    "z": -1693,
+    "width": 6.01,
+    "length": 6
+   },
+   "count": 1,
+   "seed": 601,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.42,
+    "z": -1518,
+    "width": 3.08,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 602,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 201.42,
+    "z": -1518,
+    "width": 3.08,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 603,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.38,
+    "z": -1534,
+    "width": 5.99,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 604,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.13,
+    "z": -1550,
+    "width": 6.28,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 605,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 201.13,
+    "z": -1550,
+    "width": 6.28,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 606,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 201.08,
+    "z": -1566,
+    "width": 5.81,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 607,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.95,
+    "z": -1582,
+    "width": 6.74,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 608,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 200.95,
+    "z": -1582,
+    "width": 6.74,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 609,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.59,
+    "z": -1598,
+    "width": 5.91,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 610,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 200.59,
+    "z": -1613,
+    "width": 2.66,
+    "length": 14
+   },
+   "count": 1,
+   "seed": 611,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 200.59,
+    "z": -1613,
+    "width": 2.66,
+    "length": 14
+   },
+   "count": 1,
+   "seed": 612,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.92,
+    "z": -892,
+    "width": 5.88,
+    "length": 16
+   },
+   "count": 3,
+   "seed": 613,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.38,
+    "z": -908,
+    "width": 11.53,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 614,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 129.38,
+    "z": -908,
+    "width": 11.53,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 615,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 128.96,
+    "z": -924,
+    "width": 13.01,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 616,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.17,
+    "z": -940,
+    "width": 11.8,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 617,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 129.17,
+    "z": -940,
+    "width": 11.8,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 618,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.6,
+    "z": -956,
+    "width": 11.82,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 619,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.88,
+    "z": -972,
+    "width": 12.7,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 620,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 129.88,
+    "z": -972,
+    "width": 12.7,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 621,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.93,
+    "z": -988,
+    "width": 13.16,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 622,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 130.01,
+    "z": -1004,
+    "width": 12.55,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 623,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 130.01,
+    "z": -1004,
+    "width": 12.55,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 624,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 130.35,
+    "z": -1020,
+    "width": 11.64,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 625,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 130.83,
+    "z": -1036,
+    "width": 11.7,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 626,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 130.83,
+    "z": -1036,
+    "width": 11.7,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 627,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 131.06,
+    "z": -1052,
+    "width": 12.98,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 628,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 130.82,
+    "z": -1068,
+    "width": 14.35,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 629,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 130.82,
+    "z": -1068,
+    "width": 14.35,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 630,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 130.29,
+    "z": -1084,
+    "width": 14.58,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 631,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.87,
+    "z": -1100,
+    "width": 13.68,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 632,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 129.87,
+    "z": -1100,
+    "width": 13.68,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 633,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.75,
+    "z": -1116,
+    "width": 12.85,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 634,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.74,
+    "z": -1132,
+    "width": 13.05,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 635,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 129.74,
+    "z": -1132,
+    "width": 13.05,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 636,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.56,
+    "z": -1148,
+    "width": 13.89,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 637,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.2,
+    "z": -1164,
+    "width": 14.08,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 638,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 129.2,
+    "z": -1164,
+    "width": 14.08,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 639,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.01,
+    "z": -1180,
+    "width": 13.04,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 640,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.27,
+    "z": -1196,
+    "width": 11.61,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 641,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 129.27,
+    "z": -1196,
+    "width": 11.61,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 642,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.86,
+    "z": -1212,
+    "width": 11.15,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 643,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 130.39,
+    "z": -1228,
+    "width": 12.02,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 644,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 130.39,
+    "z": -1228,
+    "width": 12.02,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 645,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 130.56,
+    "z": -1244,
+    "width": 13.16,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 646,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 130.48,
+    "z": -1260,
+    "width": 13.36,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 647,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 130.48,
+    "z": -1260,
+    "width": 13.36,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 648,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 130.49,
+    "z": -1276,
+    "width": 12.66,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 649,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 130.68,
+    "z": -1292,
+    "width": 12.23,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 650,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 130.68,
+    "z": -1292,
+    "width": 12.23,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 651,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 130.82,
+    "z": -1308,
+    "width": 12.95,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 652,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 130.57,
+    "z": -1324,
+    "width": 14.31,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 653,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 130.57,
+    "z": -1324,
+    "width": 14.31,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 654,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.97,
+    "z": -1340,
+    "width": 14.95,
+    "length": 16
+   },
+   "count": 7,
+   "seed": 655,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.4,
+    "z": -1356,
+    "width": 14.19,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 656,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 129.4,
+    "z": -1356,
+    "width": 14.19,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 657,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.19,
+    "z": -1372,
+    "width": 12.84,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 658,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.34,
+    "z": -1388,
+    "width": 12.24,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 659,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 129.34,
+    "z": -1388,
+    "width": 12.24,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 660,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.52,
+    "z": -1404,
+    "width": 12.76,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 661,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.5,
+    "z": -1420,
+    "width": 13.41,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 662,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 129.5,
+    "z": -1420,
+    "width": 13.41,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 663,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.43,
+    "z": -1436,
+    "width": 13.08,
+    "length": 16
+   },
+   "count": 6,
+   "seed": 664,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 129.68,
+    "z": -1452,
+    "width": 10.71,
+    "length": 16
+   },
+   "count": 5,
+   "seed": 665,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "aspen",
+   "area": {
+    "x": 129.68,
+    "z": -1452,
+    "width": 10.71,
+    "length": 16
+   },
+   "count": 1,
+   "seed": 666,
+   "minScale": 0.8,
+   "maxScale": 1.2,
+   "solid": true
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 130.09,
+    "z": -1468,
+    "width": 5.56,
+    "length": 16
+   },
+   "count": 2,
+   "seed": 667,
+   "minScale": 0.8,
+   "maxScale": 1.5,
+   "solid": true
+  },
+  {
+   "kind": "fence",
+   "points": [
+    {
+     "x": 116.5,
+     "z": -60
+    },
+    {
+     "x": 116.5,
+     "z": -86
+    }
+   ]
+  },
+  {
+   "kind": "fence",
+   "points": [
+    {
+     "x": 143.5,
+     "z": -60
+    },
+    {
+     "x": 143.5,
+     "z": -86
+    }
+   ]
+  },
+  {
+   "kind": "fence",
+   "points": [
+    {
+     "x": 173.5,
+     "z": -60
+    },
+    {
+     "x": 173.5,
+     "z": -86
+    }
+   ]
+  },
+  {
+   "kind": "floodlight",
+   "points": [
+    {
+     "x": -47,
+     "z": -118
+    },
+    {
+     "x": -47,
+     "z": -208
+    },
+    {
+     "x": -47,
+     "z": -298
+    },
+    {
+     "x": -47,
+     "z": -388
+    },
+    {
+     "x": -47,
+     "z": -478
+    }
+   ],
+   "heading": -90
+  },
+  {
+   "kind": "floodlight",
+   "points": [
+    {
+     "x": -83,
+     "z": -163
+    },
+    {
+     "x": -83,
+     "z": -253
+    },
+    {
+     "x": -83,
+     "z": -343
+    },
+    {
+     "x": -83,
+     "z": -433
+    },
+    {
+     "x": -83,
+     "z": -523
+    }
+   ],
+   "heading": 90
+  },
+  {
+   "kind": "floodlight",
+   "points": [
+    {
+     "x": -47,
+     "z": -652
+    },
+    {
+     "x": -47,
+     "z": -742
+    }
+   ],
+   "heading": -90
+  },
+  {
+   "kind": "floodlight",
+   "points": [
+    {
+     "x": -83,
+     "z": -697
+    },
+    {
+     "x": -83,
+     "z": -787
+    }
+   ],
+   "heading": 90
+  },
+  {
+   "kind": "floodlight",
+   "points": [
+    {
+     "x": -47,
+     "z": -914
+    },
+    {
+     "x": -47,
+     "z": -1004
+    },
+    {
+     "x": -47,
+     "z": -1094
+    },
+    {
+     "x": -47,
+     "z": -1184
+    },
+    {
+     "x": -47,
+     "z": -1274
+    },
+    {
+     "x": -47,
+     "z": -1364
+    },
+    {
+     "x": -47,
+     "z": -1454
+    }
+   ],
+   "heading": -90
+  },
+  {
+   "kind": "floodlight",
+   "points": [
+    {
+     "x": -83,
+     "z": -959
+    },
+    {
+     "x": -83,
+     "z": -1049
+    },
+    {
+     "x": -83,
+     "z": -1139
+    },
+    {
+     "x": -83,
+     "z": -1229
+    },
+    {
+     "x": -83,
+     "z": -1319
+    },
+    {
+     "x": -83,
+     "z": -1409
+    }
+   ],
+   "heading": 90
+  },
+  {
+   "kind": "floodlight",
+   "points": [
+    {
+     "x": 71,
+     "z": -120
+    },
+    {
+     "x": 71,
+     "z": -210
+    },
+    {
+     "x": 71,
+     "z": -300
+    },
+    {
+     "x": 71,
+     "z": -390
+    },
+    {
+     "x": 71,
+     "z": -480
+    }
+   ],
+   "heading": 90
+  },
+  {
+   "kind": "floodlight",
+   "points": [
+    {
+     "x": 91,
+     "z": -160
+    },
+    {
+     "x": 91,
+     "z": -240
+    },
+    {
+     "x": 91,
+     "z": -320
+    }
+   ],
+   "heading": -90
+  },
+  {
+   "kind": "floodlight",
+   "points": [
+    {
+     "x": 123,
+     "z": -920
+    },
+    {
+     "x": 123,
+     "z": -1010
+    },
+    {
+     "x": 123,
+     "z": -1100
+    },
+    {
+     "x": 123,
+     "z": -1190
+    },
+    {
+     "x": 123,
+     "z": -1280
+    },
+    {
+     "x": 123,
+     "z": -1370
+    },
+    {
+     "x": 123,
+     "z": -1460
+    }
+   ],
+   "heading": 90
+  },
+  {
+   "kind": "lightPole",
+   "points": [
+    {
+     "x": 200,
+     "z": -360
+    },
+    {
+     "x": 200,
+     "z": -430
+    },
+    {
+     "x": 200,
+     "z": -500
+    },
+    {
+     "x": 200,
+     "z": -570
+    },
+    {
+     "x": 200,
+     "z": -640
+    },
+    {
+     "x": 200,
+     "z": -710
+    },
+    {
+     "x": 200,
+     "z": -780
+    },
+    {
+     "x": 200,
+     "z": -850
+    },
+    {
+     "x": 200,
+     "z": -920
+    },
+    {
+     "x": 200,
+     "z": -990
+    },
+    {
+     "x": 200,
+     "z": -1060
+    },
+    {
+     "x": 200,
+     "z": -1130
+    },
+    {
+     "x": 200,
+     "z": -1200
+    },
+    {
+     "x": 200,
+     "z": -1270
+    },
+    {
+     "x": 200,
+     "z": -1340
+    },
+    {
+     "x": 200,
+     "z": -1410
+    },
+    {
+     "x": 200,
+     "z": -1480
+    }
+   ],
+   "heading": 90
+  },
+  {
+   "kind": "floodlight",
+   "points": [
+    {
+     "x": -40,
+     "z": -1540
+    },
+    {
+     "x": 110,
+     "z": -1540
+    },
+    {
+     "x": -150,
+     "z": -1604
+    },
+    {
+     "x": 120,
+     "z": -1604
+    }
+   ],
+   "heading": 0
+  },
+  {
+   "kind": "banner",
+   "points": [
+    {
+     "x": -84,
+     "z": -78
+    },
+    {
+     "x": 70,
+     "z": -78
+    }
+   ],
+   "heading": 0,
+   "color": "#ff7a1a"
+  },
+  {
+   "kind": "banner",
+   "points": [
+    {
+     "x": -84,
+     "z": -616
+    },
+    {
+     "x": 70,
+     "z": -616
+    }
+   ],
+   "heading": 0,
+   "color": "#ff7a1a"
+  },
+  {
+   "kind": "banner",
+   "points": [
+    {
+     "x": -84,
+     "z": -874
+    },
+    {
+     "x": 70,
+     "z": -874
+    }
+   ],
+   "heading": 0,
+   "color": "#ff7a1a"
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": -262,
+    "z": -885,
+    "width": 74,
+    "length": 1910
+   },
+   "count": 2100,
+   "seed": 3,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "pine",
+   "area": {
+    "x": 262,
+    "z": -885,
+    "width": 74,
+    "length": 1910
+   },
+   "count": 2100,
+   "seed": 5,
+   "minScale": 0.8,
+   "maxScale": 1.5
+  },
+  {
+   "kind": "rock",
+   "area": {
+    "x": -260,
+    "z": -885,
+    "width": 70,
+    "length": 1910
+   },
+   "count": 160,
+   "seed": 8,
+   "minScale": 0.6,
+   "maxScale": 1.6
+  },
+  {
+   "kind": "boulder",
+   "area": {
+    "x": 260,
+    "z": -885,
+    "width": 70,
+    "length": 1910
+   },
+   "count": 110,
+   "seed": 9,
+   "minScale": 0.8,
+   "maxScale": 1.6
+  },
+  {
+   "kind": "snag",
+   "area": {
+    "x": 258,
+    "z": -885,
+    "width": 60,
+    "length": 1910
+   },
+   "count": 50,
+   "seed": 10,
+   "minScale": 0.8,
+   "maxScale": 1.2
+  }
+ ],
+ "runs": [
+  {
+   "name": "Jib Alley",
+   "points": [
+    {
+     "x": -30,
+     "z": -60
+    },
+    {
+     "x": -30,
+     "z": -530
+    },
+    {
+     "x": 2,
+     "z": -620
+    },
+    {
+     "x": 2,
+     "z": -810
+    },
+    {
+     "x": 40,
+     "z": -940
+    },
+    {
+     "x": 40,
+     "z": -1470
+    },
+    {
+     "x": 20,
+     "z": -1530
+    },
+    {
+     "x": 20,
+     "z": -1640
+    }
+   ],
+   "clear": 0
+  },
+  {
+   "name": "Rhythm",
+   "points": [
+    {
+     "x": 6,
+     "z": -60
+    },
+    {
+     "x": 6,
+     "z": -530
+    },
+    {
+     "x": 21,
+     "z": -620
+    },
+    {
+     "x": 21,
+     "z": -810
+    },
+    {
+     "x": 57,
+     "z": -950
+    },
+    {
+     "x": 57,
+     "z": -1090
+    },
+    {
+     "x": 84,
+     "z": -1160
+    },
+    {
+     "x": 84,
+     "z": -1470
+    },
+    {
+     "x": 20,
+     "z": -1530
+    },
+    {
+     "x": 20,
+     "z": -1640
+    }
+   ],
+   "clear": 0
+  },
+  {
+   "name": "Mini Pipe",
+   "points": [
+    {
+     "x": 46,
+     "z": -62
+    },
+    {
+     "x": 46,
+     "z": -530
+    },
+    {
+     "x": 36,
+     "z": -620
+    },
+    {
+     "x": 36,
+     "z": -810
+    },
+    {
+     "x": 23,
+     "z": -950
+    },
+    {
+     "x": 23,
+     "z": -1090
+    },
+    {
+     "x": -4,
+     "z": -1160
+    },
+    {
+     "x": -4,
+     "z": -1470
+    },
+    {
+     "x": 20,
+     "z": -1530
+    },
+    {
+     "x": 20,
+     "z": -1640
+    }
+   ],
+   "clear": 0
+  },
+  {
+   "name": "Big Line",
+   "points": [
+    {
+     "x": -102,
+     "z": -66
+    },
+    {
+     "x": -102,
+     "z": -540
+    },
+    {
+     "x": -130,
+     "z": -620
+    },
+    {
+     "x": -130,
+     "z": -810
+    },
+    {
+     "x": -140,
+     "z": -880
+    },
+    {
+     "x": -140,
+     "z": -1480
+    },
+    {
+     "x": -60,
+     "z": -1540
+    },
+    {
+     "x": -20,
+     "z": -1640
+    }
+   ],
+   "clear": 0
+  },
+  {
+   "name": "Superpipe",
+   "points": [
+    {
+     "x": -152,
+     "z": -70
+    },
+    {
+     "x": -152,
+     "z": -540
+    },
+    {
+     "x": -116,
+     "z": -620
+    },
+    {
+     "x": -116,
+     "z": -810
+    },
+    {
+     "x": -124,
+     "z": -880
+    },
+    {
+     "x": -124,
+     "z": -1130
+    },
+    {
+     "x": -114,
+     "z": -1200
+    },
+    {
+     "x": -110,
+     "z": -1480
+    },
+    {
+     "x": -60,
+     "z": -1540
+    },
+    {
+     "x": -20,
+     "z": -1640
+    }
+   ],
+   "clear": 0
+  },
+  {
+   "name": "School Yard and First Tracks",
+   "points": [
+    {
+     "x": 117,
+     "z": -62
+    },
+    {
+     "x": 117,
+     "z": -260
+    },
+    {
+     "x": 150,
+     "z": -335
+    },
+    {
+     "x": 150,
+     "z": -810
+    },
+    {
+     "x": 165,
+     "z": -880
+    },
+    {
+     "x": 165,
+     "z": -1480
+    },
+    {
+     "x": 110,
+     "z": -1550
+    },
+    {
+     "x": 60,
+     "z": -1640
+    }
+   ],
+   "clear": 0
+  }
+ ],
+ "colors": {
+  "sky": "#7fb4e6",
+  "fog": "#d6e6f4"
+ },
+ "peaks": {
+  "seed": 41,
+  "count": 12,
+  "rings": 3,
+  "distance": [
+   12000,
+   30000
+  ],
+  "base": -900,
+  "height": [
+   1400,
+   3000
+  ],
+  "snowLine": 500
+ },
+ "gaps": [
+  {
+   "name": "Timber gap",
+   "from": [
+    {
+     "x": -110,
+     "z": -313.23
+    },
+    {
+     "x": -94,
+     "z": -313.23
+    },
+    {
+     "x": -94,
+     "z": -333.72
+    },
+    {
+     "x": -110,
+     "z": -333.72
+    }
+   ],
+   "to": [
+    {
+     "x": -110,
+     "z": -341.72
+    },
+    {
+     "x": -94,
+     "z": -341.72
+    },
+    {
+     "x": -94,
+     "z": -414.01
+    },
+    {
+     "x": -110,
+     "z": -414.01
+    }
+   ],
+   "points": 300
+  },
+  {
+   "name": "Sapling gap",
+   "from": [
+    {
+     "x": 128,
+     "z": -480.27
+    },
+    {
+     "x": 140,
+     "z": -480.27
+    },
+    {
+     "x": 140,
+     "z": -492.48
+    },
+    {
+     "x": 128,
+     "z": -492.48
+    }
+   ],
+   "to": [
+    {
+     "x": 128,
+     "z": -495.98
+    },
+    {
+     "x": 140,
+     "z": -495.98
+    },
+    {
+     "x": 140,
+     "z": -564.64
+    },
+    {
+     "x": 128,
+     "z": -564.64
+    }
+   ],
+   "points": 150
+  },
+  {
+   "name": "Step-up",
+   "from": [
+    {
+     "x": 17,
+     "z": -963
+    },
+    {
+     "x": 29,
+     "z": -963
+    },
+    {
+     "x": 29,
+     "z": -976
+    },
+    {
+     "x": 17,
+     "z": -976
+    }
+   ],
+   "to": [
+    {
+     "x": 10,
+     "z": -987
+    },
+    {
+     "x": 36,
+     "z": -987
+    },
+    {
+     "x": 36,
+     "z": -1049
+    },
+    {
+     "x": 10,
+     "z": -1049
+    }
+   ],
+   "points": 300
+  },
+  {
+   "name": "Step-down",
+   "from": [
+    {
+     "x": 13,
+     "z": -1034
+    },
+    {
+     "x": 25,
+     "z": -1034
+    },
+    {
+     "x": 25,
+     "z": -1052
+    },
+    {
+     "x": 13,
+     "z": -1052
+    }
+   ],
+   "to": [
+    {
+     "x": 6,
+     "z": -1054
+    },
+    {
+     "x": 40,
+     "z": -1054
+    },
+    {
+     "x": 40,
+     "z": -1119
+    },
+    {
+     "x": 6,
+     "z": -1119
+    }
+   ],
+   "points": 300
+  },
+  {
+   "name": "Step-up",
+   "from": [
+    {
+     "x": 51,
+     "z": -963
+    },
+    {
+     "x": 63,
+     "z": -963
+    },
+    {
+     "x": 63,
+     "z": -976
+    },
+    {
+     "x": 51,
+     "z": -976
+    }
+   ],
+   "to": [
+    {
+     "x": 44,
+     "z": -987
+    },
+    {
+     "x": 70,
+     "z": -987
+    },
+    {
+     "x": 70,
+     "z": -1049
+    },
+    {
+     "x": 44,
+     "z": -1049
+    }
+   ],
+   "points": 300
+  },
+  {
+   "name": "Step-down",
+   "from": [
+    {
+     "x": 55,
+     "z": -1034
+    },
+    {
+     "x": 67,
+     "z": -1034
+    },
+    {
+     "x": 67,
+     "z": -1052
+    },
+    {
+     "x": 55,
+     "z": -1052
+    }
+   ],
+   "to": [
+    {
+     "x": 40,
+     "z": -1054
+    },
+    {
+     "x": 74,
+     "z": -1054
+    },
+    {
+     "x": 74,
+     "z": -1119
+    },
+    {
+     "x": 40,
+     "z": -1119
+    }
+   ],
+   "points": 300
+  },
+  {
+   "name": "Slot gap",
+   "from": [
+    {
+     "x": 35.93,
+     "z": -1020.49
+    },
+    {
+     "x": 25.93,
+     "z": -1020.49
+    },
+    {
+     "x": 25.93,
+     "z": -1036.49
+    },
+    {
+     "x": 35.93,
+     "z": -1036.49
+    }
+   ],
+   "to": [
+    {
+     "x": 45,
+     "z": -1019.54
+    },
+    {
+     "x": 68,
+     "z": -1019.54
+    },
+    {
+     "x": 68,
+     "z": -1067.54
+    },
+    {
+     "x": 45,
+     "z": -1067.54
+    }
+   ],
+   "points": 500
+  },
+  {
+   "name": "Slot gap",
+   "from": [
+    {
+     "x": 44.07,
+     "z": -1028.49
+    },
+    {
+     "x": 54.07,
+     "z": -1028.49
+    },
+    {
+     "x": 54.07,
+     "z": -1044.49
+    },
+    {
+     "x": 44.07,
+     "z": -1044.49
+    }
+   ],
+   "to": [
+    {
+     "x": 12,
+     "z": -1027.54
+    },
+    {
+     "x": 35,
+     "z": -1027.54
+    },
+    {
+     "x": 35,
+     "z": -1075.54
+    },
+    {
+     "x": 12,
+     "z": -1075.54
+    }
+   ],
+   "points": 500
+  },
+  {
+   "name": "Hip",
+   "from": [
+    {
+     "x": 33,
+     "z": -1201.51
+    },
+    {
+     "x": 47,
+     "z": -1201.51
+    },
+    {
+     "x": 47,
+     "z": -1217.51
+    },
+    {
+     "x": 33,
+     "z": -1217.51
+    }
+   ],
+   "to": [
+    {
+     "x": -6,
+     "z": -1212.62
+    },
+    {
+     "x": 33,
+     "z": -1212.62
+    },
+    {
+     "x": 33,
+     "z": -1280.62
+    },
+    {
+     "x": -6,
+     "z": -1280.62
+    }
+   ],
+   "points": 400
+  },
+  {
+   "name": "Hip",
+   "from": [
+    {
+     "x": 33,
+     "z": -1215.51
+    },
+    {
+     "x": 47,
+     "z": -1215.51
+    },
+    {
+     "x": 47,
+     "z": -1231.51
+    },
+    {
+     "x": 33,
+     "z": -1231.51
+    }
+   ],
+   "to": [
+    {
+     "x": 47,
+     "z": -1226.62
+    },
+    {
+     "x": 86,
+     "z": -1226.62
+    },
+    {
+     "x": 86,
+     "z": -1294.62
+    },
+    {
+     "x": 47,
+     "z": -1294.62
+    }
+   ],
+   "points": 400
+  },
+  {
+   "name": "Hip",
+   "from": [
+    {
+     "x": 33,
+     "z": -1231.12
+    },
+    {
+     "x": 47,
+     "z": -1231.12
+    },
+    {
+     "x": 47,
+     "z": -1247.12
+    },
+    {
+     "x": 33,
+     "z": -1247.12
+    }
+   ],
+   "to": [
+    {
+     "x": -6,
+     "z": -1237.14
+    },
+    {
+     "x": 33,
+     "z": -1237.14
+    },
+    {
+     "x": 33,
+     "z": -1305.14
+    },
+    {
+     "x": -6,
+     "z": -1305.14
+    }
+   ],
+   "points": 400
+  },
+  {
+   "name": "Hip",
+   "from": [
+    {
+     "x": 33,
+     "z": -1245.12
+    },
+    {
+     "x": 47,
+     "z": -1245.12
+    },
+    {
+     "x": 47,
+     "z": -1261.12
+    },
+    {
+     "x": 33,
+     "z": -1261.12
+    }
+   ],
+   "to": [
+    {
+     "x": 47,
+     "z": -1251.14
+    },
+    {
+     "x": 86,
+     "z": -1251.14
+    },
+    {
+     "x": 86,
+     "z": -1319.14
+    },
+    {
+     "x": 47,
+     "z": -1319.14
+    }
+   ],
+   "points": 400
+  },
+  {
+   "name": "Knuckle",
+   "from": [
+    {
+     "x": 34,
+     "z": -1250
+    },
+    {
+     "x": 46,
+     "z": -1250
+    },
+    {
+     "x": 46,
+     "z": -1270
+    },
+    {
+     "x": 34,
+     "z": -1270
+    }
+   ],
+   "to": [
+    {
+     "x": 18,
+     "z": -1271
+    },
+    {
+     "x": 62,
+     "z": -1271
+    },
+    {
+     "x": 62,
+     "z": -1366
+    },
+    {
+     "x": 18,
+     "z": -1366
+    }
+   ],
+   "points": 350
+  },
+  {
+   "name": "Giant step-up",
+   "from": [
+    {
+     "x": -148,
+     "z": -887
+    },
+    {
+     "x": -132,
+     "z": -887
+    },
+    {
+     "x": -132,
+     "z": -901.66
+    },
+    {
+     "x": -148,
+     "z": -901.66
+    }
+   ],
+   "to": [
+    {
+     "x": -148,
+     "z": -906.66
+    },
+    {
+     "x": -132,
+     "z": -906.66
+    },
+    {
+     "x": -132,
+     "z": -989.2
+    },
+    {
+     "x": -148,
+     "z": -989.2
+    }
+   ],
+   "points": 400
+  },
+  {
+   "name": "Tree gap",
+   "from": [
+    {
+     "x": -148,
+     "z": -952.2
+    },
+    {
+     "x": -132,
+     "z": -952.2
+    },
+    {
+     "x": -132,
+     "z": -970.06
+    },
+    {
+     "x": -148,
+     "z": -970.06
+    }
+   ],
+   "to": [
+    {
+     "x": -148,
+     "z": -982.06
+    },
+    {
+     "x": -132,
+     "z": -982.06
+    },
+    {
+     "x": -132,
+     "z": -1056.33
+    },
+    {
+     "x": -148,
+     "z": -1056.33
+    }
+   ],
+   "points": 400
+  },
+  {
+   "name": "Cannon",
+   "from": [
+    {
+     "x": -141.5,
+     "z": -1028.83
+    },
+    {
+     "x": -138.5,
+     "z": -1028.83
+    },
+    {
+     "x": -138.5,
+     "z": -1034.33
+    },
+    {
+     "x": -141.5,
+     "z": -1034.33
+    }
+   ],
+   "to": [
+    {
+     "x": -147,
+     "z": -1039.53
+    },
+    {
+     "x": -133,
+     "z": -1039.53
+    },
+    {
+     "x": -133,
+     "z": -1117.53
+    },
+    {
+     "x": -147,
+     "z": -1117.53
+    }
+   ],
+   "points": 350
+  },
+  {
+   "name": "The Big One",
+   "from": [
+    {
+     "x": -149,
+     "z": -1198.81
+    },
+    {
+     "x": -131,
+     "z": -1198.81
+    },
+    {
+     "x": -131,
+     "z": -1219.81
+    },
+    {
+     "x": -149,
+     "z": -1219.81
+    }
+   ],
+   "to": [
+    {
+     "x": -158,
+     "z": -1226.81
+    },
+    {
+     "x": -122,
+     "z": -1226.81
+    },
+    {
+     "x": -122,
+     "z": -1356.81
+    },
+    {
+     "x": -158,
+     "z": -1356.81
+    }
+   ],
+   "points": 600
+  }
+ ]
+}

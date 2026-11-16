@@ -93,7 +93,7 @@ export class ChairliftView {
     let chairCount = 0;
     let riderCount = 0;
     for (const l of lines) {
-      if (l.kind !== 'chairlift' || l.points.length < 2) continue;
+      if (l.kind !== 'chairlift' || l.ride || l.points.length < 2) continue;
       const line = liftLine(l.points, hf);
       const loop = buildLoop(line, this.loops.length);
       this.loops.push(loop);

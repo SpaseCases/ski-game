@@ -714,7 +714,39 @@ export interface StartFeature {
   course: string;
 }
 
+/**
+ * A landing airbag (milestone 17): a big inflated pad shaped like a jump's
+ * table and landing. Its uphill wall stands just past a kicker's lip, its
+ * flat top runs level with the slope like a deck, then it rounds over a
+ * knuckle into a long face and eases back to the snow. Any landing on it
+ * rides away (flat, backward, upside down, mid-flip), and it takes most of
+ * the rider's speed (see CONFIG.airbag). Heights are above the slope.
+ */
+export interface AirbagFeature {
+  type: 'airbag';
+  /** Middle of its uphill edge. */
+  x: number;
+  z: number;
+  /** Heading in degrees its face points down; 0 faces downhill. */
+  yaw: number;
+  /** Width of its top; the sides bulge down to the snow over `sideWidth`. */
+  width: number;
+  sideWidth: number;
+  /** Height of its top, and the length of the uphill wall rising to it. */
+  height: number;
+  back: number;
+  /** Length of the flat top before the knuckle, and steepness of the face. */
+  top: number;
+  angle: number;
+  knuckle: number;
+  transition: number;
+  /** The two colors of its stripes. */
+  color: string;
+  accent: string;
+}
+
 export type Feature =
+  | AirbagFeature
   | BoxFeature
   | RailFeature
   | JumpFeature
@@ -870,6 +902,13 @@ export interface LineDecor {
   points: XZ[];
   /** How high (m) a viaduct's ends, an elevated line or a skybridge stands above the ground; 0 for the others. */
   height: number;
+  /**
+   * A chairlift riders can take (milestone 17): its first point is the
+   * bottom station, where skiing into the loading gate boards the next
+   * chair, and its last the top, where the chair lets them off. Its stations
+   * are open (only their pillars are solid). Default false: scenery.
+   */
+  ride: boolean;
 }
 
 export interface PropDecor {
@@ -913,6 +952,8 @@ export interface TerrainScatterDecor {
 export interface SpotsDecor {
   kind: ScatterKind;
   spots: XZ[];
+  /** Placed even inside a keep-out zone (the trees a tree gap flies over, milestone 17). Default false. */
+  anywhere: boolean;
   seed: number;
   minScale: number;
   maxScale: number;
@@ -1073,6 +1114,8 @@ export interface Heightfield {
   shapes?: TerrainShape[];
   /** The shapes sorted into square cells (see setShapes), so a sample looks at only the few nearby. */
   shapeCells?: ShapeCells;
+  /** True when any shape is an airbag (set by setShapes): only then does the sim look for one under the skier. */
+  airbags?: boolean;
 }
 
 /** A grid over the map: for each cell, its slice of `items` (indices into the shapes). */
@@ -1119,6 +1162,8 @@ export interface RampShape {
   takeoffs: number[];
   /** Draw the side slopes as snow. Structures (towers, decks, roofs) draw their own sides. */
   sides: boolean;
+  /** An airbag: the whole ramp, sides included, is its pad, striped in these two colors. */
+  airbag?: { color: string; accent: string };
   /** Bounding box in world XZ. */
   minX: number;
   maxX: number;

@@ -30,7 +30,8 @@ import { anyCheat, configChanged, TUNING } from './tuning.ts';
 // wiggling back and forth counts nothing.
 
 export type ScoreEventKind = 'trick' | 'bank' | 'lost';
-export type Landing = 'clean' | 'sketchy' | '';
+/** How a trick landed: 'airbag' (milestone 17) scores like 'sketchy' and says where it landed. */
+export type Landing = 'clean' | 'sketchy' | 'airbag' | '';
 
 /** Most grabs one trick names (the longest held). */
 export const MAX_GRABS = 6;
@@ -286,7 +287,9 @@ export function comboTotal(sc: ScoreState): number {
  * limits (sketchy), after `air` s in the air, from a rail if `fromRail`
  * (then the edges are checked however short the drop, as the landing does).
  * In powder the impact limit is powder's; a cased landing (see
- * CONFIG.landing.casePitchMax) is past pitchMax's share, so sketchy.
+ * CONFIG.landing.casePitchMax) is past pitchMax's share, so sketchy. A
+ * landing on an airbag (milestone 17) always is: it can't crash, so it
+ * scores half and adds no multiplier.
  */
 export function sketchyLanding(s: SkierState, air: number, fromRail: boolean): boolean {
   const C = CONFIG.score;
@@ -294,6 +297,7 @@ export function sketchyLanding(s: SkierState, air: number, fromRail: boolean): b
   const edges = air >= L.edgeCheckAir || fromRail;
   const impactMax = s.landPowder ? L.impactMax * L.powderImpact : L.impactMax;
   return (
+    s.landSoft ||
     s.landPitch > C.sketchyPitch * L.pitchMax ||
     s.landImpact > C.sketchyImpact * impactMax ||
     (edges && (s.landRoll > C.sketchyRoll * L.rollMax || s.landSide > C.sketchySide * L.sideMax))
@@ -566,13 +570,13 @@ function endAir(sc: ScoreState, s: SkierState, toRail: boolean): void {
   // The landing: onto a rail is clean by catching it; on the snow, close to the limits is sketchy.
   let landing: Landing = '';
   if (!toRail) {
-    landing = sketchyLanding(s, a.time, a.fromRail) ? 'sketchy' : 'clean';
+    landing = s.landSoft ? 'airbag' : sketchyLanding(s, a.time, a.fromRail) ? 'sketchy' : 'clean';
   }
   const switchOut = !toRail && isSwitch(s);
   points += C.airPoints * a.time;
   if (trick && a.switchTakeoff) points *= 1 + C.switchBonus;
   if (switchOut) points *= 1 + C.switchBonus;
-  points *= landing === 'clean' ? 1 + C.cleanBonus : landing === 'sketchy' ? C.sketchyScale : 1;
+  points *= landing === 'clean' ? 1 + C.cleanBonus : landing === '' ? 1 : C.sketchyScale;
 
   const ollie = a.butter > 0 ? 'nollie' : a.butter < 0 ? 'ollie' : '';
   if (trick && ollie !== '') points *= 1 + C.ollieBonus;
@@ -581,7 +585,7 @@ function endAir(sc: ScoreState, s: SkierState, toRail: boolean): void {
   // The repeat key: the move and its grabs, whichever order they were held in.
   let key = name;
   for (let i = 0; i < a.grab.length; i++) if (a.grab[i]! >= C.grabMin) key += `|${GRAB_ACTIONS[i]}`;
-  addTrick(sc, ev, key, name, points, trick && landing !== 'sketchy');
+  addTrick(sc, ev, key, name, points, trick && (landing === 'clean' || landing === ''));
   ev.meters = 0;
   ev.landing = landing;
   ev.switchOut = switchOut;
@@ -771,26 +775,26 @@ function endGaps(sc: ScoreState, s: SkierState, gaps: Gaps): void {
   for (const g of gaps.zones) {
     if (!g.named || !clearsZone(g, a.x0, a.z0, x1, z1)) continue;
     named = true;
-    addGap(sc, g.name, g.points, sketchy);
+    addGap(sc, g.name, g.points, sketchy, s.landSoft);
   }
   if (!named) {
     for (const g of gaps.zones) {
       if (g.named || !clearsZone(g, a.x0, a.z0, x1, z1)) continue;
-      addGap(sc, g.name, g.points, sketchy);
+      addGap(sc, g.name, g.points, sketchy, s.landSoft);
       break;
     }
   }
   if (toRail && a.rail >= 0 && s.rail !== a.rail) addGap(sc, 'Transfer', C.transferPoints, false);
-  if (crossesFence(gaps, a.x0, a.z0, x1, z1)) addGap(sc, 'Fence hop', C.hopPoints, sketchy);
+  if (crossesFence(gaps, a.x0, a.z0, x1, z1)) addGap(sc, 'Fence hop', C.hopPoints, sketchy, s.landSoft);
 }
 
 /** A gap cleared: a trick of its own, its points halved by a sketchy landing (and then no multiplier). */
-function addGap(sc: ScoreState, name: string, points: number, sketchy: boolean): void {
+function addGap(sc: ScoreState, name: string, points: number, sketchy: boolean, airbag = false): void {
   const ev = nextEvent(sc);
   ev.grabCount = 0;
   addTrick(sc, ev, name, name, sketchy ? points * CONFIG.score.sketchyScale : points, !sketchy);
   ev.meters = 0;
-  ev.landing = sketchy ? 'sketchy' : '';
+  ev.landing = airbag ? 'airbag' : sketchy ? 'sketchy' : '';
   ev.switchOut = false;
 }
 

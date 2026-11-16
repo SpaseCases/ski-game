@@ -82,6 +82,24 @@ export const STANCE: PoseDef = {
   ],
 };
 
+/**
+ * Sitting on a chairlift (milestone 17): the origin is the skis' level under
+ * the boots, the seat 0.47 m above it and 0.42 m back (sim/lift.ts LIFT),
+ * thighs along the seat, shins hanging, back against the pads, hands on the
+ * safety bar, poles across the lap pointing forward.
+ */
+export const CHAIR: PoseDef = {
+  pelvis: [0, 0.6, 0.4],
+  pelvisPitch: -0.12,
+  chestPitch: 0.1,
+  headPitch: -0.02,
+  feet: SNOW_FEET,
+  hands: [
+    { at: [-0.2, 0.84, -0.02], pole: [-0.25, -0.3, -0.9] },
+    { at: [0.2, 0.84, -0.02], pole: [0.25, -0.3, -0.9] },
+  ],
+};
+
 export const CROUCH: PoseDef = {
   pelvis: [0, 0.64, 0.17],
   pelvisPitch: 0.38,

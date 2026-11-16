@@ -1,5 +1,6 @@
 import { TUNING } from './tuning.ts';
 import type { Heightfield, ObstacleDef, RailShape } from '../maps/types.ts';
+import type { Lifts } from './lift.ts';
 import type { PowderArea } from './powder.ts';
 import { heightAt, type Vec3Like } from './terrain.ts';
 
@@ -41,6 +42,8 @@ export interface Course {
   obstacles: Obstacles;
   /** Where landings are softer (null: the whole map is groomed). */
   powder: PowderArea | null;
+  /** Chairlifts riders can take (milestone 17), with their clock; absent on a map with none. */
+  lifts?: Lifts;
 }
 
 const CELL = 8;

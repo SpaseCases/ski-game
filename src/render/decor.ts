@@ -272,7 +272,8 @@ function drawLine(line: LineDecor, hf: Heightfield, kits: TiledKit, cloths: Tile
       bunting(line.points, hf, kits, cloths);
       break;
     case 'chairlift':
-      chairlift(line.points, hf, kits);
+      // A lift riders take is drawn by render/expressLift.ts.
+      if (!line.ride) chairlift(line.points, hf, kits);
       break;
     case 'snowFence':
       // Wooden slats on posts, the top boards weathered darker.

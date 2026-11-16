@@ -26,6 +26,7 @@ export function trickTags(ev: ScoreEvent): string {
   const tags: string[] = [];
   if (ev.landing === 'clean') tags.push('Clean');
   else if (ev.landing === 'sketchy') tags.push('Sketchy');
+  else if (ev.landing === 'airbag') tags.push('Airbag');
   if (ev.switchOut) tags.push('Switch landing');
   if (ev.repeat > 0) tags.push(ev.repeat === 1 ? 'Repeat' : `Repeat ×${ev.repeat}`);
   return tags.join(' · ');

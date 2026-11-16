@@ -202,6 +202,54 @@ export const CONFIG = {
     roughLossMax: 0.4,
   },
 
+  /**
+   * Airbags (milestone 17): a landing pad that takes any landing. Read
+   * straight from here by the sim (no ski or cheat scales them).
+   */
+  airbag: {
+    /** Share of the speed along the pad kept at touchdown; the rest sinks into it. */
+    keep: 0.35,
+    /** For `grip` s after touchdown the pad drags the skis at `drag` m/s², down to `crawl` m/s; then they slide on down it and off its end. */
+    grip: 0.9,
+    drag: 9,
+    crawl: 2.5,
+  },
+
+  /**
+   * The chairlift riders can take (milestone 17): a detachable lift, slow
+   * through its stations and fast on the line. Read straight from here.
+   */
+  lift: {
+    /** Cable speed (m/s) on the line and through the stations, and the distance (m) over which chairs speed up and slow down. */
+    lineSpeed: 6,
+    stationSpeed: 1.1,
+    ramp: 18,
+    /** Seconds between chairs. */
+    interval: 7,
+    /**
+     * While the skier rides out on the line, the lift runs this many times
+     * faster (every chair with it), easing in from boostFrom to boostFull m
+     * out of a station, the change of pace smoothed over boostEase s.
+     */
+    rideBoost: 7,
+    boostFrom: 14,
+    boostFull: 90,
+    boostEase: 0.6,
+    /** The cable's height over the snow at a tower and over a station's floor, and its sag (m) midway between towers. */
+    towerHeight: 11,
+    stationCable: 3.25,
+    sag: 1.3,
+    /** Loading: within gateRadius m of the loading point and slower than gateSpeed m/s, the skier is drawn to it (at gatePull a second) to wait for the next chair. */
+    gateRadius: 5,
+    gateSpeed: 10,
+    gatePull: 3.5,
+    /** Unloading: off the chair round a half circle of this radius (m) at this speed (m/s), onto the snow facing back down the hill. */
+    exitRadius: 5.5,
+    exitSpeed: 5.5,
+    /** Holding the confirm key this long (s) on the chair skips to the top. */
+    skipHold: 0.6,
+  },
+
   rails: {
     /** Radius (m) of a round rail. */
     radius: 0.045,

@@ -1,9 +1,11 @@
 import { Quaternion, Vector3 } from 'three';
+import { CONFIG } from '../config.ts';
 import { CHEATS, TUNING } from './tuning.ts';
 import { GRAB_ACTIONS, type InputState } from '../core/input.ts';
-import { onPipeWall, onTakeoff, pipeInward } from '../maps/shapes.ts';
+import { onAirbag, onPipeWall, onTakeoff, pipeInward } from '../maps/shapes.ts';
 import type { Heightfield, RailShape, SpawnDef } from '../maps/types.ts';
 import { keepInside } from './bounds.ts';
+import { chairArriving, chairAt, LIFT, stepLifts, type ChairSpot, type Lifts } from './lift.ts';
 import { collideObstacles, type Course } from './obstacles.ts';
 import { inPowder } from './powder.ts';
 import { collideRails, railFrame, railUnder, railUp, type RailSpot } from './rails.ts';
@@ -34,6 +36,10 @@ import { groundAt, heightAt } from './terrain.ts';
 // crashes: a cheap tumble that rolls and slides to a stop. With the No
 // crashes cheat on, nothing crashes: a bad landing is set upright on the
 // snow and rides on, and a hard hit only stops the skier.
+//
+// An airbag (milestone 17) takes any landing: whatever the body's angle or
+// speed, the skier comes out upright along the travel with most of the speed
+// gone, and the pad drags them on down to a crawl until they slide off it.
 //
 // Rails and boxes: skis coming down onto one, close enough to its line and
 // lined up straight or sideways, lock on and slide along it. Otherwise they
@@ -132,6 +138,8 @@ export interface SkierState {
   landImpact: number;
   /** The last landing was in powder, where the impact limit is higher (CONFIG.landing.powderImpact). */
   landPowder: boolean;
+  /** The last landing was on an airbag, which takes anything: scored like a sketchy one. */
+  landSoft: boolean;
   bailed: boolean;
   /** Seconds since the crash. */
   bailTime: number;
@@ -154,6 +162,16 @@ export interface SkierState {
    * groundOrient), so only `orient` says which way the body points.
    */
   rail3d: boolean;
+  /**
+   * The chairlift being taken (index into the course's lifts), or -1. With
+   * it, `liftChair` is the chair sat on, -1 while standing at the loading
+   * point waiting for one, or -2 while sliding off at the top; `liftT` is
+   * how far round the way off (0..1), or how long the skip key has been held.
+   * `grounded` stays true throughout.
+   */
+  lift: number;
+  liftChair: number;
+  liftT: number;
 }
 
 export function createSkierState(): SkierState {
@@ -196,6 +214,7 @@ export function createSkierState(): SkierState {
     landSide: 0,
     landImpact: 0,
     landPowder: false,
+    landSoft: false,
     bailed: false,
     bailTime: 0,
     bailReason: '',
@@ -205,6 +224,9 @@ export function createSkierState(): SkierState {
     railAngle: 0,
     railExit: false,
     rail3d: false,
+    lift: -1,
+    liftChair: -1,
+    liftT: 0,
   };
 }
 
@@ -247,6 +269,7 @@ export function copySkierState(dst: SkierState, src: SkierState): void {
   dst.landSide = src.landSide;
   dst.landImpact = src.landImpact;
   dst.landPowder = src.landPowder;
+  dst.landSoft = src.landSoft;
   dst.bailed = src.bailed;
   dst.bailTime = src.bailTime;
   dst.bailReason = src.bailReason;
@@ -256,6 +279,9 @@ export function copySkierState(dst: SkierState, src: SkierState): void {
   dst.railAngle = src.railAngle;
   dst.railExit = src.railExit;
   dst.rail3d = src.rail3d;
+  dst.lift = src.lift;
+  dst.liftChair = src.liftChair;
+  dst.liftT = src.liftT;
 }
 
 /** Puts the skier at a spawn point, standing still on the snow. */
@@ -309,6 +335,8 @@ const fit = { tilt: 0, angle: 0 };
 
 /** Advances the skier by one fixed step. */
 export function stepSkier(s: SkierState, input: InputState, course: Course, dt: number): void {
+  const lifts = course.lifts;
+  if (lifts) stepLifts(lifts, s.lift, s.liftChair, dt);
   if (s.bailed) {
     stepBail(s, course, dt);
     return;
@@ -319,6 +347,10 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
   s.polePhase = Math.min(1, s.poleTime / c.polePushInterval);
   s.landTime += dt;
   const steer = (input.left.held ? 1 : 0) - (input.right.held ? 1 : 0);
+  if (lifts && s.lift >= 0) {
+    rideLift(s, input, course.hf, lifts, dt);
+    return;
+  }
 
   // Pop: release the crouch on the snow or a rail (or just after leaving it).
   // Up a wall it drives up the wall, a little; pushing off along the snow's
@@ -355,11 +387,118 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
   }
   if (s.grounded) updateButter(s, input, dt);
   else endButter(s);
-  if (s.grounded) rideSnow(s, input, dt);
+  if (s.grounded) rideSnow(s, input, course.hf, dt);
   else fly(s, input, steer, course.hf, dt);
 
   if (s.grounded) moveOnSnow(s, course, steer, dt);
   else moveInAir(s, course, dt);
+  if (lifts && s.grounded && s.rail < 0 && !s.bailed) enterGate(s, lifts);
+}
+
+const chairSpot: ChairSpot = { x: 0, y: 0, z: 0, yaw: 0, s: 0 };
+
+/** Riding slowly into a lift's loading gate: the skier is taken to wait for the next chair. */
+function enterGate(s: SkierState, lifts: Lifts): void {
+  const C = CONFIG.lift;
+  if (s.velocity.lengthSq() > C.gateSpeed * C.gateSpeed) return;
+  for (let i = 0; i < lifts.paths.length; i++) {
+    const path = lifts.paths[i]!;
+    if (Math.hypot(s.position.x - path.loadX, s.position.z - path.loadZ) > C.gateRadius) continue;
+    s.lift = i;
+    s.liftChair = -1;
+    s.liftT = 0;
+    return;
+  }
+}
+
+/**
+ * Taking a chairlift: standing at the loading point until the next chair
+ * comes through (it scoops the skier up), sitting on it up the line (its
+ * place follows from the lifts' clock, like every chair's), then off it at
+ * the top round a half circle to the right, onto the snow facing back down.
+ * Holding the confirm key on the chair skips to the top.
+ */
+function rideLift(s: SkierState, input: InputState, hf: Heightfield, lifts: Lifts, dt: number): void {
+  const C = CONFIG.lift;
+  const path = lifts.paths[s.lift]!;
+  const p = s.position;
+  // Nothing of riding carries onto the chair.
+  s.grounded = true;
+  s.airTime = 0;
+  s.canPop = false;
+  s.rail = -1;
+  s.rail3d = false;
+  s.railExit = false;
+  s.crouch = approach(s.crouch, 0, dt / TUNING.skier.standTime);
+  s.brake = 0;
+  s.lean = 0;
+  s.yawRate = 0;
+  s.press = 0;
+  s.grab = -1;
+  s.butter = 0;
+  s.butterAmount = 0;
+  s.spin.set(0, 0, 0);
+  s.normal.set(0, 1, 0);
+  const fx = -Math.sin(path.loadYaw);
+  const fz = -Math.cos(path.loadYaw);
+
+  if (s.liftChair === -1) {
+    // Waiting: drawn to the spot the seat passes, turning to face up the line.
+    const k = 1 - Math.exp(-C.gatePull * dt);
+    const nx = p.x + (path.loadX + fx * LIFT.feetAhead - p.x) * k;
+    const nz = p.z + (path.loadZ + fz * LIFT.feetAhead - p.z) * k;
+    s.velocity.set((nx - p.x) / dt, 0, (nz - p.z) / dt);
+    p.set(nx, heightAt(hf, nx, nz), nz);
+    s.yaw = wrapAngle(s.yaw + wrapAngle(path.loadYaw - s.yaw) * k);
+    const c = chairArriving(path, lifts.prev, lifts.clock - lifts.prev);
+    if (c >= 0 && Math.hypot(p.x - path.loadX - fx * LIFT.feetAhead, p.z - path.loadZ - fz * LIFT.feetAhead) < 0.12) {
+      s.liftChair = c;
+      s.liftT = 0;
+    }
+  } else if (s.liftChair === -2) {
+    // Off at the top: a half circle to the right of the way in.
+    const R = C.exitRadius;
+    s.liftT = Math.min(1, s.liftT + (C.exitSpeed * dt) / (Math.PI * R));
+    const a = Math.PI * s.liftT;
+    // Right of the way in.
+    const rx = -fz;
+    const rz = fx;
+    const x0 = path.exitX + fx * LIFT.feetAhead;
+    const z0 = path.exitZ + fz * LIFT.feetAhead;
+    const nx = x0 + rx * R * (1 - Math.cos(a)) + fx * R * Math.sin(a);
+    const nz = z0 + rz * R * (1 - Math.cos(a)) + fz * R * Math.sin(a);
+    s.yaw = wrapAngle(path.exitYaw - a);
+    p.set(nx, groundAt(hf, nx, nz, s.normal), nz);
+    s.velocity.set(-Math.sin(s.yaw) * C.exitSpeed, 0, -Math.cos(s.yaw) * C.exitSpeed);
+    if (s.liftT >= 1) {
+      // On the snow again, riding away.
+      s.velocity.addScaledVector(s.normal, -s.velocity.dot(s.normal));
+      s.lift = -1;
+      s.liftChair = -1;
+      s.liftT = 0;
+      s.canPop = true;
+    }
+  } else {
+    chairAt(path, lifts.clock, s.liftChair, chairSpot);
+    const cos = Math.cos(chairSpot.yaw);
+    const sin = Math.sin(chairSpot.yaw);
+    const seat = LIFT.seats[LIFT.seats.length - 1]!;
+    const nx = chairSpot.x + cos * seat - sin * LIFT.feetAhead;
+    const ny = chairSpot.y - LIFT.hang - LIFT.feetBelow;
+    const nz = chairSpot.z - sin * seat - cos * LIFT.feetAhead;
+    s.velocity.set((nx - p.x) / dt, (ny - p.y) / dt, (nz - p.z) / dt);
+    p.set(nx, ny, nz);
+    s.yaw = wrapAngle(chairSpot.yaw);
+    // Holding the confirm key skips the ride.
+    s.liftT = input.confirm.held ? s.liftT + dt : 0;
+    if (chairSpot.s >= path.unloadS || s.liftT >= C.skipHold) {
+      s.liftChair = -2;
+      // Skipped: straight to the end of the way off.
+      s.liftT = chairSpot.s >= path.unloadS ? 0 : 0.999;
+    }
+  }
+  groundOrient(s);
+  s.center.copy(p).addScaledVector(s.normal, TUNING.air.comHeight);
 }
 
 /**
@@ -443,7 +582,7 @@ function slideRail(s: SkierState, input: InputState, course: Course, steer: numb
   s.center.copy(s.position).addScaledVector(s.normal, TUNING.air.comHeight);
 }
 
-function rideSnow(s: SkierState, input: InputState, dt: number): void {
+function rideSnow(s: SkierState, input: InputState, hf: Heightfield, dt: number): void {
   const c = TUNING.skier;
   const n = s.normal;
   const g = c.gravity;
@@ -532,6 +671,17 @@ function rideSnow(s: SkierState, input: InputState, dt: number): void {
   const slow = 1 / (1 + drag * Math.hypot(u, w) * dt);
   u *= slow;
   w *= slow;
+  // An airbag's pad gives under a landing: for a moment it drags the skis
+  // down to a crawl, then lets them slide on down it and off its end.
+  if (hf.airbags && s.landSoft && s.landTime < CONFIG.airbag.grip && onAirbag(hf, s.position.x, s.position.z)) {
+    const A = CONFIG.airbag;
+    const now = Math.hypot(u, w);
+    if (now > A.crawl) {
+      const k = Math.max(A.crawl, now - A.drag * dt) / now;
+      u *= k;
+      w *= k;
+    }
+  }
 
   vn -= press * dt; // gravity keeps pressing the skis into the snow
 
@@ -807,7 +957,7 @@ function moveInAir(s: SkierState, course: Course, dt: number): void {
     p.x = s.center.x;
     p.z = s.center.z;
     p.y = groundAt(hf, p.x, p.z, contactNormal);
-    if (CHEATS.noCrashes) {
+    if (CHEATS.noCrashes || onAirbag(hf, p.x, p.z)) {
       land(s, course);
       return;
     }
@@ -816,6 +966,8 @@ function moveInAir(s: SkierState, course: Course, dt: number): void {
     s.landSide = 0;
     s.landImpact = Math.max(0, -s.velocity.dot(contactNormal));
     s.landPowder = false;
+  s.landSoft = false;
+    s.landSoft = false;
     crash(s, 'head');
   }
 }
@@ -843,6 +995,7 @@ function catchRail(s: SkierState, rails: readonly RailShape[]): boolean {
   s.landSide = off;
   s.landImpact = into;
   s.landPowder = false;
+  s.landSoft = false;
   if (fit.tilt > R.tiltMax || off > R.angleMax) {
     slipOff(s, rail.halfWidth, railYaw);
     return false;
@@ -958,6 +1111,8 @@ function bump(s: SkierState, course: Course): boolean {
   );
   if (hit < TUNING.rails.crashSpeed || CHEATS.noCrashes) return false;
   const p = s.position;
+  // On an airbag a hard hit only stops the skier, like everything else there.
+  if (onAirbag(course.hf, p.x, p.z)) return false;
   const h = groundAt(course.hf, p.x, p.z, contactNormal);
   if (s.grounded) p.y = h;
   s.landPitch = 0;
@@ -965,6 +1120,7 @@ function bump(s: SkierState, course: Course): boolean {
   s.landSide = 0;
   s.landImpact = hit;
   s.landPowder = false;
+  s.landSoft = false;
   crash(s, 'obstacle');
   return true;
 }
@@ -1000,6 +1156,8 @@ function land(s: SkierState, course: Course): void {
   s.landSide = side;
   s.landImpact = impact;
   s.landPowder = inPowder(course.powder, s.position.x, s.position.z);
+  const soft = onAirbag(course.hf, s.position.x, s.position.z);
+  s.landSoft = soft;
   // Casing a deck or a knuckle: the body still points along the flight path
   // (little trick rotation), so a steeper pitch is a rough landing, not a crash.
   const cased = s.trickTurn < L.caseTrickMax;
@@ -1021,13 +1179,13 @@ function land(s: SkierState, course: Course): void {
           : impact > impactMax
             ? 'impact'
             : '';
-  if (reason !== '') {
-    if (!CHEATS.noCrashes) {
+  if (reason !== '' || soft) {
+    if (!CHEATS.noCrashes && !soft) {
       crash(s, reason);
       return;
     }
-    // No crashes: upright on the snow with the skis along the travel (or
-    // switch, if they were closer to that), and ride on without the spin.
+    // No crashes, or an airbag: upright on the snow with the skis along the
+    // travel (or switch, if they were closer to that), and ride on without the spin.
     if (speed > 0.5) {
       const dir = skiLen > 1e-3 && bodyForward.dot(tangent) < 0 ? -1 : 1;
       bodyForward.copy(tangent).multiplyScalar(dir / speed);
@@ -1040,7 +1198,10 @@ function land(s: SkierState, course: Course): void {
   // spin carries into the turn up to what the skis can turn on snow. A hard
   // landing (casing a deck, short on a knuckle) also costs speed.
   if (vn < 0) s.velocity.addScaledVector(n, -vn);
-  if (impact > L.roughImpact) {
+  if (soft) {
+    // The pad gives under the skier: most of the speed along it goes too.
+    s.velocity.multiplyScalar(CONFIG.airbag.keep);
+  } else if (impact > L.roughImpact) {
     s.velocity.multiplyScalar(1 - Math.min(L.roughLossMax, (impact - L.roughImpact) * L.roughLoss));
   }
   if (skiLen > 1e-3) {
