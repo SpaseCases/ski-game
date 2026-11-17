@@ -486,13 +486,14 @@ export class SkierView {
     if (pushing) boardPush(p, state.polePhase, onSnow);
 
     // On an edge: the board rolls by the rest of the lean; over the heels the
-    // hips sit back and down, over the toes they press forward and the
-    // knees drive. Heel side is the board's left riding regular, its right goofy.
+    // hips sit back and down and the chest leans forward against them, over
+    // the toes the hips press forward, the knees drive and the chest stays
+    // up. Heel side is the board's left riding regular, its right goofy.
     const heel = (leanTotal - bodyLean) * (this.goofy ? -1 : 1) * onSnow;
     p.board.roll -= heel;
     p.pelvis[2] += heel * BOARD_EDGE.hips * (1 - deep);
     p.pelvis[1] -= Math.abs(heel) * BOARD_EDGE.sink * (1 - deep);
-    p.chestPitch -= heel * BOARD_EDGE.chest;
+    p.chestPitch += heel * BOARD_EDGE.chest;
     for (let i = 0; i < 2; i++) {
       const h = p.hands[i === 0 ? 0 : 1];
       if (h.boardWeight > 0) continue;
@@ -558,7 +559,7 @@ const BOARD_POINTS: readonly (readonly [number, number])[] = [
 ];
 const chest = new Vector3();
 const nose = new Vector3();
-/** On a board's edge, per radian of the lean the legs take: how far (m) the hips move toward the heels (or the toes), how far they sink, and how far the chest pitches back (or forward). */
+/** On a board's edge, per radian of the lean the legs take: how far (m) the hips move toward the heels (or the toes), how far they sink, and how far the chest pitches forward against them (or back up over the toes). */
 const BOARD_EDGE = { hips: 0.32, sink: 0.12, chest: 0.35 };
 /** Riding fakie faster than this (m/s) backwards, the head and chest turn back (radians) over the rear shoulder. */
 const BOARD_FAKIE_SPEED = 1;

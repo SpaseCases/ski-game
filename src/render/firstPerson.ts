@@ -31,8 +31,8 @@ const headUp = new Vector3();
 const DOWN = new Vector3(0, -1, 0);
 /** Grabs (GRAB_ACTIONS indices) that read only with the legs drawn while looking down: both japans and the spread eagle. */
 const LEG_GRABS: readonly number[] = [2, 6, 13];
-/** On a snowboard (milestone 22): the method, the japan, the roast beef, the poke, the rocket and the stiffy, which read only with the legs. */
-const BOARD_LEG_GRABS: readonly number[] = [2, 3, 6, 11, 12, 13];
+/** On a snowboard (milestone 22): the method, the japan, the roast beef, the poke and the stiffy, which read only with the legs (the rocket air's front knee comes up to the eye, so its view shows the board, boots and hands). */
+const BOARD_LEG_GRABS: readonly number[] = [2, 3, 6, 11, 13];
 const heading = new Vector3();
 const toBoard = new Vector3();
 /** A board grab's view leans from straight down toward the board by at most this (m across per m down). */
