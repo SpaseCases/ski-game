@@ -550,7 +550,7 @@ export function aspectOf(m: SkiModel): number {
  * cell by cell like the 3D ski: `put(x, y, hex)` for each pixel inside its
  * outline, at `pxPerM` pixels per meter, from x = 0, its middle on y = `mid`.
  */
-export function drawSki(type: SkiType, g: SkiGraphic, side: Side, base: boolean, pxPerM: number, mid: number, put: (x: number, y: number, hex: string) => void): void {
+export function drawSki(type: { model: SkiModel }, g: SkiGraphic, side: Side, base: boolean, pxPerM: number, mid: number, put: (x: number, y: number, hex: string) => void): void {
   const m = type.model;
   const half = m.length / 2;
   const aspect = aspectOf(m);
@@ -668,7 +668,11 @@ export const SKI_STATS: readonly { readonly id: SkiStat; readonly name: string }
  * goes as one over their square root), and grip from the grip and turn rate at speed.
  */
 export function skiStats(id: SkiId): Record<SkiStat, number> {
-  const s = CONFIG.skis[id] as Record<string, Record<string, number> | undefined>;
+  return statsFrom(CONFIG.skis[id] as Record<string, Record<string, number> | undefined>);
+}
+
+/** The stats from a block of multipliers (a ski's, or a board's: core/boards.ts). */
+export function statsFrom(s: Record<string, Record<string, number> | undefined>): Record<SkiStat, number> {
   const m = (block: string, key: string): number => s[block]?.[key] ?? 1;
   return {
     spins: (m('air', 'spinRate') + m('air', 'flipRate')) / 2,

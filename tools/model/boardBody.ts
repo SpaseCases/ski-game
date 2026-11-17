@@ -39,6 +39,19 @@ import {
   BOARD_TUMBLE,
 } from '../../src/render/boardPoses.ts';
 import { CROUCH, LEFT_JAPAN, LEFT_MUTE, LEFT_NOSE, LEFT_SAFETY, LEFT_TAIL, STANCE, TUCK, TUMBLE, type PoseDef } from '../../src/render/skierPoses.ts';
+import { BOARD_TYPES, boardType, type BoardId } from '../../src/core/boards.ts';
+import { riseAt } from '../../src/core/skis.ts';
+import { DEFAULT_OUTFIT, type Outfit } from '../../src/core/outfit.ts';
+
+// "--board-type <park|freeride|carving>" (milestone 22 part 2) checks that
+// board in its first graphic (the park board without it, so the output
+// stays the same). Taken out of the arguments before they're read.
+const typeAt = process.argv.indexOf('--board-type');
+const boardTypeId = (typeAt >= 0 ? process.argv.splice(typeAt, 2)[1] : 'park') as BoardId;
+if (!BOARD_TYPES.some((t) => t.id === boardTypeId)) throw new Error(`--board-type takes one of: ${BOARD_TYPES.map((t) => t.id).join(', ')}`);
+const BOARD_OUTFIT: Outfit = { ...DEFAULT_OUTFIT, board: boardTypeId, boardGraphic: boardType(boardTypeId).graphics[0]!.id };
+if (boardTypeId !== 'park') console.log(`(the ${boardTypeId} board)`);
+
 
 interface Ride {
   speed?: number;
@@ -107,7 +120,7 @@ const flat: Heightfield = {
 };
 
 function rideRig(r: Ride): SkierRig {
-  const view = new SkierView(new Scene(), flat);
+  const view = new SkierView(new Scene(), flat, BOARD_OUTFIT);
   view.setRide(true, false);
   const pose: SkierPose = createSkierPose();
   pose.center.set(0, CONFIG.air.comHeight, 0);
@@ -169,7 +182,7 @@ for (const [name, def, board] of STATES) {
   if (filter && !name.toLowerCase().includes(filter)) continue;
   let rig: SkierRig;
   if ('pelvis' in def) {
-    rig = new SkierRig();
+    rig = board ? new SkierRig(BOARD_OUTFIT) : new SkierRig();
     if (board) {
       rig.setBoard(true);
       const buffer = createPoseBuffer();
@@ -210,10 +223,14 @@ for (const [name, def, board] of STATES) {
   for (const m of [P.thighs[0]!, P.thighs[1]!, P.shins[0]!, P.shins[1]!, P.upperArms[0]!, P.upperArms[1]!]) add('head>limb', through(P.head, m));
   const collar = through(P.head, P.torso);
   if (board) {
+    // Points 3 cm over the base, nose to tail along the board's own shape
+    // (its rise and its setback: the board is built with its nose toward -X).
     let n = 0;
-    for (let x = -0.7; x <= 0.701; x += 0.05) {
+    const m = boardType(boardTypeId).model;
+    const half = m.length / 2 - 0.07;
+    for (let along = -half; along <= half + 0.001; along += 0.05) {
       for (let z = -0.1; z <= 0.101; z += 0.05) {
-        p.set(x, 0.03, z).applyMatrix4(P.board.matrixWorld);
+        p.set(-m.mount - along, riseAt(m, along) + 0.03, z).applyMatrix4(P.board.matrixWorld);
         for (const m of [P.torso, P.pelvis, ...P.thighs, ...P.shins, ...P.upperArms, ...P.forearms]) if (inside(m, p)) n++;
       }
     }

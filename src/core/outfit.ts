@@ -1,11 +1,14 @@
+import { BOARD_TYPES, boardGraphic, type BoardId } from './boards.ts';
 import { loadCustomSkis } from './customSkis.ts';
 import { SKI_TYPES, skiGraphic, type SkiId } from './skis.ts';
 import { readStored, writeStored } from './storage.ts';
 
 // The skier's look, picked in the Locker: a color for each part from one
 // shared palette, the headwear, a pattern for the jacket and the pants (in a
-// second palette color), the skis (type and graphic, see core/skis.ts) and
-// whether the skier carries poles. Saved locally as one versioned JSON entry; anything
+// second palette color), the skis (type and graphic, see core/skis.ts),
+// whether the skier carries poles, and since milestone 22 part 2 whether
+// they ride skis or a snowboard, regular or goofy, and the board (type and
+// graphic, core/boards.ts). Saved locally as one versioned JSON entry; anything
 // missing, unknown or unreadable falls back to the default, so a wiped or
 // blocked storage just means today's look.
 
@@ -83,7 +86,16 @@ export type Outfit = Record<ColorPart, string> & {
   ski: SkiId;
   skiGraphic: string;
   poles: boolean;
+  /** Skis or a snowboard (milestone 22 part 2; an older save rides skis). */
+  ride: Ride;
+  /** On a board: left foot forward (regular) or right (goofy). */
+  stance: Stance;
+  board: BoardId;
+  boardGraphic: string;
 };
+
+export type Ride = 'skis' | 'board';
+export type Stance = 'regular' | 'goofy';
 
 /** Today's look: matte black helmet, goggles and neck gaiter with a smoke lens, a plain charcoal shell, plain olive pants, gray boots and mittens, on park skis with lime tips, with poles. */
 export const DEFAULT_OUTFIT: Readonly<Outfit> = {
@@ -104,6 +116,10 @@ export const DEFAULT_OUTFIT: Readonly<Outfit> = {
   ski: 'park',
   skiGraphic: 'park-lime',
   poles: true,
+  ride: 'skis',
+  stance: 'regular',
+  board: 'park',
+  boardGraphic: 'board-park-stripes',
 };
 
 const KEY = 'outfit.v1';
@@ -153,6 +169,14 @@ export function outfitFrom(json: string | null): Outfit {
   if (ski) {
     out.ski = ski.id;
     out.skiGraphic = skiGraphic(ski.id, typeof saved.skiGraphic === 'string' ? saved.skiGraphic : '').id;
+  }
+  // Milestone 22 part 2's fields: missing (an older save) means skis, regular, the park board.
+  if (saved.ride === 'skis' || saved.ride === 'board') out.ride = saved.ride;
+  if (saved.stance === 'regular' || saved.stance === 'goofy') out.stance = saved.stance;
+  const board = BOARD_TYPES.find((b) => b.id === saved.board);
+  if (board) {
+    out.board = board.id;
+    out.boardGraphic = boardGraphic(board.id, typeof saved.boardGraphic === 'string' ? saved.boardGraphic : '').id;
   }
   return out;
 }

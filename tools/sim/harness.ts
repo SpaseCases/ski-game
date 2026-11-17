@@ -33,14 +33,24 @@ if (skiAt >= 0) {
 }
 // "--board [regular|goofy]" (milestone 22) rides a snowboard instead: the
 // board's multipliers (config.ts's boards block) and its two edges, rail
-// presses and trick names. Regular unless "goofy" follows.
+// presses and trick names. Regular unless "goofy" follows. With it,
+// "--board-type <park|freeride|carving>" picks the board (part 2; the park
+// board without it).
+const typeAt = process.argv.indexOf('--board-type');
+let boardType: keyof typeof CONFIG.boards = 'park';
+if (typeAt >= 0) {
+  const t = process.argv[typeAt + 1] ?? '';
+  if (!(t in CONFIG.boards)) throw new Error(`--board-type takes one of: ${Object.keys(CONFIG.boards).join(', ')}`);
+  boardType = t as keyof typeof CONFIG.boards;
+  process.argv.splice(typeAt, 2);
+}
 const boardAt = process.argv.indexOf('--board');
 if (boardAt >= 0) {
   const next = process.argv[boardAt + 1];
   const stance = next === 'regular' || next === 'goofy' ? next : 'regular';
-  setRide(true, stance === 'goofy');
+  setRide(true, stance === 'goofy', boardType);
   process.argv.splice(boardAt, next === stance ? 2 : 1);
-  console.log(`(on a snowboard, ${stance})`);
+  console.log(boardType === 'park' ? `(on a snowboard, ${stance})` : `(on a snowboard, ${stance}, the ${boardType} board)`);
 }
 
 /** A map built exactly as the game builds it. */

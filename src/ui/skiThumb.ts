@@ -1,7 +1,8 @@
-import { drawSki, SKI_TYPES, type Side, type SkiGraphic, type SkiType } from '../core/skis.ts';
+import { drawSki, SKI_TYPES, type Side, type SkiGraphic, type SkiModel } from '../core/skis.ts';
 
 // Flat pictures of skis for the Locker's rack and the ski editor, painted
-// cell by cell by the same painter as the 3D skis (core/skis.ts drawSki).
+// cell by cell by the same painter as the 3D skis (core/skis.ts drawSki);
+// a snowboard (milestone 22) is one "ski" of its own model.
 
 const MAX_HALF = Math.max(...SKI_TYPES.flatMap((t) => t.model.width.map(([, hw]) => hw)));
 const GAP = 3;
@@ -9,11 +10,12 @@ const GAP = 3;
 /**
  * Paints the pair seen from above (or their bases), tip to the right, the
  * left ski on top, at `pxPerM` canvas pixels per meter (or just the skis in
- * `sides`). Every ski type comes out the same height, so a rack lines up.
+ * `sides`). Every ski type comes out the same height, so a rack lines up
+ * (a board's rack passes its own widest half width, `maxHalf`).
  */
-export function paintSkis(canvas: HTMLCanvasElement, type: SkiType, g: SkiGraphic, base: boolean, pxPerM: number, sides: readonly Side[] = [-1, 1]): void {
+export function paintSkis(canvas: HTMLCanvasElement, type: { model: SkiModel }, g: SkiGraphic, base: boolean, pxPerM: number, sides: readonly Side[] = [-1, 1], maxHalf = MAX_HALF): void {
   const w = Math.round(type.model.length * pxPerM);
-  const skiH = Math.ceil(2 * MAX_HALF * pxPerM) + 1;
+  const skiH = Math.ceil(2 * maxHalf * pxPerM) + 1;
   const h = sides.length * (skiH + GAP) - GAP;
   canvas.width = w;
   canvas.height = h;

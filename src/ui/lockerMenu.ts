@@ -13,6 +13,7 @@ import {
   type Outfit,
   type Pattern,
 } from '../core/outfit.ts';
+import { BOARD_TYPES, boardGraphic, boardStats, boardType, type BoardId } from '../core/boards.ts';
 import { customGraphic, customId } from '../core/customSkis.ts';
 import {
   CUSTOM_SLOTS,
@@ -24,6 +25,7 @@ import {
   skiType,
   type SkiGraphic,
   type SkiId,
+  type SkiModel,
   type SkiStat,
   type SkiType,
 } from '../core/skis.ts';
@@ -40,14 +42,17 @@ import { paintSkis } from './skiThumb.ts';
 // per ski type (its side profile), a rack of its graphics (each pair of
 // skis drawn from the same data the 3D skis are painted from, top sheets
 // or bases), stat bars against the park ski, marked at the middle, and
-// the poles switch.
+// the poles switch. Since milestone 22 part 2 that tab is Ride: a Skis |
+// Board switch at its top; on Board the same rows show the three boards,
+// their graphics and stats (against the park board), and Regular | Goofy
+// stands where the poles switch is. Board custom slots come with the editor.
 
 export interface LockerHooks {
   get: () => Outfit;
   set: (outfit: Outfit) => void;
   /** The Locker opened (true) or closed or was covered (false). */
   shown: (open: boolean) => void;
-  /** The Skis tab is showing (the preview looks at the skis) or not. */
+  /** The Ride tab is showing (the preview looks at the skis or the board) or not. */
   skisShown: (skis: boolean) => void;
   /** Opens the ski editor on that ski's custom slot. */
   edit: (ski: SkiId, slot: number) => void;
@@ -58,6 +63,10 @@ const STAT_STEPS = 10;
 /** Thumbnails' scale: the longest ski fills this many CSS pixels. */
 const RACK_WIDTH = 300;
 const RACK_PX_PER_M = RACK_WIDTH / Math.max(...SKI_TYPES.map((t) => t.model.length));
+/** The boards' rack: the same scale, its thumbnails as tall as the widest board. */
+const BOARD_MAX_HALF = Math.max(...BOARD_TYPES.flatMap((t) => t.model.width.map(([, hw]) => hw)));
+const LONGEST_SKI = Math.max(...SKI_TYPES.map((t) => t.model.length));
+const LONGEST_BOARD = Math.max(...BOARD_TYPES.map((t) => t.model.length));
 /** A custom slot never painted: the ski's outline in the plank's hover blue. */
 const EMPTY_SLOT: SkiGraphic = { id: 'empty', name: 'Empty', base: '#2b5582', layers: [{ fill: '#2b5582' }] };
 
@@ -69,6 +78,12 @@ const OUTFIT_HINTS = [
 ] as const;
 const SKI_HINTS = [
   [['←', '→'], 'Choose a ski'],
+  [['↑', '↓'], 'Graphics'],
+  [['Enter'], 'Pick'],
+  [['Esc'], 'Back'],
+] as const;
+const BOARD_HINTS = [
+  [['←', '→'], 'Choose a board'],
   [['↑', '↓'], 'Graphics'],
   [['Enter'], 'Pick'],
   [['Esc'], 'Back'],
@@ -106,6 +121,15 @@ export class LockerScreen implements Screen {
   private readonly patterns = new Map<Garment, { name: HTMLElement; tiles: Map<Pattern, HTMLButtonElement>; accent: PaintRow }>();
   private readonly poleButtons: HTMLButtonElement[] = [];
   private readonly skiTiles = new Map<SkiId, HTMLButtonElement>();
+  /** Skis or Board, its board tiles, Regular / Goofy, and the rows only skis (or only a board) show. */
+  private readonly rideButtons: HTMLButtonElement[] = [];
+  private readonly boardTiles = new Map<BoardId, HTMLButtonElement>();
+  private readonly stanceButtons: HTMLButtonElement[] = [];
+  private readonly skiOnly: HTMLElement[] = [];
+  private readonly boardOnly: HTMLElement[] = [];
+  private readonly boardButtons = new Map<string, { button: HTMLButtonElement; board: BoardId }>();
+  private readonly lastBoardGraphic = new Map<BoardId, string>();
+  private statNote!: HTMLElement;
   private readonly graphicButtons = new Map<string, { button: HTMLButtonElement; ski: SkiId }>();
   private readonly statBars = new Map<SkiStat, HTMLElement>();
   /** The graphic last picked on each ski this visit, so switching type and back keeps it. */
@@ -148,7 +172,7 @@ export class LockerScreen implements Screen {
     tabRow.className = 'locker-tabs';
     tabRow.setAttribute('role', 'tablist');
     choices.appendChild(tabRow);
-    for (const [i, name] of ['Outfit', 'Skis'].entries()) {
+    for (const [i, name] of ['Outfit', 'Ride'].entries()) {
       const tab = document.createElement('button');
       tab.type = 'button';
       tab.className = 'locker-tab';
@@ -180,7 +204,7 @@ export class LockerScreen implements Screen {
     const o = this.hooks.get();
     if (this.onSkis()) {
       this.hooks.skisShown(true);
-      return this.skiTiles.get(o.ski) ?? null;
+      return (o.ride === 'board' ? this.boardTiles.get(o.board) : this.skiTiles.get(o.ski)) ?? null;
     }
     return this.headwear.get(o.headwear) ?? null;
   }
@@ -272,6 +296,13 @@ export class LockerScreen implements Screen {
   }
 
   private buildSkis(panel: HTMLElement): void {
+    // Skis or a snowboard.
+    const ride = switchRow('Ride', 'ride-row', [
+      ['Skis', () => this.pick({ ride: 'skis' })],
+      ['Board', () => this.pick({ ride: 'board' })],
+    ]);
+    this.rideButtons.push(...ride.buttons);
+
     const types = document.createElement('div');
     types.className = 'ski-types';
     types.setAttribute('role', 'group');
@@ -280,7 +311,7 @@ export class LockerScreen implements Screen {
       const tile = document.createElement('button');
       tile.type = 'button';
       tile.className = 'ski-tile';
-      tile.innerHTML = `<svg viewBox="0 0 100 26" aria-hidden="true"><path d="${profilePath(type)}"/></svg>`;
+      tile.innerHTML = `<svg viewBox="0 0 100 26" aria-hidden="true"><path d="${profilePath(type.model, LONGEST_SKI)}"/></svg>`;
       const name = document.createElement('span');
       name.textContent = type.name;
       tile.appendChild(name);
@@ -290,6 +321,26 @@ export class LockerScreen implements Screen {
       });
       types.appendChild(tile);
       this.skiTiles.set(type.id, tile);
+    }
+    // The boards, the same way.
+    const boards = document.createElement('div');
+    boards.className = 'ski-types';
+    boards.setAttribute('role', 'group');
+    boards.setAttribute('aria-label', 'Board');
+    for (const type of BOARD_TYPES) {
+      const tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = 'ski-tile';
+      tile.innerHTML = `<svg viewBox="0 0 100 26" aria-hidden="true"><path d="${profilePath(type.model, LONGEST_BOARD)}"/></svg>`;
+      const name = document.createElement('span');
+      name.textContent = type.name;
+      tile.appendChild(name);
+      tile.addEventListener('click', () => {
+        const o = this.hooks.get();
+        if (o.board !== type.id) this.pick({ board: type.id, boardGraphic: this.lastBoardGraphic.get(type.id) ?? type.graphics[0]!.id });
+      });
+      boards.appendChild(tile);
+      this.boardTiles.set(type.id, tile);
     }
     this.skiBlurb = document.createElement('p');
     this.skiBlurb.className = 'ski-blurb';
@@ -345,6 +396,27 @@ export class LockerScreen implements Screen {
         button.addEventListener('click', () => this.pick({ ski: type.id, skiGraphic: g.id }));
         rack.appendChild(button);
         this.graphicButtons.set(g.id, { button, ski: type.id });
+      }
+    }
+    for (const type of BOARD_TYPES) {
+      for (const g of type.graphics) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'ski-graphic';
+        button.setAttribute('aria-label', `${type.name} board: ${g.name}`);
+        for (const base of [false, true]) {
+          const canvas = document.createElement('canvas');
+          canvas.className = 'ski-thumb';
+          paintSkis(canvas, type, g, base, RACK_PX_PER_M, [1], BOARD_MAX_HALF);
+          button.appendChild(canvas);
+          this.thumbs.push({ canvas, base });
+        }
+        const label = document.createElement('span');
+        label.textContent = g.name;
+        button.appendChild(label);
+        button.addEventListener('click', () => this.pick({ board: type.id, boardGraphic: g.id }));
+        rack.appendChild(button);
+        this.boardButtons.set(g.id, { button, board: type.id });
       }
     }
 
@@ -408,9 +480,8 @@ export class LockerScreen implements Screen {
       stats.append(label, bar);
       this.statBars.set(id, bar);
     }
-    const note = document.createElement('p');
-    note.className = 'setting-note';
-    note.textContent = 'The mark in each bar is the park ski.';
+    this.statNote = document.createElement('p');
+    this.statNote.className = 'setting-note';
 
     // Poles: on, or off (Shift's push becomes a skating step).
     const poles = document.createElement('div');
@@ -439,7 +510,19 @@ export class LockerScreen implements Screen {
     polesNote.className = 'setting-note';
     polesNote.textContent = 'Without poles, Shift skates off one leg, then the other.';
 
-    panel.append(types, this.skiBlurb, head, rack, customBox, stats, note, poles, polesNote);
+    // On a board, where the poles switch is: which foot goes forward.
+    const stance = switchRow('Stance', 'stance-row', [
+      ['Regular', () => this.pick({ stance: 'regular' })],
+      ['Goofy', () => this.pick({ stance: 'goofy' })],
+    ]);
+    this.stanceButtons.push(...stance.buttons);
+    const stanceNote = document.createElement('p');
+    stanceNote.className = 'setting-note';
+    stanceNote.textContent = 'Regular rides left foot forward, goofy right foot forward. Riding backwards is fakie.';
+
+    this.skiOnly.push(types, customBox, poles, polesNote);
+    this.boardOnly.push(boards, stance.row, stanceNote);
+    panel.append(ride.row, types, boards, this.skiBlurb, head, rack, customBox, stats, this.statNote, poles, polesNote, stance.row, stanceNote);
   }
 
   /** Redraws the custom slots' thumbnails (they change in the editor). */
@@ -460,7 +543,7 @@ export class LockerScreen implements Screen {
   private showTab(index: number): void {
     this.tabs.forEach((t, i) => t.setAttribute('aria-selected', String(i === index)));
     this.panels.forEach((p, i) => (p.hidden = i !== index));
-    setHints(this.foot, index === 1 ? SKI_HINTS : OUTFIT_HINTS);
+    setHints(this.foot, index === 1 ? (this.hooks.get().ride === 'board' ? BOARD_HINTS : SKI_HINTS) : OUTFIT_HINTS);
     this.hooks.skisShown(index === 1);
   }
 
@@ -493,16 +576,32 @@ export class LockerScreen implements Screen {
     }
     this.poleButtons.forEach((b, i) => b.setAttribute('aria-pressed', String((i === 0) === o.poles)));
 
+    // Skis or the board: each side's rows, picks and stats.
+    const onBoard = o.ride === 'board';
+    this.rideButtons.forEach((b, i) => b.setAttribute('aria-pressed', String((i === 1) === onBoard)));
+    for (const el of this.skiOnly) el.hidden = onBoard;
+    for (const el of this.boardOnly) el.hidden = !onBoard;
+    this.stanceButtons.forEach((b, i) => b.setAttribute('aria-pressed', String((i === 1) === (o.stance === 'goofy'))));
+    if (this.onSkis()) setHints(this.foot, onBoard ? BOARD_HINTS : SKI_HINTS);
     const type = skiType(o.ski);
     const graphic = skiGraphic(o.ski, o.skiGraphic);
     this.lastGraphic.set(o.ski, graphic.id);
+    const bType = boardType(o.board);
+    const bGraphic = boardGraphic(o.board, o.boardGraphic);
+    this.lastBoardGraphic.set(o.board, bGraphic.id);
     for (const [id, tile] of this.skiTiles) tile.setAttribute('aria-pressed', String(o.ski === id));
+    for (const [id, tile] of this.boardTiles) tile.setAttribute('aria-pressed', String(o.board === id));
     for (const [id, { button, ski }] of this.graphicButtons) {
-      button.hidden = ski !== o.ski;
+      button.hidden = onBoard || ski !== o.ski;
       button.setAttribute('aria-pressed', String(id === graphic.id));
     }
-    this.skiBlurb.textContent = type.blurb;
-    this.skiGraphicName.textContent = graphic.name;
+    for (const [id, { button, board }] of this.boardButtons) {
+      button.hidden = !onBoard || board !== o.board;
+      button.setAttribute('aria-pressed', String(id === bGraphic.id));
+    }
+    this.skiBlurb.textContent = onBoard ? bType.blurb : type.blurb;
+    this.skiGraphicName.textContent = onBoard ? bGraphic.name : graphic.name;
+    this.statNote.textContent = onBoard ? 'The mark in each bar is the park board.' : 'The mark in each bar is the park ski.';
     this.faceButtons.forEach((b, i) => b.setAttribute('aria-pressed', String((i === 1) === this.showBases)));
     for (const { canvas, base } of this.thumbs) canvas.hidden = base !== this.showBases;
     for (const [ski, row] of this.customRows) row.hidden = ski !== o.ski;
@@ -510,7 +609,7 @@ export class LockerScreen implements Screen {
       c.button.setAttribute('aria-pressed', String(c.ski === o.ski && customId(c.ski, c.slot) === graphic.id));
       for (const { canvas, base } of c.thumbs) canvas.hidden = base !== this.showBases;
     }
-    const stats = skiStats(o.ski);
+    const stats = onBoard ? boardStats(o.board) : skiStats(o.ski);
     for (const [id, bar] of this.statBars) {
       const steps = statSteps(stats[id]);
       bar.setAttribute('aria-valuenow', String(steps));
@@ -557,6 +656,30 @@ function paintRow(name: string, onPick: (hex: string) => void): PaintRow {
   return { row, name: chosen, chips };
 }
 
+/** A labelled row of segment buttons (like the poles switch), each calling its pick. */
+function switchRow(name: string, className: string, options: readonly (readonly [string, () => void])[]): { row: HTMLElement; buttons: HTMLButtonElement[] } {
+  const row = document.createElement('div');
+  row.className = `poles-row ${className}`;
+  const label = document.createElement('span');
+  label.className = 'stat-name';
+  label.textContent = name;
+  const group = document.createElement('div');
+  group.className = 'segmented poles-switch';
+  group.setAttribute('role', 'group');
+  group.setAttribute('aria-label', name);
+  const buttons = options.map(([text, onPick]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'segment';
+    b.textContent = text;
+    b.addEventListener('click', onPick);
+    group.appendChild(b);
+    return b;
+  });
+  row.append(label, group);
+  return { row, buttons };
+}
+
 /** A small flat drawing of a pattern in the garment's colors, for its tile (roughly as the 3D garment paints it). */
 function patternSwatch(pattern: Pattern, base: string, accent: string): string {
   let art = '';
@@ -593,11 +716,9 @@ function statSteps(stat: number): number {
   return Math.round(Math.min(1, Math.max(1 / STAT_STEPS, share)) * STAT_STEPS);
 }
 
-/** The ski seen side on, its rise exaggerated, as an SVG path in a 100 x 26 box (tip to the right). */
-function profilePath(type: SkiType): string {
-  const m = type.model;
+/** A ski (or a board) seen side on, its rise exaggerated, as an SVG path in a 100 x 26 box (tip to the right), scaled so the `longest` fills it. */
+function profilePath(m: SkiModel, longest: number): string {
   const half = m.length / 2;
-  const longest = Math.max(...SKI_TYPES.map((t) => t.model.length));
   const scale = 96 / longest;
   const lift = 90;
   const steps = 40;

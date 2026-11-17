@@ -2766,3 +2766,14 @@ body {
     max-width: 14em;
   }
 }
+
+/* Ride tab (milestone 22 part 2): Skis or Board at the top; on a board, Regular or Goofy where the poles switch is. */
+.poles-row.ride-row {
+  margin: 0 0 10px;
+}
+
+/* The rows only skis (or only a board) show: their display would override `hidden`. */
+.ski-types[hidden],
+.poles-row[hidden] {
+  display: none;
+}

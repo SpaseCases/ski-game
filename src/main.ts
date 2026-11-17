@@ -6,6 +6,7 @@ import { startLoop } from './core/loop.ts';
 import { PointerOrbit } from './core/pointerOrbit.ts';
 import { bestCombo, submitCombo } from './core/bests.ts';
 import { customSkisText, paintedSlots, setCustomSkisText } from './core/customSkis.ts';
+import { BOARD_TYPES, mainColor, type BoardId } from './core/boards.ts';
 import { HEADWEAR, loadOutfit, outfitFrom, PALETTE, PATTERNS, saveOutfit, type Outfit } from './core/outfit.ts';
 import { SKI_TYPES } from './core/skis.ts';
 import {
@@ -87,9 +88,13 @@ const settings = loadSettings();
 /** The skier's look from the Locker. */
 let outfit: Outfit = loadOutfit();
 setSkiScale(CONFIG.skis[outfit.ski]);
-// A snowboard (milestone 22) until the Locker offers one (part 2): ?board=regular or ?board=goofy rides one this visit.
+// Skis or the snowboard, as the Locker saved it (milestone 22). For testing,
+// ?board=regular or ?board=goofy rides the saved board this visit, and
+// ?board=skis rides skis; not saved unless the Locker then changes something.
 const urlBoard = new URLSearchParams(window.location.search).get('board');
-if (urlBoard === 'regular' || urlBoard === 'goofy' || urlBoard === '1') setRide(true, urlBoard === 'goofy');
+if (urlBoard === 'regular' || urlBoard === 'goofy' || urlBoard === '1') outfit = { ...outfit, ride: 'board', stance: urlBoard === 'goofy' ? 'goofy' : 'regular' };
+else if (urlBoard === 'skis' || urlBoard === '0') outfit = { ...outfit, ride: 'skis' };
+setRide(outfit.ride === 'board', outfit.stance === 'goofy', outfit.board);
 /** The preset in use: the saved one, unless the URL names one for this visit. */
 let quality: Quality = urlQuality() ?? settings.quality;
 /** Auto's rung: one better than where it settled last visit (skipping rungs that draw the same here), stepping down while riding if frames are slow. */
@@ -265,6 +270,7 @@ const cheatsScreen = new CheatsScreen(
 );
 // The Locker and the ski editor: the preview draws through a hole in the menu while either is open (see drawLocker).
 const lockerStage = new LockerStage(outfit);
+lockerStage.setRide(RIDE.board, RIDE.goofy);
 /** The screen whose window shows the preview, or null. */
 let stageScreen: { viewRect(): Rect } | null = null;
 /** A custom ski was painted: rebuild the skis on the next preview frame. */
@@ -297,7 +303,7 @@ const lockerScreen = new LockerScreen(
 );
 const skiEditor = new SkiEditorScreen(
   {
-    wear: (ski, graphic) => setOutfit({ ...outfit, ski, skiGraphic: graphic }),
+    wear: (ski, graphic) => setOutfit({ ...outfit, ride: 'skis', ski, skiGraphic: graphic }),
     repaint: () => (skisDirty = true),
     shown: (open) => {
       if (open) lockerStage.showSkis(true);
@@ -334,6 +340,7 @@ function loadOnline(): Promise<Online> {
           headwear: HEADWEAR.map((h) => h.id),
           patterns: PATTERNS.map((x) => x.id),
           skis: SKI_TYPES.map((x) => x.id),
+          boards: BOARD_TYPES.map((t) => ({ id: t.id, graphics: t.graphics.map((g) => g.id), colors: t.graphics.map((g) => mainColor(t, g)) })),
         },
         finishSlot: runHud.boardSlot,
         back: () => menus.back(),
@@ -701,14 +708,24 @@ function openLocker(): void {
   menus.push(lockerScreen);
 }
 
-/** A new look from the Locker: on the skier at once (and the preview), and saved. */
-function setOutfit(next: Outfit): void {
+/** A new look from the Locker: on the skier at once (and the preview), and saved (unless `save` is false: the dev hook). */
+function setOutfit(next: Outfit, save = true): void {
   outfit = next;
-  saveOutfit(outfit);
+  if (save) saveOutfit(outfit);
   setSkiScale(CONFIG.skis[outfit.ski]);
   skierView?.rig.setOutfit(outfit);
   lockerStage.setOutfit(outfit);
   sound.setPoles(outfit.poles);
+  // Skis or the board (milestone 22): the sim's multipliers, edges and names, the rig, the stage.
+  const board = outfit.ride === 'board';
+  const goofy = board && outfit.stance === 'goofy';
+  if (board !== RIDE.board || goofy !== RIDE.goofy || (board && outfit.board !== RIDE.type)) {
+    // A combo under way ends with what it was ridden on.
+    if (scoring()) endCombo(score, skier);
+    setRide(board, goofy, outfit.board);
+    skierView?.setRide(board, goofy);
+    lockerStage.setRide(board, goofy);
+  }
 }
 
 /**
@@ -979,11 +996,9 @@ if (import.meta.env.DEV) {
       respawn,
       backToTop,
       teleport,
-      /** Rides a snowboard (regular, or goofy) or skis (milestone 22; ?board=regular|goofy does it from the start). */
-      setRide: (board: boolean, goofy = false) => {
-        if (scoring()) endCombo(score, skier);
-        setRide(board, goofy);
-        skierView?.setRide(board, goofy);
+      /** Rides a snowboard (regular, or goofy; optionally of a type: park, freeride, carving) or skis, this visit only (milestone 22; ?board=regular|goofy|skis does it from the start; the Locker saves it). */
+      setRide: (board: boolean, goofy = false, type?: BoardId) => {
+        setOutfit({ ...outfit, ride: board ? 'board' : 'skis', stance: board ? (goofy ? 'goofy' : 'regular') : outfit.stance, board: type && type in CONFIG.boards ? type : outfit.board }, false);
       },
       /** Posts a score to its online board as a banked best or a finished course would (use ?boards=test). */
       postScore,

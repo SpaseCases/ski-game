@@ -3,8 +3,12 @@ import type { Outfit } from '../core/outfit.ts';
 // The skier's look posted with each score and drawn beside the name as a
 // tiny figure (20 × 24). A look is 13 characters, one per part: palette
 // colors as letters (a is PALETTE[0]), headwear, patterns and the ski type as
-// digits. The API allows [a-z0-9]{0,24} (LOOK_FORMAT). Anything unreadable draws
-// as the default look's color, so a bad or old look never breaks a board.
+// digits. Since milestone 22 part 2, three more digits: the ride (0 skis, else
+// 1 + the board type's index), the stance (0 regular, 1 goofy) and the
+// board graphic's index; a 13-character look rides skis, and an older game
+// reads only the first 13 (skis). The API allows [a-z0-9]{0,24}
+// (LOOK_FORMAT). Anything unreadable draws as the default look's color, so
+// a bad or old look never breaks a board.
 // The palette and lists come from main (setLookTables): importing
 // core/outfit.ts here would split it, with config.ts, into a chunk of its
 // own that the first load would then fetch.
@@ -15,9 +19,11 @@ export interface LookTables {
   headwear: readonly string[];
   patterns: readonly string[];
   skis: readonly string[];
+  /** BOARD_TYPES in order: each one's id, its graphics' ids and their main colors (core/boards.ts mainColor). */
+  boards: readonly { id: string; graphics: readonly string[]; colors: readonly string[] }[];
 }
 
-let tables: LookTables = { palette: ['#2c3037'], headwear: ['helmet'], patterns: ['plain'], skis: ['park'] };
+let tables: LookTables = { palette: ['#2c3037'], headwear: ['helmet'], patterns: ['plain'], skis: ['park'], boards: [] };
 
 export function setLookTables(t: LookTables): void {
   tables = t;
@@ -33,12 +39,16 @@ function digits(part: Part): readonly string[] | null {
 }
 
 export function encodeLook(o: Outfit): string {
-  return PARTS.map((part) => {
+  const parts = PARTS.map((part) => {
     const list = digits(part);
     if (list) return String(Math.max(0, list.indexOf(String(o[part]))));
     const i = tables.palette.indexOf(String(o[part]));
     return String.fromCharCode(97 + Math.max(0, i));
   }).join('');
+  // The ride, stance and board graphic (milestone 22 part 2), after the old 13.
+  const type = Math.max(0, tables.boards.findIndex((b) => b.id === o.board));
+  const graphic = Math.max(0, tables.boards[type]?.graphics.indexOf(o.boardGraphic) ?? 0);
+  return `${parts}${o.ride === 'board' ? type + 1 : 0}${o.stance === 'goofy' ? 1 : 0}${graphic}`;
 }
 
 interface Look {
@@ -47,6 +57,8 @@ interface Look {
   pantsPattern: string;
   headwear: string;
   ski: string;
+  /** On a board: the board graphic's main color (null on skis). */
+  board: string | null;
 }
 
 function decode(look: string): Look {
@@ -58,7 +70,10 @@ function decode(look: string): Look {
     if (list) picks[part] = list[Number(ch)] ?? list[0]!;
     else colors[part] = tables.palette[ch.charCodeAt(0) - 97] ?? tables.palette[0]!;
   });
-  return { colors, jacketPattern: picks.jacketPattern!, pantsPattern: picks.pantsPattern!, headwear: picks.headwear!, ski: picks.ski! };
+  // A 13-character look, or a ride this game doesn't know, rides skis.
+  const type = tables.boards[Number(look.charAt(PARTS.length)) - 1];
+  const board = type ? (type.colors[Number(look.charAt(PARTS.length + 2))] ?? type.colors[0] ?? SKI) : null;
+  return { colors, jacketPattern: picks.jacketPattern!, pantsPattern: picks.pantsPattern!, headwear: picks.headwear!, ski: picks.ski!, board };
 }
 
 const PUMPKIN = '#e8761e';
@@ -66,14 +81,17 @@ const SKI = '#d5dbe2';
 
 /** The tiny skier for a look, as SVG markup (it holds only colors from the palette, never posted text). */
 export function lookSvg(look: string): string {
-  const { colors: c, jacketPattern, pantsPattern, headwear, ski } = decode(look);
+  const { colors: c, jacketPattern, pantsPattern, headwear, ski, board } = decode(look);
   const p: string[] = [];
   const rect = (x: number, y: number, w: number, h: number, fill: string): void => {
     p.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}"/>`);
   };
-  // The skis: longer for the big-mountain ski.
-  const half = ski === 'big' ? 9.6 : 8.4;
-  rect(10 - half, 22.2, half * 2, 1.4, SKI);
+  // A snowboard under both boots, in its graphic's main color with a dark edge; or the skis, longer for the big-mountain ski.
+  if (board) p.push(`<rect x="1.4" y="21.9" width="17.2" height="2" rx="1" fill="${board}" stroke="#1b1d21" stroke-width="0.5"/>`);
+  else {
+    const half = ski === 'big' ? 9.6 : 8.4;
+    rect(10 - half, 22.2, half * 2, 1.4, SKI);
+  }
   // A hood sits behind the head, in the jacket's color.
   if (headwear === 'hood') p.push(`<circle cx="10" cy="5" r="4.4" fill="${c.jacket}"/>`);
   // Legs and boots.

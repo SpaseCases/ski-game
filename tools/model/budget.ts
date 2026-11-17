@@ -5,6 +5,7 @@
 
 import { Mesh, type BufferGeometry } from 'three';
 import { DEFAULT_OUTFIT, HEADWEAR, PATTERNS, type Outfit } from '../../src/core/outfit.ts';
+import { BOARD_TYPES } from '../../src/core/boards.ts';
 import { SKI_TYPES } from '../../src/core/skis.ts';
 import { SkierRig } from '../../src/render/skierRig.ts';
 
@@ -63,3 +64,20 @@ for (const { id: headwear } of HEADWEAR) {
 const b = count(DEFAULT_OUTFIT, true);
 console.log(`snowboard (default look)     ${String(b.calls).padStart(2)} draw calls, ${String(b.tris).padStart(5)} triangles`);
 console.log(`snowboard: most draw calls: ${boardCalls}; most triangles: ${boardWorst.tris} (${boardWorst.name})`);
+
+// Each board type in each of its graphics (milestone 22 part 2), in the
+// default look, then that board with the worst outfit. Last again.
+for (const t of BOARD_TYPES) {
+  for (const g of t.graphics) {
+    const c = count({ ...DEFAULT_OUTFIT, board: t.id, boardGraphic: g.id }, true);
+    console.log(`board ${t.id}: ${g.name.padEnd(16)} ${String(c.calls).padStart(2)} draw calls, ${String(c.tris).padStart(5)} triangles`);
+  }
+}
+let typeWorst = { name: '', tris: 0, calls: 0 };
+for (const t of BOARD_TYPES) {
+  for (const g of t.graphics) {
+    const c = count({ ...DEFAULT_OUTFIT, headwear: 'hood', jacketPattern: 'plaid', pantsPattern: 'plaid', board: t.id, boardGraphic: g.id }, true);
+    if (c.tris > typeWorst.tris) typeWorst = { name: `hood, plaid, ${t.id} board, ${g.name}`, tris: c.tris, calls: c.calls };
+  }
+}
+console.log(`every board: most triangles: ${typeWorst.tris} (${typeWorst.name}), ${typeWorst.calls} draw calls`);

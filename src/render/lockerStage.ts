@@ -5,6 +5,7 @@ import {
   Color,
   CylinderGeometry,
   DirectionalLight,
+  Group,
   HemisphereLight,
   Mesh,
   MeshBasicMaterial,
@@ -20,6 +21,8 @@ import type { Outfit } from '../core/outfit.ts';
 import { insideObstacle, type Obstacles } from '../sim/obstacles.ts';
 import { heightAt } from '../sim/terrain.ts';
 import type { Heightfield } from '../maps/types.ts';
+import { BOARD_STANCE } from './boardPoses.ts';
+import { createPoseBuffer, setPose } from './poseBlend.ts';
 import { renderFrame, type View } from './scene.ts';
 import { STANCE } from './skierPoses.ts';
 import { SkierRig } from './skierRig.ts';
@@ -35,8 +38,11 @@ const sight = new Vector3();
 // canvas (a scissored viewport on the one WebGLRenderer, never a second
 // context): from the title, a small stage of its own (the skier on a snow
 // plinth against a winter sky, turning slowly); from pause, the paused world
-// itself, with the camera circling the real skier. On the Skis tab the
-// camera looks down at the skis instead of the whole skier.
+// itself, with the camera circling the real skier. On the Ride tab the
+// camera looks down at the skis (or the board) instead of the whole skier.
+// On a snowboard (milestone 22 part 2) the stage's rig rides it too: the
+// board stance, turned across the board and mirrored for goofy as
+// SkierView does.
 
 
 export interface Rect {
@@ -50,7 +56,12 @@ export class LockerStage {
   private readonly scene = new Scene();
   private readonly camera = new PerspectiveCamera(30, 1, 0.1, 40);
   private rig: SkierRig | null = null;
+  /** The turntable (turned by the angle), and inside it the stance (across the board, as SkierView's). */
+  private readonly turntable = new Group();
+  private readonly stance = new Group();
   private outfit: Outfit;
+  private board = false;
+  private goofy = false;
   private angle = 0.6;
   /** Real seconds turned times the turn rate, never wrapped: drives the swing across an open arc. */
   private swing = 0;
@@ -77,6 +88,26 @@ export class LockerStage {
     this.rig?.setOutfit(outfit);
   }
 
+  /** Skis, or a snowboard ridden regular or goofy (the stage's own rig; the paused world draws the game's). */
+  setRide(board: boolean, goofy: boolean): void {
+    this.board = board;
+    this.goofy = board && goofy;
+    if (this.rig) this.poseRig();
+  }
+
+  /** The rig's feet, board and standing pose for the ride, and the stance group across the board. */
+  private poseRig(): void {
+    const rig = this.rig!;
+    rig.setBoard(this.board);
+    if (this.board) {
+      const pose = createPoseBuffer();
+      setPose(pose, BOARD_STANCE);
+      rig.apply(pose);
+    } else rig.apply(STANCE);
+    this.stance.rotation.y = this.board ? (this.goofy ? Math.PI / 2 : -Math.PI / 2) : 0;
+    this.stance.scale.x = this.goofy ? -1 : 1;
+  }
+
   /** Rebuilds the skis (a custom graphic was painted). */
   repaintSkis(): void {
     this.rig?.repaintSkis();
@@ -96,9 +127,10 @@ export class LockerStage {
   /** The stage on its own (no map loaded): built the first time it's needed. */
   renderStage(renderer: WebGLRenderer, rect: Rect): void {
     if (!this.rig) this.build();
-    this.rig!.root.rotation.y = -this.angle;
-    this.rig!.root.updateMatrix();
-    this.rig!.root.updateMatrixWorld(true);
+    this.turntable.rotation.y = -this.angle;
+    this.stance.updateMatrix();
+    this.turntable.updateMatrix();
+    this.turntable.updateMatrixWorld(true);
     this.aim.set(0, this.skis ? CONFIG.locker.skiAim : 0.85, 0);
     // A turntable: the skier turns under a still camera and sun.
     this.place(rect, CONFIG.locker.stageAngle);
@@ -219,9 +251,11 @@ export class LockerStage {
 
   private build(): void {
     const rig = new SkierRig(this.outfit);
-    rig.apply(STANCE);
     this.rig = rig;
-    this.scene.add(rig.root);
+    this.poseRig();
+    this.stance.add(rig.root);
+    this.turntable.add(this.stance);
+    this.scene.add(this.turntable);
 
     // Sky: a gradient on the inside of a sphere, pale near the snow, deeper blue overhead.
     const sky = new SphereGeometry(20, 16, 10);

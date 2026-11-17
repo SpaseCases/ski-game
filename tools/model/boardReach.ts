@@ -11,10 +11,22 @@ import { SkierRig } from '../../src/render/skierRig.ts';
 import type { PoseDef } from '../../src/render/skierPoses.ts';
 import { GRAB_ACTIONS } from '../../src/core/input.ts';
 import { Quaternion, Vector3 } from 'three';
+import { BOARD_TYPES, boardType, type BoardId } from '../../src/core/boards.ts';
+import { DEFAULT_OUTFIT, type Outfit } from '../../src/core/outfit.ts';
+
+// "--board-type <park|freeride|carving>" (milestone 22 part 2) checks that
+// board in its first graphic (the park board without it, so the output
+// stays the same). Taken out of the arguments before they're read.
+const typeAt = process.argv.indexOf('--board-type');
+const boardTypeId = (typeAt >= 0 ? process.argv.splice(typeAt, 2)[1] : 'park') as BoardId;
+if (!BOARD_TYPES.some((t) => t.id === boardTypeId)) throw new Error(`--board-type takes one of: ${BOARD_TYPES.map((t) => t.id).join(', ')}`);
+const BOARD_OUTFIT: Outfit = { ...DEFAULT_OUTFIT, board: boardTypeId, boardGraphic: boardType(boardTypeId).graphics[0]!.id };
+if (boardTypeId !== 'park') console.log(`(the ${boardTypeId} board)`);
+
 
 const want = new Vector3();
 
-const rig = new SkierRig();
+const rig = new SkierRig(BOARD_OUTFIT);
 rig.setBoard(true);
 const buffer = createPoseBuffer();
 const poses: [string, PoseDef][] = [

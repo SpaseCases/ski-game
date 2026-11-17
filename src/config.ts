@@ -1101,8 +1101,10 @@ export const CONFIG = {
   /**
    * Snowboards (milestone 22): like `skis`, the board multiplies these
    * numbers in their blocks above (before any cheat), in place of the ski's.
-   * One board for now (the user's pick). Spins and flips are left alone so
-   * the Park's 720 jumps still clear.
+   * Three boards like the three skis (the Locker, part 2). The park
+   * board's spins and flips are left alone so the Park's 720 jumps still
+   * clear; the freeride and carving boards add the big-mountain and
+   * carving skis' multipliers to the park board's (a 720 still fits).
    */
   boards: {
     /**
@@ -1115,7 +1117,7 @@ export const CONFIG = {
      * parks' biggest jumps at 24 m/s (a new impact crash) and onto the hips'
      * landings sideways at 6 m/s, which the ski clears.
      */
-    board: {
+    park: {
       skier: {
         toeEdge: 1.1,
         heelEdge: 0.9,
@@ -1125,6 +1127,34 @@ export const CONFIG = {
         butterGrip: 1.5,
         popMin: 1.05,
       },
+    },
+    /** The park board's edges and pivots, with the big-mountain ski's drops and landings and slower spins. */
+    freeride: {
+      skier: { toeEdge: 1.1, heelEdge: 0.9, skidFriction: 1.3, turnRateSlow: 1.15, butterGrip: 1.5, popMin: 1.05 },
+      landing: { impactMax: 1.3, pitchMax: 1.35 },
+      air: { spinRate: 0.85, flipRate: 0.85, lincolnRate: 0.85 },
+    },
+    /** The park board's edges and pivots, with the carving ski's grip, speed, stiff landings, slower spins and twitchy fakie. */
+    carving: {
+      skier: {
+        toeEdge: 1.1,
+        heelEdge: 0.9,
+        skidFriction: 1.3,
+        turnRateSlow: 1.15,
+        butterGrip: 1.5,
+        popMin: 1.05,
+        grip: 1.3,
+        carveFriction: 0.5,
+        turnRateFast: 1.3,
+        skiFriction: 0.8,
+        dragStand: 0.9,
+        dragCrouch: 0.9,
+        dragAir: 0.9,
+        switchGrip: 0.6,
+        switchEdgeHold: 0.6,
+      },
+      landing: { impactMax: 0.85, pitchMax: 0.75 },
+      air: { spinRate: 0.8, flipRate: 0.8, lincolnRate: 0.8 },
     },
   },
 

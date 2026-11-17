@@ -23,7 +23,7 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DEFAULT_OUTFIT, GARMENTS, type Garment, type Outfit, type Pattern } from '../core/outfit.ts';
-import { BOARD_GRAPHIC, BOARD_MODEL } from '../core/boards.ts';
+import { boardGraphic, boardType } from '../core/boards.ts';
 import { skiGraphic, skiType, type Side } from '../core/skis.ts';
 import { BINDINGS, BINDING_YAW } from './boardPoses.ts';
 import { clothMaterial } from './cloth.ts';
@@ -227,7 +227,7 @@ export class SkierRig {
       const side = i === 0 ? -1 : 1;
       swap([m], on ? buildBoardFoot(side, boots) : buildFoot(side, boots, buildSki(this.outfit, side)));
     });
-    swap([this.board], on ? buildBoard() : new BufferGeometry());
+    swap([this.board], on ? buildBoard(this.outfit) : new BufferGeometry());
     this.board.visible = on;
     this.setPoles();
   }
@@ -266,6 +266,7 @@ export class SkierRig {
       this.setHeadwear();
     }
     if (changed('poles')) this.setPoles();
+    if (this.boardMode && changed('board', 'boardGraphic')) swap([this.board], buildBoard(next));
   }
 
   /** Rebuilds the skis from their graphic as it is now (a custom graphic changes in the editor but keeps its id). */
@@ -2145,8 +2146,8 @@ function buildBoardFoot(side: number, boot: Color): BufferGeometry {
 }
 
 /** The snowboard, built regular: its base on the snow at y = 0, its nose toward -X (see render/boardPoses.ts). */
-function buildBoard(): BufferGeometry {
-  return buildSkiGeometry(BOARD_MODEL, BOARD_GRAPHIC, 1).rotateY(Math.PI / 2);
+function buildBoard(outfit: Outfit): BufferGeometry {
+  return buildSkiGeometry(boardType(outfit.board).model, boardGraphic(outfit.board, outfit.boardGraphic), 1).rotateY(Math.PI / 2);
 }
 
 /** Lower boot shell: a box that narrows and drops toward a rounded toe. */
