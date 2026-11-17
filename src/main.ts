@@ -5,10 +5,10 @@ import { createInputState, Keyboard, type Bindings } from './core/input.ts';
 import { startLoop } from './core/loop.ts';
 import { PointerOrbit } from './core/pointerOrbit.ts';
 import { bestCombo, submitCombo } from './core/bests.ts';
-import { customSkisText, paintedSlots, setCustomSkisText } from './core/customSkis.ts';
+import { gearBoard, loadCustomSkis, lookSkisText, paintedSlots, setCustomSkisText } from './core/customSkis.ts';
 import { BOARD_TYPES, mainColor, type BoardId } from './core/boards.ts';
 import { HEADWEAR, loadOutfit, outfitFrom, PALETTE, PATTERNS, saveOutfit, type Outfit } from './core/outfit.ts';
-import { SKI_TYPES } from './core/skis.ts';
+import { SKI_TYPES, type SkiId } from './core/skis.ts';
 import {
   clampRung,
   decorDensity,
@@ -85,6 +85,8 @@ import { drawMapArt, TrailMap, type MapArt } from './ui/trailMap.ts';
 const app = byId('app');
 const hud = byId('hud');
 const settings = loadSettings();
+// The custom slots first, so the outfit can wear a custom ski or board graphic.
+loadCustomSkis();
 /** The skier's look from the Locker. */
 let outfit: Outfit = loadOutfit();
 setSkiScale(CONFIG.skis[outfit.ski]);
@@ -273,7 +275,7 @@ const lockerStage = new LockerStage(outfit);
 lockerStage.setRide(RIDE.board, RIDE.goofy);
 /** The screen whose window shows the preview, or null. */
 let stageScreen: { viewRect(): Rect } | null = null;
-/** A custom ski was painted: rebuild the skis on the next preview frame. */
+/** A custom ski or board was painted: rebuild the skis (or the board) on the next preview frame. */
 let skisDirty = false;
 function showStage(screen: { viewRect(): Rect } | null): void {
   stageScreen = screen;
@@ -294,8 +296,8 @@ const lockerScreen = new LockerScreen(
     set: setOutfit,
     skisShown: (on) => lockerStage.showSkis(on),
     shown: (open) => showStage(open ? lockerScreen : null),
-    edit: (ski, slot) => {
-      skiEditor.open(ski, slot);
+    edit: (gear, slot) => {
+      skiEditor.open(gear, slot);
       menus.push(skiEditor);
     },
   },
@@ -303,7 +305,10 @@ const lockerScreen = new LockerScreen(
 );
 const skiEditor = new SkiEditorScreen(
   {
-    wear: (ski, graphic) => setOutfit({ ...outfit, ride: 'skis', ski, skiGraphic: graphic }),
+    wear: (gear, graphic) => {
+      const board = gearBoard(gear);
+      setOutfit(board ? { ...outfit, ride: 'board', board, boardGraphic: graphic } : { ...outfit, ride: 'skis', ski: gear as SkiId, skiGraphic: graphic });
+    },
     repaint: () => (skisDirty = true),
     shown: (open) => {
       if (open) lockerStage.showSkis(true);
@@ -430,7 +435,7 @@ let lookName = settings.name;
 let lookSaved = lookText();
 
 function lookText(): string {
-  return `${JSON.stringify(outfit)}\n${customSkisText()}`;
+  return `${JSON.stringify(outfit)}\n${lookSkisText()}`;
 }
 
 /** The title's name box was finished with `name` saved: offer the look saved online under it. */
@@ -470,7 +475,7 @@ function saveLookOnline(always: boolean): void {
   if (!name || (!always && text === lookSaved)) return;
   lookSaved = text;
   loadOnline()
-    .then((o) => o.saveLook({ name, outfit: JSON.stringify(outfit), skis: customSkisText() }))
+    .then((o) => o.saveLook({ name, outfit: JSON.stringify(outfit), skis: lookSkisText() }))
     .catch(() => {
       // Offline: try again the next time the Locker closes.
       lookSaved = '';

@@ -6,6 +6,7 @@
 import { Mesh, type BufferGeometry } from 'three';
 import { DEFAULT_OUTFIT, HEADWEAR, PATTERNS, type Outfit } from '../../src/core/outfit.ts';
 import { BOARD_TYPES } from '../../src/core/boards.ts';
+import { boardGear, customFace, customId } from '../../src/core/customSkis.ts';
 import { SKI_TYPES } from '../../src/core/skis.ts';
 import { SkierRig } from '../../src/render/skierRig.ts';
 
@@ -81,3 +82,19 @@ for (const t of BOARD_TYPES) {
   }
 }
 console.log(`every board: most triangles: ${typeWorst.tris} (${typeWorst.name}), ${typeWorst.calls} draw calls`);
+
+// A custom board (milestone 23) at its worst: the top and the base painted
+// as a checkerboard, so no two cells in a row share a color and every cell
+// is its own face. On each board type, in the default look and with the
+// worst outfit. Last again, so every line above stays the same.
+for (const t of BOARD_TYPES) {
+  const gear = boardGear(t.id);
+  for (const face of ['top', 'base'] as const) {
+    const { rows, cols, cells } = customFace(gear, 0, face);
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cells[r * cols + c] = (r + c) % 2 === 0 ? 0 : 5;
+  }
+  const o = { ...DEFAULT_OUTFIT, board: t.id, boardGraphic: customId(gear, 0) };
+  const c = count(o, true);
+  const w = count({ ...o, headwear: 'hood', jacketPattern: 'plaid', pantsPattern: 'plaid' }, true);
+  console.log(`custom board ${t.id.padEnd(9)} checkerboard ${String(c.calls).padStart(2)} draw calls, ${String(c.tris).padStart(5)} triangles; hood, plaid ${String(w.tris).padStart(5)}`);
+}

@@ -1500,6 +1500,11 @@ body {
   margin-left: 6px;
 }
 
+/* A board has no Left / Right / Same on both / Side by side: the group hides (its flex display beats `hidden`). */
+.segmented.editor-segments[hidden] {
+  display: none;
+}
+
 .editor-segments > .key {
   margin-left: 4px;
 }

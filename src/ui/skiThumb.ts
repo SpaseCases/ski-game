@@ -6,6 +6,8 @@ import { drawSki, SKI_TYPES, type Side, type SkiGraphic, type SkiModel } from '.
 
 const MAX_HALF = Math.max(...SKI_TYPES.flatMap((t) => t.model.width.map(([, hw]) => hw)));
 const GAP = 3;
+/** Hex colors as 0xRRGGBB, parsed once (the painter gives one per pixel). */
+const RGB = new Map<string, number>();
 
 /**
  * Paints the pair seen from above (or their bases), tip to the right, the
@@ -26,9 +28,11 @@ export function paintSkis(canvas: HTMLCanvasElement, type: { model: SkiModel }, 
     drawSki(type, g, side, base, pxPerM, row * (skiH + GAP) + skiH / 2, (x, y, hex) => {
       if (x >= w || y < 0 || y >= h) return;
       const i = (y * w + x) * 4;
-      img.data[i] = parseInt(hex.slice(1, 3), 16);
-      img.data[i + 1] = parseInt(hex.slice(3, 5), 16);
-      img.data[i + 2] = parseInt(hex.slice(5, 7), 16);
+      let rgb = RGB.get(hex);
+      if (rgb === undefined) RGB.set(hex, (rgb = parseInt(hex.slice(1, 7), 16)));
+      img.data[i] = rgb >> 16;
+      img.data[i + 1] = (rgb >> 8) & 255;
+      img.data[i + 2] = rgb & 255;
       img.data[i + 3] = 255;
     });
   });

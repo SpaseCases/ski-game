@@ -269,9 +269,12 @@ export class SkierRig {
     if (this.boardMode && changed('board', 'boardGraphic')) swap([this.board], buildBoard(next));
   }
 
-  /** Rebuilds the skis from their graphic as it is now (a custom graphic changes in the editor but keeps its id). */
+  /** Rebuilds the skis (or the board, when riding one) from their graphic as it is now (a custom graphic changes in the editor but keeps its id). */
   repaintSkis(): void {
-    if (this.boardMode) return;
+    if (this.boardMode) {
+      swap([this.board], buildBoard(this.outfit));
+      return;
+    }
     const boots = colors(this.outfit).boots;
     this.feet.forEach((m, i) => {
       const side = i === 0 ? -1 : 1;

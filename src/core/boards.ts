@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.ts';
-import { aspectOf, graphicColor, statsFrom, type Layer, type SkiGraphic, type SkiModel, type SkiStat, type UV } from './skis.ts';
+import { aspectOf, CUSTOM_SLOTS, graphicColor, statsFrom, type Layer, type SkiGraphic, type SkiModel, type SkiStat, type UV } from './skis.ts';
 
 // The snowboards (milestone 22), as data in the ski's format (core/skis.ts),
 // so the ski painter and render/skiModel.ts build them and the Locker's rack
@@ -8,7 +8,9 @@ import { aspectOf, graphicColor, statsFrom, type Layer, type SkiGraphic, type Sk
 // graphics. A board graphic paints one board (v from -1 at its left edge to
 // 1 at its right, seen from above with the nose toward the tip end, u = 1);
 // pictures stand upright with their top toward v = -1, which is the top of
-// the Locker's rack (the nose to the right).
+// the Locker's rack (the nose to the right). Since milestone 23 each board
+// type also has CUSTOM_SLOTS custom graphics painted in the editor
+// (core/customSkis.ts fills CUSTOM_BOARDS), found by id like the stock ones.
 
 export type BoardId = keyof typeof CONFIG.boards;
 
@@ -267,10 +269,20 @@ export function boardType(id: BoardId): BoardType {
   return BOARD_TYPES.find((t) => t.id === id) ?? PARK;
 }
 
-/** The graphic with this id on that board, or the board's first. */
+/**
+ * The player's own graphics on each board (milestone 23), CUSTOM_SLOTS each,
+ * null until a slot is first painted. core/customSkis.ts fills them.
+ */
+export const CUSTOM_BOARDS: Record<BoardId, (SkiGraphic | null)[]> = {
+  park: Array<SkiGraphic | null>(CUSTOM_SLOTS).fill(null),
+  freeride: Array<SkiGraphic | null>(CUSTOM_SLOTS).fill(null),
+  carving: Array<SkiGraphic | null>(CUSTOM_SLOTS).fill(null),
+};
+
+/** The graphic with this id on that board (a stock one or a painted custom slot), or the board's first. */
 export function boardGraphic(id: BoardId, graphic: string): SkiGraphic {
   const type = boardType(id);
-  return type.graphics.find((g) => g.id === graphic) ?? type.graphics[0]!;
+  return type.graphics.find((g) => g.id === graphic) ?? CUSTOM_BOARDS[type.id].find((g) => g?.id === graphic) ?? type.graphics[0]!;
 }
 
 /** How the board compares with the park board (1), as the skis' stat bars (core/skis.ts skiStats). */

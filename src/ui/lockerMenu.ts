@@ -14,7 +14,7 @@ import {
   type Pattern,
 } from '../core/outfit.ts';
 import { BOARD_TYPES, boardGraphic, boardStats, boardType, type BoardId } from '../core/boards.ts';
-import { customGraphic, customId } from '../core/customSkis.ts';
+import { boardGear, customGraphic, customId, gearBoard, gearType, type Gear } from '../core/customSkis.ts';
 import {
   CUSTOM_SLOTS,
   riseAt,
@@ -45,7 +45,8 @@ import { paintSkis } from './skiThumb.ts';
 // the poles switch. Since milestone 22 part 2 that tab is Ride: a Skis |
 // Board switch at its top; on Board the same rows show the three boards,
 // their graphics and stats (against the park board), and Regular | Goofy
-// stands where the poles switch is. Board custom slots come with the editor.
+// stands where the poles switch is. Each ski and (since milestone 23) each
+// board has a row of custom slots, each with Edit (the editor, skiEditor.ts).
 
 export interface LockerHooks {
   get: () => Outfit;
@@ -54,8 +55,8 @@ export interface LockerHooks {
   shown: (open: boolean) => void;
   /** The Ride tab is showing (the preview looks at the skis or the board) or not. */
   skisShown: (skis: boolean) => void;
-  /** Opens the ski editor on that ski's custom slot. */
-  edit: (ski: SkiId, slot: number) => void;
+  /** Opens the editor on that ski's or board's custom slot. */
+  edit: (gear: Gear, slot: number) => void;
 }
 
 /** Segments in a stat bar; the park ski fills half. */
@@ -140,9 +141,9 @@ export class LockerScreen implements Screen {
   private showBases = false;
   private readonly faceButtons: HTMLButtonElement[] = [];
   private readonly thumbs: { canvas: HTMLCanvasElement; base: boolean }[] = [];
-  /** Each ski's row of custom slots, and each slot's pick button, name and thumbnails. */
-  private readonly customRows = new Map<SkiId, HTMLElement>();
-  private readonly customs: { ski: SkiId; slot: number; button: HTMLButtonElement; note: HTMLElement; thumbs: { canvas: HTMLCanvasElement; base: boolean }[] }[] = [];
+  /** Each ski's and board's row of custom slots, and each slot's pick button, name and thumbnails. */
+  private readonly customRows = new Map<Gear, HTMLElement>();
+  private readonly customs: { gear: Gear; slot: number; button: HTMLButtonElement; note: HTMLElement; thumbs: { canvas: HTMLCanvasElement; base: boolean }[] }[] = [];
   private readonly foot: HTMLElement;
   private readonly rect: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
@@ -420,13 +421,15 @@ export class LockerScreen implements Screen {
       }
     }
 
-    // The player's own graphics: a row of custom slots per ski, each with Edit.
+    // The player's own graphics: a row of custom slots per ski and per board, each with Edit.
     const customBox = document.createElement('div');
-    for (const type of SKI_TYPES) {
+    const gears: Gear[] = [...SKI_TYPES.map((t) => t.id), ...BOARD_TYPES.map((t) => boardGear(t.id))];
+    for (const gear of gears) {
+      const name = gearBoard(gear) ? `${gearType(gear).name} board` : gearType(gear).name;
       const row = document.createElement('div');
       row.className = 'ski-customs';
       row.setAttribute('role', 'group');
-      row.setAttribute('aria-label', `${type.name}: your graphics`);
+      row.setAttribute('aria-label', `${name}: your graphics`);
       for (let slot = 0; slot < CUSTOM_SLOTS; slot++) {
         const cell = document.createElement('div');
         cell.className = 'ski-custom';
@@ -447,21 +450,24 @@ export class LockerScreen implements Screen {
         label.appendChild(note);
         button.appendChild(label);
         button.addEventListener('click', () => {
-          if (customGraphic(type.id, slot)) this.pick({ ski: type.id, skiGraphic: customId(type.id, slot) });
-          else this.hooks.edit(type.id, slot);
+          if (!customGraphic(gear, slot)) this.hooks.edit(gear, slot);
+          else {
+            const board = gearBoard(gear);
+            this.pick(board ? { board, boardGraphic: customId(gear, slot) } : { ski: gear as SkiId, skiGraphic: customId(gear, slot) });
+          }
         });
         const edit = document.createElement('button');
         edit.type = 'button';
         edit.className = 'ski-edit';
         edit.textContent = 'Edit';
-        edit.setAttribute('aria-label', `Edit ${type.name} custom ${slot + 1}`);
-        edit.addEventListener('click', () => this.hooks.edit(type.id, slot));
+        edit.setAttribute('aria-label', `Edit ${name} custom ${slot + 1}`);
+        edit.addEventListener('click', () => this.hooks.edit(gear, slot));
         cell.append(button, edit);
         row.appendChild(cell);
-        this.customs.push({ ski: type.id, slot, button, note, thumbs });
+        this.customs.push({ gear, slot, button, note, thumbs });
       }
       customBox.appendChild(row);
-      this.customRows.set(type.id, row);
+      this.customRows.set(gear, row);
     }
 
     const stats = document.createElement('div');
@@ -520,7 +526,7 @@ export class LockerScreen implements Screen {
     stanceNote.className = 'setting-note';
     stanceNote.textContent = 'Regular rides left foot forward, goofy right foot forward. Riding backwards is fakie.';
 
-    this.skiOnly.push(types, customBox, poles, polesNote);
+    this.skiOnly.push(types, poles, polesNote);
     this.boardOnly.push(boards, stance.row, stanceNote);
     panel.append(ride.row, types, boards, this.skiBlurb, head, rack, customBox, stats, this.statNote, poles, polesNote, stance.row, stanceNote);
   }
@@ -528,10 +534,15 @@ export class LockerScreen implements Screen {
   /** Redraws the custom slots' thumbnails (they change in the editor). */
   private paintCustoms(): void {
     for (const c of this.customs) {
-      const g = customGraphic(c.ski, c.slot);
-      for (const { canvas, base } of c.thumbs) paintSkis(canvas, skiType(c.ski), g ?? EMPTY_SLOT, base, RACK_PX_PER_M);
+      const g = customGraphic(c.gear, c.slot);
+      const type = gearType(c.gear);
+      const board = gearBoard(c.gear) !== null;
+      for (const { canvas, base } of c.thumbs) {
+        if (board) paintSkis(canvas, type, g ?? EMPTY_SLOT, base, RACK_PX_PER_M, [1], BOARD_MAX_HALF);
+        else paintSkis(canvas, type, g ?? EMPTY_SLOT, base, RACK_PX_PER_M);
+      }
       c.note.textContent = g ? '' : 'Empty: paint one';
-      c.button.setAttribute('aria-label', `${skiType(c.ski).name}: Custom ${c.slot + 1}${g ? '' : ', empty'}`);
+      c.button.setAttribute('aria-label', `${type.name}${board ? ' board' : ''}: Custom ${c.slot + 1}${g ? '' : ', empty'}`);
     }
   }
 
@@ -604,9 +615,11 @@ export class LockerScreen implements Screen {
     this.statNote.textContent = onBoard ? 'The mark in each bar is the park board.' : 'The mark in each bar is the park ski.';
     this.faceButtons.forEach((b, i) => b.setAttribute('aria-pressed', String((i === 1) === this.showBases)));
     for (const { canvas, base } of this.thumbs) canvas.hidden = base !== this.showBases;
-    for (const [ski, row] of this.customRows) row.hidden = ski !== o.ski;
+    // The custom slots of the ski (or the board) being ridden.
+    const riding: Gear = onBoard ? boardGear(o.board) : o.ski;
+    for (const [gear, row] of this.customRows) row.hidden = gear !== riding;
     for (const c of this.customs) {
-      c.button.setAttribute('aria-pressed', String(c.ski === o.ski && customId(c.ski, c.slot) === graphic.id));
+      c.button.setAttribute('aria-pressed', String(c.gear === riding && customId(c.gear, c.slot) === (onBoard ? bGraphic.id : graphic.id)));
       for (const { canvas, base } of c.thumbs) canvas.hidden = base !== this.showBases;
     }
     const stats = onBoard ? boardStats(o.board) : skiStats(o.ski);

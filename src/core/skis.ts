@@ -555,14 +555,21 @@ export function drawSki(type: { model: SkiModel }, g: SkiGraphic, side: Side, ba
   const half = m.length / 2;
   const aspect = aspectOf(m);
   const w = Math.round(m.length * pxPerM);
+  // Every pixel of a cell takes the cell's color: work each out once per row of cells (the ski editor redraws this every frame of a stroke).
+  const rowColors: string[] = new Array<string>(m.cols).fill('');
+  let colorsRow = -1;
   for (let px = 0; px < w; px++) {
     const along = -half + ((px + 0.5) / w) * m.length;
     const row = Math.min(m.rows - 1, Math.floor(((along + half) / m.length) * m.rows));
     const u = ((row + 0.5) / m.rows) * 2 - 1;
+    if (row !== colorsRow) {
+      colorsRow = row;
+      rowColors.fill('');
+    }
     const hw = halfWidthAt(m, along) * pxPerM;
     for (let py = Math.ceil(mid - hw - 0.5); py < mid + hw; py++) {
       const col = Math.min(m.cols - 1, Math.max(0, Math.floor(((py + 0.5 - (mid - hw)) / (2 * hw)) * m.cols)));
-      put(px, py, graphicColor(g, u, -1 + (2 * col + 1) / m.cols, aspect, side, base));
+      put(px, py, (rowColors[col] ||= graphicColor(g, u, -1 + (2 * col + 1) / m.cols, aspect, side, base)));
     }
   }
 }

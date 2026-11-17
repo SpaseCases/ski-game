@@ -1,5 +1,4 @@
 import { BOARD_TYPES, boardGraphic, type BoardId } from './boards.ts';
-import { loadCustomSkis } from './customSkis.ts';
 import { SKI_TYPES, skiGraphic, type SkiId } from './skis.ts';
 import { readStored, writeStored } from './storage.ts';
 
@@ -135,10 +134,13 @@ export function contrastColor(hex: string): string {
   return lum < 128 ? '#ece8de' : '#2c3037';
 }
 
-/** The saved outfit, or the default for anything not saved (or not a palette color). */
+/**
+ * The saved outfit, or the default for anything not saved (or not a palette
+ * color). A saved custom ski or board graphic is found only once the slots
+ * are read: the game calls core/customSkis.ts loadCustomSkis first (this
+ * module doesn't import it, so the pose gallery's shared chunk stays small).
+ */
 export function loadOutfit(): Outfit {
-  // A saved custom graphic is found only once the slots are read.
-  loadCustomSkis();
   return outfitFrom(readStored(KEY));
 }
 

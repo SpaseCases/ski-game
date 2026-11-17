@@ -108,7 +108,7 @@ export class LockerStage {
     this.stance.scale.x = this.goofy ? -1 : 1;
   }
 
-  /** Rebuilds the skis (a custom graphic was painted). */
+  /** Rebuilds the skis or the board (a custom graphic was painted). */
   repaintSkis(): void {
     this.rig?.repaintSkis();
   }
