@@ -23,8 +23,11 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DEFAULT_OUTFIT, GARMENTS, type Garment, type Outfit, type Pattern } from '../core/outfit.ts';
+import { BOARD_GRAPHIC, BOARD_MODEL } from '../core/boards.ts';
 import { skiGraphic, skiType, type Side } from '../core/skis.ts';
+import { BINDINGS, BINDING_YAW } from './boardPoses.ts';
 import { clothMaterial } from './cloth.ts';
+import type { PoseBuffer } from './poseBlend.ts';
 import { buildSkiGeometry } from './skiModel.ts';
 import type { PoseDef, Vec3 } from './skierPoses.ts';
 
@@ -37,6 +40,10 @@ import type { PoseDef, Vec3 } from './skierPoses.ts';
 // hem is the one part rebuilt every pose, so it rides up over the thighs.
 // Colors, headwear and skis come from the Locker's outfit; changing it rebuilds
 // only the parts it touches (setOutfit), never per frame.
+//
+// On a snowboard (milestone 22, setBoard) the skis and poles go: the feet
+// are soft boots in bindings, one board mesh lies under both, and a pose
+// places the board (applyBoard), the ankles following its bindings.
 
 const FIXED = {
   vent: '#0e0f12',
@@ -46,6 +53,9 @@ const FIXED = {
   bootSole: '#202328',
   buckle: '#c9ced6',
   binding: '#1c1f25',
+  /** A snowboard binding's highback and straps, and the straps' ratchets. */
+  boardBinding: '#23262c',
+  ratchet: '#9aa2ad',
   poleShaft: '#b8c0c9',
   poleDark: '#1c1f25',
   hatRed: '#c3262e',
@@ -115,6 +125,11 @@ export class SkierRig {
   private readonly shins: Mesh[] = [];
   private readonly feet: Mesh[] = [];
   private readonly poles: Mesh[] = [];
+  /** The snowboard (milestone 22): hidden on skis. */
+  private readonly board: Mesh;
+  private boardMode = false;
+  private readonly boardPos = new Vector3();
+  private readonly boardQ = new Quaternion();
 
   // Solved joint positions and orientations (skier space), reused every pose.
   private readonly pelvisPos = new Vector3();
@@ -182,12 +197,39 @@ export class SkierRig {
       this.poles.push(add(pole));
     }
     this.setShins(pants, c.boots);
+    this.board = add(new BufferGeometry());
+    this.board.visible = false;
     this.setPoles();
   }
 
-  /** Whether the skier carries poles (without them, the push is a skating step: see SkierView). */
+  /** Whether the skier carries poles (without them, the push is a skating step: see SkierView). A board never has them. */
   get hasPoles(): boolean {
-    return this.outfit.poles;
+    return this.outfit.poles && !this.boardMode;
+  }
+
+  /** True while riding a snowboard (setBoard). */
+  get onBoard(): boolean {
+    return this.boardMode;
+  }
+
+  /**
+   * Skis (false) or a snowboard (true, milestone 22): swaps the feet between
+   * ski boots on skis and snowboard boots in bindings, shows the board and
+   * hides the poles. The board is always built regular (nose toward -X);
+   * SkierView mirrors the whole rig for goofy. Poses must then come from
+   * render/boardPoses.ts.
+   */
+  setBoard(on: boolean): void {
+    if (on === this.boardMode) return;
+    this.boardMode = on;
+    const boots = colors(this.outfit).boots;
+    this.feet.forEach((m, i) => {
+      const side = i === 0 ? -1 : 1;
+      swap([m], on ? buildBoardFoot(side, boots) : buildFoot(side, boots, buildSki(this.outfit, side)));
+    });
+    swap([this.board], on ? buildBoard() : new BufferGeometry());
+    this.board.visible = on;
+    this.setPoles();
   }
 
   /** Changes colors, patterns, headwear, skis or poles, rebuilding only the parts that change (the old geometry is freed). */
@@ -215,7 +257,7 @@ export class SkierRig {
     if (changed('boots', 'ski', 'skiGraphic')) {
       this.feet.forEach((m, i) => {
         const side = i === 0 ? -1 : 1;
-        swap([m], buildFoot(side, c.boots, buildSki(next, side)));
+        swap([m], this.boardMode ? buildBoardFoot(side, c.boots) : buildFoot(side, c.boots, buildSki(next, side)));
       });
     }
     // The hood is the jacket's color.
@@ -228,6 +270,7 @@ export class SkierRig {
 
   /** Rebuilds the skis from their graphic as it is now (a custom graphic changes in the editor but keeps its id). */
   repaintSkis(): void {
+    if (this.boardMode) return;
     const boots = colors(this.outfit).boots;
     this.feet.forEach((m, i) => {
       const side = i === 0 ? -1 : 1;
@@ -247,7 +290,7 @@ export class SkierRig {
   }
 
   private setPoles(): void {
-    for (const m of this.poles) m.visible = this.outfit.poles && !this.bodyHidden;
+    for (const m of this.poles) m.visible = this.outfit.poles && !this.boardMode && !this.bodyHidden;
   }
 
   /**
@@ -300,9 +343,9 @@ export class SkierRig {
   }
 
   /** The part meshes by name (index 0 left, 1 right), for checks such as tools/model/clearance.ts. */
-  parts(): Record<'pelvis' | 'torso' | 'hem' | 'head', Mesh> & Record<'upperArms' | 'forearms' | 'thighs' | 'shins' | 'feet' | 'poles', readonly Mesh[]> {
-    const { pelvis, torso, head, upperArms, forearms, thighs, shins, feet, poles } = this;
-    return { pelvis, torso, hem: this.hem.mesh, head, upperArms, forearms, thighs, shins, feet, poles };
+  parts(): Record<'pelvis' | 'torso' | 'hem' | 'head' | 'board', Mesh> & Record<'upperArms' | 'forearms' | 'thighs' | 'shins' | 'feet' | 'poles', readonly Mesh[]> {
+    const { pelvis, torso, head, upperArms, forearms, thighs, shins, feet, poles, board } = this;
+    return { pelvis, torso, hem: this.hem.mesh, head, upperArms, forearms, thighs, shins, feet, poles, board };
   }
 
   /** Frees every geometry and material (the rig is not used again). */
@@ -325,8 +368,12 @@ export class SkierRig {
     this.face.visible = hw === 'pumpkin';
   }
 
-  /** Solves the pose and moves every part into place. */
-  apply(p: PoseDef): void {
+  /** Solves the pose and moves every part into place. On a board the pose must be a PoseBuffer with its board (see applyBoard). */
+  apply(p: PoseDef | PoseBuffer): void {
+    if (this.boardMode && 'board' in p && p.board) {
+      this.applyBoard(p as PoseBuffer);
+      return;
+    }
     this.reachError = 0;
     this.ankleError = 0;
 
@@ -394,6 +441,74 @@ export class SkierRig {
   }
 
   /**
+   * A snowboard pose (milestone 22): the same rigid core as apply(), then the
+   * board where the pose puts it; a hand holding the board goes to its point
+   * on the board (by its weight), and each ankle to its binding, the back one
+   * eased out to the pose's own back foot by `board.free`.
+   */
+  private applyBoard(p: PoseBuffer): void {
+    this.reachError = 0;
+    this.ankleError = 0;
+    this.pelvisPos.set(p.pelvis[0], p.pelvis[1], p.pelvis[2]);
+    this.pelvisQ.setFromEuler(euler.set(-p.pelvisPitch, p.pelvisYaw, p.pelvisRoll, 'YXZ'));
+    this.chestQ.copy(this.pelvisQ).multiply(q1.setFromEuler(euler.set(-p.chestPitch, p.chestYaw, p.chestRoll, 'YXZ')));
+    this.headQ.copy(this.chestQ).multiply(q1.setFromEuler(euler.set(-p.headPitch, p.headYaw, 0, 'YXZ')));
+    place(this.pelvis, this.pelvisPos, this.pelvisQ);
+    place(this.torso, this.pelvisPos, this.chestQ);
+    const neck = v1.set(0, BODY.spine, 0).applyQuaternion(this.chestQ).add(this.pelvisPos);
+    place(this.head, neck, this.headQ);
+    this.headCenter.set(0, GOGGLE_Y, 0).applyQuaternion(this.headQ).add(neck);
+
+    // The board: yaw, then the nose up or down, then onto an edge.
+    const b = p.board;
+    this.boardPos.set(b.at[0], b.at[1], b.at[2]);
+    this.boardQ.setFromEuler(euler.set(-b.roll, b.yaw, -b.pitch, 'YZX'));
+    place(this.board, this.boardPos, this.boardQ);
+
+    for (let i = 0; i < 2; i++) {
+      const side = i === 0 ? -1 : 1;
+      const hand = p.hands[i === 0 ? 0 : 1];
+      this.shoulders[i]!.set(side * BODY.shoulderWidth, BODY.spine - BODY.shoulderDrop, 0)
+        .applyQuaternion(this.chestQ)
+        .add(this.pelvisPos);
+      this.hands[i]!.set(hand.at[0], hand.at[1], hand.at[2]);
+      if (hand.boardWeight > 0) {
+        v2.set(hand.boardOn[0], hand.boardOn[1], hand.boardOn[2]).applyQuaternion(this.boardQ).add(this.boardPos);
+        this.hands[i]!.lerp(v2, Math.min(1, hand.boardWeight));
+      }
+      setHint(hint, hand.elbow);
+      this.solveLimb(this.shoulders[i]!, this.hands[i]!, BODY.upperArm, BODY.forearm + BODY.hand, hint, this.elbows[i]!);
+      segment(this.upperArms[i]!, this.shoulders[i]!, this.elbows[i]!, hint);
+      segment(this.forearms[i]!, this.elbows[i]!, this.hands[i]!, hint);
+    }
+
+    for (let i = 0; i < 2; i++) {
+      const side = i === 0 ? -1 : 1;
+      const foot = p.feet[i === 0 ? 0 : 1];
+      this.hips[i]!.set(side * BODY.hipWidth, -BODY.hipDrop, 0).applyQuaternion(this.pelvisQ).add(this.pelvisPos);
+      const bind = BINDINGS[i === 0 ? 0 : 1];
+      this.ankles[i]!.set(bind[0], bind[1], bind[2]).applyQuaternion(this.boardQ).add(this.boardPos);
+      this.footQs[i]!.copy(this.boardQ).multiply(q1.setFromAxisAngle(Y_AXIS, BINDING_YAW[i === 0 ? 0 : 1]));
+      const free = i === 1 ? Math.min(1, Math.max(0, b.free)) : 0;
+      if (free > 0) {
+        // Out of its binding: toward where the pose puts the foot.
+        this.ankles[i]!.lerp(v2.set(foot.ankle[0], foot.ankle[1], foot.ankle[2]), free);
+        this.footQs[i]!.slerp(q1.setFromEuler(euler.set(foot.pitch, foot.yaw, foot.roll, 'YXZ')), free);
+      }
+      setHint(hint, foot.knee);
+      this.solveLimb(this.hips[i]!, this.ankles[i]!, BODY.thigh, BODY.shin, hint, this.knees[i]!);
+      segment(this.thighs[i]!, this.hips[i]!, this.knees[i]!, hint);
+      segment(this.shins[i]!, this.knees[i]!, this.ankles[i]!, hint);
+      place(this.feet[i]!, this.ankles[i]!, this.footQs[i]!);
+      this.checkAnkle(i);
+    }
+
+    this.feetCenter.addVectors(this.ankles[0]!, this.ankles[1]!).multiplyScalar(0.5);
+    place(this.hem.mesh, this.pelvisPos, this.pelvisQ);
+    this.hem.fit(this.pelvisPos, this.pelvisQ, this.chestQ, this.hips, this.knees);
+  }
+
+  /**
    * Two-bone IK: finds the middle joint between `start` and `target` given
    * the two bone lengths, bending toward `bend`. If the target is out of
    * reach it is pulled in to the limb's full length.
@@ -435,6 +550,7 @@ export class SkierRig {
 
 // Scratch objects so posing never allocates.
 const euler = new Euler();
+const Y_AXIS = new Vector3(0, 1, 0);
 const q1 = new Quaternion();
 const v1 = new Vector3();
 const v2 = new Vector3();
@@ -2002,6 +2118,35 @@ function buildFoot(side: number, boot: Color, ski: BufferGeometry): BufferGeomet
     parts.push(paint(new BoxGeometry(0.014, 0.02, 0.056).translate(side * 0.069, y, z), FIXED.buckle));
   }
   return merge(parts);
+}
+
+/**
+ * A snowboard boot in its binding (milestone 22), in the foot frame (origin
+ * at the ankle, the board's top 0.146 m under it): a softer, roomier boot
+ * than the ski's, a baseplate under it, a highback behind the heel and two
+ * straps over the instep and the ankle with their ratchets on the outside.
+ */
+function buildBoardFoot(side: number, boot: Color): BufferGeometry {
+  const drop = 0.015;
+  const parts = [
+    paint(bootShell().scale(1.06, 1.05, 1.04).translate(0, -drop, 0), boot),
+    paint(new BoxGeometry(0.125, 0.024, 0.33).translate(0, -0.104 - drop, -0.015), FIXED.bootSole),
+    // Baseplate on the board, the heel cup and the highback behind the calf.
+    paint(new BoxGeometry(0.15, 0.016, 0.3).translate(0, -0.138, -0.01), FIXED.boardBinding),
+    paint(new BoxGeometry(0.15, 0.06, 0.03).translate(0, -0.105, 0.155), FIXED.boardBinding),
+    paint(new BoxGeometry(0.13, 0.2, 0.016).rotateX(0.18).translate(0, -0.02, 0.17), FIXED.boardBinding),
+    // Straps across the instep and the ankle, a little wider than the boot.
+    paint(new BoxGeometry(0.15, 0.03, 0.07).translate(0, -0.02, -0.07), FIXED.boardBinding),
+    paint(new BoxGeometry(0.15, 0.035, 0.06).translate(0, 0.045, 0.04), FIXED.boardBinding),
+    paint(new BoxGeometry(0.018, 0.026, 0.04).translate(side * 0.078, -0.02, -0.07), FIXED.ratchet),
+    paint(new BoxGeometry(0.018, 0.03, 0.04).translate(side * 0.078, 0.045, 0.04), FIXED.ratchet),
+  ];
+  return merge(parts);
+}
+
+/** The snowboard, built regular: its base on the snow at y = 0, its nose toward -X (see render/boardPoses.ts). */
+function buildBoard(): BufferGeometry {
+  return buildSkiGeometry(BOARD_MODEL, BOARD_GRAPHIC, 1).rotateY(Math.PI / 2);
 }
 
 /** Lower boot shell: a box that narrows and drops toward a rounded toe. */

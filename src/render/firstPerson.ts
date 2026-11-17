@@ -31,7 +31,12 @@ const headUp = new Vector3();
 const DOWN = new Vector3(0, -1, 0);
 /** Grabs (GRAB_ACTIONS indices) that read only with the legs drawn while looking down: both japans and the spread eagle. */
 const LEG_GRABS: readonly number[] = [2, 6, 13];
+/** On a snowboard (milestone 22): the method, the japan, the roast beef, the poke, the rocket and the stiffy, which read only with the legs. */
+const BOARD_LEG_GRABS: readonly number[] = [2, 3, 6, 11, 12, 13];
 const heading = new Vector3();
+const toBoard = new Vector3();
+/** A board grab's view leans from straight down toward the board by at most this (m across per m down). */
+const BOARD_AIM_MAX = 0.6;
 const grabView = new Quaternion();
 const chasePos = new Vector3();
 const chaseQ = new Quaternion();
@@ -68,6 +73,8 @@ export class FirstPerson {
   /** How far the view has turned to look down at the skis for a grab (0..1), and the grab it last looked at (kept while easing back up). */
   grabLook = 0;
   lastGrab = -1;
+  /** The way the grab view's top points: the flight path's heading across the ground (kept while too slow to say). */
+  private readonly grabHeading = new Vector3();
   private lookYaw = 0;
   private lookPitch = 0;
   private sinceDrag = Infinity;
@@ -140,12 +147,26 @@ export class FirstPerson {
     if (this.roll !== 0) q.multiply(qAxis.setFromAxisAngle(Z_AXIS, this.roll));
     if (this.lookPitch !== 0) q.multiply(qAxis.setFromAxisAngle(X_AXIS, this.lookPitch));
     if (this.grabLook > 0.001) {
-      // Panned straight down at the snow below, keeping the view's heading at the top of the screen (no roll).
-      heading.set(0, 0, -1).applyQuaternion(q);
-      heading.y = 0;
-      if (heading.lengthSq() < 1e-4) heading.set(0, 1, 0).applyQuaternion(q).setY(0);
-      if (heading.lengthSq() < 1e-4) heading.set(-Math.sin(pose.yaw), 0, -Math.cos(pose.yaw));
-      look.lookAt(ORIGIN, DOWN, heading.normalize());
+      // Panned straight down at the snow below, the way the rider is flying at
+      // the top of the screen (no roll). The heading comes from the flight
+      // path, not the view: upside down in a flip the view's own forward
+      // points back the other way, and taking the heading from it spun the
+      // downward view half round mid-flip.
+      const v = pose.velocity;
+      if (v.x * v.x + v.z * v.z > 1) this.grabHeading.set(v.x, 0, v.z).normalize();
+      else if (snap || this.grabHeading.lengthSq() < 0.5) this.grabHeading.set(-Math.sin(pose.yaw), 0, -Math.cos(pose.yaw));
+      heading.copy(this.grabHeading);
+      // On a snowboard (milestone 22) the head is out over the toes in a grab, not over the board: the
+      // view leans from straight down toward the board (by its offset across the ground, so it never
+      // jumps however the body is turned).
+      if (rig.onBoard) {
+        rig.root.updateWorldMatrix(true, false);
+        toBoard.copy(rig.feetCenter).applyMatrix4(rig.root.matrixWorld).sub(this.middle).setY(0);
+        const across = toBoard.length();
+        if (across > BOARD_AIM_MAX) toBoard.multiplyScalar(BOARD_AIM_MAX / across);
+        toBoard.y = -1;
+        look.lookAt(ORIGIN, toBoard.normalize(), heading);
+      } else look.lookAt(ORIGIN, DOWN, heading);
       grabView.setFromRotationMatrix(look);
       const g = this.grabLook;
       q.slerp(grabView, g * g * (3 - 2 * g));
@@ -265,7 +286,8 @@ export class GameCamera {
     // looking down at a grab, all but the mittens, poles, boots and skis (the rest would fill the view from inches away).
     const atEye = cam.position.distanceToSquared(first.eye) < c.firstHideRange * c.firstHideRange;
     const flying = !pose.grounded && !pose.bailed && !pose.onRail;
-    const grab = !atEye || first.grabLook <= 0.2 ? 0 : LEG_GRABS.includes(first.lastGrab) ? 2 : 1;
+    const legs = rig.onBoard ? BOARD_LEG_GRABS : LEG_GRABS;
+    const grab = !atEye || first.grabLook <= 0.2 ? 0 : legs.includes(first.lastGrab) ? 2 : 1;
     rig.setHidden(atEye, atEye && flying && this.firstAir === 'level', grab);
   }
 }

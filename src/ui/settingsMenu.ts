@@ -1,7 +1,7 @@
 import { DEFAULT_BINDINGS, type Action, type Bindings } from '../core/input.ts';
 import { assignKey, clearSecondKey, KEY_SLOTS, QUALITIES, wantsAntialias, type CameraView, type FirstAir, type PopWith, type Quality, type Settings } from '../core/settings.ts';
 import { CONFIG } from '../config.ts';
-import { ACTION_NAMES, keyName, mainKey } from './keyNames.ts';
+import { actionName, keyName, mainKey } from './keyNames.ts';
 import { addBackButton, board, setHints, type Screen } from './menus.ts';
 
 // The Settings screen: the quality preset (applied at once), sound volumes
@@ -287,7 +287,7 @@ export class SettingsScreen implements Screen {
         const tr = document.createElement('tr');
         const th = document.createElement('th');
         th.scope = 'row';
-        th.textContent = ACTION_NAMES[action];
+        th.textContent = actionName(action);
         tr.appendChild(th);
         for (let slot = 0; slot < KEY_SLOTS; slot++) {
           const td = document.createElement('td');
@@ -376,7 +376,7 @@ export class SettingsScreen implements Screen {
     if (b[action].length < 2) return true;
     this.hooks.setBindings(clearSecondKey(b, action));
     this.syncKeys();
-    this.say(`${ACTION_NAMES[action]}: second key cleared.`);
+    this.say(`${actionName(action)}: second key cleared.`);
     return true;
   }
 
@@ -385,7 +385,7 @@ export class SettingsScreen implements Screen {
     this.listening = btn;
     btn.classList.add('is-listening');
     btn.textContent = 'Press a key';
-    this.say(`Press the new key for ${ACTION_NAMES[action]}. Click anywhere to cancel.`);
+    this.say(`Press the new key for ${actionName(action)}. Click anywhere to cancel.`);
     this.hooks.trapNextKey((e) => {
       this.listening = null;
       window.removeEventListener('pointerdown', this.cancelOnClick, true);
@@ -401,9 +401,9 @@ export class SettingsScreen implements Screen {
       this.syncKeys();
       const key = keyName(e.code);
       const d = result.displaced;
-      if (!d) this.say(`${ACTION_NAMES[action]}: ${key}.`);
-      else if (d.unbound) this.say(`${key} was the key for ${ACTION_NAMES[d.action]}, which has no key now. Give it one below.`);
-      else this.say(`${key} was the key for ${ACTION_NAMES[d.action]}, so the two swapped: ${ACTION_NAMES[d.action]} is now ${keyName(d.now ?? '')}.`);
+      if (!d) this.say(`${actionName(action)}: ${key}.`);
+      else if (d.unbound) this.say(`${key} was the key for ${actionName(d.action)}, which has no key now. Give it one below.`);
+      else this.say(`${key} was the key for ${actionName(d.action)}, so the two swapped: ${actionName(d.action)} is now ${keyName(d.now ?? '')}.`);
       btn.focus();
     });
     window.addEventListener('pointerdown', this.cancelOnClick, true);
@@ -509,12 +509,12 @@ export class SettingsScreen implements Screen {
       if (idle) {
         btn.classList.remove('is-empty');
         btn.textContent = slot === 0 ? `Uses ${mainKey(b, 'up')}` : '';
-        btn.setAttribute('aria-label', `${ACTION_NAMES[action]}: uses ${mainKey(b, 'up')}, set by Pop with.`);
+        btn.setAttribute('aria-label', `${actionName(action)}: uses ${mainKey(b, 'up')}, set by Pop with.`);
         continue;
       }
       btn.classList.toggle('is-empty', !code);
       btn.textContent = code ? keyName(code) : slot === 0 ? 'none' : 'Add';
-      btn.setAttribute('aria-label', `${ACTION_NAMES[action]}, ${slot === 0 ? 'key' : 'second key'}: ${code ? keyName(code) : 'none'}. Press Enter to change.`);
+      btn.setAttribute('aria-label', `${actionName(action)}, ${slot === 0 ? 'key' : 'second key'}: ${code ? keyName(code) : 'none'}. Press Enter to change.`);
     }
   }
 

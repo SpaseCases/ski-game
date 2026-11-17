@@ -1,5 +1,5 @@
 import { ACTIONS, type Action, type Bindings } from '../core/input.ts';
-import { ACTION_NAMES, keycap, keyName } from './keyNames.ts';
+import { actionName, keycap, keyName } from './keyNames.ts';
 import { addBackButton, board, setHints, type Screen } from './menus.ts';
 
 // The key tester (from Controls): a laptop keyboard drawing that lights each
@@ -124,7 +124,7 @@ export class KeyTesterScreen implements Screen {
     for (const { el, codes } of this.capList) {
       const actions = codes.flatMap((code) => bound.get(code) ?? []);
       el.classList.toggle('is-bound', actions.length > 0);
-      el.title = actions.map((a) => ACTION_NAMES[a]).join(', ');
+      el.title = actions.map((a) => actionName(a)).join(', ');
     }
     this.buildCombos(keys);
     this.reset();
@@ -205,7 +205,7 @@ export class KeyTesterScreen implements Screen {
     const keys = this.bindings();
     const names = [...this.held].map((code) => {
       const action = ACTIONS.find((a) => keys[a].includes(code));
-      return action ? `${keyName(code)} (${ACTION_NAMES[action]})` : keyName(code);
+      return action ? `${keyName(code)} (${actionName(action)})` : keyName(code);
     });
     this.heldList.textContent = names.length > 0 ? names.join(' · ') : 'Hold some keys.';
   }

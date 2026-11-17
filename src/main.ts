@@ -56,7 +56,7 @@ import { createScore, endCombo, resetScore, stepScore, taintCombo } from './sim/
 import { placeInAvalanches, stepAvalanches } from './sim/avalanche.ts';
 import { copySkierState, createSkierState, placeSkierAt, stepSkier } from './sim/skier.ts';
 import { heightAt } from './sim/terrain.ts';
-import { anyCheat, CHEATS, configChanged, rebuildTuning, setCheat, setSkiScale, TUNING } from './sim/tuning.ts';
+import { anyCheat, CHEATS, configChanged, rebuildTuning, RIDE, setCheat, setRide, setSkiScale, TUNING } from './sim/tuning.ts';
 import { CheatsScreen } from './ui/cheatsMenu.ts';
 import type { TuningPanel } from './ui/tuningPanel.ts';
 import { mountWindowButtons } from './ui/embed.ts';
@@ -87,6 +87,9 @@ const settings = loadSettings();
 /** The skier's look from the Locker. */
 let outfit: Outfit = loadOutfit();
 setSkiScale(CONFIG.skis[outfit.ski]);
+// A snowboard (milestone 22) until the Locker offers one (part 2): ?board=regular or ?board=goofy rides one this visit.
+const urlBoard = new URLSearchParams(window.location.search).get('board');
+if (urlBoard === 'regular' || urlBoard === 'goofy' || urlBoard === '1') setRide(true, urlBoard === 'goofy');
 /** The preset in use: the saved one, unless the URL names one for this visit. */
 let quality: Quality = urlQuality() ?? settings.quality;
 /** Auto's rung: one better than where it settled last visit (skipping rungs that draw the same here), stepping down while riding if frames are slow. */
@@ -611,6 +614,7 @@ async function loadMap(entry: MapEntry): Promise<void> {
       chase.hf = built.hf;
     } else {
       skierView = new SkierView(scene, built.hf, outfit);
+      skierView.setRide(RIDE.board, RIDE.goofy);
       chase = new ChaseCamera(camera, built.hf);
     }
     applyWeatherLook();
@@ -975,6 +979,12 @@ if (import.meta.env.DEV) {
       respawn,
       backToTop,
       teleport,
+      /** Rides a snowboard (regular, or goofy) or skis (milestone 22; ?board=regular|goofy does it from the start). */
+      setRide: (board: boolean, goofy = false) => {
+        if (scoring()) endCombo(score, skier);
+        setRide(board, goofy);
+        skierView?.setRide(board, goofy);
+      },
       /** Posts a score to its online board as a banked best or a finished course would (use ?boards=test). */
       postScore,
       setQuality,

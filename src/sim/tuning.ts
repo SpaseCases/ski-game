@@ -41,9 +41,25 @@ for (const b of BLOCKS) (TUNING as Record<Block, Numbers>)[b] = { ...(CONFIG[b] 
 /** The ski's multipliers (the park ski's are all 1). */
 let skiScale: Scale = {};
 
+/**
+ * What the rider stands on (milestone 22): skis, or a snowboard with the
+ * left foot forward (regular) or the right (goofy). The sim reads it for
+ * the board's two edges and its rail presses; scoring names tricks by it;
+ * the view draws the board and its poses. On a board the board's block
+ * (CONFIG.boards.board) scales the numbers in place of the ski's.
+ */
+export const RIDE = { board: false, goofy: false };
+
 /** Rides on a ski: pass its block from CONFIG.skis (the same object, so the tuning panel's edits to it apply). */
 export function setSkiScale(scale: Scale): void {
   skiScale = scale;
+  rebuildTuning();
+}
+
+/** Rides a snowboard (regular, or goofy) or, with `board` false, the ski set by setSkiScale. */
+export function setRide(board: boolean, goofy: boolean): void {
+  RIDE.board = board;
+  RIDE.goofy = board && goofy;
   rebuildTuning();
 }
 
@@ -57,7 +73,7 @@ export function rebuildTuning(): void {
   for (const b of BLOCKS) {
     const base = CONFIG[b] as Numbers;
     const out = (TUNING as Record<Block, Numbers>)[b];
-    const ski = skiScale[b] as Numbers | undefined;
+    const ski = (RIDE.board ? (CONFIG.boards.board as Scale) : skiScale)[b] as Numbers | undefined;
     for (const key in base) {
       let v = base[key]! * (ski?.[key] ?? 1);
       for (const id in CONFIG.cheats) {

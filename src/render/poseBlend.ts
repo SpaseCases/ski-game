@@ -1,5 +1,5 @@
 import { DEFAULT_HINTS } from './skierRig.ts';
-import type { FootDef, HandDef, PoseDef, Vec3 } from './skierPoses.ts';
+import type { BoardDef, FootDef, HandDef, PoseDef, Vec3 } from './skierPoses.ts';
 
 // A mutable pose the game rebuilds every frame by mixing pose definitions,
 // so animating the skier never allocates. Every optional field of PoseDef is
@@ -25,6 +25,17 @@ interface HandBuffer {
   grab: 0 | 1 | undefined;
   on: MutableVec3;
   weight: number;
+  /** On a snowboard: the point on the board this hand reaches for (board space), and how far (0..1). */
+  boardOn: MutableVec3;
+  boardWeight: number;
+}
+
+interface BoardBuffer {
+  at: MutableVec3;
+  pitch: number;
+  yaw: number;
+  roll: number;
+  free: number;
 }
 
 export interface PoseBuffer {
@@ -39,7 +50,11 @@ export interface PoseBuffer {
   headYaw: number;
   feet: [FootBuffer, FootBuffer];
   hands: [HandBuffer, HandBuffer];
+  /** The snowboard (milestone 22): zeros for a ski pose, which never reads it. */
+  board: BoardBuffer;
 }
+
+const NO_BOARD: BoardDef = { at: [0, 0, 0] };
 
 export function createPoseBuffer(): PoseBuffer {
   const foot = (): FootBuffer => ({ ankle: [0, 0, 0], yaw: 0, pitch: 0, roll: 0, knee: [0, 0, 0] });
@@ -50,6 +65,8 @@ export function createPoseBuffer(): PoseBuffer {
     grab: undefined,
     on: [0, 0, 0],
     weight: 0,
+    boardOn: [0, 0, 0],
+    boardWeight: 0,
   });
   return {
     pelvis: [0, 0, 0],
@@ -63,6 +80,7 @@ export function createPoseBuffer(): PoseBuffer {
     headYaw: 0,
     feet: [foot(), foot()],
     hands: [hand(), hand()],
+    board: { at: [0, 0, 0], pitch: 0, yaw: 0, roll: 0, free: 0 },
   };
 }
 
@@ -94,7 +112,18 @@ export function setPose(out: PoseBuffer, def: PoseDef): void {
     h.grab = undefined;
     h.weight = 0;
     if (hd.grab !== undefined && hd.on) setGrip(h, hd.grab, hd.on, hd.weight ?? 1);
+    h.boardWeight = 0;
+    if (hd.board) {
+      copy(h.boardOn, hd.board);
+      h.boardWeight = hd.weight ?? 1;
+    }
   }
+  const b = def.board ?? NO_BOARD;
+  copy(out.board.at, b.at);
+  out.board.pitch = b.pitch ?? 0;
+  out.board.yaw = b.yaw ?? 0;
+  out.board.roll = b.roll ?? 0;
+  out.board.free = b.free ?? 0;
 }
 
 /**
@@ -132,6 +161,20 @@ export function addPoseDelta(out: PoseBuffer, base: PoseDef, target: PoseDef, w:
     addDelta(h.pole, bh.pole ?? DEFAULT_HINTS.pole[s], th.pole ?? DEFAULT_HINTS.pole[s], w);
     addDelta(h.elbow, bh.elbow ?? DEFAULT_HINTS.elbow[s], th.elbow ?? DEFAULT_HINTS.elbow[s], w);
     if (th.grab !== undefined && th.on && w > h.weight) setGrip(h, th.grab, th.on, w);
+    if (th.board && w > h.boardWeight) {
+      copy(h.boardOn, th.board);
+      h.boardWeight = w;
+    }
+  }
+  // A ski pose has no board: only board poses blend one.
+  const bb = base.board;
+  const tb = target.board;
+  if (bb && tb) {
+    addDelta(out.board.at, bb.at, tb.at, w);
+    out.board.pitch += ((tb.pitch ?? 0) - (bb.pitch ?? 0)) * w;
+    out.board.yaw += ((tb.yaw ?? 0) - (bb.yaw ?? 0)) * w;
+    out.board.roll += ((tb.roll ?? 0) - (bb.roll ?? 0)) * w;
+    out.board.free += ((tb.free ?? 0) - (bb.free ?? 0)) * w;
   }
 }
 

@@ -1,6 +1,6 @@
 import { Quaternion, Vector3 } from 'three';
 import { CONFIG } from '../config.ts';
-import { CHEATS, TUNING } from './tuning.ts';
+import { CHEATS, RIDE, TUNING } from './tuning.ts';
 import { GRAB_ACTIONS, type InputState } from '../core/input.ts';
 import { onAirbag, onPipeWall, onTakeoff, pipeInward } from '../maps/shapes.ts';
 import type { Heightfield, RailShape, SpawnDef } from '../maps/types.ts';
@@ -330,6 +330,8 @@ const DEG = Math.PI / 180;
 const CREASE_COS = Math.cos(10 * DEG);
 /** Speed (m/s) away from the snow past a crease that leaves it. */
 const CREASE_LEAVE = 0.5;
+/** Lean (radians) at which a board's carve is fully on one edge (milestone 22). */
+const BOARD_EDGE_LEAN = 0.15;
 /** Body against a rail, from railFit: tilt off the rail's up, and the skis' angle against its direction. */
 const fit = { tilt: 0, angle: 0 };
 
@@ -381,7 +383,10 @@ export function stepSkier(s: SkierState, input: InputState, course: Course, dt: 
   s.crouch = approach(s.crouch, crouchTarget, dt / (crouchTarget > s.crouch ? c.crouchTime : c.standTime));
 
   if (s.rail >= 0) {
-    endButter(s);
+    // A board presses its nose or tail on a rail too (a nose or tail press:
+    // only a pose and a name, the slide is the same); skis don't.
+    if (RIDE.board) updateButter(s, input, dt);
+    else endButter(s);
     slideRail(s, input, course, steer, dt);
     return;
   }
@@ -594,8 +599,17 @@ function rideSnow(s: SkierState, input: InputState, hf: Heightfield, dt: number)
   // switchEdgeHold), fading in with the speed backwards along the skis.
   const backwards = s.velocity.x * Math.sin(s.yaw) + s.velocity.z * Math.cos(s.yaw);
   const sw = clamp(backwards / c.switchSpeed, 0, 1);
-  const grip = c.grip * (1 + (c.switchGrip - 1) * sw);
-  const edgeHold = c.edgeHold * (1 + (c.switchEdgeHold - 1) * sw);
+  let grip = c.grip * (1 + (c.switchGrip - 1) * sw);
+  let edgeHold = c.edgeHold * (1 + (c.switchEdgeHold - 1) * sw);
+  // A snowboard (milestone 22) carves on one edge or the other: leaning to
+  // the board's left (lean > 0) is the heel side for a regular rider, the
+  // toe side for goofy. The edge's grip eases in with the lean (no jump as
+  // it crosses flat).
+  const heelSign = RIDE.goofy ? -1 : 1;
+  if (RIDE.board) {
+    const k = clamp((s.lean * heelSign) / BOARD_EDGE_LEAN, -1, 1);
+    grip *= 1 + ((k > 0 ? c.heelEdge : c.toeEdge) - 1) * Math.abs(k);
+  }
 
   // Steering: the skis turn at a rate that drops with speed, and never faster
   // than the edges can carve (a held turn is a clean arc, not a skid).
@@ -630,6 +644,9 @@ function rideSnow(s: SkierState, input: InputState, hf: Heightfield, dt: number)
 
   u += slopeGravity.dot(forward) * dt;
   const sidePull = slopeGravity.dot(left);
+  // On a board the uphill edge holds against the slope's pull: the board's
+  // right edge when the pull is to its left (the toe side, regular).
+  if (RIDE.board) edgeHold *= sidePull * heelSign < 0 ? c.heelEdge : c.toeEdge;
   const overHold = Math.abs(sidePull) - edgeHold * load;
   if (overHold > 0) w += Math.sign(sidePull) * overHold * dt;
 

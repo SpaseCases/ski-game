@@ -1,11 +1,13 @@
 import type { Action, Bindings } from '../core/input.ts';
 import type { Settings } from '../core/settings.ts';
-import { keycap, keyName } from './keyNames.ts';
+import { RIDE } from '../sim/tuning.ts';
+import { actionName, keycap, keyName } from './keyNames.ts';
 import { addBackButton, board, setHints, type Screen } from './menus.ts';
 
 // The Controls screen: GAME_DESIGN.md's key tables, built from the current
 // bindings and the Pop with setting each time it opens, so rebound keys show
-// as they are. A plank at the top opens the key tester.
+// as they are. A plank at the top opens the key tester. On a snowboard
+// (milestone 22) the tables say what the keys do on a board.
 
 /** A key cell: the action keys as keycaps, joined by `/` for a pair like left / right. */
 type Keys = readonly (Action | 'Esc' | '/')[];
@@ -23,13 +25,20 @@ interface Row {
 /** The riding rows; `popKey` is the key that pops now (the pop key, or ↑ with "Pop with: ↑"). */
 function rows(popWithUp: boolean, popKey: string): Row[] {
   const pop: Row = { keys: ['pop'], note: 'hold, then release', ground: 'Crouch (less drag), then pop (↓ while crouching: no pop)', air: '', rail: 'Crouch, then pop off' };
+  const board = RIDE.board;
   return [
-    { keys: ['left', '/', 'right'], ground: 'Turn', air: 'Spin left or right', rail: 'Turn the skis (any angle)' },
+    board
+      ? { keys: ['left', '/', 'right'], ground: 'Turn (onto the heel or toe edge)', air: 'Spin frontside or backside', rail: 'Turn the board (along: 50-50; across: board or lipslide)' }
+      : { keys: ['left', '/', 'right'], ground: 'Turn', air: 'Spin left or right', rail: 'Turn the skis (any angle)' },
     ...(popWithUp ? [] : [pop]),
     popWithUp ? { ...pop, keys: ['up'], air: 'Front flip' } : { keys: ['up'], ground: '', air: 'Front flip (hold it off the lip)', rail: '' },
     { keys: ['down'], ground: 'Brake', air: 'Back flip', rail: 'Brake' },
-    { keys: ['pole'], ground: `Pole push; tuck once fast (${popKey} from a tuck pops at full strength)`, air: '', rail: '' },
-    ...OTHER_ROWS,
+    board
+      ? { keys: ['pole'], ground: `Push with the back foot; tuck once fast (${popKey} from a tuck pops at full strength)`, air: '', rail: '' }
+      : { keys: ['pole'], ground: `Pole push; tuck once fast (${popKey} from a tuck pops at full strength)`, air: '', rail: '' },
+    ...(board
+      ? [{ keys: ['lincolnLeft', '/', 'lincolnRight'] as Keys, ground: '', air: `${actionName('lincolnLeft')} or ${actionName('lincolnRight')} (a flip over the heels or the toes)`, rail: '' }, ...OTHER_ROWS.slice(1)]
+      : OTHER_ROWS),
   ];
 }
 
@@ -49,6 +58,22 @@ const GRABS: readonly (readonly [Action, string, Action, string])[] = [
   ['grabLeftJapan', 'Left japan', 'grabRightJapan', 'Right japan'],
   ['grabLeftTail', 'Left tail', 'grabRightTail', 'Right tail'],
   ['grabLeftNose', 'Left nose', 'grabRightNose', 'Right nose'],
+];
+
+/** On a board: the front hand's row of grab keys, then the rear hand's (the names come from actionName). */
+const BOARD_GRABS: readonly (readonly [Action, Action])[] = [
+  ['grabLeftMute', 'grabRightMute'],
+  ['grabLeftSafety', 'grabRightSafety'],
+  ['grabLeftJapan', 'grabRightJapan'],
+  ['grabLeftTail', 'grabRightTail'],
+  ['grabLeftNose', 'grabRightNose'],
+];
+
+const BOARD_STYLE: readonly (readonly [Action, string])[] = [
+  ['styleSeaman', 'The board turned about 70° under the hips, shoulders still'],
+  ['styleDaffy', 'The front leg kicked straight, the nose boned out'],
+  ['styleIronCross', 'Both hands on the nose, the board stood up in front'],
+  ['styleSpreadEagle', 'Both legs straight, the board flat out under you'],
 ];
 
 const STYLE: readonly (readonly [Action, string, string])[] = [
@@ -150,9 +175,10 @@ export class ControlsScreen implements Screen {
 
     const grabs = document.createElement('table');
     grabs.className = 'controls-table grabs-table';
-    grabs.innerHTML = '<caption>Grabs (hold in the air, let go to release)</caption><thead><tr><th scope="col">Key</th><th scope="col">Left hand</th><th scope="col">Key</th><th scope="col">Right hand</th></tr></thead>';
+    const board = RIDE.board;
+    grabs.innerHTML = `<caption>Grabs (hold in the air, let go to release)</caption><thead><tr><th scope="col">Key</th><th scope="col">${board ? 'Front hand' : 'Left hand'}</th><th scope="col">Key</th><th scope="col">${board ? 'Rear hand' : 'Right hand'}</th></tr></thead>`;
     const gbody = document.createElement('tbody');
-    for (const [la, ln, ra, rn] of GRABS) {
+    for (const [la, ln, ra, rn] of board ? BOARD_GRABS.map(([f, r]) => [f, actionName(f), r, actionName(r)] as const) : GRABS) {
       const tr = document.createElement('tr');
       tr.append(cell([la]), td(ln), cell([ra]), td(rn));
       gbody.appendChild(tr);
@@ -163,7 +189,7 @@ export class ControlsScreen implements Screen {
     style.className = 'controls-table grabs-table';
     style.innerHTML = '<caption>Style moves (hold in the air, let go to release)</caption><thead><tr><th scope="col">Key</th><th scope="col">Move</th><th scope="col">What it looks like</th></tr></thead>';
     const sbody = document.createElement('tbody');
-    for (const [action, name, look] of STYLE) {
+    for (const [action, name, look] of board ? BOARD_STYLE.map(([a, look]) => [a, actionName(a), look] as const) : STYLE) {
       const tr = document.createElement('tr');
       tr.append(cell([action]), td(name), td(look));
       sbody.appendChild(tr);
@@ -175,8 +201,12 @@ export class ControlsScreen implements Screen {
     for (const text of [
       'Hold a spin key and a flip key together to tilt the spin: that makes corks and misty flips.',
       'Spins and flips keep going while the key is held and slow down after you let go. Let go early to time the landing.',
-      `Butter on the snow: hold a nose grab key (${mainKeys(keys, 'grabLeftNose', 'grabRightNose')}) to press onto your tips or a tail grab key (${mainKeys(keys, 'grabLeftTail', 'grabRightTail')}) onto your tails. ← → pivot the skis; releasing ${popKey} pops off that end.`,
-      'Land on a rail or box to slide it. There is no grind button.',
+      board
+        ? `Butter on the snow: hold ${mainKeys(keys, 'grabLeftNose', 'grabRightNose')} to press onto the nose or ${mainKeys(keys, 'grabLeftTail', 'grabRightTail')} onto the tail. ← → pivot the board; releasing ${popKey} pops off that end (a nollie or an ollie). On a rail they're a nose or tail press.`
+        : `Butter on the snow: hold a nose grab key (${mainKeys(keys, 'grabLeftNose', 'grabRightNose')}) to press onto your tips or a tail grab key (${mainKeys(keys, 'grabLeftTail', 'grabRightTail')}) onto your tails. ← → pivot the skis; releasing ${popKey} pops off that end.`,
+      board
+        ? 'Land on a rail or box to slide it: along it is a 50-50; across it is a boardslide if the nose crossed over it, a lipslide if the tail did. Landing sideways to your travel on the snow crashes.'
+        : 'Land on a rail or box to slide it. There is no grind button.',
       `At the finish, ${keys.confirm[0] ? keyName(keys.confirm[0]) : 'the Back to top button'} takes you back to the top.`,
       'Drag the game view with the mouse to look around the skier.',
       'Change any key, and whether Space or ↑ pops, in Settings.',

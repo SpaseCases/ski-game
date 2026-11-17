@@ -21,6 +21,32 @@ import { CONFIG } from './config.ts';
 import type { Heightfield } from './maps/types.ts';
 import { createSkierPose, SkierView, type SkierPose } from './render/skierView.ts';
 import { SkierRig } from './render/skierRig.ts';
+import { createPoseBuffer, setPose } from './render/poseBlend.ts';
+import {
+  BOARD_CHAIR,
+  BOARD_CROUCH,
+  BOARD_NOSE_PRESS,
+  BOARD_SLAM_HEEL,
+  BOARD_SLAM_TOE,
+  BOARD_STANCE,
+  BOARD_TAIL_PRESS,
+  BOARD_TUCK,
+  BOARD_TUMBLE,
+  CRAIL,
+  INDY,
+  JAPAN,
+  MELON,
+  METHOD,
+  MUTE,
+  NOSE_GRAB,
+  POKE,
+  ROAST_BEEF,
+  ROCKET,
+  SHIFTY,
+  STALEFISH,
+  STIFFY,
+  TAIL_GRAB,
+} from './render/boardPoses.ts';
 import { COLOR_PARTS, DEFAULT_OUTFIT, GARMENTS, HEADWEAR, PATTERNS, type Outfit } from './core/outfit.ts';
 import {
   CROUCH,
@@ -53,6 +79,8 @@ interface Entry {
   airborne: boolean;
   /** Changes to the page's outfit for this view. */
   outfit?: Partial<Outfit>;
+  /** On a snowboard (milestone 22): the pose is a board pose, or the riding state is drawn on a board. */
+  board?: boolean;
 }
 
 /** The riding state the game turns into a pose (see SkierView). */
@@ -199,7 +227,55 @@ const LOOKS: (Entry | null)[] = [
   })),
 ];
 
-const SETS: Record<string, (Entry | null)[]> = { poling: POLING, skating: SKATING, looks: LOOKS };
+/** ?set=board (milestone 22): every snowboard pose, regular (&goofy=1 for goofy riding views). */
+const BOARD: (Entry | null)[] = [
+  ...(
+    [
+      ['Stance', 'Across the board, knees flexed, looking over the front shoulder', BOARD_STANCE, false],
+      ['Crouch', 'Loading a pop', BOARD_CROUCH, false],
+      ['Tuck', 'Low and fast (Shift)', BOARD_TUCK, false],
+      ['Nose press', 'Butter on the nose', BOARD_NOSE_PRESS, false],
+      ['Tail press', 'Butter on the tail', BOARD_TAIL_PRESS, false],
+      ['Chair', 'Front foot in, the board hanging nose forward', BOARD_CHAIR, false],
+      ['Mute (A)', 'Front hand, toe edge between the bindings', MUTE, true],
+      ['Melon (S)', 'Front hand, heel edge behind the front leg', MELON, true],
+      ['Method (D)', 'Front hand on the heel edge, board pulled up behind', METHOD, true],
+      ['Japan (F)', 'Front hand on the toe edge, board tucked up behind', JAPAN, true],
+      ['Nose grab (G)', 'Front hand to the nose', NOSE_GRAB, true],
+      ['Indy (Z)', 'Rear hand, toe edge between the bindings', INDY, true],
+      ['Stalefish (X)', 'Rear hand behind the back leg, heel edge', STALEFISH, true],
+      ['Roast beef (C)', 'Rear hand between the legs, heel edge', ROAST_BEEF, true],
+      ['Tail grab (V)', 'Rear hand to the tail', TAIL_GRAB, true],
+      ['Crail (B)', 'Rear hand across to the toe edge by the nose', CRAIL, true],
+      ['Shifty (T)', 'Board turned under the hips', SHIFTY, true],
+      ['Poke (W)', 'Front leg kicked straight, nose boned', POKE, true],
+      ['Rocket air (1)', 'Both hands on the nose, board stood up', ROCKET, true],
+      ['Stiffy (2)', 'Both legs straight, board flat', STIFFY, true],
+      ['Tumble', 'Crash: balled up with the board on', BOARD_TUMBLE, true],
+      ['Heel-side slam', 'Crash: heel edge caught, onto the back', BOARD_SLAM_HEEL, false],
+      ['Toe-side slam', 'Crash: toe edge caught, onto the knees', BOARD_SLAM_TOE, false],
+    ] as const
+  ).map(([name, note, pose, airborne]) => ({ name, note, pose, airborne, board: true })),
+  null,
+];
+/** ?set=boardride: riding states on a board as the game draws them. */
+const BOARD_RIDE: (Entry | null)[] = [
+  { name: 'Riding', note: 'In game: straight at speed', ride: { speed: 10 }, airborne: false, board: true },
+  { name: 'Heel-side carve', note: 'In game: hard turn on the heels', ride: { speed: 12, lean: 0.85 }, airborne: false, board: true },
+  { name: 'Toe-side carve', note: 'In game: hard turn on the toes', ride: { speed: 12, lean: -0.85 }, airborne: false, board: true },
+  { name: 'Crouch', note: 'In game: loading a pop', ride: { speed: 5, crouch: 1 }, airborne: false, board: true },
+  { name: 'Tuck', note: 'In game: Shift when fast', ride: { speed: 15, crouch: 1 }, airborne: false, board: true },
+  { name: 'Hockey stop', note: 'In game: full brake', ride: { speed: 8, brake: 1, brakeSide: 1 }, airborne: false, board: true },
+  { name: '50-50', note: 'In game: along a rail', ride: { speed: 6, onRail: true, railYaw: 0 }, airborne: false, board: true },
+  { name: 'Boardslide', note: 'In game: across a rail', ride: { speed: 6, onRail: true, railYaw: Math.PI / 2 }, airborne: false, board: true },
+  { name: 'Nose press', note: 'In game: nose key on the snow', ride: { speed: 6, butter: 1 }, airborne: false, board: true },
+  { name: 'Tail press', note: 'In game: tail key on the snow', ride: { speed: 6, butter: -1 }, airborne: false, board: true },
+  { name: 'Fakie', note: 'In game: riding backwards, looking back', ride: { speed: -8 }, airborne: false, board: true },
+  null,
+  ...SKATE_POINTS.map(([phase, what]) => ({ name: 'Foot push', note: `${what} (${phase})`, ride: { speed: 3, polePhase: phase }, airborne: false, board: true })),
+];
+
+const SETS: Record<string, (Entry | null)[]> = { poling: POLING, skating: SKATING, looks: LOOKS, board: BOARD, boardride: BOARD_RIDE };
 const ENTRIES = SETS[new URLSearchParams(window.location.search).get('set') ?? ''] ?? POSES;
 
 const COLS = 6;
@@ -313,7 +389,13 @@ const views: (View | null)[] = ENTRIES.map((entry) => {
   if (entry.pose) {
     const rig = new SkierRig(dress);
     rig.setGlow(glow);
-    rig.apply(entry.pose);
+    if (entry.board) {
+      // A board pose goes through a pose buffer, as the game blends it.
+      rig.setBoard(true);
+      const buffer = createPoseBuffer();
+      setPose(buffer, entry.pose);
+      rig.apply(buffer);
+    } else rig.apply(entry.pose);
     const lift = entry.airborne ? AIR_HEIGHT : 0;
     rig.root.position.y = lift;
     scene.add(rig.root);
@@ -325,6 +407,7 @@ const views: (View | null)[] = ENTRIES.map((entry) => {
   // Riding states go through SkierView, which adds its own shadow.
   const view = new SkierView(scene, flat, dress);
   view.rig.setGlow(glow);
+  if (entry.board) view.setRide(true, params.get('goofy') === '1');
   const ride = { ...RIDE_DEFAULTS, ...entry.ride };
   const pose = ridePose(ride);
   view.snap(pose);

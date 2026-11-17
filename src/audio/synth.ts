@@ -15,6 +15,7 @@ export type ShotId =
   | 'slabCrack'
   | 'pole'
   | 'skate'
+  | 'footPush'
   | 'railMetal'
   | 'railWood'
   | 'cheer'
@@ -432,6 +433,34 @@ const SHOTS: Record<ShotId, Recipe> = {
       src.stop(0.6);
       // Grit in the scrape, thinning out.
       crunch(ctx, out, r, n, 0.16, 0.26, 0.16, 1500);
+    },
+  },
+  // A snowboard's push (milestone 22), from the start of the push: the back
+  // boot stamps into the snow (a dull thud under a packed crunch), then
+  // scuffs back along it, lower and grittier than a ski's skate, and lifts.
+  footPush: {
+    seconds: 0.6,
+    build(ctx, out, r, n) {
+      tone(ctx, out, { t: 0.1, f0: 140, f1: 70, decay: 0.035, gain: 0.5 });
+      crunch(ctx, out, r, n, 0.1, 0.06, 0.55, 1700);
+      const src = ctx.createBufferSource();
+      src.buffer = n.pink;
+      src.loop = true;
+      const f = ctx.createBiquadFilter();
+      f.type = 'bandpass';
+      f.Q.value = 1.1;
+      f.frequency.setValueAtTime(1300, 0.12);
+      f.frequency.exponentialRampToValueAtTime(650, 0.5);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, 0);
+      g.gain.setValueAtTime(0, 0.12);
+      g.gain.linearRampToValueAtTime(0.42, 0.2);
+      g.gain.setTargetAtTime(0.26, 0.24, 0.07);
+      g.gain.setTargetAtTime(0, 0.42, 0.05);
+      src.connect(f).connect(g).connect(out);
+      src.start(0, r());
+      src.stop(0.6);
+      crunch(ctx, out, r, n, 0.18, 0.22, 0.14, 1100);
     },
   },
   // Onto a metal rail: a clank with a ring (out-of-tune partials, like a struck pipe).

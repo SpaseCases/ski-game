@@ -2,6 +2,7 @@ import { CONFIG } from '../config.ts';
 import type { RailShape } from '../maps/types.ts';
 import { sketchyLanding } from '../sim/score.ts';
 import type { SkierState } from '../sim/skier.ts';
+import { RIDE } from '../sim/tuning.ts';
 import { AudioEngine, Voice } from './engine.ts';
 
 // The skier's sounds. Like the snow effects, they're worked out from the
@@ -141,7 +142,8 @@ export class RidingSounds {
     } else if (prev.rail < 0 && s.rail >= 0) {
       this.railOn(s, rails);
     }
-    if (s.poleTime < prev.poleTime && s.grounded && s.rail < 0 && s.lift < 0) e.play(this.poles ? 'pole' : 'skate');
+    // A push: poles planted, a skating step without them, or on a board the back foot (milestone 22).
+    if (s.poleTime < prev.poleTime && s.grounded && s.rail < 0 && s.lift < 0) e.play(RIDE.board ? 'footPush' : this.poles ? 'pole' : 'skate');
   }
 
   /** Sets the continuous sounds from the skier's state `s` now (at game speed `pitch`, in powder or not). */
@@ -151,11 +153,22 @@ export class RidingSounds {
     // On a chairlift's chair (milestone 17) the skis are off the snow: only the wind is heard.
     const sitting = s.lift >= 0 && s.liftChair >= 0;
     const onSnow = s.grounded && s.rail < 0 && !s.bailed && !sitting;
-    if (onSnow) carveTarget(speed, s.lean, powder, t);
-    else if (s.bailed) slideTarget(speed, t);
+    const b = CONFIG.audio.board;
+    if (onSnow) {
+      carveTarget(speed, s.lean, powder, t);
+      // A board carves on one long edge: a little louder and lower than two skis.
+      if (RIDE.board) {
+        t.gain *= b.carveGain;
+        t.freq *= b.carveFreq;
+      }
+    } else if (s.bailed) slideTarget(speed, t);
     else t.gain = 0;
     this.carve.set(t.gain, t.freq, pitch);
     brakeTarget(speed, onSnow ? s.brake : 0, t);
+    if (RIDE.board) {
+      t.gain *= b.brakeGain;
+      t.freq *= b.brakeFreq;
+    }
     this.brake.set(t.gain, t.freq, pitch);
     windTarget(speed, (!s.grounded || sitting) && !s.bailed, t);
     this.wind.set(t.gain, t.freq, pitch, 0, 0.15);

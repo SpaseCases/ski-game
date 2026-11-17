@@ -15,6 +15,21 @@ import { groundAt } from '../sim/terrain.ts';
 import { TUNING } from '../sim/tuning.ts';
 import { addPoseDelta, createPoseBuffer, setPose, type PoseBuffer } from './poseBlend.ts';
 import { CHAIR, CROUCH, GRABS, NOSE_PRESS, STANCE, STANCE_HALF_WIDTH, TAIL_PRESS, TUCK, TUMBLE, TUMBLE_CENTER } from './skierPoses.ts';
+import {
+  BOARD_CHAIR,
+  BOARD_CROUCH,
+  BOARD_GRABS,
+  BOARD_NOSE_PRESS,
+  BOARD_SLAM_HEEL,
+  BOARD_SLAM_TOE,
+  BOARD_STANCE,
+  BOARD_TAIL_PRESS,
+  BOARD_TUCK,
+  BOARD_TUMBLE,
+  BOARD_TUMBLE_CENTER,
+  PUSH_BACK,
+  PUSH_FOOT,
+} from './boardPoses.ts';
 import { DEFAULT_OUTFIT, type Outfit } from '../core/outfit.ts';
 import { SkierRig } from './skierRig.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
@@ -131,7 +146,12 @@ const HAND_WIDE = 0.36;
 /**
  * Draws the skier and its blob shadow from interpolated sim state.
  *   root (on the snow, tilted to the slope, turned to the ski heading)
- *   └ swing (hockey-stop yaw) └ lean (roll into the turn) └ rig
+ *   └ swing (hockey-stop yaw) └ lean (roll into the turn) └ stance └ rig
+ * The stance group does nothing on skis. On a snowboard (milestone 22,
+ * setRide) the sim's heading is the board's, and the stance group turns
+ * the rig a quarter turn so the rider stands across it (facing the board's
+ * right, riding regular), mirrored for goofy; the board's poses
+ * (render/boardPoses.ts) are written for regular in the rig's own space.
  */
 export class SkierView {
   /** The posed model; its root sits inside this view's groups. */
@@ -139,7 +159,15 @@ export class SkierView {
   private readonly root = new Group();
   private readonly swing = new Group();
   private readonly lean = new Group();
+  private readonly stance = new Group();
   private readonly pose: PoseBuffer = createPoseBuffer();
+  /** On a snowboard (milestone 22), and goofy (the right foot forward). */
+  private board = false;
+  private goofy = false;
+  /** A board's crash: which slam starts it (1 toe side, -1 heel side), and how far the head has turned to look back over the rear shoulder riding fakie. */
+  private slamSide = -1;
+  private wasBailed = false;
+  private fakieLook = 0;
   private readonly shadow: Mesh;
   private readonly shadowMaterial: MeshBasicMaterial;
   private readonly tilt = new Quaternion();
@@ -180,7 +208,8 @@ export class SkierView {
     this.rig = new SkierRig(outfit);
     this.root.add(this.swing);
     this.swing.add(this.lean);
-    this.lean.add(this.rig.root);
+    this.lean.add(this.stance);
+    this.stance.add(this.rig.root);
     scene.add(this.root);
 
     // Blob shadow: a dark disc on the snow instead of real shadow maps. Vertex
@@ -206,6 +235,28 @@ export class SkierView {
     scene.add(this.shadow);
   }
 
+  /**
+   * Skis, or a snowboard (milestone 22) ridden regular or goofy: swaps the
+   * rig's feet and board, and turns (and for goofy mirrors) the rig across
+   * the board's heading.
+   */
+  setRide(board: boolean, goofy: boolean): void {
+    this.board = board;
+    this.goofy = board && goofy;
+    this.rig.setBoard(board);
+    // Regular: the rig's -X (the nose, the left foot's side) along the board's -Z.
+    this.stance.rotation.y = board ? (this.goofy ? Math.PI / 2 : -Math.PI / 2) : 0;
+    this.stance.scale.x = this.goofy ? -1 : 1;
+  }
+
+  /** On a snowboard, and goofy (see setRide). */
+  get onBoard(): boolean {
+    return this.board;
+  }
+  get isGoofy(): boolean {
+    return this.goofy;
+  }
+
   /** Drops all smoothing and blending and shows the pose as it is (start and respawn). */
   snap(pose: SkierPose): void {
     this.offset.identity();
@@ -219,6 +270,8 @@ export class SkierView {
     this.tailWeight = pose.butter === -1 ? pose.butterAmount : 0;
     this.lastPolePhase = pose.polePhase;
     this.skateArms = !this.rig.hasPoles && pose.polePhase < 1 ? 1 : 0;
+    this.wasBailed = pose.bailed;
+    this.fakieLook = 0;
   }
 
   /**
@@ -271,6 +324,12 @@ export class SkierView {
     // Switching grabs briefly overlaps two; keep the total at most 1.
     const grabScale = grabTotal > 1 ? live / grabTotal : live;
     const free = live - Math.min(grabTotal, 1) * live;
+
+    if (this.board) {
+      this.poseBoard(state, frameTime, firstArms, live, grabScale, free);
+      this.placeShadow(state);
+      return;
+    }
 
     // A crash tumbles around the middle of the balled-up body, not the feet.
     const bw = this.bailWeight;
@@ -342,7 +401,11 @@ export class SkierView {
     // On a rail the skis rest on the rail, not the snow.
     this.sitOnDrawnSnow(onSnow * (1 - this.railWeight) * (state.sitting ? 0 : 1));
 
-    // Shadow sits on the drawn snow under the body and fades as it rises.
+    this.placeShadow(state);
+  }
+
+  /** The blob shadow sits on the drawn snow under the body and fades as it rises. */
+  private placeShadow(state: SkierPose): void {
     const pos = state.center;
     const ground = groundAt(this.hf, pos.x, pos.z, this.groundNormal);
     const height = Math.max(0, pos.y - ground - (state.bailed ? CONFIG.bail.centerHeight : CONFIG.air.comHeight));
@@ -355,17 +418,114 @@ export class SkierView {
   }
 
   /**
+   * A snowboard's pose (milestone 22): the board's stance, crouch, tuck,
+   * presses, grabs and style moves, rails, the chair and the crash, blended
+   * as the skier's are; the board on its edge by the whole lean (the body
+   * by its share, the rest from the hips and knees over the heels or the
+   * toes); the back foot's push; the head turned back over the rear
+   * shoulder riding fakie.
+   */
+  private poseBoard(state: SkierPose, frameTime: number, firstArms: number, live: number, grabScale: number, free: number): void {
+    const r = CONFIG.render;
+    const bw = this.bailWeight;
+    const sit = this.sitWeight;
+    this.root.position.lerpVectors(state.position, state.center, bw);
+    this.rig.root.position.set(-BOARD_TUMBLE_CENTER[0] * bw, -BOARD_TUMBLE_CENTER[1] * bw, -BOARD_TUMBLE_CENTER[2] * bw);
+
+    const speed = Math.hypot(state.velocity.x, state.velocity.z);
+    const tuck = smoothstep(r.tuckSpeedMin, r.tuckSpeedFull, speed);
+    const squash = state.landDepth * landCurve(state.landTime);
+    const groundCrouch =
+      state.crouch * (1 - tuck) +
+      state.brake * r.brakeSink * (1 - state.crouch) +
+      squash * (1 - state.crouch) +
+      this.railWeight * r.railCrouch * (1 - state.crouch);
+
+    // A board's hockey stop: it swings across the travel, the rider leaning
+    // away from the skid. The board goes onto its edge by the whole lean.
+    const stop = state.brake * (1 - this.railWeight);
+    const swing = stop * r.brakeTwist * state.brakeSide * live;
+    const leanTotal = (state.lean + stop * r.brakeLean * state.brakeSide) * live;
+    const onSnow = (1 - this.airWeight) * live;
+    const deep = Math.min(1, groundCrouch + state.crouch * tuck);
+    const legShare = (1 - r.leanBodyShare) * (1 - (1 - r.crouchAngulation) * deep);
+    const bodyLean = leanTotal * (1 - legShare * onSnow);
+    this.swing.rotation.y = swing;
+    this.lean.rotation.z = bodyLean;
+
+    // The crash starts with a slam onto the side the body went over to: the
+    // toes if the rider was moving the way the chest faces, else the heels.
+    if (state.bailed && !this.wasBailed) {
+      chest.set(this.goofy ? -1 : 1, 0, 0).applyQuaternion(state.orient);
+      this.slamSide = chest.dot(state.velocity) > 0 ? 1 : -1;
+    }
+    this.wasBailed = state.bailed;
+    const slam = state.bailed ? 1 - smoothstep(0.35, 0.8, state.bailTime) : 0;
+
+    const airCrouch = r.airCrouch + r.spinTuck * Math.min(1, state.spinRate / TUNING.air.flipRate);
+    const air = this.airWeight;
+    const p = this.pose;
+    setPose(p, BOARD_STANCE);
+    addPoseDelta(p, BOARD_STANCE, BOARD_CROUCH, free * (groundCrouch * (1 - air) + airCrouch * air));
+    addPoseDelta(p, BOARD_STANCE, BOARD_TUCK, free * state.crouch * tuck * (1 - air));
+    addPoseDelta(p, BOARD_STANCE, BOARD_NOSE_PRESS, free * this.noseWeight * (1 - air));
+    addPoseDelta(p, BOARD_STANCE, BOARD_TAIL_PRESS, free * this.tailWeight * (1 - air));
+    for (let i = 0; i < BOARD_GRABS.length; i++) {
+      const w = (this.grabWeights[i] ?? 0) * grabScale;
+      if (w > 0) addPoseDelta(p, BOARD_STANCE, BOARD_GRABS[i]!, w);
+    }
+    addPoseDelta(p, BOARD_STANCE, BOARD_TUMBLE, bw * (1 - slam));
+    addPoseDelta(p, BOARD_STANCE, this.slamSide > 0 ? BOARD_SLAM_TOE : BOARD_SLAM_HEEL, bw * slam);
+    addPoseDelta(p, BOARD_STANCE, BOARD_CHAIR, sit);
+
+    // The push: the back foot comes out of its binding (no poles on a board).
+    this.lastPolePhase = state.polePhase;
+    const pushing = !state.bailed && sit < 0.5 && state.polePhase < 1;
+    // Snow kicks off the toe side, where the foot pushes: the board's right riding regular, its left goofy.
+    this.skateSide = pushing ? (this.goofy ? -1 : 1) : 0;
+    if (pushing) boardPush(p, state.polePhase, onSnow);
+
+    // On an edge: the board rolls by the rest of the lean; over the heels the
+    // hips sit back and down, over the toes they press forward and the
+    // knees drive. Heel side is the board's left riding regular, its right goofy.
+    const heel = (leanTotal - bodyLean) * (this.goofy ? -1 : 1) * onSnow;
+    p.board.roll -= heel;
+    p.pelvis[2] += heel * BOARD_EDGE.hips * (1 - deep);
+    p.pelvis[1] -= Math.abs(heel) * BOARD_EDGE.sink * (1 - deep);
+    p.chestPitch -= heel * BOARD_EDGE.chest;
+    for (let i = 0; i < 2; i++) {
+      const h = p.hands[i === 0 ? 0 : 1];
+      if (h.boardWeight > 0) continue;
+      h.at[2] += heel * BOARD_EDGE.hips * (1 - deep);
+      h.at[1] -= Math.abs(heel) * BOARD_EDGE.sink * (1 - deep);
+    }
+
+    // Riding fakie, the head turns back over the rear shoulder to see where it's going.
+    nose.set(0, 0, -1).applyQuaternion(state.orient);
+    const along = nose.dot(state.velocity);
+    const backwards = !state.bailed && sit < 0.5 && along < -BOARD_FAKIE_SPEED ? 1 : 0;
+    this.fakieLook += (backwards - this.fakieLook) * (1 - Math.exp(-frameTime / 0.25));
+    p.headYaw -= this.fakieLook * BOARD_FAKIE.head;
+    p.chestYaw -= this.fakieLook * BOARD_FAKIE.chest;
+
+    if (firstArms > 0) raiseBoardArms(p, firstArms * live, deep);
+    this.rig.apply(p);
+    // On a rail the board rests on the rail, not the snow.
+    this.sitOnDrawnSnow(onSnow * (1 - this.railWeight) * (state.sitting ? 0 : 1), BOARD_POINTS);
+  }
+
+  /**
    * The sim rides a smooth surface, but the snow is drawn as flat facets
    * with some jitter, a few centimeters off (more on the side banks). On the
    * snow, move the skier up or down so the skis rest on the drawn facets:
    * the lowest point of each ski touches, none sinks in.
    */
-  private sitOnDrawnSnow(weight: number): void {
+  private sitOnDrawnSnow(weight: number, points = SKI_POINTS): void {
     if (weight <= 0) return;
     this.root.updateMatrix();
     let lift = -Infinity;
-    for (let i = 0; i < SKI_POINTS.length; i++) {
-      const pt = SKI_POINTS[i]!;
+    for (let i = 0; i < points.length; i++) {
+      const pt = points[i]!;
       // In a butter only the pressed end touches: the other is up off the snow.
       if ((pt[1] > 0 && this.noseWeight > 0.5) || (pt[1] < 0 && this.tailWeight > 0.5)) continue;
       skiPoint.set(pt[0], 0, pt[1]).applyQuaternion(this.swing.quaternion).applyMatrix4(this.root.matrix);
@@ -385,6 +545,27 @@ const SKI_POINTS: readonly (readonly [number, number])[] = [
   [STANCE_HALF_WIDTH, -0.7],
 ];
 const skiPoint = new Vector3();
+/** A board's bottom where it touches the snow (the heading's frame x, z): nose, tail, and each edge under the bindings and at the middle. */
+const BOARD_POINTS: readonly (readonly [number, number])[] = [
+  [0, -0.7],
+  [0, 0.7],
+  [-0.12, -0.26],
+  [0.12, -0.26],
+  [-0.12, 0],
+  [0.12, 0],
+  [-0.12, 0.26],
+  [0.12, 0.26],
+];
+const chest = new Vector3();
+const nose = new Vector3();
+/** On a board's edge, per radian of the lean the legs take: how far (m) the hips move toward the heels (or the toes), how far they sink, and how far the chest pitches back (or forward). */
+const BOARD_EDGE = { hips: 0.32, sink: 0.12, chest: 0.35 };
+/** Riding fakie faster than this (m/s) backwards, the head and chest turn back (radians) over the rear shoulder. */
+const BOARD_FAKIE_SPEED = 1;
+const BOARD_FAKIE = { head: 1.45, chest: 0.4 };
+/** First person on a board: how far (m) the front and rear hands move into the view. The eye looks over the front shoulder toward the nose, so the front hand drops and comes round to the toe side (out of the line of sight, at the view's lower right), and the rear one comes forward. */
+const FIRST_BOARD_FRONT: readonly [number, number, number] = [0.12, -0.08, -0.32];
+const FIRST_BOARD_REAR: readonly [number, number, number] = [-0.1, 0.1, -0.2];
 
 /**
  * Turns from the knees and hips. The rig sits in the lean group, already
@@ -466,6 +647,60 @@ function raiseArms(p: PoseBuffer, w: number, deep: number): void {
     h.pole[2] += FIRST_POLE_SHIFT[2] * k * turn;
   }
 }
+
+/** First person on a board: the hands come up into the view, the front one toward the nose, less when folded down (a board's raiseArms). */
+function raiseBoardArms(p: PoseBuffer, w: number, deep: number): void {
+  const rise = 1 - 0.6 * deep;
+  for (let i = 0; i < 2; i++) {
+    const h = p.hands[i === 0 ? 0 : 1];
+    const k = w * (1 - Math.min(1, h.boardWeight));
+    if (k <= 0) continue;
+    const shift = i === 0 ? FIRST_BOARD_FRONT : FIRST_BOARD_REAR;
+    h.at[0] += shift[0] * k;
+    h.at[1] += shift[1] * k * rise;
+    h.at[2] += shift[2] * k * rise;
+  }
+}
+
+/**
+ * A board's push (milestone 22), on the pole push's timing like the skating
+ * push: the back foot comes out of its binding, plants on the snow on the
+ * toe side, drives back along the board while the push force acts, lifts,
+ * and steps back in; the hips sit over the front foot and the shoulders
+ * open toward the nose. `weight` fades it out off the snow.
+ */
+function boardPush(p: PoseBuffer, phase: number, weight: number): void {
+  if (phase >= 1 || weight <= 0) return;
+  const s = TUNING.skier;
+  const plant = s.polePlantTime / s.polePushInterval;
+  const done = Math.min(0.95, (s.polePlantTime + s.polePushTime) / s.polePushInterval);
+  SKATE_TIMES[1] = plant;
+  SKATE_TIMES[2] = (plant + done) / 2;
+  SKATE_TIMES[3] = done;
+  const k = (keys: readonly number[]): number => keyed(SKATE_TIMES, keys, phase);
+  const foot = p.feet[1];
+  const back = k(PUSH.back) * PUSH_BACK;
+  foot.ankle[0] = PUSH_FOOT.ankle[0] + back;
+  foot.ankle[1] = PUSH_FOOT.ankle[1] + k(PUSH.lift);
+  foot.ankle[2] = PUSH_FOOT.ankle[2] + back * 0.15;
+  foot.yaw = PUSH_FOOT.yaw ?? 0;
+  foot.pitch = k(PUSH.toe);
+  foot.roll = 0;
+  p.board.free += (1 - p.board.free) * k(PUSH.free) * weight;
+  const w = k(PUSH.weight) * weight;
+  p.pelvis[0] -= 0.08 * w;
+  p.pelvis[1] -= 0.14 * w;
+  p.pelvisYaw += 0.25 * w;
+  p.chestYaw += 0.3 * w;
+}
+/** A board's push keys (at SKATE_TIMES): out of the binding (0..1), back along the board (0..1 of PUSH_BACK), lifted (m), the toe pointed (radians), the weight over the front foot (0..1). */
+const PUSH = {
+  free: [0, 1, 1, 1, 0],
+  back: [0, 0, 0.5, 1, 0.4],
+  lift: [0.1, 0, 0, 0.06, 0.12],
+  toe: [0, 0, 0, -0.3, 0],
+  weight: [0, 0.8, 1, 0.9, 0],
+} as const;
 
 /** Rotates a point or direction about the vertical axis through (cx, cz). */
 function turnY(v: [number, number, number], c: number, s: number, cx: number, cz: number): void {

@@ -18,6 +18,11 @@
 // or a thigh; the helmet's count is the baseline).
 //   node tools/model/clearance.ts            every state
 //   node tools/model/clearance.ts tuck       states whose name contains "tuck"
+// Last (milestone 22, after everything above so its output stays the
+// same): the snowboard rider, regular and goofy: every board pose and
+// riding state and the foot push, through the same checks (the jacket and
+// the head), plus the board against the body: points over the board's top
+// inside a leg, the torso or an arm.
 // Inside means inside a part's closed surface, found by counting how many
 // times a ray from the point crosses it, along two rays that must agree (a
 // ray grazing a seam can miscount). The hem is an open tube, so its rays run
@@ -29,6 +34,20 @@ import type { Heightfield } from '../../src/maps/types.ts';
 import { createSkierPose, SkierView, type SkierPose } from '../../src/render/skierView.ts';
 import { BODY, JACKET_LAYOUT, SkierRig, THIGH_RADIUS } from '../../src/render/skierRig.ts';
 import { DEFAULT_OUTFIT, HEADWEAR, type Outfit } from '../../src/core/outfit.ts';
+import { createPoseBuffer, setPose } from '../../src/render/poseBlend.ts';
+import {
+  BOARD_CHAIR,
+  BOARD_CROUCH,
+  BOARD_GRABS,
+  BOARD_NOSE_PRESS,
+  BOARD_SLAM_HEEL,
+  BOARD_SLAM_TOE,
+  BOARD_STANCE,
+  BOARD_TAIL_PRESS,
+  BOARD_TUCK,
+  BOARD_TUMBLE,
+} from '../../src/render/boardPoses.ts';
+import { GRAB_ACTIONS } from '../../src/core/input.ts';
 import {
   CROUCH,
   DAFFY,
@@ -119,8 +138,9 @@ const flat: Heightfield = {
 };
 
 /** A riding state posed the way the game poses it, after settling for a moment. */
-function rideRig(r: Ride, outfit: Outfit = DEFAULT_OUTFIT): SkierRig {
+function rideRig(r: Ride, outfit: Outfit = DEFAULT_OUTFIT, board = 0): SkierRig {
   const view = new SkierView(new Scene(), flat, outfit);
+  if (board) view.setRide(true, board < 0);
   const pose: SkierPose = createSkierPose();
   pose.center.set(0, CONFIG.air.comHeight, 0);
   pose.velocity.set(0, 0, -(r.speed ?? 0));
@@ -169,13 +189,19 @@ let worst = 0;
  * and with `head`, the head and hat against the body, and with `skis`, the
  * pushing ski against the other. Returns the report line and the head count.
  */
-function check(name: string, def: PoseDef | Ride, outfit: Outfit, head: boolean, skis: boolean): { line: string; head: number } {
+function check(name: string, def: PoseDef | Ride, outfit: Outfit, head: boolean, skis: boolean, board = 0): { line: string; head: number } {
   let rig: SkierRig;
   if ('pelvis' in def) {
     rig = new SkierRig(outfit);
-    rig.apply(def);
+    if (board) {
+      // A board pose goes through a pose buffer, as the game blends it.
+      rig.setBoard(true);
+      const buffer = createPoseBuffer();
+      setPose(buffer, def);
+      rig.apply(buffer);
+    } else rig.apply(def);
   } else {
-    rig = rideRig(def, outfit);
+    rig = rideRig(def, outfit, board);
   }
   rig.root.updateMatrixWorld(true);
   const parts = rig.parts();
@@ -319,8 +345,41 @@ function check(name: string, def: PoseDef | Ride, outfit: Outfit, head: boolean,
     }
     skiReport = `skis ${(near * 100).toFixed(0)} cm apart at the closest${through ? `, ${through}/41 points through the other ski` : ''}`;
   }
+  // The board: points over its top surface inside a body part.
+  let boardReport = '';
+  if (board) {
+    const hits = new Map<string, number>();
+    const parts2: [string, Mesh][] = [
+      ['torso', parts.torso],
+      ['hips', parts.pelvis],
+      ...[0, 1].flatMap((i): [string, Mesh][] => [
+        [`thigh${i}`, parts.thighs[i]!],
+        [`shin${i}`, parts.shins[i]!],
+        [`arm${i}`, parts.upperArms[i]!],
+        [`forearm${i}`, parts.forearms[i]!],
+      ]),
+    ];
+    for (const m of parts2) m[1].geometry.computeBoundingSphere();
+    const sphere = new Sphere();
+    let points = 0;
+    for (let x = -0.7; x <= 0.701; x += 0.05) {
+      for (let z = -0.1; z <= 0.101; z += 0.05) {
+        points++;
+        p.set(x, 0.03, z).applyMatrix4(parts.board.matrixWorld);
+        for (const [part, m] of parts2) {
+          sphere.copy(m.geometry.boundingSphere!).applyMatrix4(m.matrixWorld);
+          if (sphere.containsPoint(p) && inside(m, p, across) && inside(m, p, ahead)) hits.set(part, (hits.get(part) ?? 0) + 1);
+        }
+      }
+    }
+    const total = [...hits.values()].reduce((a, b) => a + b, 0);
+    if (total) boardReport = `board: ${total}/${points} points inside (${[...hits].map(([k, v]) => `${k} ${v}`).join(', ')})`;
+    const reach = rig.reachError > 0.02 ? `${(rig.reachError * 100).toFixed(0)} cm short` : '';
+    const ankle = rig.ankleError > 0 ? `boot ${rig.ankleError.toFixed(0)}° past` : '';
+    boardReport = [boardReport, reach, ankle].filter(Boolean).join(', ');
+  }
   rig.dispose();
-  return { line: [...poleReport, armReport, jacket, headReport, skiReport].filter(Boolean).join(' | ') || 'clear', head: headIn };
+  return { line: [...poleReport, armReport, jacket, headReport, skiReport, boardReport].filter(Boolean).join(' | ') || 'clear', head: headIn };
 }
 
 for (const [name, def] of STATES) {
@@ -399,4 +458,39 @@ for (const [name, r] of [
   }
   console.log(`push ${name.padEnd(17)} elbow: up to ${(worstElbow * 100).toFixed(1)} cm in 1% of the stroke (at ${at}%, hand moved ${(handThen * 100).toFixed(1)} cm)`);
   view.rig.dispose();
+}
+
+// The snowboard rider (milestone 22), regular then goofy.
+const BOARD_STATES: [string, PoseDef | Ride][] = [
+  ['board stance', BOARD_STANCE],
+  ['board crouch', BOARD_CROUCH],
+  ['board tuck pose', BOARD_TUCK],
+  ['board nose press', BOARD_NOSE_PRESS],
+  ['board tail press', BOARD_TAIL_PRESS],
+  ['board chair', BOARD_CHAIR],
+  ...BOARD_GRABS.map((def, i): [string, PoseDef] => [`board ${GRAB_ACTIONS[i]}`, def]),
+  ['board tumble', BOARD_TUMBLE],
+  ['board heel slam', BOARD_SLAM_HEEL],
+  ['board toe slam', BOARD_SLAM_TOE],
+  ['board ride: heel carve', { speed: 12, lean: 0.85 }],
+  ['board ride: toe carve', { speed: 12, lean: -0.85 }],
+  ['board ride: crouch carve', { speed: 5, crouch: 1, lean: 0.6 }],
+  ['board ride: tuck', { speed: 15, crouch: 1 }],
+  ['board ride: tuck carve', { speed: 15, crouch: 1, lean: -0.85 }],
+  ['board ride: hockey stop', { speed: 8, brake: 1 }],
+  ['board ride: nose press', { speed: 6, butter: 1 }],
+  ['board ride: tail press', { speed: 6, butter: -1 }],
+  ['board ride: fakie', { speed: -8 }],
+  ...[0.1, 0.2, 0.3, 0.45, 0.6, 0.75, 0.82, 0.9].map((phase): [string, Ride] => [`board push ${phase}`, { speed: 3, polePhase: phase }]),
+];
+for (const [stance, sign] of [
+  ['regular', 1],
+  ['goofy', -1],
+] as const) {
+  console.log(`\nSnowboard, ${stance} (the board against the body; head points inside the body):`);
+  for (const [name, def] of BOARD_STATES) {
+    if (filter && !name.includes(filter)) continue;
+    const r = check(name, def, DEFAULT_OUTFIT, true, false, sign);
+    console.log(`${name.padEnd(26)} ${r.line}`);
+  }
 }

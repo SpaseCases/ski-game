@@ -8,8 +8,9 @@ import { DEFAULT_OUTFIT, HEADWEAR, PATTERNS, type Outfit } from '../../src/core/
 import { SKI_TYPES } from '../../src/core/skis.ts';
 import { SkierRig } from '../../src/render/skierRig.ts';
 
-function count(o: Outfit): { calls: number; tris: number } {
+function count(o: Outfit, board = false): { calls: number; tris: number } {
   const rig = new SkierRig(o);
+  if (board) rig.setBoard(true);
   let calls = 0;
   let tris = 0;
   rig.root.traverseVisible((m) => {
@@ -47,3 +48,18 @@ for (const { id: headwear } of HEADWEAR) {
   }
 }
 console.log(`most draw calls: ${calls}; most triangles: ${worst.tris} (${worst.name})`);
+
+// The snowboard rider (milestone 22): poles off, ski boots swapped for
+// snowboard boots in bindings, one board. Last, so the lines above stay the same.
+let boardWorst = { name: '', tris: 0 };
+let boardCalls = 0;
+for (const { id: headwear } of HEADWEAR) {
+  for (const { id: pattern } of PATTERNS) {
+    const c = count({ ...DEFAULT_OUTFIT, headwear, jacketPattern: pattern, pantsPattern: pattern }, true);
+    boardCalls = Math.max(boardCalls, c.calls);
+    if (c.tris > boardWorst.tris) boardWorst = { name: `${headwear}, ${pattern}`, tris: c.tris };
+  }
+}
+const b = count(DEFAULT_OUTFIT, true);
+console.log(`snowboard (default look)     ${String(b.calls).padStart(2)} draw calls, ${String(b.tris).padStart(5)} triangles`);
+console.log(`snowboard: most draw calls: ${boardCalls}; most triangles: ${boardWorst.tris} (${boardWorst.name})`);

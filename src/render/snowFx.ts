@@ -24,9 +24,10 @@ import { LANE_ACROSS, lanePoint, RUNNING, type Avalanches, type AvalancheZone } 
 import { insideBounds } from '../sim/bounds.ts';
 import { inPowder, type PowderArea } from '../sim/powder.ts';
 import type { SkierState } from '../sim/skier.ts';
-import { TUNING } from '../sim/tuning.ts';
+import { RIDE, TUNING } from '../sim/tuning.ts';
 import type { SkierPose } from './skierView.ts';
 import { STANCE_HALF_WIDTH } from './skierPoses.ts';
+import { BOARD_HALF_WIDTH } from '../core/boards.ts';
 import { shapeSurfaceAt, SURFACE } from '../maps/shapes.ts';
 import { smoothstep } from '../maps/terrain.ts';
 import { drawnHeightAt } from './terrainMesh.ts';
@@ -1072,17 +1073,20 @@ export class SnowFx {
     // sideways, the whole ski smears it, from the middle.
     const along = this.skiFwd.dot(this.travel);
     const back = f.skiLength * 0.4 * along;
-    for (let t = 0; t < 2; t++) {
+    // A snowboard (milestone 22) leaves one track as wide as the board, down its middle.
+    const board = RIDE.board;
+    if (board) this.breakTrack(1);
+    for (let t = 0; t < (board ? 1 : 2); t++) {
       this.at
         .copy(pose.position)
-        .addScaledVector(this.skiLeft, (t === 0 ? 1 : -1) * STANCE_HALF_WIDTH)
+        .addScaledVector(this.skiLeft, board ? 0 : (t === 0 ? 1 : -1) * STANCE_HALF_WIDTH)
         .addScaledVector(this.skiFwd, -back);
       // Snow only: none on a start deck's wood or a stair's steps.
       if (shapeSurfaceAt(this.hf, this.at.x, this.at.z) !== SURFACE.snow) {
         this.breakTrack(t);
         continue;
       }
-      this.lay(t, this.at.x, this.at.z, half, opacity, pose.normal);
+      this.lay(t, this.at.x, this.at.z, board ? Math.max(half, BOARD_HALF_WIDTH) : half, opacity, pose.normal);
     }
   }
 

@@ -34,6 +34,26 @@ export interface HandDef {
   pole?: Vec3;
   /** Direction the elbow points (defaults to out and back). */
   elbow?: Vec3;
+  /** On a snowboard (milestone 22): the point on the board this hand holds, in board space (see BoardDef); the hand goes there. */
+  board?: Vec3;
+}
+
+/**
+ * A snowboard under both feet (milestone 22, render/boardPoses.ts). Board
+ * space: the base's middle at the origin, the nose toward -X (the front
+ * foot's side, riding regular), the toe edge toward -Z, the heel edge +Z.
+ * `at` puts that origin in skier space; `pitch` lifts the nose (+ up),
+ * `yaw` turns it (+ left, as everywhere), `roll` tips it onto an edge (+
+ * the toe edge down). The feet stand in its bindings; `free` (0..1) takes
+ * the back foot out of its binding to where the pose's own back foot is
+ * (the skating push, the chairlift).
+ */
+export interface BoardDef {
+  at: Vec3;
+  pitch?: number;
+  yaw?: number;
+  roll?: number;
+  free?: number;
 }
 
 export interface PoseDef {
@@ -50,6 +70,8 @@ export interface PoseDef {
   headYaw?: number;
   feet: readonly [FootDef, FootDef];
   hands: readonly [HandDef, HandDef];
+  /** On a snowboard: where the board is (a ski pose has none). */
+  board?: BoardDef;
 }
 
 // Grab points on the left ski. Its outside edge is -X and inside edge +X;

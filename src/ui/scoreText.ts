@@ -1,6 +1,7 @@
 import { GRAB_ACTIONS } from '../core/input.ts';
 import type { ScoreEvent } from '../sim/score.ts';
-import { ACTION_NAMES } from './keyNames.ts';
+import { RIDE } from '../sim/tuning.ts';
+import { actionName } from './keyNames.ts';
 
 // Words for scoring events, shared by the HUD and the headless tools.
 
@@ -8,7 +9,7 @@ import { ACTION_NAMES } from './keyNames.ts';
 export function trickText(ev: ScoreEvent): string {
   let text = ev.meters > 0 ? `${ev.name} ${Math.round(ev.meters)} m` : ev.name;
   for (let i = 0; i < ev.grabCount; i++) {
-    const grab = ACTION_NAMES[GRAB_ACTIONS[ev.grabs[i]!]!];
+    const grab = actionName(GRAB_ACTIONS[ev.grabs[i]!]!);
     text += i === 0 ? (text === '' ? grab : ` · ${grab}`) : ` + ${grab}`;
   }
   return text;
@@ -18,7 +19,7 @@ export function trickText(ev: ScoreEvent): string {
 export function chainText(ev: ScoreEvent): string {
   if (ev.meters > 0) return `${ev.name} ${Math.round(ev.meters)} m`;
   if (ev.name !== '' || ev.grabCount === 0) return ev.name;
-  return ACTION_NAMES[GRAB_ACTIONS[ev.grabs[0]!]!];
+  return actionName(GRAB_ACTIONS[ev.grabs[0]!]!);
 }
 
 /** The notes after a trick: how it landed, switch, repeated. */
@@ -27,7 +28,7 @@ export function trickTags(ev: ScoreEvent): string {
   if (ev.landing === 'clean') tags.push('Clean');
   else if (ev.landing === 'sketchy') tags.push('Sketchy');
   else if (ev.landing === 'airbag') tags.push('Airbag');
-  if (ev.switchOut) tags.push('Switch landing');
+  if (ev.switchOut) tags.push(RIDE.board ? 'Fakie landing' : 'Switch landing');
   if (ev.repeat > 0) tags.push(ev.repeat === 1 ? 'Repeat' : `Repeat ×${ev.repeat}`);
   return tags.join(' · ');
 }

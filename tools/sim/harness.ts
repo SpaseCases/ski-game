@@ -16,7 +16,7 @@ import { placeInAvalanches, stepAvalanches } from '../../src/sim/avalanche.ts';
 import { createRun, updateRun, type RunState } from '../../src/sim/checkpoints.ts';
 import { createRace, stepRace, type RaceEvent, type RaceState } from '../../src/sim/race.ts';
 import { copySkierState, createSkierState, placeSkierAt, stepSkier } from '../../src/sim/skier.ts';
-import { setSkiScale, type Scale } from '../../src/sim/tuning.ts';
+import { setRide, setSkiScale, type Scale } from '../../src/sim/tuning.ts';
 
 export const DT = 1 / CONFIG.sim.stepHz;
 
@@ -30,6 +30,17 @@ if (skiAt >= 0) {
   setSkiScale(CONFIG.skis[ski as keyof typeof CONFIG.skis] as Scale);
   process.argv.splice(skiAt, 2);
   console.log(`(on the ${ski} ski)`);
+}
+// "--board [regular|goofy]" (milestone 22) rides a snowboard instead: the
+// board's multipliers (config.ts's boards block) and its two edges, rail
+// presses and trick names. Regular unless "goofy" follows.
+const boardAt = process.argv.indexOf('--board');
+if (boardAt >= 0) {
+  const next = process.argv[boardAt + 1];
+  const stance = next === 'regular' || next === 'goofy' ? next : 'regular';
+  setRide(true, stance === 'goofy');
+  process.argv.splice(boardAt, next === stance ? 2 : 1);
+  console.log(`(on a snowboard, ${stance})`);
 }
 
 /** A map built exactly as the game builds it. */

@@ -47,6 +47,13 @@ export const CONFIG = {
     switchGrip: 1,
     switchEdgeHold: 1,
     switchSpeed: 3,
+    /**
+     * A snowboard's two edges (milestone 22; only a board reads these): grip
+     * and edgeHold are multiplied by toeEdge on the toe side and heelEdge on
+     * the heel side. 1 here; the board's block (`boards`) sets them.
+     */
+    toeEdge: 1,
+    heelEdge: 1,
 
     /** Ski turn rate (rad/s) when stopped and at turnSpeedRef or faster. */
     turnRateSlow: 2.3,
@@ -1091,6 +1098,36 @@ export const CONFIG = {
     },
   },
 
+  /**
+   * Snowboards (milestone 22): like `skis`, the board multiplies these
+   * numbers in their blocks above (before any cheat), in place of the ski's.
+   * One board for now (the user's pick). Spins and flips are left alone so
+   * the Park's 720 jumps still clear.
+   */
+  boards: {
+    /**
+     * Carvy edges, skiddy flats: the toe edge grips and holds a little more
+     * than a ski, the heel edge a little less (heel-side turns wash out
+     * sooner); a sideways skid scrubs harder; pivots are quicker when slow;
+     * a press grips a little more so a butter holds its line; a quick pop
+     * (an ollie without much crouch) is a touch stronger. The full-crouch
+     * pop stays the ski's: at ×1.05 it carried riders 5% further off the
+     * parks' biggest jumps at 24 m/s (a new impact crash) and onto the hips'
+     * landings sideways at 6 m/s, which the ski clears.
+     */
+    board: {
+      skier: {
+        toeEdge: 1.1,
+        heelEdge: 0.9,
+        skidFriction: 1.3,
+        // Quicker pivots when slow: 1.2 sent face.ts's rider into a wall on Freeride's Rooftops run.
+        turnRateSlow: 1.15,
+        butterGrip: 1.5,
+        popMin: 1.05,
+      },
+    },
+  },
+
   /** The Locker's live preview of the skier. */
   locker: {
     /** How fast it turns (rad/s). */
@@ -1157,6 +1194,7 @@ export const CONFIG = {
       slabCrack: { gain: 0.75, spread: 0.05 },
       pole: { gain: 0.18, spread: 0.12 },
       skate: { gain: 0.3, spread: 0.1 },
+      footPush: { gain: 0.32, spread: 0.1 },
       railMetal: { gain: 0.45, spread: 0.06 },
       railWood: { gain: 0.55, spread: 0.08 },
       cheer: { gain: 0.33, spread: 0.05 },
@@ -1177,6 +1215,12 @@ export const CONFIG = {
     railOn: { min: 0.35, full: 10 },
 
     /** Snow hiss: by speed (m/s) and edge (lean, rad); band-pass from freqLow to freqHigh with speed, brighter on edge. */
+    /**
+     * A snowboard (milestone 22) carves on one long edge instead of two
+     * skis' edges, and stops on that edge too: the carve's and the brake's
+     * gain and filter frequency are multiplied by these.
+     */
+    board: { carveGain: 1.1, carveFreq: 0.8, brakeGain: 1.15, brakeFreq: 0.85 },
     carve: { gain: 0.67, speedMin: 1.5, speedFull: 24, edgeBase: 0.4, edgeMin: 0.15, edgeFull: 0.75, freqLow: 700, freqHigh: 2300, edgeFreq: 1.3, q: 0.8, powderGain: 0.8, powderFreq: 0.55 },
     /** Braking or a hockey stop: a gritty scrape by speed. */
     brake: { gain: 0.7, speedMin: 1, speedFull: 12, freqLow: 650, freqHigh: 1700, q: 1.1 },

@@ -5,7 +5,8 @@ import { shapeSurfaceAt, SURFACE } from '../maps/shapes.ts';
 import type { BoxStyle, Heightfield, RailShape, RailStyle } from '../maps/types.ts';
 import { clearsZone, crossesFence, type Gaps } from './gaps.ts';
 import { wrapAngle, type SkierState } from './skier.ts';
-import { anyCheat, configChanged, TUNING } from './tuning.ts';
+import { railFrame } from './rails.ts';
+import { anyCheat, configChanged, RIDE, TUNING } from './tuning.ts';
 
 // Scoring: combos of tricks with a timer (GAME_DESIGN.md, Scoring). It reads
 // the skier's state after each fixed step and works out what happened from
@@ -28,6 +29,13 @@ import { anyCheat, configChanged, TUNING } from './tuning.ts';
 // skis following the flight path doesn't. Each axis keeps its rotation in
 // runs each way (see Runs), so turning back counts as a reverse, and
 // wiggling back and forth counts nothing.
+//
+// On a snowboard (milestone 22, sim/tuning.ts RIDE) the same tricks take a
+// snowboarder's names: a spin is frontside or backside (the chest turning
+// toward the way the rider goes first, which flips with the stance and with
+// riding backwards), riding backwards is fakie, a Lincoln loop is a wildcat
+// (over the heels) or a tamedog (over the toes), and a rail is a 50-50, a
+// nose or tail press, or a boardslide or lipslide (see RailTrack).
 
 export type ScoreEventKind = 'trick' | 'bank' | 'lost';
 /** How a trick landed: 'airbag' (milestone 17) scores like 'sketchy' and says where it landed. */
@@ -138,7 +146,21 @@ interface RailTrack {
   points: number;
   /** Radians a 3D rail's up has turned under the skis so far (a loop or a corkscrew goes all the way round). */
   turn: number;
+  /**
+   * A board (milestone 22): the side of the rail the rider came onto it
+   * from (-1 its left, 1 its right, 0 straight down its line, which counts
+   * as a boardslide), meters pressing the nose and the tail, and the
+   * sideways meters by name (SLIDE_NAMES: whether the nose or the tail
+   * crossed over the rail, and which way the rider faced).
+   */
+  cameFrom: number;
+  noseMeters: number;
+  tailMeters: number;
+  readonly slides: Float64Array;
 }
+
+/** A board's sideways slides, by RailTrack.slides index: board or lip, facing down the rail or back up it. */
+const SLIDE_NAMES = ['backside boardslide', 'frontside boardslide', 'frontside lipslide', 'backside lipslide'] as const;
 
 export interface ScoreState {
   /** A combo is live. */
@@ -196,7 +218,7 @@ export function createScore(): ScoreState {
       switchTakeoff: false,
       butter: 0,
     },
-    rail: { active: false, rail: -1, meters: 0, sideMeters: 0, switchMeters: 0, points: 0, turn: 0 },
+    rail: { active: false, rail: -1, meters: 0, sideMeters: 0, switchMeters: 0, points: 0, turn: 0, cameFrom: 0, noseMeters: 0, tailMeters: 0, slides: new Float64Array(4) },
     butter: { active: false, end: 0, time: 0, turn: 0, runs: createRuns() },
     wall: { active: false, meters: 0, points: 0 },
   };
@@ -244,8 +266,9 @@ function runPath(r: Runs, angle: number): number {
   return r.path + Math.abs(angle - r.start);
 }
 
-/** Set by spinRuns: the degrees it counted over all the runs. */
+/** Set by spinRuns: the degrees it counted over all the runs, and the direction of the first run counted (0: none). */
 let counted = 0;
+let firstDir = 0;
 
 /**
  * A spin's runs named and counted ("360", "360 · reverse 180"): each run
@@ -258,6 +281,7 @@ function spinRuns(r: Runs, angle: number, total: number, whole: boolean, step: n
   let text = '';
   let lastDir = 0;
   counted = 0;
+  firstDir = 0;
   for (let i = 0; i <= r.count; i++) {
     const going = i === r.count;
     const size = going ? angle - r.start : r.size[i]!;
@@ -265,6 +289,7 @@ function spinRuns(r: Runs, angle: number, total: number, whole: boolean, step: n
     const deg = steps(turn * DEG, step, going ? short : 0);
     if (deg < min) continue;
     const dir = Math.sign(size);
+    if (text === '') firstDir = dir;
     text += text === '' ? `${deg}` : ` · ${dir !== lastDir ? 'reverse ' : ''}${deg}`;
     lastDir = dir;
     counted += deg;
@@ -364,7 +389,7 @@ export function stepScore(sc: ScoreState, prev: SkierState, s: SkierState, rails
     }
   }
   if (s.rail >= 0) {
-    if (prev.rail !== s.rail) beginRail(sc, s);
+    if (prev.rail !== s.rail) beginRail(sc, prev, s, rails);
     trackRail(sc.rail, s, dt);
     // Round a 3D rail: how far its up turns under the skis.
     if (s.rail3d && prev.rail === s.rail) sc.rail.turn += Math.acos(Math.min(1, prev.normal.dot(s.normal)));
@@ -477,6 +502,25 @@ function times(n: number): string {
   return n < MULTI.length ? MULTI[n]! : `${n}x `;
 }
 
+/**
+ * On a board, "frontside " or "backside " for a spin turning `dir` (1 left,
+ * -1 right, as the body sees it), taken off backwards (`fakie`) or not; ''
+ * on skis. Frontside turns the chest toward the way the rider is going
+ * first: for a regular rider (who faces the board's right) going forwards
+ * that's a turn to the left.
+ */
+function side(dir: number, fakie: boolean): string {
+  if (!RIDE.board || dir === 0) return '';
+  return dir * (RIDE.goofy ? -1 : 1) * (fakie ? -1 : 1) > 0 ? 'frontside ' : 'backside ';
+}
+
+/** A loop about the skis' (or the board's) length turning `dir` (1 left): a Lincoln loop, or on a board a wildcat (over the heels) or a tamedog (over the toes). */
+function loopName(dir: number): string {
+  if (!RIDE.board) return 'Lincoln loop';
+  // Rolling left tips the body over the board's left edge: the heels, riding regular.
+  return dir * (RIDE.goofy ? -1 : 1) > 0 ? 'wildcat' : 'tamedog';
+}
+
 /** The air is over (on the snow, or onto a rail): name and score its trick. */
 function endAir(sc: ScoreState, s: SkierState, toRail: boolean): void {
   const C = CONFIG.score;
@@ -501,7 +545,7 @@ function endAir(sc: ScoreState, s: SkierState, toRail: boolean): void {
     if (text !== '') {
       const tipped = Math.max(flip, lincoln) >= C.corkMin;
       const flat = tipped && lincoln > flip;
-      rotation = `${tipped ? (flat ? 'flat ' : 'cork ') : ''}${text}`;
+      rotation = `${side(firstDir, a.switchTakeoff)}${tipped ? (flat ? 'flat ' : 'cork ') : ''}${text}`;
       points = (counted / 180) * C.spinPoints * (1 + (tipped ? (flat ? C.flatBonus : C.corkBonus) : 0));
     }
   } else {
@@ -511,6 +555,7 @@ function endAir(sc: ScoreState, s: SkierState, toRail: boolean): void {
     const angle = flipping ? a.flip : a.lincoln;
     const spun = spinRuns(a.spinRuns, a.spin, a.total, false, step, short, minSpin);
     const spunDeg = counted;
+    const spunSide = spun !== '' ? side(firstDir, a.switchTakeoff) : '';
     let flips = 0;
     let lastDir = 0;
     for (let i = 0; i <= runs.count; i++) {
@@ -522,7 +567,9 @@ function endAir(sc: ScoreState, s: SkierState, toRail: boolean): void {
       const back = size > 0; // nose up
       if (rotation === '') {
         const withSpin = spun !== '' ? ` ${spun}` : '';
-        rotation = flipping ? `${times(n)}${back ? (spun ? 'rodeo' : 'back flip') : spun ? 'misty' : 'front flip'}${withSpin}` : `${times(n)}Lincoln loop${withSpin}`;
+        rotation = flipping ? `${spunSide}${times(n)}${back ? (spun ? 'rodeo' : 'back flip') : spun ? 'misty' : 'front flip'}${withSpin}` : `${spunSide}${times(n)}${loopName(dir)}${withSpin}`;
+      } else if (RIDE.board && !flipping) {
+        rotation += ` · ${times(n)}${loopName(dir)}`;
       } else {
         rotation += flipping ? ` · ${times(n)}${back ? 'back flip' : 'front flip'}` : ` · ${dir !== lastDir ? 'reverse ' : ''}${times(n)}Lincoln loop`;
       }
@@ -581,7 +628,7 @@ function endAir(sc: ScoreState, s: SkierState, toRail: boolean): void {
   const ollie = a.butter > 0 ? 'nollie' : a.butter < 0 ? 'ollie' : '';
   if (trick && ollie !== '') points *= 1 + C.ollieBonus;
   const move = ollie !== '' && rotation !== '' ? `${ollie} ${rotation}` : ollie || rotation;
-  const name = !trick ? 'Air' : capitalize(`${a.switchTakeoff ? 'switch ' : ''}${move}`);
+  const name = !trick ? 'Air' : capitalize(`${a.switchTakeoff ? (RIDE.board ? 'fakie ' : 'switch ') : ''}${move}`);
   // The repeat key: the move and its grabs, whichever order they were held in.
   let key = name;
   for (let i = 0; i < a.grab.length; i++) if (a.grab[i]! >= C.grabMin) key += `|${GRAB_ACTIONS[i]}`;
@@ -591,7 +638,7 @@ function endAir(sc: ScoreState, s: SkierState, toRail: boolean): void {
   ev.switchOut = switchOut;
 }
 
-function beginRail(sc: ScoreState, s: SkierState): void {
+function beginRail(sc: ScoreState, prev: SkierState, s: SkierState, rails: readonly RailShape[]): void {
   const r = sc.rail;
   r.active = true;
   r.rail = s.rail;
@@ -600,7 +647,30 @@ function beginRail(sc: ScoreState, s: SkierState): void {
   r.switchMeters = 0;
   r.points = 0;
   r.turn = 0;
+  r.noseMeters = 0;
+  r.tailMeters = 0;
+  r.slides.fill(0);
+  r.cameFrom = 0;
+  const shape = rails[s.rail];
+  if (!RIDE.board || !shape) return;
+  // Which side of the rail the rider came onto it from: moving across it,
+  // the side they came from; else the side of its line they were on; else
+  // straight down its line.
+  railFrame(shape, s.railS, railPoint, railDirection);
+  const rx = -railDirection.z;
+  const rz = railDirection.x;
+  const across = Math.hypot(rx, rz) || 1;
+  const lateral = (prev.velocity.x * rx + prev.velocity.z * rz) / across;
+  const offset = ((prev.position.x - railPoint.x) * rx + (prev.position.z - railPoint.z) * rz) / across;
+  if (Math.abs(lateral) > CAME_ACROSS) r.cameFrom = lateral > 0 ? -1 : 1;
+  else if (Math.abs(offset) > CAME_OFF) r.cameFrom = offset > 0 ? 1 : -1;
 }
+
+/** Moving across a rail faster than this (m/s) as a board catches it says which side it came from; else being further than CAME_OFF (m) off its line does. */
+const CAME_ACROSS = 0.6;
+const CAME_OFF = 0.06;
+const railPoint = new Vector3();
+const railDirection = new Vector3();
 
 function trackRail(r: RailTrack, s: SkierState, dt: number): void {
   if (!r.active) return;
@@ -614,6 +684,21 @@ function trackRail(r: RailTrack, s: SkierState, dt: number): void {
   r.meters += m;
   if (sideways) r.sideMeters += m;
   if (sw) r.switchMeters += m;
+  if (RIDE.board) {
+    if (s.butterAmount >= C.butterMin) {
+      if (s.butter > 0) r.noseMeters += m;
+      else if (s.butter < 0) r.tailMeters += m;
+    }
+    if (sideways) {
+      // Which end crossed over the rail: the nose, if it points to the side away from where the rider came from (a boardslide).
+      const noseSide = Math.sin(s.railAngle) > 0 ? -1 : 1;
+      const board = r.cameFrom === 0 || noseSide !== r.cameFrom;
+      // Facing down the rail: the chest (the board's right, regular; its left, goofy) along the travel.
+      const chest = s.railAngle + (RIDE.goofy ? Math.PI / 2 : -Math.PI / 2);
+      const down = Math.cos(chest - (s.railSpeed < 0 ? Math.PI : 0)) > 0;
+      r.slides[board ? (down ? 0 : 1) : down ? 2 : 3]! += m;
+    }
+  }
   r.points += scored * C.railPoints * (sideways ? C.railSideways : 1) * (sw ? C.railSwitch : 1);
 }
 
@@ -626,8 +711,21 @@ export function liveSlide(sc: ScoreState, rails: readonly RailShape[]): string {
 function slideName(r: RailTrack, rails: readonly RailShape[]): string {
   const shape = rails[r.rail];
   const what = shape ? LOOK_NAMES[shape.look] : 'rail';
+  if (RIDE.board) return boardSlideName(r, what);
   const style = r.sideMeters * 2 > r.meters ? 'slide' : '50-50';
   return capitalize(`${r.switchMeters * 2 > r.meters ? 'switch ' : ''}${what} ${style}`);
+}
+
+/** A board's slide: "Backside rail boardslide", "Box 50-50", "Fakie rail nose press". */
+function boardSlideName(r: RailTrack, what: string): string {
+  if (r.sideMeters * 2 > r.meters) {
+    let best = 0;
+    for (let i = 1; i < r.slides.length; i++) if (r.slides[i]! > r.slides[best]!) best = i;
+    const [facing, slide] = SLIDE_NAMES[best]!.split(' ');
+    return capitalize(`${facing} ${what} ${slide}`);
+  }
+  const style = r.noseMeters * 2 > r.meters ? 'nose press' : r.tailMeters * 2 > r.meters ? 'tail press' : '50-50';
+  return capitalize(`${r.switchMeters * 2 > r.meters ? 'fakie ' : ''}${what} ${style}`);
 }
 
 /** What a slide on each look is called. */
