@@ -14,10 +14,12 @@ import {
   type Gear,
 } from '../core/customSkis.ts';
 import { boardGraphic } from '../core/boards.ts';
-import { skiGraphic, type PixelArt, type Side, type SkiGraphic, type SkiId, type SkiModel } from '../core/skis.ts';
+import { skiGraphic, type Side, type SkiGraphic, type SkiId, type SkiModel } from '../core/skis.ts';
 import { BINDINGS } from '../render/boardPoses.ts';
-import type { Rect } from '../render/lockerStage.ts';
+import type { Rect, StageWindow } from '../render/lockerStage.ts';
 import { keycap } from './keyNames.ts';
+import { PaintGrid } from './paintGrid.ts';
+import { previewCanvas } from './lockerMenu.ts';
 import { board, setHints, type Screen } from './menus.ts';
 import { paintSkis } from './skiThumb.ts';
 import { signText } from './signText.ts';
@@ -56,9 +58,6 @@ interface Snapshot {
   sidewall: number;
   linked: boolean;
 }
-/** A box of cells in the grid's own columns (inclusive): along0, x0, along1, x1. */
-type Box = readonly [number, number, number, number];
-
 /** Undo steps kept. */
 const UNDO_MAX = 60;
 /** Grid cell size in CSS pixels: as big as fits, within these. */
@@ -77,8 +76,6 @@ const BOOT_LENGTH = 0.32;
 const BOOT_WIDTH = 0.12;
 const BINDING_SPAN = 2 * Math.abs(BINDINGS[1][0]) + BOOT_WIDTH;
 
-const BOTH = [0, 1] as const;
-const ONE = [[0], [1]] as const;
 const LEFT_SKI = [-1] as const;
 const RIGHT_SKI = [1] as const;
 const PAIR_SKIS = [-1, 1] as const;
@@ -100,7 +97,7 @@ const HINTS = [
 ] as const;
 const BOARD_HINTS = HINTS.filter(([keys]) => keys[0] !== 'V');
 
-export class SkiEditorScreen implements Screen {
+export class SkiEditorScreen implements Screen, StageWindow {
   readonly el: HTMLElement;
   private readonly hooks: SkiEditorHooks;
   private readonly title: HTMLElement;
@@ -134,19 +131,21 @@ export class SkiEditorScreen implements Screen {
   private readonly blankSwatches: HTMLElement[] = [];
   private readonly view: HTMLElement;
   private readonly rect: Rect = { x: 0, y: 0, width: 0, height: 0 };
+  /** The preview's own canvas in the window (render/lockerStage.ts present copies it in). */
+  private readonly preview: CanvasRenderingContext2D | null;
 
   private gear: Gear = 'park';
   private slot = 0;
   private model: SkiModel = gearType('park').model;
-  /** Painting a board (one board, its own grid) rather than a pair of skis. */
-  private onBoard = false;
-  /** The face being painted, and its grid (a ski slot's is a pair: both skis' columns in each row). */
+  /** The face being painted. */
   private face: Face = 'top';
-  private art!: PixelArt;
-  /** The ski shown and painted in the single view when the slot isn't linked: 0 left, 1 right. */
-  private side = 0;
-  /** Both skis' grids at once, the left ski's columns above the right's (never on a board). */
-  private pair = false;
+  /**
+   * The grid's cells, view and brush (ui/paintGrid.ts, left unobfuscated: it
+   * runs on every pointer move and frame of a stroke): the face's art, a
+   * board or skis, side by side, the ski shown, linked, the picked color,
+   * the brush and the mirror switches.
+   */
+  private readonly g = new PaintGrid();
   /** Decide side by side from the room there is when the editor next lays out (set on opening). */
   private pickPair = false;
   /** Cursor: `along` from the tail (the ski's rows), `x` the grid's column from its top (in side by side, the right ski's start at `cols`). */
@@ -155,12 +154,7 @@ export class SkiEditorScreen implements Screen {
   /** The mouse's cell, or along < 0 when it's off the grid. */
   private hoverAlong = -1;
   private hoverX = 0;
-  private color = 22;
   private tool: Tool = 'pencil';
-  private mirrorEnds = false;
-  private mirrorSides = false;
-  /** The pencil's square, this many cells across. */
-  private brush = 1;
   private undo: Snapshot[] = [];
   /** A stroke being painted: by the mouse (its last cell) or by a held Space or Enter. */
   private dragging = false;
@@ -185,6 +179,7 @@ export class SkiEditorScreen implements Screen {
 
   constructor(hooks: SkiEditorHooks, onDone: () => void) {
     this.hooks = hooks;
+    this.g.color = 22;
     const b = board('Ski editor', 'editor-screen');
     this.el = b.el;
     this.title = b.head.querySelector('.board-title')!;
@@ -215,7 +210,7 @@ export class SkiEditorScreen implements Screen {
     }
     this.linkButton = segment('Same on both', 'K', () => this.setLinked(!this.linked));
     this.linkButton.classList.add('editor-link');
-    this.pairButton = segment('Side by side', 'V', () => this.setPair(!this.pair));
+    this.pairButton = segment('Side by side', 'V', () => this.setPair(!this.g.pair));
     this.pairButton.classList.add('editor-link');
     this.skiGroup.append(this.linkButton, this.pairButton);
     const faceGroup = document.createElement('div');
@@ -362,6 +357,7 @@ export class SkiEditorScreen implements Screen {
     this.view.className = 'locker-view';
     this.view.setAttribute('role', 'img');
     this.view.setAttribute('aria-label', 'Your skis, turning slowly');
+    this.preview = previewCanvas(this.view);
     frame.appendChild(this.view);
 
     lower.append(palette, tools, frame);
@@ -375,34 +371,36 @@ export class SkiEditorScreen implements Screen {
     this.slot = slot;
     const type = gearType(gear);
     this.model = type.model;
-    this.onBoard = gearBoard(gear) !== null;
+    this.g.rows = type.model.rows;
+    this.g.cols = type.model.cols;
+    this.g.onBoard = gearBoard(gear) !== null;
     this.face = 'top';
-    this.side = 0;
-    this.pair = false;
-    this.pickPair = !this.onBoard;
-    this.art = customFace(gear, slot, 'top');
+    this.g.side = 0;
+    this.g.pair = false;
+    this.pickPair = !this.g.onBoard;
+    this.g.art = customFace(gear, slot, 'top');
     this.along = Math.floor(this.rows / 2);
     this.x = Math.floor(this.cols / 2);
     this.hoverAlong = -1;
     this.undo = [];
     this.unbuilt = false;
-    const heading = this.onBoard ? 'Board editor' : 'Ski editor';
+    const heading = this.g.onBoard ? 'Board editor' : 'Ski editor';
     this.title.replaceChildren(signText(heading));
     this.el.setAttribute('aria-label', heading);
-    this.sub.textContent = this.onBoard
+    this.sub.textContent = this.g.onBoard
       ? `Custom ${slot + 1} on the ${type.name} board. Paint the top sheet and the base; it saves as you paint.`
       : `Custom ${slot + 1} on the ${type.name} ski. Paint the top sheets and the bases, both skis alike or each its own, one at a time or side by side; it saves as you paint.`;
-    this.skiGroup.hidden = this.onBoard;
-    this.shapeLabel.textContent = this.onBoard ? 'On the board' : 'On the ski';
-    this.tipLabel.textContent = this.onBoard ? 'Nose' : 'Tip';
-    this.view.setAttribute('aria-label', this.onBoard ? 'Your board, turning slowly' : 'Your skis, turning slowly');
-    this.wallsButton.title = this.onBoard ? 'The board’s edges take the picked color' : 'The sidewalls and ends take the picked color';
-    setHints(this.foot, this.onBoard ? BOARD_HINTS : HINTS);
+    this.skiGroup.hidden = this.g.onBoard;
+    this.shapeLabel.textContent = this.g.onBoard ? 'On the board' : 'On the ski';
+    this.tipLabel.textContent = this.g.onBoard ? 'Nose' : 'Tip';
+    this.view.setAttribute('aria-label', this.g.onBoard ? 'Your board, turning slowly' : 'Your skis, turning slowly');
+    this.wallsButton.title = this.g.onBoard ? 'The board’s edges take the picked color' : 'The sidewalls and ends take the picked color';
+    setHints(this.foot, this.g.onBoard ? BOARD_HINTS : HINTS);
     // The ruler's mark: where the boots stand on a ski, the bindings on a board.
     const m = this.model;
-    const span = this.onBoard ? BINDING_SPAN : BOOT_LENGTH;
+    const span = this.g.onBoard ? BINDING_SPAN : BOOT_LENGTH;
     const stance = (m.length / 2 - m.mount) / m.length;
-    this.boots.textContent = this.onBoard ? 'Bindings' : 'Boots';
+    this.boots.textContent = this.g.onBoard ? 'Bindings' : 'Boots';
     this.mark = [stance - span / 2 / m.length, span / m.length];
     this.buildStarts();
     saveCustom(gear);
@@ -439,6 +437,10 @@ export class SkiEditorScreen implements Screen {
     return this.rect;
   }
 
+  viewContext(): CanvasRenderingContext2D | null {
+    return this.preview;
+  }
+
   onKey(e: KeyboardEvent): boolean {
     const onGrid = document.activeElement === this.grid;
     if (onGrid) {
@@ -466,7 +468,7 @@ export class SkiEditorScreen implements Screen {
         return true;
       case '[':
       case ']':
-        this.setColor((this.color + (key === ']' ? 1 : -1) + EDIT_PALETTE.length) % EDIT_PALETTE.length);
+        this.setColor((this.g.color + (key === ']' ? 1 : -1) + EDIT_PALETTE.length) % EDIT_PALETTE.length);
         return true;
     }
     if (e.repeat) return false;
@@ -489,7 +491,7 @@ export class SkiEditorScreen implements Screen {
         this.toggleMirror('sides');
         return true;
       case 'i':
-        this.setColor(this.art.cells[this.index(this.along, this.x)]!);
+        this.setColor(this.g.art.cells[this.g.index(this.along, this.x)]!);
         return true;
       case 'b':
         this.setFace(this.face === 'top' ? 'base' : 'top');
@@ -499,7 +501,7 @@ export class SkiEditorScreen implements Screen {
         return true;
     }
     // One ski or the other, both alike, side by side: not on a board.
-    if (this.onBoard) return false;
+    if (this.g.onBoard) return false;
     switch (key) {
       case 'l':
         this.setSide(0);
@@ -511,7 +513,7 @@ export class SkiEditorScreen implements Screen {
         this.setLinked(!this.linked);
         return true;
       case 'v':
-        this.setPair(!this.pair);
+        this.setPair(!this.g.pair);
         return true;
     }
     return false;
@@ -530,102 +532,21 @@ export class SkiEditorScreen implements Screen {
 
   /** The grid's columns: one ski's (or the board's), or both skis' side by side. */
   private get gridCols(): number {
-    return this.pair ? this.cols * 2 : this.cols;
+    return this.g.gridCols;
   }
 
   private get linked(): boolean {
     return customLinked(this.gear, this.slot);
   }
 
-  /** The ski (0 left, 1 right) that grid column `x` shows; always 0 on a board. */
-  private sideAt(x: number): number {
-    if (this.onBoard) return 0;
-    return this.pair ? (x >= this.cols ? 1 : 0) : this.side;
-  }
-
-  /** The column across its own ski that grid column `x` shows. */
-  private colAt(x: number): number {
-    return this.pair && x >= this.cols ? x - this.cols : x;
-  }
-
-  /** A cell of the face being painted: `c` across the `side` ski (0 on a board). */
-  private cellIndex(along: number, side: number, c: number): number {
-    return along * this.art.cols + side * this.cols + c;
-  }
-
-  /** The cell under grid column `x`. */
-  private index(along: number, x: number): number {
-    return this.cellIndex(along, this.sideAt(x), this.colAt(x));
-  }
-
-  /** The skis a cell painted on `side` lands on: both while linked. */
-  private paintSides(side: number): readonly number[] {
-    return this.linked ? BOTH : ONE[side]!;
-  }
-
-  /** The brush's square at (along, x) in grid columns, cut to the grid. An even brush reaches one more cell right and down. */
-  private square(along: number, x: number): Box {
-    const lo = -Math.floor((this.brush - 1) / 2);
-    return [Math.max(0, along + lo), Math.max(0, x + lo), Math.min(this.rows - 1, along + lo + this.brush - 1), Math.min(this.gridCols - 1, x + lo + this.brush - 1)];
-  }
-
-  /** Paints one cell on its ski, and its mirrors while the switches are on (tip to tail, and edge to edge within the ski). */
-  private put(along: number, side: number, c: number): void {
-    const cells = this.art.cells;
-    const fa = this.rows - 1 - along;
-    const fc = this.cols - 1 - c;
-    for (const s of this.paintSides(side)) {
-      cells[this.cellIndex(along, s, c)] = this.color;
-      if (this.mirrorEnds) cells[this.cellIndex(fa, s, c)] = this.color;
-      if (this.mirrorSides) cells[this.cellIndex(along, s, fc)] = this.color;
-      if (this.mirrorEnds && this.mirrorSides) cells[this.cellIndex(fa, s, fc)] = this.color;
-    }
-  }
-
-  /** Paints the brush at (along, x), and its mirrors; side by side its square may reach across onto the other ski. */
-  private stamp(along: number, x: number): void {
-    const [a0, x0, a1, x1] = this.square(along, x);
-    for (let a = a0; a <= a1; a++) for (let xx = x0; xx <= x1; xx++) this.put(a, this.sideAt(xx), this.colAt(xx));
-  }
-
-  /** The cells a fill at (along, c) on one ski starts from: it, and its mirrors while the switches are on. */
-  private targets(along: number, c: number): [number, number][] {
-    const out: [number, number][] = [[along, c]];
-    const fa = this.rows - 1 - along;
-    const fc = this.cols - 1 - c;
-    if (this.mirrorEnds) out.push([fa, c]);
-    if (this.mirrorSides) out.push([along, fc]);
-    if (this.mirrorEnds && this.mirrorSides) out.push([fa, fc]);
-    return out;
-  }
-
   private paintCell(along: number, x: number): void {
-    this.stamp(along, x);
+    this.g.stamp(along, x);
     this.changed();
   }
 
   /** Paints a straight line of cells from the last one painted, so a fast drag leaves no gaps. */
   private paintLine(along: number, x: number): void {
-    let a = this.lastAlong;
-    let c = this.lastX;
-    const da = Math.abs(along - a);
-    const dc = Math.abs(x - c);
-    const sa = along > a ? 1 : -1;
-    const sc = x > c ? 1 : -1;
-    let err = da - dc;
-    for (;;) {
-      this.stamp(a, c);
-      if (a === along && c === x) break;
-      const e2 = 2 * err;
-      if (e2 > -dc) {
-        err -= dc;
-        a += sa;
-      }
-      if (e2 < da) {
-        err += da;
-        c += sc;
-      }
-    }
+    this.g.line(this.lastAlong, this.lastX, along, x);
     this.lastAlong = along;
     this.lastX = x;
     this.changed();
@@ -633,31 +554,7 @@ export class SkiEditorScreen implements Screen {
 
   /** Fills the patch of one color round (along, x), four ways within its ski, and its mirrors (on both skis while linked). */
   private floodFill(along: number, x: number): void {
-    const { rows, cols } = this;
-    const cells = this.art.cells;
-    for (const side of this.paintSides(this.sideAt(x))) {
-      for (const [sa, sc] of this.targets(along, this.colAt(x))) {
-        const from = cells[this.cellIndex(sa, side, sc)]!;
-        if (from === this.color) continue;
-        cells[this.cellIndex(sa, side, sc)] = this.color;
-        const stack: [number, number][] = [[sa, sc]];
-        while (stack.length > 0) {
-          const [a, c] = stack.pop()!;
-          for (const [na, nc] of [
-            [a - 1, c],
-            [a + 1, c],
-            [a, c - 1],
-            [a, c + 1],
-          ] as const) {
-            if (na < 0 || na >= rows || nc < 0 || nc >= cols) continue;
-            const j = this.cellIndex(na, side, nc);
-            if (cells[j] !== from) continue;
-            cells[j] = this.color;
-            stack.push([na, nc]);
-          }
-        }
-      }
-    }
+    this.g.floodFill(along, x);
     this.changed();
   }
 
@@ -690,10 +587,7 @@ export class SkiEditorScreen implements Screen {
   /** The whole face in the picked color: of the skis showing (both while linked or side by side), or the board. */
   private fillAll(): void {
     this.remember();
-    const sides = this.onBoard ? ONE[0] : this.pair || this.linked ? BOTH : ONE[this.side]!;
-    for (const side of sides) {
-      for (let a = 0; a < this.rows; a++) this.art.cells.fill(this.color, this.cellIndex(a, side, 0), this.cellIndex(a, side, this.cols));
-    }
+    this.g.fillAll();
     this.changed();
     this.save();
   }
@@ -709,9 +603,9 @@ export class SkiEditorScreen implements Screen {
   }
 
   private setSidewall(): void {
-    if (customSidewall(this.gear, this.slot) === this.color) return;
+    if (customSidewall(this.gear, this.slot) === this.g.color) return;
     this.remember();
-    setCustomSidewall(this.gear, this.slot, this.color);
+    setCustomSidewall(this.gear, this.slot, this.g.color);
     this.changed();
     this.save();
     this.sync();
@@ -722,7 +616,7 @@ export class SkiEditorScreen implements Screen {
     this.liftPen();
     this.endDrag();
     this.face = face;
-    this.art = customFace(this.gear, this.slot, face);
+    this.g.art = customFace(this.gear, this.slot, face);
     this.sync();
     this.queueDraw(true);
   }
@@ -731,8 +625,8 @@ export class SkiEditorScreen implements Screen {
   private setSide(side: number): void {
     this.liftPen();
     this.endDrag();
-    if (this.pair) this.x = side * this.cols + this.colAt(this.x);
-    else this.side = side;
+    if (this.g.pair) this.x = side * this.cols + this.g.colAt(this.x);
+    else this.g.side = side;
     if (this.linked) this.setLinked(false);
     this.sync();
     this.queueDraw(true);
@@ -740,15 +634,15 @@ export class SkiEditorScreen implements Screen {
 
   /** Both skis' grids at once, or one ski's: the cursor stays on its cell. */
   private setPair(on: boolean): void {
-    if (this.onBoard || on === this.pair) return;
+    if (this.g.onBoard || on === this.g.pair) return;
     this.liftPen();
     this.endDrag();
-    if (on) this.x = this.side * this.cols + this.x;
+    if (on) this.x = this.g.side * this.cols + this.x;
     else {
-      this.side = this.sideAt(this.x);
-      this.x = this.colAt(this.x);
+      this.g.side = this.g.sideAt(this.x);
+      this.x = this.g.colAt(this.x);
     }
-    this.pair = on;
+    this.g.pair = on;
     this.hoverAlong = -1;
     this.sync();
     this.layout();
@@ -760,13 +654,13 @@ export class SkiEditorScreen implements Screen {
     this.endDrag();
     if (linked) {
       this.remember();
-      const shown = this.sideAt(this.x);
+      const shown = this.g.sideAt(this.x);
       const other = 1 - shown;
       for (const face of ['top', 'base'] as const) {
         const { cells, cols } = customFace(this.gear, this.slot, face);
         for (let a = 0; a < this.rows; a++) cells.copyWithin(a * cols + other * this.cols, a * cols + shown * this.cols, a * cols + (shown + 1) * this.cols);
       }
-      this.side = shown;
+      this.g.side = shown;
       this.changed();
     }
     setCustomLinked(this.gear, this.slot, linked);
@@ -801,7 +695,7 @@ export class SkiEditorScreen implements Screen {
   }
 
   private setColor(i: number): void {
-    this.color = i;
+    this.g.color = i;
     this.sync();
     this.queueDraw();
   }
@@ -813,14 +707,14 @@ export class SkiEditorScreen implements Screen {
   }
 
   private setBrush(size: number): void {
-    this.brush = size;
+    this.g.brush = size;
     this.sync();
     this.queueDraw();
   }
 
   private toggleMirror(which: 'ends' | 'sides'): void {
-    if (which === 'ends') this.mirrorEnds = !this.mirrorEnds;
-    else this.mirrorSides = !this.mirrorSides;
+    if (which === 'ends') this.g.mirrorEnds = !this.g.mirrorEnds;
+    else this.g.mirrorSides = !this.g.mirrorSides;
     this.sync();
     this.queueDraw();
   }
@@ -936,9 +830,9 @@ export class SkiEditorScreen implements Screen {
         return;
       }
     }
-    this.sizeGrid(this.pair ? this.pairCell(width) : Math.floor(width / this.rows));
+    this.sizeGrid(this.g.pair ? this.pairCell(width) : Math.floor(width / this.rows));
     // Side by side, the strip under the grid draws both skis (taller) on the next frame: fit the grid again then.
-    this.refit = this.pair;
+    this.refit = this.g.pair;
     this.queueDraw(true);
   }
 
@@ -973,7 +867,7 @@ export class SkiEditorScreen implements Screen {
 
   private drawGrid(): void {
     const { rows, gridCols, cols } = this;
-    const { cells, colors } = this.art;
+    const { cells } = this.g.art;
     const s = this.cell;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = Math.round(rows * s * dpr);
@@ -984,87 +878,18 @@ export class SkiEditorScreen implements Screen {
     }
     const ctx = this.grid.getContext('2d');
     if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    for (let a = 0; a < rows; a++) {
-      for (let x = 0; x < gridCols; x++) {
-        ctx.fillStyle = colors[cells[this.index(a, x)]!]!;
-        ctx.fillRect(a * s, x * s, s, s);
-      }
-    }
-    // Cell lines, a stronger one every eight cells along and down each ski's middle (where Mirror sides folds).
-    if (s >= 6) {
-      ctx.fillStyle = 'rgb(0 0 0 / 0.22)';
-      for (let a = 1; a < rows; a++) ctx.fillRect(a * s, 0, 1 / dpr, gridCols * s);
-      for (let x = 1; x < gridCols; x++) ctx.fillRect(0, x * s, rows * s, 1 / dpr);
-    }
-    ctx.fillStyle = 'rgb(255 255 255 / 0.28)';
-    for (let a = 8; a < rows; a += 8) ctx.fillRect(a * s - 0.5, 0, 1, gridCols * s);
-    for (let k = 0; k < gridCols / cols; k++) ctx.fillRect(0, (k + 0.5) * cols * s - 0.5, rows * s, 1);
-    // Side by side: a seam between the left ski and the right, a light line on a dark keyline so it shows on any color.
-    if (this.pair) {
-      ctx.fillStyle = '#142030';
-      ctx.fillRect(0, cols * s - 2, rows * s, 4);
-      ctx.fillStyle = 'rgb(244 248 252 / 0.85)';
-      ctx.fillRect(0, cols * s - 1, rows * s, 2);
-    }
-
-    // Where the pencil would paint under the mouse (the brush and its mirrors) in the picked color; for a fill, its starting cells.
-    if (this.hoverAlong >= 0 && !this.dragging) {
-      ctx.fillStyle = colors[this.color]!;
-      for (const [a0, x0, a1, x1] of this.marks(this.hoverAlong, this.hoverX)) {
-        const [w, h] = [(a1 - a0 + 1) * s, (x1 - x0 + 1) * s];
-        ctx.fillRect(a0 * s + 1, x0 * s + 1, w - 2, h - 2);
-        box(ctx, a0 * s, x0 * s, w, h, 'rgb(255 255 255 / 0.8)', 1);
-      }
-    }
-    // The keyboard cursor round the brush: a white box with a dark keyline; its mirrors (and its copy on the other ski) dashed.
-    if (document.activeElement === this.grid) {
-      this.marks(this.along, this.x).forEach(([a0, x0, a1, x1], i) => {
-        const [bx, by, bw, bh] = [a0 * s - 1, x0 * s - 1, (a1 - a0 + 1) * s + 2, (x1 - x0 + 1) * s + 2];
-        if (i > 0) ctx.setLineDash([2, 2]);
-        box(ctx, bx, by, bw, bh, '#142030', 4);
-        box(ctx, bx, by, bw, bh, '#f4f8fc', 2);
-        ctx.setLineDash([]);
-      });
-    }
-    const name = EDIT_PALETTE[cells[this.index(this.along, this.x)]!]!.name;
-    const where = `${this.place(this.sideAt(this.x))}, ${this.face}`;
-    this.status.textContent = `${where}: ${this.along + 1} of ${rows} along, ${this.colAt(this.x) + 1} of ${cols} across, ${name}`;
+    // The cells and lines, then where the tool would paint under the mouse and the keyboard cursor's box.
+    const hover = this.dragging ? -1 : this.hoverAlong;
+    this.g.draw(ctx, s, dpr, this.tool === 'pencil', hover, this.hoverX, document.activeElement === this.grid, this.along, this.x);
+    const name = EDIT_PALETTE[cells[this.g.index(this.along, this.x)]!]!.name;
+    const where = `${this.place(this.g.sideAt(this.x))}, ${this.face}`;
+    this.status.textContent = `${where}: ${this.along + 1} of ${rows} along, ${this.g.colAt(this.x) + 1} of ${cols} across, ${name}`;
   }
 
   /** What's painted at the cursor: the board, both skis, or one of them. */
   private place(side: number): string {
-    if (this.onBoard) return 'Board';
+    if (this.g.onBoard) return 'Board';
     return this.linked ? 'Both skis' : side === 0 ? 'Left ski' : 'Right ski';
-  }
-
-  /**
-   * What the tool would paint at (along, x), as boxes in grid columns: the
-   * pencil's brush (or a fill's starting cell) first, then its mirrors within
-   * each ski and, side by side while linked, its copy on the other ski.
-   */
-  private marks(along: number, x: number): Box[] {
-    const main: Box = this.tool === 'pencil' ? this.square(along, x) : [along, x, along, x];
-    const out: Box[] = [main];
-    const { rows, cols } = this;
-    const [a0, x0, a1, x1] = main;
-    const fa: readonly [number, number] = [rows - 1 - a1, rows - 1 - a0];
-    // The box's part on each ski it covers (one ski's grid shows as side 0), then each mirror (and copy) of that part.
-    for (const side of this.pair ? BOTH : ONE[0]) {
-      const lo = Math.max(x0, this.pair ? side * cols : 0);
-      const hi = Math.min(x1, this.pair ? side * cols + cols - 1 : cols - 1);
-      if (lo > hi) continue;
-      const [c0, c1] = [this.colAt(lo), this.colAt(hi)];
-      const onto = this.pair && this.linked ? BOTH : ONE[this.pair ? side : 0]!;
-      for (const s of onto) {
-        const at = this.pair ? s * cols : 0;
-        if (s !== side) out.push([a0, at + c0, a1, at + c1]);
-        if (this.mirrorEnds) out.push([fa[0], at + c0, fa[1], at + c1]);
-        if (this.mirrorSides) out.push([a0, at + cols - 1 - c1, a1, at + cols - 1 - c0]);
-        if (this.mirrorEnds && this.mirrorSides) out.push([fa[0], at + cols - 1 - c1, fa[1], at + cols - 1 - c0]);
-      }
-    }
-    return out;
   }
 
   /** The skis (or board) as they really are (the grid stretched along to the outline), top or base: the one shown, or both side by side. */
@@ -1076,7 +901,7 @@ export class SkiEditorScreen implements Screen {
     const type = gearType(this.gear);
     const pxPerM = Math.floor(width / type.model.length);
     if (board) paintSkis(this.shape, type, boardGraphic(board, id), this.face === 'base', pxPerM, BOARD_SIDE, maxHalf(type.model));
-    else paintSkis(this.shape, type, skiGraphic(this.gear as SkiId, id), this.face === 'base', pxPerM, this.pair ? PAIR_SKIS : this.side === 0 ? LEFT_SKI : RIGHT_SKI);
+    else paintSkis(this.shape, type, skiGraphic(this.gear as SkiId, id), this.face === 'base', pxPerM, this.g.pair ? PAIR_SKIS : this.g.side === 0 ? LEFT_SKI : RIGHT_SKI);
   }
 
   /** The Start from tiles: Blank (the picked color everywhere), then the ski's (or board's) stock graphics. */
@@ -1093,7 +918,7 @@ export class SkiEditorScreen implements Screen {
     blank.addEventListener('click', () => this.startFrom(null));
     const tiles = [blank];
     const type = gearType(this.gear);
-    const sides: readonly Side[] = this.onBoard ? BOARD_SIDE : PAIR_SKIS;
+    const sides: readonly Side[] = this.g.onBoard ? BOARD_SIDE : PAIR_SKIS;
     for (const g of type.graphics) {
       const tile = document.createElement('button');
       tile.type = 'button';
@@ -1101,7 +926,7 @@ export class SkiEditorScreen implements Screen {
       tile.setAttribute('aria-label', `Start from ${g.name}`);
       const canvas = document.createElement('canvas');
       canvas.className = 'editor-start-ski';
-      if (this.onBoard) paintSkis(canvas, type, g, false, 48, sides, maxHalf(type.model));
+      if (this.g.onBoard) paintSkis(canvas, type, g, false, 48, sides, maxHalf(type.model));
       else paintSkis(canvas, type, g, false, 48);
       tile.append(canvas, text(g.name));
       tile.addEventListener('click', () => this.startFrom(g));
@@ -1112,27 +937,28 @@ export class SkiEditorScreen implements Screen {
 
   /** Marks the picked color, tool and switches. */
   private sync(): void {
-    const hex = EDIT_PALETTE[this.color]!.hex;
-    this.chips.forEach((chip, i) => chip.setAttribute('aria-pressed', String(i === this.color)));
-    this.colorName.textContent = EDIT_PALETTE[this.color]!.name;
+    this.g.linked = this.linked;
+    const hex = EDIT_PALETTE[this.g.color]!.hex;
+    this.chips.forEach((chip, i) => chip.setAttribute('aria-pressed', String(i === this.g.color)));
+    this.colorName.textContent = EDIT_PALETTE[this.g.color]!.name;
     this.colorSwatch.style.background = hex;
     for (const s of this.blankSwatches) s.style.background = hex;
     this.wallSwatch.style.background = EDIT_PALETTE[customSidewall(this.gear, this.slot)]!.hex;
     const linked = this.linked;
-    const side = this.sideAt(this.x);
+    const side = this.g.sideAt(this.x);
     this.sideButtons.forEach((b, i) => b.setAttribute('aria-pressed', String(!linked && i === side)));
     this.linkButton.setAttribute('aria-pressed', String(linked));
-    this.pairButton.setAttribute('aria-pressed', String(this.pair));
+    this.pairButton.setAttribute('aria-pressed', String(this.g.pair));
     this.faceButtons.forEach((b, i) => b.setAttribute('aria-pressed', String((i === 1) === (this.face === 'base'))));
     this.bench.classList.toggle('is-base', this.face === 'base');
     const m = this.model;
-    const what = this.onBoard ? 'The board' : this.pair ? 'Both skis side by side, the left ski on top' : linked ? 'Both skis' : side === 0 ? 'Left ski' : 'Right ski';
-    const across = this.pair ? `${m.cols} across each` : `${m.cols} across`;
+    const what = this.g.onBoard ? 'The board' : this.g.pair ? 'Both skis side by side, the left ski on top' : linked ? 'Both skis' : side === 0 ? 'Left ski' : 'Right ski';
+    const across = this.g.pair ? `${m.cols} across each` : `${m.cols} across`;
     this.grid.setAttribute('aria-label', `${what}, ${this.face === 'base' ? 'base' : 'top sheet'}: ${m.rows} cells long and ${across}. Arrows move, Space paints.`);
     for (const [tool, b] of this.toolButtons) b.setAttribute('aria-pressed', String(tool === this.tool));
-    this.mirrorEndsButton.setAttribute('aria-pressed', String(this.mirrorEnds));
-    this.mirrorSidesButton.setAttribute('aria-pressed', String(this.mirrorSides));
-    this.brushButtons.forEach((b, i) => b.setAttribute('aria-pressed', String(BRUSHES[i] === this.brush)));
+    this.mirrorEndsButton.setAttribute('aria-pressed', String(this.g.mirrorEnds));
+    this.mirrorSidesButton.setAttribute('aria-pressed', String(this.g.mirrorSides));
+    this.brushButtons.forEach((b, i) => b.setAttribute('aria-pressed', String(BRUSHES[i] === this.g.brush)));
     this.undoButton.disabled = this.undo.length === 0;
   }
 }
@@ -1178,10 +1004,4 @@ function toolButton(name: string, key: string, onPick: () => void): HTMLButtonEl
   if (key) b.appendChild(keycap(key));
   b.addEventListener('click', onPick);
   return b;
-}
-
-function box(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string, width: number): void {
-  ctx.strokeStyle = color;
-  ctx.lineWidth = width;
-  ctx.strokeRect(x, y, w, h);
 }

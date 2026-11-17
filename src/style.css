@@ -955,7 +955,11 @@ body {
 
 .locker-frame {
   display: flex;
-  min-height: 380px;
+  /* It stays in sight while the choices beside it scroll, no taller than the window. */
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: clamp(300px, calc(100vh - 150px), 620px);
   padding: 6px;
   border: 3px solid var(--snow);
   border-radius: 4px;
@@ -963,8 +967,18 @@ body {
 }
 
 .locker-view {
+  position: relative;
   flex: 1;
   min-width: 0;
+}
+
+/* The 3D preview, copied in every frame (render/lockerStage.ts present). */
+.locker-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .locker-tabs {
@@ -1354,6 +1368,7 @@ body {
   }
 
   .locker-frame {
+    position: static;
     min-height: 0;
     height: clamp(200px, 36vh, 300px);
   }
@@ -1747,6 +1762,9 @@ body {
 }
 
 .locker-frame.editor-frame {
+  position: static;
+  align-self: stretch;
+  height: auto;
   min-height: 130px;
 }
 

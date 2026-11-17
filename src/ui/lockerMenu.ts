@@ -29,7 +29,7 @@ import {
   type SkiStat,
   type SkiType,
 } from '../core/skis.ts';
-import type { Rect } from '../render/lockerStage.ts';
+import type { Rect, StageWindow } from '../render/lockerStage.ts';
 import { addBackButton, board, setHints, type Screen } from './menus.ts';
 import { paintSkis } from './skiThumb.ts';
 
@@ -110,7 +110,7 @@ const ICONS: Record<Headwear, string> = {
     '<ellipse cx="20" cy="19" rx="14" ry="11" fill="#e8761e"/><path d="M14 9 C12 14 12 24 14 29 M26 9 C28 14 28 24 26 29" stroke="#c95f14" stroke-width="1.6" fill="none"/><path d="M19 9 L20 3 L23 4 L21 9 Z" fill="#6e6a2c"/><path d="M12 17 L15 12 L18 17 Z M22 17 L25 12 L28 17 Z" fill="#2a1206"/><path d="M11 21 C15 26 25 26 29 21 L26 24 L23 22 L20 25 L17 22 L14 24 Z" fill="#2a1206"/>',
 };
 
-export class LockerScreen implements Screen {
+export class LockerScreen implements Screen, StageWindow {
   readonly el: HTMLElement;
   private readonly hooks: LockerHooks;
   private readonly view: HTMLElement;
@@ -146,6 +146,8 @@ export class LockerScreen implements Screen {
   private readonly customs: { gear: Gear; slot: number; button: HTMLButtonElement; note: HTMLElement; thumbs: { canvas: HTMLCanvasElement; base: boolean }[] }[] = [];
   private readonly foot: HTMLElement;
   private readonly rect: Rect = { x: 0, y: 0, width: 0, height: 0 };
+  /** The preview's own canvas in the window (render/lockerStage.ts present copies it in). */
+  private readonly preview: CanvasRenderingContext2D | null;
 
   constructor(hooks: LockerHooks, onBack: () => void) {
     this.hooks = hooks;
@@ -165,6 +167,7 @@ export class LockerScreen implements Screen {
     this.view.className = 'locker-view';
     this.view.setAttribute('role', 'img');
     this.view.setAttribute('aria-label', 'Your skier, turning slowly');
+    this.preview = previewCanvas(this.view);
     frame.appendChild(this.view);
 
     const choices = document.createElement('div');
@@ -222,6 +225,10 @@ export class LockerScreen implements Screen {
     this.rect.width = Math.round(r.width);
     this.rect.height = Math.round(r.height);
     return this.rect;
+  }
+
+  viewContext(): CanvasRenderingContext2D | null {
+    return this.preview;
   }
 
   private buildOutfit(panel: HTMLElement): void {
@@ -753,4 +760,12 @@ function skiThumb(type: SkiType, g: SkiGraphic, base: boolean): HTMLCanvasElemen
   canvas.className = 'ski-thumb';
   paintSkis(canvas, type, g, base, RACK_PX_PER_M);
   return canvas;
+}
+
+/** The canvas the 3D preview is copied into, filling the window `view`, and its 2D context (opaque: the preview covers it). */
+export function previewCanvas(view: HTMLElement): CanvasRenderingContext2D | null {
+  const canvas = document.createElement('canvas');
+  canvas.className = 'locker-canvas';
+  view.appendChild(canvas);
+  return canvas.getContext('2d', { alpha: false });
 }

@@ -35,7 +35,7 @@ import { CONFIG } from './config.ts';
 import { ChaseCamera, type OrbitDrag } from './render/chaseCamera.ts';
 import { GameCamera } from './render/firstPerson.ts';
 import { clothTime } from './render/cloth.ts';
-import { LockerStage, type Rect } from './render/lockerStage.ts';
+import { LockerStage, present, type Rect, type StageWindow } from './render/lockerStage.ts';
 import { AutoQuality } from './render/autoQuality.ts';
 import { applyMap, applyWeather, compileShaders, createView, renderFrame, setPixelRatio, setViewRange, type View } from './render/scene.ts';
 import { createSkierPose, interpolateSkier, SkierView } from './render/skierView.ts';
@@ -270,19 +270,18 @@ const cheatsScreen = new CheatsScreen(
   },
   () => menus.back(),
 );
-// The Locker and the ski editor: the preview draws through a hole in the menu while either is open (see drawLocker).
+// The Locker and the ski editor: the preview is drawn, then copied into the screen's window, while either is open (see drawLocker).
 const lockerStage = new LockerStage(outfit);
 lockerStage.setRide(RIDE.board, RIDE.goofy);
 /** The screen whose window shows the preview, or null. */
-let stageScreen: { viewRect(): Rect } | null = null;
+let stageScreen: StageWindow | null = null;
 /** A custom ski or board was painted: rebuild the skis (or the board) on the next preview frame. */
 let skisDirty = false;
-function showStage(screen: { viewRect(): Rect } | null): void {
+function showStage(screen: StageWindow | null): void {
   stageScreen = screen;
   // The painted mountain fills round the window, from the title and from pause.
   menus.setScenery(screen !== null || !level);
   if (!screen) {
-    menus.setHole(null);
     repaintSkis();
     // The ski editor opening over the Locker shows the stage again at once: only leaving both saves.
     queueMicrotask(() => {
@@ -735,21 +734,29 @@ function setOutfit(next: Outfit, save = true): void {
 
 /**
  * The Locker's preview, instead of the full frame (the painted menu covers
- * the rest): the paused world round the skier, or the stage before any map.
- * It turns, and the Santa hat's pom-pom sways, in real time.
+ * the canvas): the paused world round the skier, or the stage before any
+ * map, drawn at the canvas's top left at the window's size, then copied into
+ * the window's own canvas (present). It turns, and the Santa hat's pom-pom
+ * sways, in real time. Nothing is drawn while the window is scrolled out of sight.
  */
-function drawLocker(screen: { viewRect(): Rect }, realFrameTime: number): void {
+function drawLocker(screen: StageWindow, realFrameTime: number): void {
   repaintSkis();
-  const rect = screen.viewRect();
-  menus.setHole(rect);
-  if (rect.width <= 0 || rect.height <= 0) return;
+  const at = screen.viewRect();
+  const ctx = screen.viewContext();
   lockerStage.turn(realFrameTime);
   clothTime.value += realFrameTime;
+  const canvas = renderer.domElement;
+  stageRect.width = Math.min(at.width, canvas.clientWidth);
+  stageRect.height = Math.min(at.height, canvas.clientHeight);
+  if (!ctx || stageRect.width <= 0 || stageRect.height <= 0 || at.y >= window.innerHeight || at.y + at.height <= 0) return;
   // The Locker always shows the whole skier, first person or not (the game camera hides the head again next frame).
   skierView?.rig.setHidden(false, false);
-  if (level && skierView) lockerStage.renderWorld(view, rect, pose.center, level.built.hf, level.built.course.obstacles);
-  else lockerStage.renderStage(renderer, rect);
+  if (level && skierView) lockerStage.renderWorld(view, stageRect, pose.center, level.built.hf, level.built.course.obstacles);
+  else lockerStage.renderStage(renderer, stageRect);
+  present(renderer, stageRect, ctx);
 }
+/** Where drawLocker draws the preview: the canvas's top left, at the window's size. */
+const stageRect: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
 /** Rebuilds the skier's and the preview's skis if a custom ski was painted since. */
 function repaintSkis(): void {

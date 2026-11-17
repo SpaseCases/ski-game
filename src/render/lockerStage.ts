@@ -52,6 +52,16 @@ export interface Rect {
   height: number;
 }
 
+/**
+ * A screen with a window for the preview (the Locker, the ski editor):
+ * where the window is (viewport CSS pixels, read every frame) and the 2D
+ * canvas inside it that the preview is copied into (present).
+ */
+export interface StageWindow {
+  viewRect(): Rect;
+  viewContext(): CanvasRenderingContext2D | null;
+}
+
 export class LockerStage {
   private readonly scene = new Scene();
   private readonly camera = new PerspectiveCamera(30, 1, 0.1, 40);
@@ -296,6 +306,26 @@ export class LockerStage {
       o.updateMatrixWorld(true);
     }
   }
+}
+
+/**
+ * Copies the preview just drawn at the canvas's top left (`rect` at 0, 0, as
+ * renderStage or renderWorld drew it) into the window's own 2D canvas. It
+ * must run in the same task as the drawing (the WebGL canvas keeps no copy
+ * of its picture after that). The preview then sits in the page like any
+ * element, so it scrolls with its frame exactly; drawn behind the menu
+ * through a hole, it trailed the frame while the page scrolled (milestone 23).
+ */
+export function present(renderer: WebGLRenderer, rect: Rect, ctx: CanvasRenderingContext2D): void {
+  const pr = renderer.getPixelRatio();
+  const w = Math.floor(rect.width * pr);
+  const h = Math.floor(rect.height * pr);
+  const canvas = ctx.canvas;
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+  }
+  ctx.drawImage(renderer.domElement, 0, 0, w, h, 0, 0, w, h);
 }
 
 /** Points the renderer's viewport and scissor at `rect` (CSS pixels from the top left). */

@@ -18,8 +18,15 @@ import JavaScriptObfuscator from 'javascript-obfuscator';
 
 /** Modules to obfuscate (paths with forward slashes). */
 const INCLUDE = /\/src\/(boot\.ts$|main\.ts$|poses\.ts$|ui\/.+\.ts$|online\/.+\.ts$|core\/.+\.ts$)/;
-/** Read on every frame or every key (the corner map moves every frame): left minified only. */
-const EXCLUDE = /\/src\/(core\/(loop|input)|ui\/cornerMap)\.ts$/;
+/**
+ * Read on every frame or every key, left minified only: the corner map moves
+ * every frame, and the ski painter (core/skis.ts drawSki, graphicColor) and
+ * the flat ski pictures (ui/skiThumb.ts) run per pixel, and the editor's
+ * grid (ui/paintGrid.ts) per cell, every frame of an editor stroke.
+ * Obfuscated, each property read there became a call to the string table's
+ * decoder: about 25 ms a frame on Low at CPU 4x (milestone 23).
+ */
+const EXCLUDE = /\/src\/(core\/(loop|input|skis)|ui\/(cornerMap|skiThumb|paintGrid))\.ts$/;
 
 /** @type {import('javascript-obfuscator').ObfuscatorOptions} */
 const OPTIONS = {
