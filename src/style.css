@@ -939,27 +939,49 @@ body {
 }
 
 /*
- * Locker: the skier in a window cut into the sign (the game draws it there,
- * through a hole in the menu), the choices beside it. Colors are paint
- * chips in a strip per part; the picked chip wears the sign's white keyline.
+ * Locker: the skier in a window in the sign (the game draws the preview and
+ * copies it into the window's canvas), the choices beside it. The sign fills
+ * the window's height and only the open tab's choices scroll, so the
+ * preview's window never moves (on a window too short for that, under the
+ * sign's min-height, the whole sign scrolls instead). Colors are paint chips
+ * in a strip per part; the picked chip wears the sign's white keyline.
  */
 .locker-screen {
   width: min(1080px, 100%);
+  height: 100%;
+  min-height: 360px;
+}
+
+.locker-screen .board {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 100%;
+}
+
+.locker-screen .board-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
 }
 
 .locker-layout {
   display: grid;
+  flex: 1;
   grid-template-columns: minmax(250px, 0.8fr) minmax(0, 1.3fr);
   gap: 22px;
+  min-height: 0;
+}
+
+.locker-choices {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .locker-frame {
   display: flex;
-  /* It stays in sight while the choices beside it scroll, no taller than the window. */
-  position: sticky;
-  top: 0;
-  align-self: start;
-  height: clamp(300px, calc(100vh - 150px), 620px);
+  min-height: 0;
   padding: 6px;
   border: 3px solid var(--snow);
   border-radius: 4px;
@@ -1008,8 +1030,13 @@ body {
   color: var(--snow);
 }
 
+/* The open tab's choices: the one part of the Locker that scrolls (a little room each side for the focus outlines). */
 .locker-panel {
-  padding-top: 12px;
+  flex: 1;
+  min-height: 0;
+  margin: 0 -8px;
+  padding: 12px 8px 8px;
+  overflow-y: auto;
 }
 
 .locker-panel[hidden] {
@@ -1365,12 +1392,11 @@ body {
 @media (max-width: 900px) {
   .locker-layout {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .locker-frame {
-    position: static;
-    min-height: 0;
-    height: clamp(200px, 36vh, 300px);
+    height: clamp(160px, 30vh, 300px);
   }
 }
 
@@ -1762,9 +1788,6 @@ body {
 }
 
 .locker-frame.editor-frame {
-  position: static;
-  align-self: stretch;
-  height: auto;
   min-height: 130px;
 }
 
