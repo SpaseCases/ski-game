@@ -73,6 +73,7 @@ import { LockerScreen, setPreviewControl, type ShareKind } from './ui/lockerMenu
 import { marketDescribe, marketThumb, outfitShare, slotShare, useItem } from './ui/marketGlue.ts';
 import { isDevName } from './core/devUnlock.ts';
 import type { Online } from './online/index.ts';
+import type { Dev } from './ui/devPowers.ts';
 import { SkiEditorScreen } from './ui/skiEditor.ts';
 import { WearEditorScreen } from './ui/wearEditor.ts';
 import { PauseScreen, TitleScreen } from './ui/mainMenus.ts';
@@ -175,7 +176,10 @@ const menus = new Menus(hud, onRootBack, onGameKey, () => [...windowBar.querySel
 menus.scenery.innerHTML = titleArt();
 /** Whether the board name is the developer's nickname (core/devUnlock.ts): with a saved code, the marketplace's Remove shows. */
 let devName = false;
-void isDevName(settings.name).then((d) => (devName = d));
+void isDevName(settings.name).then((d) => {
+  devName = d;
+  checkDev();
+});
 const titleScreen = new TitleScreen({
   play: openMapSelect,
   locker: openLocker,
@@ -190,7 +194,10 @@ const titleScreen = new TitleScreen({
   nameDone: nameChosen,
   isDev: (name) =>
     isDevName(name).then((d) => {
-      if (name === settings.name) devName = d;
+      if (name === settings.name) {
+        devName = d;
+        checkDev();
+      }
       return d;
     }),
   devCode: () => settings.devCode,
@@ -198,7 +205,13 @@ const titleScreen = new TitleScreen({
     settings.devCode = code;
     saveSettings(settings);
   },
-  checkDevCode: (code) => loadOnline().then((o) => o.checkCode(code), () => 'offline' as const),
+  checkDevCode: (code) =>
+    loadOnline()
+      .then((o) => o.checkCode(code), () => 'offline' as const)
+      .then((r) => {
+        devAnswer(code, r);
+        return r;
+      }),
 });
 const pauseScreen = new PauseScreen({
   resume: closeMenus,
@@ -383,6 +396,55 @@ let onlineLoading: Promise<Online> | null = null;
 let runSince = 0;
 /** True when cheats were on at any moment of the timed run (its time goes on the course's Cheats board). */
 let raceCheats = false;
+/** True when the timed run was flown in at any moment (milestone 25, the developer's powers): its time posts nowhere. */
+let raceFlown = false;
+
+// The developer's powers (milestone 25): their chunk (ui/devPowers.ts) is
+// imported only once the board name is the developer's (core/devUnlock.ts)
+// and the Worker has accepted the saved code this visit. Everyone else's
+// game never fetches it, so nothing of it runs or shows for them.
+/** The powers' chunk, once loaded; null for everyone else. */
+let dev: Dev | null = null;
+let devLoading: Promise<void> | null = null;
+/** The Worker accepted the saved code, and which code it last answered for (checked once a visit, and again when the title's box changes it). */
+let devAccepted = false;
+let devChecked: string | null = null;
+
+/** True while the powers work: the board name is the developer's and the Worker accepted the code. */
+function devLive(): boolean {
+  return dev !== null && devName && devAccepted;
+}
+
+/** Asks the Worker whether the saved code is right, once a visit (only for the developer's name); a yes loads the powers. */
+function checkDev(): void {
+  const code = settings.devCode;
+  if (!devName || !code || devChecked === code) return;
+  devChecked = code;
+  loadOnline()
+    .then((o) => o.checkCode(code))
+    .then(
+      (r) => devAnswer(code, r),
+      () => {},
+    );
+}
+
+/** The Worker's answer for `code`: right loads the powers; wrong or offline turns them off. */
+function devAnswer(code: string, answer: 'ok' | 'wrong' | 'offline'): void {
+  if (code !== settings.devCode) return;
+  devChecked = code;
+  devAccepted = answer === 'ok';
+  if (!devAccepted) return;
+  devLoading ??= import('./ui/devPowers.ts').then(
+    (m) => {
+      dev = m.createDevPowers({ hud, scene, audio: sound.engine, listening: () => !gameWaits() });
+      controlsScreen.extra = () => (devLive() && dev ? dev.controls() : null);
+      keyTester.extraKeys = () => (devLive() && dev ? dev.testerKeys : null);
+    },
+    () => {
+      devLoading = null;
+    },
+  );
+}
 /** Whether the finish being shown has had its board opened (see the frame), and whether the player hid it. */
 let finishSeen = false;
 let boardHidden = false;
@@ -553,7 +615,7 @@ function showFinishBoard(): void {
   if (built.map.scoring === false && !timed) return;
   const course = timed && race ? race.course : -1;
   const cheats = timed ? raceCheats : !cheatsTag.hidden;
-  const note = timed && race && race.missed > 0 ? 'Missed a gate: not posted.' : '';
+  const note = timed && race && race.missed > 0 ? 'Missed a gate: not posted.' : timed && raceFlown ? 'Flown: not posted.' : '';
   const since = runSince;
   loadOnline().then(
     (o) => {
@@ -1172,6 +1234,8 @@ if (import.meta.env.DEV) {
       setQuality,
       setWeather,
       loadMap: (id: MapId) => loadMap(mapEntry(id)!),
+      /** The developer's powers (milestone 25), with the dev unlock: aim at (x, y, z) from the eye, held steady. */
+      devAimAt: (x: number, y: number, z: number) => dev?.powers.aimAt(x, y, z),
       /** Looks from (x, y, z) at (tx, ty, tz) until called with no arguments, which goes back to the chase camera. */
       lookFrom: (...v: number[]) => {
         const [x = 0, y = 0, z = 0, tx = 0, ty = 0, tz = 0] = v;
@@ -1284,6 +1348,8 @@ startLoop(
     }
 
     copySkierState(skierPrev, skier);
+    // The developer's powers (milestone 25): the fly key, aiming (it takes the arrows), a shot.
+    dev?.powers.step(devLive(), skier, keys, dt);
     stepSkier(skier, keys, built.course, dt);
     // Avalanches (milestone 21): their slides run on the course, after the skier.
     const slides = built.course.avalanches;
@@ -1297,13 +1363,20 @@ startLoop(
     if (skier.liftChair === -2 && skierPrev.liftChair >= 0 && skier.liftT > 0.5) snapView = true;
     sound.step(skierPrev, skier, built.course.rails);
     const event = updateRun(run, built.map, skierPrev.position, skier);
-    if (scoring()) stepScore(score, skierPrev, skier, built.course.rails, built.gaps, built.hf, dt);
+    // Flying (milestone 25) scores nothing: a combo under way is dropped at take-off, and scoring starts again on the snow.
+    const flew = skier.flight !== 0 || skierPrev.flight !== 0;
+    if (flew && skierPrev.flight === 0) resetScore(score);
+    if (scoring() && !flew) stepScore(score, skierPrev, skier, built.course.rails, built.gaps, built.hf, dt);
     if (race && built.race) {
       const raceEvent = stepRace(race, built.race, skierPrev.position, skier, dt);
       if (raceEvent === 'missed') toast.show('Missed gate');
-      if (raceEvent === 'start') raceCheats = !cheatsTag.hidden;
-      // A clean run's time goes on the course's online board (a missed gate means no time).
-      if (raceEvent === 'finish' && race.missed === 0) postScore(level.id, race.course, raceCheats, Math.round(race.time * 1000));
+      if (raceEvent === 'start') {
+        raceCheats = !cheatsTag.hidden;
+        raceFlown = false;
+      }
+      if (skier.flight !== 0) raceFlown = true;
+      // A clean run's time goes on the course's online board (a missed gate means no time; nor does flying).
+      if (raceEvent === 'finish' && race.missed === 0 && !raceFlown) postScore(level.id, race.course, raceCheats, Math.round(race.time * 1000));
     }
     if (event === 'flag' && !timedRun()) toast.show(`Checkpoint: flag ${run.flag + 1} of ${built.map.flags.length}`);
     // After a crash, let the tumble play out, then fade and respawn (unless
@@ -1332,6 +1405,8 @@ startLoop(
       orbit.take(drag);
       drag.active = orbit.dragging;
       gameCamera.update(chase, pose, skierView.rig, level.built.hf, frameTime, drag);
+      // The developer's powers (milestone 25): through the scope (it overrides the camera), the carried model, a shot. Put away while the Locker shows.
+      dev?.powers.frame(devLive() && !stageScreen, pose, skier, skierView.rig, camera, frameTime, level.built.course, level.world.snow, gameCamera.firstWeight);
       if (freeCamera) {
         camera.position.copy(freeCamera.from);
         camera.lookAt(freeCamera.at);

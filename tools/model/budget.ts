@@ -3,6 +3,7 @@
 // calls, about 9,000 triangles). The worst outfit is the one to watch.
 //   node tools/model/budget.ts
 
+import { readFileSync } from 'node:fs';
 import { Mesh, type BufferGeometry } from 'three';
 import { DEFAULT_OUTFIT, HEADWEAR, PATTERNS, type Outfit } from '../../src/core/outfit.ts';
 import { BOARD_TYPES } from '../../src/core/boards.ts';
@@ -127,4 +128,16 @@ for (const t of BOARD_TYPES) {
   const c = count({ ...look, ...painted }, true);
   const p = count({ ...look, ...plaid }, true);
   console.log(`painted garments, hood, ${t.id.padEnd(8)} board ${String(c.calls).padStart(2)} draw calls, ${String(c.tris).padStart(5)} triangles (plaid ${p.calls}, ${p.tris})`);
+}
+
+// The developer's powers (milestone 25): the carried model (converted by
+// tools/models/packs.ts into src/render/devModels.json) is one mesh, so one
+// more draw call, only for the developer and only while it shows (on the
+// back, or in the hands until the scope is up). Its triangles, and with the
+// default rider. Last, so every line above stays the same.
+{
+  const dev = JSON.parse(readFileSync('src/render/devModels.json', 'utf8')) as { models: Record<string, { pos: string }> };
+  const tris = Buffer.from(dev.models.long!.pos, 'base64').length / 18;
+  const base = count(DEFAULT_OUTFIT);
+  console.log(`dev powers: carried model 1 draw call, ${tris} triangles; default rider with it ${base.calls + 1} draw calls, ${base.tris + tris} triangles`);
 }

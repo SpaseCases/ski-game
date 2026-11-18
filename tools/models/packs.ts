@@ -8,6 +8,9 @@
 // The raw packs stay out of git (reference/ is ignored). Put them in:
 //   reference/packs/kaykit/KayKit_City_Builder_Bits_1.0_FREE.zip  (Kay Lousberg, kaylousberg.itch.io/city-builder-bits, CC0)
 //   reference/packs/quaternius/Modular Street Pack by Quaternius.zip  (Quaternius, quaternius.itch.io/lowpoly-modular-street, CC0)
+//   reference/packs/quaternius-guns/ultimate_gun_pack_by_quaternius.zip  (Quaternius, Ultimate Gun Pack, July 2019:
+//     opengameart.org/content/low-poly-guns-pack, also quaternius.itch.io/50-lowpoly-guns; CC0, see tools/models/LICENSES.md)
+//     milestone 25: one model for the developer's powers, written to src/render/devModels.json, never snowed
 // then, from the repo root:
 //   node tools/models/packs.ts
 //
@@ -222,8 +225,10 @@ interface Source {
 }
 const KAY = 'reference/packs/kaykit/KayKit_City_Builder_Bits_1.0_FREE.zip';
 const QUAT = 'reference/packs/quaternius/Modular Street Pack by Quaternius.zip';
+const GUNS = 'reference/packs/quaternius-guns/ultimate_gun_pack_by_quaternius.zip';
 const kay = readZip(KAY);
 const quat = readZip(QUAT);
+const guns = readZip(GUNS);
 const KDIR = 'KayKit_City_Builder_Bits_1.0_FREE/Assets/gltf';
 // Wheels are buried in the snow: left out (each is a quarter of a car's triangles).
 const WHEELS = /wheel/i;
@@ -249,9 +254,20 @@ const SOURCES: Source[] = [
 
 const SNOW: [number, number, number] = [241, 245, 250];
 
+/**
+ * The developer's powers (milestone 25), fetched only for the developer:
+ * the pack's SniperRifle_6 (wood stock, 1,370 triangles), 1.2 m long, its
+ * muzzle toward -z. Kept apart from SOURCES so propModels.json stays as it was.
+ */
+const DEV_SOURCES: Source[] = [
+  { id: 'long', tris: () => objTris(guns, 'Ultimate Gun Pack - July 2019/OBJ/SniperRifle_6'), size: { axis: 'z', meters: 1.2 }, turn: 90 },
+];
+
+/** Converts `sources` and writes them to `file` as { models }. */
+function convert(sources: Source[], file: string): void {
 const models: Record<string, unknown> = {};
 let total = 0;
-for (const src of SOURCES) {
+for (const src of sources) {
   let tris = src.tris();
   // Turn so the length runs along z.
   if (src.turn) {
@@ -294,5 +310,9 @@ for (const src of SOURCES) {
   console.log(`${src.id}: ${tris.length} triangles, ${size.map((v) => v.toFixed(2)).join(' x ')} m`);
 }
 const json = JSON.stringify({ models });
-writeFileSync('src/render/propModels.json', `${json}\n`);
-console.log(`wrote src/render/propModels.json: ${SOURCES.length} models, ${total} triangles, ${(json.length / 1024).toFixed(0)} kB`);
+writeFileSync(file, `${json}\n`);
+console.log(`wrote ${file}: ${sources.length} models, ${total} triangles, ${(json.length / 1024).toFixed(0)} kB`);
+}
+
+convert(SOURCES, 'src/render/propModels.json');
+convert(DEV_SOURCES, 'src/render/devModels.json');

@@ -53,6 +53,9 @@ export class KeyTesterScreen implements Screen {
   private readonly held = new Set<string>();
   private most = 0;
 
+  /** More keys the game uses, by code, with their names, when this returns any (milestone 25: set by main, filled only for the developer). */
+  extraKeys: (() => ReadonlyMap<string, string> | null) | null = null;
+
   constructor(bindings: () => Bindings, onBack: () => void) {
     this.bindings = bindings;
     const b = board('Key tester', 'tester-screen');
@@ -121,10 +124,12 @@ export class KeyTesterScreen implements Screen {
     for (const action of ACTIONS) {
       for (const code of keys[action]) bound.set(code, [...(bound.get(code) ?? []), action]);
     }
+    const extra = this.extraKeys?.() ?? null;
     for (const { el, codes } of this.capList) {
-      const actions = codes.flatMap((code) => bound.get(code) ?? []);
-      el.classList.toggle('is-bound', actions.length > 0);
-      el.title = actions.map((a) => actionName(a)).join(', ');
+      const names = codes.flatMap((code) => (bound.get(code) ?? []).map((a) => actionName(a)));
+      if (extra) for (const code of codes) if (extra.has(code)) names.push(extra.get(code)!);
+      el.classList.toggle('is-bound', names.length > 0);
+      el.title = names.join(', ');
     }
     this.buildCombos(keys);
     this.reset();
@@ -205,7 +210,8 @@ export class KeyTesterScreen implements Screen {
     const keys = this.bindings();
     const names = [...this.held].map((code) => {
       const action = ACTIONS.find((a) => keys[a].includes(code));
-      return action ? `${keyName(code)} (${actionName(action)})` : keyName(code);
+      const extra = action ? undefined : this.extraKeys?.()?.get(code);
+      return action ? `${keyName(code)} (${actionName(action)})` : extra ? `${keyName(code)} (${extra})` : keyName(code);
     });
     this.heldList.textContent = names.length > 0 ? names.join(' · ') : 'Hold some keys.';
   }

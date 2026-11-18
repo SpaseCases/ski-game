@@ -26,8 +26,10 @@ const INCLUDE = /\/src\/(boot\.ts$|main\.ts$|poses\.ts$|ui\/.+\.ts$|online\/.+\.
  * 23 part 2) per cell, every frame of an editor stroke.
  * Obfuscated, each property read there became a call to the string table's
  * decoder: about 25 ms a frame on Low at CPU 4x (milestone 23).
+ * The developer's keys (core/devKeys.ts) and scope (ui/devScope.ts,
+ * milestone 25) run every step and frame of the developer's powers.
  */
-const EXCLUDE = /\/src\/(core\/(loop|input|skis)|ui\/(cornerMap|skiThumb|paintGrid|wearGrid))\.ts$/;
+const EXCLUDE = /\/src\/(core\/(loop|input|skis|devKeys)|ui\/(cornerMap|skiThumb|paintGrid|wearGrid|devScope))\.ts$/;
 
 /** @type {import('javascript-obfuscator').ObfuscatorOptions} */
 const OPTIONS = {

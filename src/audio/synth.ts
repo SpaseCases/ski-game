@@ -165,7 +165,7 @@ interface ToneOpts {
 }
 
 /** An oscillator note with a sliding pitch and a plucked envelope. */
-function tone(ctx: BaseAudioContext, out: AudioNode, o: ToneOpts): void {
+export function tone(ctx: BaseAudioContext, out: AudioNode, o: ToneOpts): void {
   const t = o.t ?? 0;
   const osc = ctx.createOscillator();
   osc.type = o.type ?? 'sine';
@@ -192,7 +192,7 @@ interface BurstOpts {
 }
 
 /** A burst of filtered noise. */
-function burst(ctx: BaseAudioContext, out: AudioNode, r: Rng, o: BurstOpts): void {
+export function burst(ctx: BaseAudioContext, out: AudioNode, r: Rng, o: BurstOpts): void {
   const t = o.t ?? 0;
   const src = ctx.createBufferSource();
   src.buffer = o.noise;
@@ -211,7 +211,7 @@ function burst(ctx: BaseAudioContext, out: AudioNode, r: Rng, o: BurstOpts): voi
 }
 
 /** A low-pass in front of `out`, for a whole recipe or part of one. */
-function lowpass(ctx: BaseAudioContext, out: AudioNode, freq: number, q = 0.7): BiquadFilterNode {
+export function lowpass(ctx: BaseAudioContext, out: AudioNode, freq: number, q = 0.7): BiquadFilterNode {
   const f = ctx.createBiquadFilter();
   f.type = 'lowpass';
   f.frequency.value = freq;

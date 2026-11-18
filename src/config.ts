@@ -1323,4 +1323,105 @@ export const CONFIG = {
     /** Seconds between frame-rate readout updates. */
     fpsInterval: 0.5,
   },
+
+  /**
+   * The developer's powers (milestone 25): only with the dev unlock, run
+   * from a lazy chunk nobody else fetches. Read straight from CONFIG.
+   */
+  dev: {
+    flight: {
+      /** Speed flown on its own (m/s), held with the pole key (fast), and how quickly speed changes (m/s²). */
+      cruise: 15,
+      fast: 45,
+      accel: 18,
+      /** Hovering (Space): how quickly the flight slows to a stop (m/s²). */
+      hoverBrake: 30,
+      /** Turning with ← → (rad/s). */
+      turnRate: 1.6,
+      /** Climbing on ↑ and diving on ↓ (m/s), reached at `climbAccel` (m/s²). */
+      climb: 9,
+      dive: 14,
+      climbAccel: 24,
+      /** The lift off the snow at take-off (m/s up). */
+      liftOff: 6,
+      /** Feet kept at least this far over the snow while flying (m); and no higher than `ceiling` m over it. */
+      clearance: 0.5,
+      ceiling: 300,
+      /** Landing: the glide down to the snow (m/s down), and how much of the speed across the ground it keeps on touching down. */
+      glide: 7,
+      landKeep: 1,
+      /** How quickly the body turns to the flight's heading and pitch (1/s), and how far it pitches with a climb or dive (rad at full rate). */
+      turnBody: 8,
+      pitchMax: 0.35,
+    },
+    scope: {
+      /** Zoom while aiming (times first person's field of view). */
+      zoom: 4,
+      /** Seconds to raise the scope to the eye, and to lower it. */
+      raise: 0.22,
+      /** Aiming with the arrows (rad/s), slower once zoomed in, and the pitch it stays within (rad). */
+      aimRate: 0.5,
+      /** Fine aiming with the pole key held (rad/s). */
+      fineRate: 0.08,
+      /** Where the aim starts up and down (rad, 0 level): the camera's heading, a touch below the horizon. */
+      startPitch: -0.03,
+      pitchMin: -1.2,
+      pitchMax: 1.0,
+      /** Sway (rad): wandering while moving the aim or just raised, steadying over `steady` s held still; more at speed (rad per m/s). */
+      sway: 0.006,
+      steadySway: 0.0012,
+      speedSway: 0.00012,
+      steady: 1.0,
+      /** How fast the sway wanders (Hz). */
+      swayRate: 0.45,
+      /** Recoil: the kick up (rad), and how quickly it settles (1/s). */
+      kick: 0.05,
+      settle: 5,
+    },
+    shot: {
+      /** Seconds between shots (a bolt action), and how far a shot reaches (m). */
+      reload: 1.1,
+      range: 1500,
+      /** The ray is marched over the snow in steps this long (m), then the crossing found by halving. */
+      step: 0.5,
+      /** A surface steeper than this (its normal's up, cos) or a wall the ray runs into is hard: sparks, not a puff. */
+      hardCos: 0.6,
+      /** Snow puff and sparks at the hit: how many, how fast they fly (m/s), and how long they last (s). */
+      puff: 26,
+      puffSpeed: 3.2,
+      puffLife: 1.1,
+      sparks: 18,
+      sparkSpeed: 6,
+      sparkLife: 0.35,
+      /** Sizes (m): the puff's cloud from start to end, its chunks, a spark; past `sizeFrom` m away they grow with the distance, so far hits still show. */
+      cloud0: 0.12,
+      cloud1: 0.7,
+      chunk: 0.025,
+      spark: 0.02,
+      sizeFrom: 40,
+      /** The shot's loudness (0..1 of the game bus), and how quickly the echo comes back (s) and how loud (0..1). */
+      gain: 0.7,
+      echo: 0.55,
+      echoGain: 0.35,
+    },
+    /**
+     * Carrying it (render/devPowers.ts), in the model's own meters: x across, y
+     * up from its base, z along it (muzzle toward -z). `eye` is where the eye
+     * sits behind the scope, `grip` and `fore` the hands' holds, `back` where
+     * its middle sits on the rider's back (chest space: +y up the spine, +z
+     * behind), slung at `sling` rad across the back.
+     */
+    carry: {
+      eye: [0, 0.222, 0.335],
+      grip: [0, 0.07, 0.3],
+      fore: [0, 0.13, -0.1],
+      back: [0, 0.3, 0.17],
+      sling: 0.75,
+      /** Aiming seen from outside: the eye point this far in front of the head's middle (m), and lowered. */
+      cheek: 0.1,
+      cheekDrop: 0.02,
+      /** First person: hidden on the back once the view is this far in (it's at the eye). */
+      hideFirst: 0.3,
+    },
+  },
 };

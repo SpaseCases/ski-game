@@ -88,6 +88,8 @@ export class ControlsScreen implements Screen {
   private readonly body: HTMLElement;
   private readonly tester: HTMLElement;
   private readonly settings: () => Settings;
+  /** One more table after the style moves, when this returns one (milestone 25: set by main, filled only for the developer). */
+  extra: (() => HTMLElement | null) | null = null;
 
   constructor(settings: () => Settings, onTester: () => void, onBack: () => void) {
     this.settings = settings;
@@ -222,7 +224,8 @@ export class ControlsScreen implements Screen {
       div.appendChild(t);
       return div;
     };
-    this.body.replaceChildren(this.tester, wrap(main), wrap(grabs), wrap(style), tips);
+    const extra = this.extra?.() ?? null;
+    this.body.replaceChildren(this.tester, wrap(main), wrap(grabs), wrap(style), ...(extra ? [wrap(extra)] : []), tips);
   }
 }
 

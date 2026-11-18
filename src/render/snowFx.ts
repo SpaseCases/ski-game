@@ -902,7 +902,7 @@ export class SnowFx {
   }
 
   /** Starts a particle in the next slot of the ring. */
-  private spawn(at: Vector3, vx: number, vy: number, vz: number, life: number, size0: number, size1: number, gravity: number, drag: number, kind: number): void {
+  spawn(at: Vector3, vx: number, vy: number, vz: number, life: number, size0: number, size1: number, gravity: number, drag: number, kind: number): void {
     const i = this.next;
     this.next = (i + 1) % this.size;
     this.px[i] = at.x;

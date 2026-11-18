@@ -172,6 +172,14 @@ export interface SkierState {
   lift: number;
   liftChair: number;
   liftT: number;
+  /**
+   * The developer's free flight (milestone 25): 0 off, 1 flying, 2 gliding
+   * down to land. While it isn't 0, stepSkier runs the flight step instead
+   * of everything else (sim/flight.ts, registered by the developer's chunk
+   * with setFlightStep); `grounded` is false and nothing crashes. Sim only:
+   * nothing else ever sets it, so with it 0 every step runs as before.
+   */
+  flight: number;
 }
 
 export function createSkierState(): SkierState {
@@ -227,6 +235,7 @@ export function createSkierState(): SkierState {
     lift: -1,
     liftChair: -1,
     liftT: 0,
+    flight: 0,
   };
 }
 
@@ -282,6 +291,7 @@ export function copySkierState(dst: SkierState, src: SkierState): void {
   dst.lift = src.lift;
   dst.liftChair = src.liftChair;
   dst.liftT = src.liftT;
+  dst.flight = src.flight;
 }
 
 /** Puts the skier at a spawn point, standing still on the snow. */
@@ -336,9 +346,21 @@ const BOARD_EDGE_LEAN = 0.15;
 const fit = { tilt: 0, angle: 0 };
 
 /** Advances the skier by one fixed step. */
+/** The flight step (sim/flight.ts), set only in the developer's chunk; null for everyone else. */
+let flightStep: ((s: SkierState, input: InputState, course: Course, dt: number) => void) | null = null;
+
+/** Registers the developer's flight step (milestone 25): run instead of everything else while `flight` isn't 0. */
+export function setFlightStep(step: typeof flightStep): void {
+  flightStep = step;
+}
+
 export function stepSkier(s: SkierState, input: InputState, course: Course, dt: number): void {
   const lifts = course.lifts;
   if (lifts) stepLifts(lifts, s.lift, s.liftChair, dt);
+  if (s.flight !== 0 && flightStep) {
+    flightStep(s, input, course, dt);
+    return;
+  }
   if (s.bailed) {
     stepBail(s, course, dt);
     return;
