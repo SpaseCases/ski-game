@@ -819,10 +819,70 @@ function skiThumb(type: SkiType, g: SkiGraphic, base: boolean): HTMLCanvasElemen
   return canvas;
 }
 
-/** The canvas the 3D preview is copied into, filling the window `view`, and its 2D context (opaque: the preview covers it). */
+/** What a drag or the wheel on a preview window does (main points it at render/lockerStage.ts). */
+export interface PreviewControl {
+  grab: () => void;
+  drag: (dx: number, dy: number) => void;
+  release: () => void;
+  zoom: (deltaY: number) => void;
+}
+let control: PreviewControl | null = null;
+
+export function setPreviewControl(c: PreviewControl): void {
+  control = c;
+}
+
+/**
+ * The canvas the 3D preview is copied into, filling the window `view`, and
+ * its 2D context (opaque: the preview covers it). The window also takes the
+ * hand (milestone 23, the user's ask): a click-and-drag turns and tilts the
+ * view, the wheel zooms, and it turns by itself again a few seconds after
+ * (PreviewControl). The drag keeps the focus where it was (the editor's grid).
+ */
 export function previewCanvas(view: HTMLElement): CanvasRenderingContext2D | null {
   const canvas = document.createElement('canvas');
   canvas.className = 'locker-canvas';
-  view.appendChild(canvas);
+  const hint = document.createElement('span');
+  hint.className = 'preview-hint';
+  hint.textContent = 'Drag to turn · Wheel to zoom';
+  view.append(canvas, hint);
+  view.classList.add('is-handled');
+  let x = 0;
+  let y = 0;
+  let held = -1;
+  view.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    view.setPointerCapture(e.pointerId);
+    held = e.pointerId;
+    x = e.clientX;
+    y = e.clientY;
+    view.classList.add('is-held');
+    control?.grab();
+  });
+  view.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== held) return;
+    control?.drag(e.clientX - x, e.clientY - y);
+    x = e.clientX;
+    y = e.clientY;
+  });
+  const end = (e: PointerEvent): void => {
+    if (e.pointerId !== held) return;
+    held = -1;
+    view.classList.remove('is-held');
+    control?.release();
+  };
+  view.addEventListener('pointerup', end);
+  view.addEventListener('pointercancel', end);
+  view.addEventListener('lostpointercapture', end);
+  view.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
+      control?.zoom(e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY);
+    },
+    { passive: false },
+  );
+  view.addEventListener('contextmenu', (e) => e.preventDefault());
   return canvas.getContext('2d', { alpha: false });
 }

@@ -1,8 +1,8 @@
 import { EDIT_PALETTE } from '../core/customSkis.ts';
-import { fillStock, openWear, saveCustomWear } from '../core/customWear.ts';
+import { fillStock, openWear, saveCustomWear, wearTrims } from '../core/customWear.ts';
 import { GARMENTS, PATTERNS, type Outfit, type StockPattern } from '../core/outfit.ts';
 import type { Rect, StageWindow } from '../render/lockerStage.ts';
-import { BODY_PANEL, layoutSize, wearOffsets, wearPanels, type WearGarment } from '../render/wearPanels.ts';
+import { BODY_PANEL, CUFFS, layoutSize, POCKETS, wearOffsets, wearPanels, type WearGarment } from '../render/wearPanels.ts';
 import { keycap } from './keyNames.ts';
 import { patternSwatch, previewCanvas } from './lockerMenu.ts';
 import { board, setHints, type Screen } from './menus.ts';
@@ -40,6 +40,8 @@ const UNDO_MAX = 60;
 /** Grid cell size in CSS pixels: as big as fits, within these. */
 const CELL_MAX = 20;
 const CELL_MIN = 6;
+/** The menu's padding above and below the sign (style.css .menu), px. */
+const MENU_PAD = 74;
 const BRUSHES = [1, 2, 3, 4] as const;
 const JUMP = 4;
 const MOVES: Partial<Record<string, readonly [number, number]>> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
@@ -61,13 +63,18 @@ const HINTS = [
   [['Tab'], 'Palette and tools'],
   [['Esc'], 'Done'],
 ] as const;
+/** The pants' too: their cuffs and pockets. */
+const PANTS_HINTS = [...HINTS.slice(0, 6), [['C', 'O'], 'Cuffs, pockets'], ...HINTS.slice(6)] as const;
 
 export class WearEditorScreen implements Screen, StageWindow {
   readonly el: HTMLElement;
   private readonly hooks: WearEditorHooks;
   private readonly title: HTMLElement;
   private readonly sub: HTMLElement;
+  private readonly foot: HTMLElement;
   private readonly bench: HTMLElement;
+  /** Everything but the 3D window: the part that scrolls (style.css .editor-main). */
+  private readonly main: HTMLElement;
   private readonly grid: HTMLCanvasElement;
   private readonly status: HTMLElement;
   private readonly starts: HTMLElement;
@@ -79,6 +86,8 @@ export class WearEditorScreen implements Screen, StageWindow {
   private readonly mirrorButton: HTMLButtonElement;
   private readonly brushButtons: HTMLButtonElement[] = [];
   private readonly undoButton: HTMLButtonElement;
+  /** The pants' trims (WEAR_TRIMS order: cuffs, pockets), each a button with a swatch of its color, as the ski editor's Sidewalls. */
+  private readonly trimButtons: { button: HTMLButtonElement; swatch: HTMLElement }[] = [];
   private readonly view: HTMLElement;
   private readonly rect: Rect = { x: 0, y: 0, width: 0, height: 0 };
   private readonly preview: CanvasRenderingContext2D | null;
@@ -93,7 +102,7 @@ export class WearEditorScreen implements Screen, StageWindow {
   private hoverX = -1;
   private hoverY = 0;
   private tool: Tool = 'pencil';
-  private undo: Uint8Array<ArrayBufferLike>[] = [];
+  private undo: { cells: Uint8Array<ArrayBufferLike>; trims: number[] }[] = [];
   private dragging = false;
   private penDown = false;
   private lastX = 0;
@@ -223,6 +232,20 @@ export class WearEditorScreen implements Screen, StageWindow {
     const clear = toolButton('Clear', '', () => this.fillAll());
     clear.title = 'Paint every square in the picked color';
     tools.append(this.mirrorButton, this.undoButton, clear);
+    // The pants' cuffs and pockets in the picked color (pressed again, back to the pants' own color).
+    for (const [name, key, title] of [
+      ['Cuffs', 'C', 'The folds at the hem take the picked color (again: the pants color)'],
+      ['Pockets', 'O', 'The pockets and their flaps take the picked color (again: the pants color)'],
+    ] as const) {
+      const i = this.trimButtons.length;
+      const button = toolButton(name, key, () => this.setTrim(i));
+      button.title = title;
+      const swatch = document.createElement('span');
+      swatch.className = 'editor-swatch';
+      button.querySelector('.editor-tool-name')!.prepend(swatch);
+      tools.appendChild(button);
+      this.trimButtons.push({ button, swatch });
+    }
     const brushes = document.createElement('div');
     brushes.className = 'editor-brushes';
     brushes.setAttribute('role', 'group');
@@ -254,13 +277,14 @@ export class WearEditorScreen implements Screen, StageWindow {
     this.preview = previewCanvas(this.view);
     frame.appendChild(this.view);
 
-    const main = document.createElement('div');
+    const main = (this.main = document.createElement('div'));
     main.className = 'editor-main';
     main.append(this.bench, mid, lower);
     const layout = document.createElement('div');
     layout.className = 'editor-layout';
     layout.append(main, frame);
     b.body.appendChild(layout);
+    this.foot = b.foot;
     setHints(b.foot, HINTS);
   }
 
@@ -290,7 +314,8 @@ export class WearEditorScreen implements Screen, StageWindow {
     this.sub.textContent =
       garment === 'jacket'
         ? `Custom ${slot + 1} for your jacket: every square of it, laid flat with the front in the middle. The collar, cuffs, pockets, hood and hem stay your jacket color. It saves as you paint.`
-        : `Custom ${slot + 1} for your pants: the seat and both legs, hip to hem, laid flat with the front in the middle. The pocket and the hem's folds stay your pants color. It saves as you paint.`;
+        : `Custom ${slot + 1} for your pants: the seat and both legs, hip to hem, laid flat with the front in the middle. Cuffs and Pockets give the hem's folds and the pockets a color of their own. It saves as you paint.`;
+    setHints(this.foot, garment === 'pants' ? PANTS_HINTS : HINTS);
     saveCustomWear();
     this.hooks.wear(garment, slot);
   }
@@ -375,6 +400,11 @@ export class WearEditorScreen implements Screen, StageWindow {
       case 'm':
         this.toggleMirror();
         return true;
+      case 'c':
+      case 'o':
+        if (this.garment !== 'pants') return false;
+        this.setTrim(key === 'c' ? CUFFS : POCKETS);
+        return true;
       case 'i': {
         const i = this.g.index(this.x, this.y);
         if (i >= 0) this.setColor(this.g.cells[i]!);
@@ -435,7 +465,7 @@ export class WearEditorScreen implements Screen, StageWindow {
   }
 
   private remember(): void {
-    this.undo.push(this.g.cells.slice());
+    this.undo.push({ cells: this.g.cells.slice(), trims: wearTrims(this.garment, this.slot).slice() });
     if (this.undo.length > UNDO_MAX) this.undo.shift();
     this.undoButton.disabled = false;
   }
@@ -444,8 +474,21 @@ export class WearEditorScreen implements Screen, StageWindow {
     if (this.penDown || this.dragging) return;
     const last = this.undo.pop();
     if (!last) return;
-    this.g.cells.set(last);
+    this.g.cells.set(last.cells);
+    const t = wearTrims(this.garment, this.slot);
+    for (let i = 0; i < t.length; i++) t[i] = last.trims[i] ?? -1;
     this.changed();
+    this.save();
+    this.sync();
+  }
+
+  /** A trim (the pants' cuffs or pockets) in the picked color, or back to the pants' own color when it already has it. */
+  private setTrim(i: number): void {
+    const t = wearTrims(this.garment, this.slot);
+    if (i >= t.length) return;
+    this.remember();
+    t[i] = t[i] === this.g.color ? -1 : this.g.color;
+    this.unbuilt = true;
     this.save();
     this.sync();
   }
@@ -568,8 +611,11 @@ export class WearEditorScreen implements Screen, StageWindow {
   /** Sizes the grid to the bench (on opening and when the window resizes). */
   private layout(): void {
     if (!this.shown) return;
+    // As wide as the bench, and no taller than the scrolling part can show at once (the rest of the bench under it too).
     const width = contentWidth(this.bench);
-    this.cell = Math.max(CELL_MIN, Math.min(CELL_MAX, Math.floor(width / this.g.width)));
+    const sign = this.el.firstElementChild?.getBoundingClientRect().height ?? 0;
+    const room = window.innerHeight - MENU_PAD - (sign - this.main.clientHeight) - (this.bench.getBoundingClientRect().height - this.grid.getBoundingClientRect().height);
+    this.cell = Math.max(CELL_MIN, Math.min(CELL_MAX, Math.floor(width / this.g.width), Math.floor(room / this.g.height)));
     this.grid.style.width = `${this.cell * this.g.width}px`;
     this.grid.style.height = `${this.cell * this.g.height}px`;
     this.queueDraw();
@@ -608,12 +654,13 @@ export class WearEditorScreen implements Screen, StageWindow {
 
   /** Each piece's name in the row above it, and round the body (or the seat) where its back, sides and front are. */
   private drawNames(ctx: CanvasRenderingContext2D, s: number): void {
-    const size = Math.max(9, Math.min(13, Math.round(s * 0.7)));
+    const size = Math.max(9, Math.min(13, Math.round(s * 1.2)));
     ctx.font = `700 ${size}px system-ui, sans-serif`;
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#a9c1dc';
     this.g.panels.forEach((p, i) => {
-      const y = (p.y - 0.5) * s;
+      // In the middle of the two rows left above the piece.
+      const y = (p.y - 1) * s;
       const main = this.garment === 'jacket' ? i === BODY_PANEL : i === 0;
       if (!main) {
         ctx.textAlign = 'center';
@@ -644,6 +691,14 @@ export class WearEditorScreen implements Screen, StageWindow {
     this.mirrorButton.setAttribute('aria-pressed', String(this.g.mirror));
     this.brushButtons.forEach((b, i) => b.setAttribute('aria-pressed', String(BRUSHES[i] === this.g.brush)));
     this.undoButton.disabled = this.undo.length === 0;
+    const t = wearTrims(this.garment, this.slot);
+    const own = o[g.id];
+    this.trimButtons.forEach(({ button, swatch }, i) => {
+      button.hidden = i >= t.length;
+      const c = t[i] ?? -1;
+      swatch.style.background = c >= 0 ? EDIT_PALETTE[c]!.hex : own;
+      button.setAttribute('aria-pressed', String(c >= 0));
+    });
     const what = this.garment === 'jacket' ? 'The jacket laid flat: the right sleeve, the body round from the back with the front in the middle, the left sleeve' : 'The pants laid flat: the seat, then the right leg and the left';
     this.grid.setAttribute('aria-label', `${what}. Arrows move, Space paints.`);
   }

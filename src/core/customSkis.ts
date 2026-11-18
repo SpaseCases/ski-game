@@ -90,7 +90,7 @@ function gearList(gear: Gear): (SkiGraphic | null)[] {
 const KEY = 'customSkis.v1';
 const BOARD_KEY = 'customBoards.v1';
 /** One letter per palette index in the saved string; a run of one color is its length in digits, then the letter. */
-const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+export const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
 /** A slot's own data: its two grids (shared with its graphic's layers), the sidewalls' color index, and whether the skis are painted alike (never on a board). */
 interface Slot {
@@ -345,7 +345,7 @@ export function runs(cells: Uint8Array): string {
   return out;
 }
 
-function letterIndex(ch: string | undefined): number {
+export function letterIndex(ch: string | undefined): number {
   const i = ch === undefined ? -1 : LETTERS.indexOf(ch);
   return i >= 0 && i < HEXES.length ? i : -1;
 }

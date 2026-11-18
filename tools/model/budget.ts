@@ -101,16 +101,18 @@ for (const t of BOARD_TYPES) {
 }
 
 // Painted garments (milestone 23 part 2) at their worst: a checkerboard
-// jacket and pants, every square its own color. They are cut into plaid's
-// faces, so each line should match plaid's; on skis (each ski type, with the
-// hood) and on each board type. Last again, so every line above stays the same.
+// jacket and pants, every square its own color, beside plaid's count. Each
+// of plaid's faces is cut WEAR_SPLIT x WEAR_SPLIT (2 x 2 since the user
+// asked for finer painting: about 3,400 more triangles than plaid, the same
+// draw calls); on skis (each ski type, with the hood) and on each board
+// type. Last again, so every line above stays the same.
 for (const garment of ['jacket', 'pants'] as const) {
   const cells = new Uint8Array(wearSize(garment));
   const at = wearOffsets(garment);
   wearPanels(garment).forEach((p, i) => {
     for (let r = 0; r < p.rows; r++) for (let c = 0; c < p.cols; c++) cells[at[i]! + r * p.cols + c] = (r + c) % 2;
   });
-  setWearArt(garment, 'custom-1', { cells, colors: ['#2c3037', '#ece8de'] });
+  setWearArt(garment, 'custom-1', { cells, colors: ['#2c3037', '#ece8de'], trims: [] });
 }
 const painted: Partial<Outfit> = { jacketPattern: 'custom-1', pantsPattern: 'custom-1' };
 const plaid: Partial<Outfit> = { jacketPattern: 'plaid', pantsPattern: 'plaid' };

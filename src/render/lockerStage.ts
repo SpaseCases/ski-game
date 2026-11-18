@@ -27,6 +27,14 @@ import { renderFrame, type View } from './scene.ts';
 import { STANCE } from './skierPoses.ts';
 import { SkierRig } from './skierRig.ts';
 
+/** Highest the view tilts (rad): short of straight down, where lookAt loses its way. */
+const MAX_PITCH = 1.45;
+
+/** An angle brought within -π..π. */
+function wrapAngle(a: number): number {
+  return a - Math.PI * 2 * Math.round(a / (Math.PI * 2));
+}
+
 /** Steps (m) along the camera's sight line when checking it for walls. */
 const SIGHT_STEP = 0.2;
 /** Angles round the skier tried when looking for an open arc, and the fewest clear in a row that make one. */
@@ -42,7 +50,10 @@ const sight = new Vector3();
 // camera looks down at the skis (or the board) instead of the whole skier.
 // On a snowboard (milestone 22 part 2) the stage's rig rides it too: the
 // board stance, turned across the board and mirrored for goofy as
-// SkierView does.
+// SkierView does. By hand (milestone 23, the user's ask): a drag on the
+// window turns the view round the skier and tilts it, the wheel zooms, and
+// CONFIG.locker.handResume s after letting go it turns by itself again from
+// where it was left (ui/lockerMenu.ts previewCanvas sends the pointer here).
 
 
 export interface Rect {
@@ -86,7 +97,23 @@ export class LockerStage {
    */
   private arc: { mid: number; half: number } | null = null;
   private readonly arcAim = new Vector3(Infinity, 0, 0);
-  private arcKey = '';
+  /** What the arc was worked out for: the window's size, the framing and the hand's tilt and zoom. */
+  private arcWidth = 0;
+  private arcHeight = 0;
+  private arcSkis = false;
+  private arcTilt = 0;
+  private arcZoom = 1;
+  /** The angle the view was last drawn at (a drag starts from it), and whether it was the paused world (the camera circling) or the stage (the skier turning). */
+  private shown = 0;
+  private world = false;
+  /** By hand: held now, seconds since it was last moved (Infinity: not since it opened), the tilt (rad) and zoom (a share of the framed distance). */
+  private holding = false;
+  private handIdle = Infinity;
+  private tilt = 0;
+  private zoom = 1;
+  /** Back from the hand onto the swing across an open arc: the angle left by hand and how much of it still shows (1 to 0). */
+  private backFrom = 0;
+  private back = 0;
 
   constructor(outfit: Outfit) {
     this.outfit = outfit;
@@ -128,15 +155,90 @@ export class LockerStage {
     this.rig?.repaintWear(garment);
   }
 
-  /** Frames the skis (true) or the whole skier. */
+  /** Frames the skis (true) or the whole skier (a change forgets the hand's tilt and zoom). */
   showSkis(on: boolean): void {
+    if (on !== this.skis) this.resetHand();
     this.skis = on;
   }
 
-  /** Turns the preview on by `frameTime` seconds (real time; it turns even while the game is paused). */
+  /** Back to turning by itself, untilted and unzoomed (a preview window opening). */
+  resetHand(): void {
+    this.holding = false;
+    this.handIdle = Infinity;
+    this.tilt = 0;
+    this.zoom = 1;
+    this.back = 0;
+  }
+
+  /** The pointer went down on the window: it stops turning, from the angle it shows. */
+  handGrab(): void {
+    if (!this.holding && this.handIdle >= CONFIG.locker.handResume) this.angle = this.shown;
+    this.holding = true;
+    this.handIdle = 0;
+    this.back = 0;
+  }
+
+  /**
+   * A drag of (dx, dy) CSS pixels: turns the view round the skier, as if the
+   * skier were grabbed (dragging right brings its near side right: the stage
+   * turns the skier one way, the paused world circles the camera the other),
+   * and tilts it (dragging down looks from higher up).
+   */
+  handDrag(dx: number, dy: number): void {
+    const { dragTurn, dragTilt, tiltMin, tiltMax } = CONFIG.locker;
+    this.angle = (this.angle + (this.world ? dx : -dx) * dragTurn) % (Math.PI * 2);
+    this.tilt = Math.min(tiltMax, Math.max(tiltMin, this.tilt + dy * dragTilt));
+    this.handIdle = 0;
+  }
+
+  handRelease(): void {
+    this.holding = false;
+  }
+
+  /** The wheel over the window: zooms in (up) or out, and stops it turning for a while as a drag does. */
+  handZoom(deltaY: number): void {
+    const { zoomPerPixel, zoomMin, zoomMax, handResume } = CONFIG.locker;
+    if (!this.holding && this.handIdle >= handResume) this.angle = this.shown;
+    this.zoom = Math.min(zoomMax, Math.max(zoomMin, this.zoom * Math.exp(deltaY * zoomPerPixel)));
+    this.handIdle = 0;
+    this.back = 0;
+  }
+
+  /**
+   * Turns the preview on by `frameTime` seconds (real time; it turns even
+   * while the game is paused): not while held, nor for handResume s after
+   * the hand let go, then easing up to speed over handEase s.
+   */
   turn(frameTime: number): void {
-    this.angle = (this.angle + frameTime * CONFIG.locker.turnRate) % (Math.PI * 2);
-    this.swing += frameTime * CONFIG.locker.turnRate;
+    const { turnRate, handResume, handEase } = CONFIG.locker;
+    if (this.holding) {
+      this.handIdle = 0;
+      return;
+    }
+    const was = this.handIdle;
+    this.handIdle += frameTime;
+    if (this.handIdle < handResume) return;
+    if (was < handResume) this.resumeSwing();
+    const speed = turnRate * Math.min(1, (this.handIdle - handResume) / handEase);
+    this.angle = (this.angle + frameTime * speed) % (Math.PI * 2);
+    this.swing += frameTime * speed;
+    if (this.back > 0) this.back = Math.max(0, this.back - frameTime / handEase);
+  }
+
+  /**
+   * From pause between walls, turning again after the hand: the swing
+   * across the open arc picks up where the hand left the view; from outside
+   * the arc it eases over from there.
+   */
+  private resumeSwing(): void {
+    const arc = this.arc;
+    if (!arc) return;
+    const x = wrapAngle(this.angle - arc.mid) / arc.half;
+    this.swing = arc.half * Math.asin(Math.min(1, Math.max(-1, x)));
+    if (Math.abs(x) > 1) {
+      this.backFrom = this.angle;
+      this.back = 1;
+    }
   }
 
   /** The stage on its own (no map loaded): built the first time it's needed. */
@@ -147,6 +249,8 @@ export class LockerStage {
     this.turntable.updateMatrix();
     this.turntable.updateMatrixWorld(true);
     this.aim.set(0, this.skis ? CONFIG.locker.skiAim : 0.85, 0);
+    this.shown = this.angle;
+    this.world = false;
     // A turntable: the skier turns under a still camera and sun.
     this.place(rect, CONFIG.locker.stageAngle);
     beginScissor(renderer, rect);
@@ -164,15 +268,24 @@ export class LockerStage {
   renderWorld(view: View, rect: Rect, center: Vector3, hf: Heightfield, obstacles: Obstacles): void {
     this.aim.copy(center);
     this.aim.y += this.skis ? CONFIG.locker.skiAim - CONFIG.air.comHeight : 0.1;
-    const key = `${rect.width}x${rect.height}${this.skis}`;
-    if (key !== this.arcKey || this.aim.distanceToSquared(this.arcAim) > 0.25) {
-      this.arcKey = key;
+    const changed = rect.width !== this.arcWidth || rect.height !== this.arcHeight || this.skis !== this.arcSkis || this.tilt !== this.arcTilt || this.zoom !== this.arcZoom;
+    if (changed || this.aim.distanceToSquared(this.arcAim) > 0.25) {
+      this.arcWidth = rect.width;
+      this.arcHeight = rect.height;
+      this.arcSkis = this.skis;
+      this.arcTilt = this.tilt;
+      this.arcZoom = this.zoom;
       this.arcAim.copy(this.aim);
       this.arc = this.openArc(rect, obstacles);
     }
-    // Across the open arc and back, as fast at its middle as the circling; else all the way round.
+    // Across the open arc and back, as fast at its middle as the circling; else all the way round; where the hand put it while it's moved by hand.
     const arc = this.arc;
-    this.place(rect, arc ? arc.mid + arc.half * Math.sin(this.swing / arc.half) : this.angle);
+    const byHand = this.holding || this.handIdle < CONFIG.locker.handResume;
+    let angle = byHand || !arc ? this.angle : arc.mid + arc.half * Math.sin(this.swing / arc.half);
+    if (!byHand && this.back > 0) angle += wrapAngle(this.backFrom - angle) * this.back;
+    this.shown = angle;
+    this.world = true;
+    this.place(rect, angle);
     this.clearSight(obstacles);
     const c = this.camera;
     const ground = heightAt(hf, c.position.x, c.position.z) + 0.5;
@@ -246,18 +359,24 @@ export class LockerStage {
   private place(rect: Rect, angle: number): void {
     const c = this.camera;
     c.aspect = rect.width / Math.max(1, rect.height);
-    // Far enough back for the whole skier, and the skis when turned side on.
+    // Far enough back for the whole skier, and the skis when turned side on; then tilted and zoomed by hand.
     const t = Math.tan((c.fov * Math.PI) / 360);
     const { halfHeight, halfWidth, rise, skiHalfLength, skiPitch } = CONFIG.locker;
+    let d: number;
+    let pitch: number;
     if (this.skis) {
       // Looking down at the skis from all round, the whole length in view.
-      const d = skiHalfLength / (t * Math.min(1, c.aspect));
-      const flat = Math.cos(skiPitch) * d;
-      c.position.set(this.aim.x + Math.sin(angle) * flat, this.aim.y + Math.sin(skiPitch) * d, this.aim.z - Math.cos(angle) * flat);
+      d = skiHalfLength / (t * Math.min(1, c.aspect));
+      pitch = skiPitch;
     } else {
-      const d = Math.max(halfHeight / t, halfWidth / (t * c.aspect));
-      c.position.set(this.aim.x + Math.sin(angle) * d, this.aim.y + rise, this.aim.z - Math.cos(angle) * d);
+      const flat = Math.max(halfHeight / t, halfWidth / (t * c.aspect));
+      d = Math.hypot(flat, rise);
+      pitch = Math.atan2(rise, flat);
     }
+    d *= this.zoom;
+    pitch = Math.min(MAX_PITCH, pitch + this.tilt);
+    const flat = Math.cos(pitch) * d;
+    c.position.set(this.aim.x + Math.sin(angle) * flat, this.aim.y + Math.sin(pitch) * d, this.aim.z - Math.cos(angle) * flat);
     c.lookAt(this.aim);
     c.near = 0.1;
     c.updateProjectionMatrix();

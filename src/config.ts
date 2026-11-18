@@ -1184,6 +1184,23 @@ export const CONFIG = {
     skiAim: 0.1,
     skiHalfLength: 1.15,
     skiPitch: 0.9,
+    /**
+     * Turning the preview by hand (milestone 23, the user's ask): a drag
+     * turns it `dragTurn` rad and tilts the view `dragTilt` rad a pixel,
+     * the tilt kept within `tiltMin`..`tiltMax` of the framing's own (rad);
+     * the wheel zooms by `zoomPerPixel` a pixel of scroll, between `zoomMin`
+     * and `zoomMax` of the framed distance. `handResume` s after letting go
+     * it turns by itself again, up to speed over `handEase` s.
+     */
+    dragTurn: 0.012,
+    dragTilt: 0.008,
+    tiltMin: -0.45,
+    tiltMax: 0.9,
+    zoomPerPixel: 0.0015,
+    zoomMin: 0.35,
+    zoomMax: 1.6,
+    handResume: 3,
+    handEase: 1,
     /** Stat bars: the park ski fills half; each 0.1 a ski's stat is over or under 1 moves the bar this share of 0.1. */
     statGain: 1.4,
   },

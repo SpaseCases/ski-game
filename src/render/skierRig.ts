@@ -30,7 +30,7 @@ import { clothMaterial } from './cloth.ts';
 import type { PoseBuffer } from './poseBlend.ts';
 import { buildSkiGeometry } from './skiModel.ts';
 import type { PoseDef, Vec3 } from './skierPoses.ts';
-import { BODY_PANEL, LEG_LEFT, LEG_RIGHT, SEAT_PANEL, SLEEVE_LEFT, SLEEVE_RIGHT, wearArt, wearOffsets, wearPanels } from './wearPanels.ts';
+import { BODY_PANEL, CUFFS, LEG_LEFT, LEG_RIGHT, POCKETS, SEAT_PANEL, SLEEVE_LEFT, SLEEVE_RIGHT, WEAR_SPLIT, wearArt, wearOffsets, wearPanels } from './wearPanels.ts';
 
 // Low-poly freeskier: a roomy shell jacket down to the thighs, wide pants over
 // chunky boots, a snug matte helmet, small goggles and a neck gaiter that
@@ -251,7 +251,7 @@ export class SkierRig {
     }
     if (jacketChanged || hoodChanged) swap([this.torso], buildTorso(jacket, next.headwear === 'hood'));
     if (jacketChanged) {
-      this.hem.recolor(jacket);
+      if (this.hem.recolor(jacket)) this.refitHem();
       this.upperArms.forEach((m, i) => swap([m], buildUpperArm(jacket, i === 0 ? -1 : 1)));
     }
     if (jacketChanged || changed('mittens')) this.setForearms(jacket, c.mittens);
@@ -299,9 +299,14 @@ export class SkierRig {
       return;
     }
     swap([this.torso], buildTorso(w, this.outfit.headwear === 'hood'));
-    this.hem.recolor(w);
+    if (this.hem.recolor(w)) this.refitHem();
     this.upperArms.forEach((m, i) => swap([m], buildUpperArm(w, i === 0 ? -1 : 1)));
     this.setForearms(w, c.mittens);
+  }
+
+  /** Fits a lower jacket made again to the pose last applied (the stage's rig is posed only when its ride changes). */
+  private refitHem(): void {
+    this.hem.fit(this.pelvisPos, this.pelvisQ, this.chestQ, this.hips, this.knees);
   }
 
   /** Builds the shins: one geometry for both, or one each when the pants are striped or painted. */
@@ -605,6 +610,8 @@ interface Wear {
   dark: Color;
   /** A painted garment's square at (panel, row, column) (render/wearPanels.ts), or null for a stock pattern. */
   squares: SquareColor | null;
+  /** A painted garment's trims in their own colors (render/wearPanels.ts WEAR_TRIMS), null where they keep the garment's. */
+  trims: (Color | null)[];
 }
 type SquareColor = (panel: number, row: number, col: number) => Color;
 
@@ -615,6 +622,7 @@ function wear(o: Outfit, garment: Garment): Wear {
   const accent = new Color(o[g.accent]);
   const dark = base.clone().lerp(accent, 0.5).multiplyScalar(0.55);
   let squares: SquareColor | null = null;
+  let trims: (Color | null)[] = [];
   if (isCustomPattern(pattern)) {
     // A custom slot with no squares (never painted, or not loaded: the pose gallery) is plain.
     const art = wearArt(garment, pattern);
@@ -626,9 +634,10 @@ function wear(o: Outfit, garment: Garment): Wear {
         const p = panels[panel]!;
         return palette[art.cells[at[panel]! + row * p.cols + col]!] ?? base;
       };
+      trims = art.trims.map((t) => palette[t] ?? null);
     } else pattern = 'plain';
   }
-  return { pattern, base, accent, dark, squares };
+  return { pattern, base, accent, dark, squares, trims };
 }
 
 /**
@@ -652,7 +661,9 @@ interface Panel {
  * part's prism of faces (`rows` of them from its `y0`), which panel row a
  * mesh row is (`row`, from the part's own first row) and which panel column
  * a mesh column is (`col`, see unroll). A round joint passes its part's
- * grid for the column and a `row` that ignores its argument.
+ * grid for the column and a `row` that ignores its argument. Painted, every
+ * face of plaid's prism is split WEAR_SPLIT × WEAR_SPLIT on its own plane
+ * (splitPrism), so these grids and rows are the split ones (fine).
  */
 interface Squares {
   panel: number;
@@ -681,12 +692,59 @@ function unroll(sides: number, front: number, dir: 1 | -1): (m: number) => numbe
   };
 }
 /** The torso's 18 columns (LOWER_SEGMENTS, declared further down, so the number is written out). */
-const TORSO_COLS = unroll(18, 0, -1);
-const SEAT_COLS = unroll(12, 0, -1);
-const LEG_COLS = unroll(12, 0, 1);
+const F = WEAR_SPLIT;
+const TORSO_COLS = unroll(18 * F, 0, -1);
+const SEAT_COLS = unroll(12 * F, 0, -1);
+const LEG_COLS = unroll(12 * F, 0, 1);
 /** The sleeves' fronts, by side (index 0 the left arm). */
-const UPPER_ARM_COLS = [unroll(10, -4, 1), unroll(10, 4, 1)] as const;
-const FOREARM_COLS = [unroll(10, -3, 1), unroll(10, 3, 1)] as const;
+const UPPER_ARM_COLS = [unroll(10 * F, -4 * F, 1), unroll(10 * F, 4 * F, 1)] as const;
+const FOREARM_COLS = [unroll(10 * F, -3 * F, 1), unroll(10 * F, 3 * F, 1)] as const;
+
+/** A part's coarse grid split for a painted garment: WEAR_SPLIT times the columns and rows. */
+function fineGrid(g: Grid): Grid {
+  return { ...g, sides: g.sides * F, row: g.row / F };
+}
+
+/**
+ * A garment part's prism: plaid's (prism) unless the garment is painted,
+ * when every face is split WEAR_SPLIT × WEAR_SPLIT on its own plane, so the
+ * silhouette and the flat shading stay exactly the same.
+ */
+function garmentPrism(w: Wear, r0: number, r1: number, length: number, sides: number, rows = 1, turn = 0): BufferGeometry {
+  return w.squares ? splitPrism(r0, r1, length, sides, rows, turn) : prism(r0, r1, length, sides, rows, turn);
+}
+
+/**
+ * A prism with WEAR_SPLIT times the sides and rows whose in-between corners
+ * are pulled onto the coarse prism's faces: a corner between two coarse
+ * corners (round the side) moves in to the straight edge between them, so
+ * each coarse face is cut into flat pieces on its own plane (and the caps
+ * keep the coarse outline). The rows already lie on the faces: the sides of
+ * a prism are straight from bottom to top.
+ */
+function splitPrism(r0: number, r1: number, length: number, sides: number, rows: number, turn: number): BufferGeometry {
+  const g = prism(r0, r1, length, sides * F, rows * F, turn);
+  const pos = g.getAttribute('position');
+  const step = (Math.PI * 2) / (sides * F);
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    const r = Math.hypot(x, z);
+    if (r < 1e-9) continue;
+    const k = Math.round((Math.atan2(x, z) - turn) / step);
+    const off = ((k % F) + F) % F;
+    if (off === 0) continue;
+    // Its share of the way from one coarse corner to the next, and the straight edge between them there.
+    const a = (k - off) * step;
+    const t = off / F;
+    const ax = Math.sin(a + turn) * r;
+    const az = Math.cos(a + turn) * r;
+    const bx = Math.sin(a + turn + F * step) * r;
+    const bz = Math.cos(a + turn + F * step) * r;
+    pos.setXYZ(i, ax + (bx - ax) * t, pos.getY(i), az + (bz - az) * t);
+  }
+  return g;
+}
 
 /**
  * A prism's faces: `sides` columns (even, so the check meets itself round
@@ -938,8 +996,8 @@ function buildPelvis(pants: Wear): BufferGeometry {
   const turn = pants.pattern === 'stripes' ? SIDE_FACE : 0;
   const n = rows(pants, 0.2);
   const grid = { sides: 12, y0: -0.13, row: 0.2 / n, depth: 0.72 };
-  const paintIt = cloth(pants, { stripe: (c) => onSide(c, -1) || onSide(c, 1), grid, squares: { panel: SEAT_PANEL, grid, rows: n, row: (r) => n - 1 - r, col: SEAT_COLS } });
-  return paint(prism(0.145, 0.165, 0.2, 12, n, turn).translate(0, -0.13, 0).scale(1, 1, 0.72), paintIt);
+  const paintIt = cloth(pants, { stripe: (c) => onSide(c, -1) || onSide(c, 1), grid, squares: { panel: SEAT_PANEL, grid: fineGrid(grid), rows: n * F, row: (r) => n * F - 1 - r, col: SEAT_COLS } });
+  return paint(garmentPrism(pants, 0.145, 0.165, 0.2, 12, n, turn).translate(0, -0.13, 0).scale(1, 1, 0.72), paintIt);
 }
 
 /**
@@ -959,7 +1017,7 @@ function buildTorso(w: Wear, hoodUp: boolean): BufferGeometry {
   // Rows from the waist seam, as the lower jacket's, so plaid carries on across it.
   const grid = { sides: LOWER_SEGMENTS, y0: TORSO_BOTTOM, row: shell / shellRows, depth: JACKET.depth };
   // Painted: the body panel's top rows, the chest's top row first.
-  const squares = { panel: BODY_PANEL, grid, rows: shellRows, row: (r: number) => shellRows - 1 - r, col: TORSO_COLS };
+  const squares = { panel: BODY_PANEL, grid: fineGrid(grid), rows: shellRows * F, row: (r: number) => shellRows * F - 1 - r, col: TORSO_COLS };
   const body = cloth(w, {
     stripe: (c) => CHEST_STRIPES.includes(row(c, CHEST_ROWS)),
     block: (c) => row(c, YOKE_ROWS) === YOKE_ROWS - 1,
@@ -968,7 +1026,7 @@ function buildTorso(w: Wear, hoodUp: boolean): BufferGeometry {
   });
   const parts = [
     // As many sides as the lower jacket, corner for corner, so the two meet flush.
-    paint(prism(JACKET.waist, JACKET.chest, shell, LOWER_SEGMENTS, shellRows).translate(0, TORSO_BOTTOM, 0).scale(1, 1, JACKET.depth), body),
+    paint(garmentPrism(w, JACKET.waist, JACKET.chest, shell, LOWER_SEGMENTS, shellRows).translate(0, TORSO_BOTTOM, 0).scale(1, 1, JACKET.depth), body),
     paint(prism(0.116, 0.106, 0.09, 12).translate(0, 0.49, 0.008).scale(1, 1, 0.95), jacket),
     paint(new BoxGeometry(0.014, 0.21, 0.012).translate(0, 0.405, -0.155), FIXED.zip),
     paint(new BoxGeometry(0.11, 0.085, 0.012).translate(-0.11, 0.38, -0.15), dark),
@@ -1075,17 +1133,30 @@ const RIDE_UP_SPAN = 0.22;
  * Drawn from both sides, so looking up under the hem never sees through it.
  */
 class JacketLower {
-  readonly mesh: Mesh;
-  /** Ring points then zip points, in pelvis space, and which point each mesh vertex is. */
-  private readonly points: Float32Array;
-  private readonly vertexPoint: Uint16Array;
-  private readonly position: BufferAttribute;
+  readonly mesh = new Mesh(new BufferGeometry(), lowerMaterial);
+  /**
+   * Ring points, zip points and (painted) the split bands' in-between points
+   * (FINE_POINTS), in pelvis space, and which point each mesh vertex is.
+   */
+  private points!: Float32Array;
+  private vertexPoint!: Uint16Array;
+  private position!: BufferAttribute;
   private readonly ringPoints = LOWER_RINGS.length * LOWER_SEGMENTS;
+  /** Where the split bands' points start: after the ring and zip points. */
+  private readonly finePoints = this.ringPoints + (ZIP_LAST - ZIP_FIRST + 1) * 2;
+  /** A painted jacket: its body bands cut 2 × 2 (WEAR_SPLIT), which changes the mesh's layout. */
+  private split = false;
 
   constructor(jacket: Wear) {
+    this.layout(jacket);
+  }
+
+  /** Makes the mesh for the jacket: its faces, colors and point table. */
+  private layout(w: Wear): void {
+    this.split = w.squares !== null;
     const colors: number[] = [];
-    const index = this.build(jacket, colors);
-    this.points = new Float32Array((this.ringPoints + (ZIP_LAST - ZIP_FIRST + 1) * 2) * 3);
+    const index = this.build(w, colors);
+    this.points = new Float32Array((this.finePoints + (this.split ? FINE_POINTS : 0)) * 3);
     this.vertexPoint = new Uint16Array(index);
     this.position = new BufferAttribute(new Float32Array(index.length * 3), 3);
     const geometry = new BufferGeometry();
@@ -1093,16 +1164,26 @@ class JacketLower {
     geometry.setAttribute('color', new Float32BufferAttribute(colors, 3));
     // It moves every pose; a fixed sphere around the hips covers it.
     geometry.boundingSphere = new Sphere(new Vector3(0, 0, 0), 0.6);
-    this.mesh = new Mesh(geometry, lowerMaterial);
+    this.mesh.geometry.dispose();
+    this.mesh.geometry = geometry;
   }
 
-  /** New jacket colors or pattern: rewrites the vertex colors in place (the shape is untouched). */
-  recolor(jacket: Wear): void {
+  /**
+   * New jacket colors or pattern: rewrites the vertex colors in place (the
+   * shape is untouched); to or from a painted jacket the mesh is made again
+   * (true: fit it again before it's drawn).
+   */
+  recolor(jacket: Wear): boolean {
+    if ((jacket.squares !== null) !== this.split) {
+      this.layout(jacket);
+      return true;
+    }
     const colors: number[] = [];
     this.build(jacket, colors);
     const attr = this.mesh.geometry.getAttribute('color') as BufferAttribute;
     (attr.array as Float32Array).set(colors);
     attr.needsUpdate = true;
+    return false;
   }
 
   /**
@@ -1126,12 +1207,23 @@ class JacketLower {
     const point = (ring: number, seg: number): number => ring * LOWER_SEGMENTS + (seg % LOWER_SEGMENTS);
     const last = LOWER_RINGS.length - 1;
     const rest = new Vector3();
+    const squares = w.squares;
     for (let ring = 0; ring < last; ring++) {
       for (let seg = 0; seg < LOWER_SEGMENTS; seg++) {
         let color = ring < last - 2 ? jacket : ring === last - 2 ? band : under;
-        if (ring < last - 2 && w.squares) {
-          // Painted: each band is a row of the body panel under the chest's two (the band tucked inside takes the first's).
-          color = w.squares(BODY_PANEL, 2 + Math.max(0, ring - 1), TORSO_COLS(seg));
+        if (ring < last - 2 && squares) {
+          // Painted: the body panel's rows under the chest's (SHELL_FINE), two to a band, each face cut 2 × 2; the band tucked inside takes the first row.
+          if (ring === 0) color = squares(BODY_PANEL, SHELL_FINE, TORSO_COLS(seg * WEAR_SPLIT));
+          else {
+            for (let j = 0; j < WEAR_SPLIT; j++) {
+              const fr = (ring - 1) * WEAR_SPLIT + j;
+              for (let i = 0; i < WEAR_SPLIT; i++) {
+                const fc = seg * WEAR_SPLIT + i;
+                quad(this.finePoint(fr, fc), this.finePoint(fr, fc + 1), this.finePoint(fr + 1, fc + 1), this.finePoint(fr + 1, fc), squares(BODY_PANEL, SHELL_FINE + fr, TORSO_COLS(fc)));
+              }
+            }
+            continue;
+          }
         } else if (ring < last - 2 && typeof body === 'function') {
           // The middle of the face as the jacket hangs at rest.
           const a = ((seg + 0.5) / LOWER_SEGMENTS) * Math.PI * 2;
@@ -1152,6 +1244,46 @@ class JacketLower {
       quad(zipPoint(ring, 0), zipPoint(ring, 1), zipPoint(ring + 1, 1), zipPoint(ring + 1, 0), zip);
     }
     return index;
+  }
+
+  /**
+   * A point of the split bands' grid (a painted jacket): `fr` rows down from
+   * ring 1 (even rows are rings, odd ones halfway to the next), `fc` columns
+   * round from the front (even columns are the ring's own points, odd ones
+   * halfway to the next). The in-between ones are FINE_POINTS, averaged from
+   * the fitted corners each pose (fitFine).
+   */
+  private finePoint(fr: number, fc: number): number {
+    const c = fc % FINE_COLS;
+    const half = c >> 1;
+    const row = fr >> 1;
+    if ((fr & 1) === 0) return (c & 1) === 0 ? (1 + row) * LOWER_SEGMENTS + half : this.finePoints + row * LOWER_SEGMENTS + half;
+    const band = this.finePoints + (FINE_RINGS + ((c & 1) === 0 ? 0 : FINE_BANDS) + row) * LOWER_SEGMENTS;
+    return band + half;
+  }
+
+  /** The split bands' in-between points from the fitted ring points: halfway round each ring, halfway down to the next, and each face's middle. */
+  private fitFine(): void {
+    const pts = this.points;
+    const at = (ring: number, seg: number): number => (ring * LOWER_SEGMENTS + (seg % LOWER_SEGMENTS)) * 3;
+    for (let k = 0; k < 3; k++) {
+      for (let row = 0; row < FINE_RINGS; row++) {
+        for (let seg = 0; seg < LOWER_SEGMENTS; seg++) {
+          const o = (this.finePoints + row * LOWER_SEGMENTS + seg) * 3 + k;
+          pts[o] = ((pts[at(1 + row, seg) + k] ?? 0) + (pts[at(1 + row, seg + 1) + k] ?? 0)) / 2;
+        }
+      }
+      for (let row = 0; row < FINE_BANDS; row++) {
+        for (let seg = 0; seg < LOWER_SEGMENTS; seg++) {
+          const a = pts[at(1 + row, seg) + k] ?? 0;
+          const b = pts[at(1 + row, seg + 1) + k] ?? 0;
+          const c = pts[at(2 + row, seg) + k] ?? 0;
+          const d = pts[at(2 + row, seg + 1) + k] ?? 0;
+          pts[(this.finePoints + (FINE_RINGS + row) * LOWER_SEGMENTS + seg) * 3 + k] = (a + c) / 2;
+          pts[(this.finePoints + (FINE_RINGS + FINE_BANDS + row) * LOWER_SEGMENTS + seg) * 3 + k] = (a + b + c + d) / 4;
+        }
+      }
+    }
   }
 
   /** Rebuilds the lower jacket for a solved pose (all inputs in skier space). */
@@ -1176,6 +1308,7 @@ class JacketLower {
         lowerP.toArray(pts, (this.ringPoints + (ring - ZIP_FIRST) * 2 + side) * 3);
       }
     }
+    if (this.split) this.fitFine();
     const out = this.position.array as Float32Array;
     const map = this.vertexPoint;
     for (let v = 0; v < map.length; v++) {
@@ -1203,6 +1336,17 @@ class JacketLower {
 }
 
 const lowerMaterial = new MeshLambertMaterial({ vertexColors: true, flatShading: true, side: DoubleSide });
+/**
+ * A painted jacket's split bands (the six body bands under the one tucked
+ * inside, rings 1 to 7): their rings, their bands, the grid's columns round,
+ * the in-between points (halfway round each of the rings, halfway down each
+ * band, each face's middle) and the body panel's rows above them (the chest's).
+ */
+const FINE_RINGS = 7;
+const FINE_BANDS = 6;
+const FINE_COLS = LOWER_SEGMENTS * WEAR_SPLIT;
+const FINE_POINTS = (FINE_RINGS + 2 * FINE_BANDS) * LOWER_SEGMENTS;
+const SHELL_FINE = 2 * WEAR_SPLIT;
 const lowerInv = new Quaternion();
 const lowerChest = new Quaternion();
 /** Each ring's share of the chest's bend, for the pose being fitted. */
@@ -2131,7 +2275,7 @@ function buildUpperArm(w: Wear, side: number): BufferGeometry {
   const sides = sidesFor(w, 9);
   const grid = { sides, y0: 0, row: length / armRows };
   // Painted: the sleeve panel's top rows, from the shoulder; the elbow takes the last.
-  const squares: Squares = { panel: side < 0 ? SLEEVE_LEFT : SLEEVE_RIGHT, grid, rows: armRows, row: (r) => r, col: UPPER_ARM_COLS[side < 0 ? 0 : 1] };
+  const squares: Squares = { panel: side < 0 ? SLEEVE_LEFT : SLEEVE_RIGHT, grid: fineGrid(grid), rows: armRows * F, row: (r) => r, col: UPPER_ARM_COLS[side < 0 ? 0 : 1] };
   const sleeve = cloth(w, {
     stripe: (c) => ARM_STRIPES.includes(Math.floor((c.y / length) * ARM_ROWS)),
     block: () => true,
@@ -2139,8 +2283,8 @@ function buildUpperArm(w: Wear, side: number): BufferGeometry {
     squares,
   });
   const parts = [
-    paint(prism(0.082, 0.076, length, sides, armRows), sleeve),
-    paint(new IcosahedronGeometry(0.077, 1).translate(0, length, 0), w.pattern === 'blocks' ? w.accent : cloth(w, { radius: 0.077, squares: { ...squares, row: () => armRows - 1 } })),
+    paint(garmentPrism(w, 0.082, 0.076, length, sides, armRows), sleeve),
+    paint(new IcosahedronGeometry(0.077, 1).translate(0, length, 0), w.pattern === 'blocks' ? w.accent : cloth(w, { radius: 0.077, squares: { ...squares, row: () => armRows * F - 1 } })),
   ];
   if (side < 0) {
     const face = 2.13; // turns +X to point at the outside of the arm
@@ -2165,9 +2309,9 @@ function buildForearm(w: Wear, mitten: Color, side: number): BufferGeometry {
   const n = rows(w, f);
   const grid = { sides: sidesFor(w, 9), y0: 0, row: f / n };
   // Painted: the sleeve panel's rows under the upper arm's (UPPER_ARM_ROWS of them), from the elbow.
-  const squares: Squares = { panel: side < 0 ? SLEEVE_LEFT : SLEEVE_RIGHT, grid, rows: n, row: (r) => rows(w, BODY.upperArm) + r, col: FOREARM_COLS[side < 0 ? 0 : 1] };
+  const squares: Squares = { panel: side < 0 ? SLEEVE_LEFT : SLEEVE_RIGHT, grid: fineGrid(grid), rows: n * F, row: (r) => rows(w, BODY.upperArm) * F + r, col: FOREARM_COLS[side < 0 ? 0 : 1] };
   return merge([
-    paint(prism(0.076, 0.084, f, grid.sides, n), cloth(w, { grid, squares })),
+    paint(garmentPrism(w, 0.076, 0.084, f, grid.sides, n), cloth(w, { grid, squares })),
     paint(prism(0.087, 0.087, 0.025, 9).translate(0, f - 0.03, 0), shade(jacket, 0.78)),
     paint(prism(0.058, 0.056, 0.05, 10).translate(0, f - 0.01, 0), shade(mitten, 0.74)),
     // A big mitt with a clear thumb, and a darker band over the knuckles.
@@ -2192,12 +2336,13 @@ function buildThigh(w: Wear, side: number): BufferGeometry {
   const legRows = rows(w, t);
   const grid = { sides: 12, y0: 0, row: t / legRows };
   // Painted: the leg panel's top rows, from the hip; the knee takes the last.
-  const squares: Squares = { panel: side < 0 ? LEG_LEFT : LEG_RIGHT, grid, rows: legRows, row: (r) => r, col: LEG_COLS };
+  const squares: Squares = { panel: side < 0 ? LEG_LEFT : LEG_RIGHT, grid: fineGrid(grid), rows: legRows * F, row: (r) => r, col: LEG_COLS };
   const leg = cloth(w, { stripe: (c) => onSide(c, -side), grid, squares });
-  const pocket = w.pattern === 'stripes' ? w.accent : pants;
+  // A painted pair's pockets may take their own color.
+  const pocket = w.pattern === 'stripes' ? w.accent : (w.trims[POCKETS] ?? pants);
   return merge([
-    paint(prism(r, r + 0.002, t, 12, legRows, turn), leg),
-    paint(new IcosahedronGeometry(PANTS.knee, 1).translate(0, t, 0), w.pattern === 'blocks' ? w.accent : cloth(w, { radius: PANTS.knee, squares: { ...squares, row: () => legRows - 1 } })),
+    paint(garmentPrism(w, r, r + 0.002, t, 12, legRows, turn), leg),
+    paint(new IcosahedronGeometry(PANTS.knee, 1).translate(0, t, 0), w.pattern === 'blocks' ? w.accent : cloth(w, { radius: PANTS.knee, squares: { ...squares, row: () => legRows * F - 1 } })),
     // The pocket and its flap above it (toward the hip), on the stripe when there is one.
     paint(new BoxGeometry(0.03, 0.13, 0.1).translate(out, t * 0.55, 0.004), shade(pocket, 0.93)),
     paint(new BoxGeometry(0.036, 0.032, 0.108).translate(out * 1.02, t * 0.55 - 0.072, 0.004), shade(pocket, 0.82)),
@@ -2219,13 +2364,15 @@ function buildShin(w: Wear, boot: Color, side: number): BufferGeometry {
   const shinRows = rows(w, s + 0.04);
   const grid = { sides: 12, y0: 0, row: (s + 0.04) / shinRows };
   // Painted: the leg panel's rows under the thigh's, from the knee.
-  const squares: Squares = { panel: side < 0 ? LEG_LEFT : LEG_RIGHT, grid, rows: shinRows, row: (r) => rows(w, BODY.thigh) + r, col: LEG_COLS };
+  const squares: Squares = { panel: side < 0 ? LEG_LEFT : LEG_RIGHT, grid: fineGrid(grid), rows: shinRows * F, row: (r) => rows(w, BODY.thigh) * F + r, col: LEG_COLS };
   const leg = w.pattern === 'blocks' ? pants : cloth(w, { stripe: (c) => side !== 0 && onSide(c, -side), grid, squares });
   const stripe = w.pattern === 'stripes' && side !== 0;
+  // The folds at the hem: a painted pair's cuffs may take their own color.
+  const cuff = w.trims[CUFFS] ?? pants;
   const fold = (g: BufferGeometry, k: number): BufferGeometry =>
-    paint(g, stripe ? (c) => shade(onSide(c, -side) ? w.accent : pants, k) : shade(pants, k));
+    paint(g, stripe ? (c) => shade(onSide(c, -side) ? w.accent : pants, k) : shade(cuff, k));
   return merge([
-    paint(prism(PANTS.knee - 0.002, hem, s + 0.04, 12, shinRows, turn), leg),
+    paint(garmentPrism(w, PANTS.knee - 0.002, hem, s + 0.04, 12, shinRows, turn), leg),
     fold(prism(hem + 0.004, hem + 0.004, 0.035, 12, 1, turn).translate(0, s - 0.1, 0), 0.92),
     fold(prism(hem + 0.003, hem + 0.004, 0.024, 12, 1, turn).translate(0, s + 0.02, 0), 0.8),
     paint(prism(0.078, 0.078, 0.2, 12).translate(0, s - 0.15, 0), boot),

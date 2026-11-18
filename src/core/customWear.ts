@@ -1,5 +1,5 @@
-import { BODY_PANEL, LEG_LEFT, LEG_RIGHT, SEAT_PANEL, SLEEVE_LEFT, SLEEVE_RIGHT, setWearArt, wearOffsets, wearPanels, wearSize, type WearGarment } from '../render/wearPanels.ts';
-import { EDIT_PALETTE, nearestIndex, runs, unruns } from './customSkis.ts';
+import { BODY_PANEL, LEG_LEFT, LEG_RIGHT, SEAT_PANEL, SLEEVE_LEFT, SLEEVE_RIGHT, setWearArt, WEAR_SPLIT, WEAR_TRIMS, wearOffsets, wearPanels, wearSize, type WearGarment } from '../render/wearPanels.ts';
+import { EDIT_PALETTE, LETTERS, letterIndex, nearestIndex, runs, unruns } from './customSkis.ts';
 import { CUSTOM_PATTERNS, GARMENTS, isCustomPattern, WEAR_SLOTS, type CustomPattern, type Garment, type Outfit, type StockPattern } from './outfit.ts';
 import { readStored, writeStored } from './storage.ts';
 
@@ -11,7 +11,12 @@ import { readStored, writeStored } from './storage.ts';
 // and keeps the garment's own Locker color for the collar, cuffs, pockets,
 // hood and hem trim. Saved on this computer as one entry, customWear.v1:
 // { "jacket": [slot or null, ...], "pants": [...] }, a slot being its
-// squares, panel after panel, as customSkis.v1's run-length letters. With
+// squares, panel after panel, as customSkis.v1's run-length letters, then
+// (the pants' cuffs and pockets in their own colors) `|` and a letter per
+// trim, `.` for the garment's own color; none when every trim keeps it (since
+// the user asked for finer painting, each of plaid's faces is WEAR_SPLIT ×
+// WEAR_SPLIT squares; a slot saved at one square a face, the first form,
+// is scaled up as it's read, each square a block). With
 // storage blocked or wiped the slots last the visit. Only the game's own
 // code imports this module (main loads it with the custom skis, before the
 // outfit), so it stays out of the chunk the pose gallery shares.
@@ -20,11 +25,20 @@ const KEY = 'customWear.v1';
 const HEXES = EDIT_PALETTE.map((c) => c.hex);
 const GARMENT_IDS: readonly WearGarment[] = ['jacket', 'pants'];
 
-/** Each garment's slots: its squares, or null while never opened in the editor. */
+/** Each garment's slots: its squares, or null while never opened in the editor; and its trims' colors (-1: the garment's own; render/wearPanels.ts WEAR_TRIMS). */
 const slots: Record<WearGarment, (Uint8Array | null)[]> = {
   jacket: Array.from({ length: WEAR_SLOTS }, () => null),
   pants: Array.from({ length: WEAR_SLOTS }, () => null),
 };
+const trims: Record<WearGarment, number[][]> = {
+  jacket: Array.from({ length: WEAR_SLOTS }, () => new Array<number>(WEAR_TRIMS.jacket).fill(-1)),
+  pants: Array.from({ length: WEAR_SLOTS }, () => new Array<number>(WEAR_TRIMS.pants).fill(-1)),
+};
+
+/** A slot's trims (edited in place by the editor): each a palette index, or -1 for the garment's own color. */
+export function wearTrims(garment: WearGarment, slot: number): number[] {
+  return trims[garment][slot]!;
+}
 let loaded = false;
 
 /** The pattern id a slot is worn as. */
@@ -48,7 +62,7 @@ function slotCells(garment: WearGarment, slot: number, fill: number): Uint8Array
   if (!cells) {
     cells = new Uint8Array(wearSize(garment)).fill(fill);
     slots[garment][slot] = cells;
-    setWearArt(garment, wearPattern(slot), { cells, colors: HEXES });
+    setWearArt(garment, wearPattern(slot), { cells, colors: HEXES, trims: trims[garment][slot]! });
   }
   return cells;
 }
@@ -70,11 +84,12 @@ export function openWear(garment: WearGarment, slot: number, o: Outfit): Uint8Ar
 }
 
 /**
- * Paints the slot with a stock pattern in two colors, as near as the
- * squares go: stripes are a band round the lower chest and the belly and
- * round each upper sleeve, and two columns down the outside of each leg;
- * blocks the chest's top row and the upper sleeves, and the pants from the
- * knee down; plaid an even check of every other column and row, darker where
+ * Paints the slot with a stock pattern in two colors, as near as plaid's
+ * faces go (each a WEAR_SPLIT block of squares, so the rules below count in
+ * faces): stripes are a band round the lower chest and the belly and round
+ * each upper sleeve, and two columns down the outside of each leg; blocks
+ * the chest's top row and the upper sleeves, and the pants from the knee
+ * down; plaid an even check of every other column and row, darker where
  * they cross (as the 3D plaid).
  */
 export function fillStock(garment: WearGarment, slot: number, pattern: StockPattern, baseHex: string, accentHex: string): void {
@@ -87,19 +102,21 @@ export function fillStock(garment: WearGarment, slot: number, pattern: StockPatt
   panels.forEach((p, panel) => {
     for (let r = 0; r < p.rows; r++) {
       for (let c = 0; c < p.cols; c++) {
+        const fr = Math.floor(r / WEAR_SPLIT);
+        const fc = Math.floor(c / WEAR_SPLIT);
         let color = base;
         if (pattern === 'plaid') {
-          const across = c % 2 === 0;
-          const down = r % 2 === 0;
+          const across = fc % 2 === 0;
+          const down = fr % 2 === 0;
           color = across && down ? dark : across || down ? accent : base;
-        } else if (pattern !== 'plain' && stockAccent(garment, pattern, panel, r, c)) color = accent;
+        } else if (pattern !== 'plain' && stockAccent(garment, pattern, panel, fr, fc)) color = accent;
         cells[at[panel]! + r * p.cols + c] = color;
       }
     }
   });
 }
 
-/** Whether stripes or blocks put the second color on this square. */
+/** Whether stripes or blocks put the second color on this face (r, c in plaid's faces, not squares). */
 function stockAccent(garment: WearGarment, pattern: 'stripes' | 'blocks', panel: number, r: number, c: number): boolean {
   const sleeve = panel === SLEEVE_LEFT || panel === SLEEVE_RIGHT;
   if (garment === 'jacket') {
@@ -145,7 +162,8 @@ export function saveCustomWear(): void {
 
 /** Every slot as saved (customWear.v1's object): an online look carries it in its `skis` text as `wear`. */
 export function wearJson(): Record<Garment, (string | null)[]> {
-  return { jacket: slots.jacket.map((c) => (c ? runs(c) : null)), pants: slots.pants.map((c) => (c ? runs(c) : null)) };
+  const text = (g: WearGarment): (string | null)[] => slots[g].map((c, slot) => (c ? runs(c) + trimText(trims[g][slot]!) : null));
+  return { jacket: text('jacket'), pants: text('pants') };
 }
 
 /**
@@ -174,15 +192,42 @@ function readSlots(text: string | null, inLook: boolean): boolean {
     const list = saved[garment];
     for (let slot = 0; slot < WEAR_SLOTS; slot++) {
       const entry = Array.isArray(list) ? (list[slot] as unknown) : null;
-      const cells = typeof entry === 'string' ? unruns(entry, wearSize(garment)) : null;
-      if (cells) slotCells(garment, slot, 0).set(cells);
-      else if (inLook || entry !== undefined) {
+      const [text, trimPart] = typeof entry === 'string' ? entry.split('|') : [];
+      const cells = text !== undefined ? (unruns(text, wearSize(garment)) ?? scaleUp(garment, unruns(text, wearSize(garment) / (WEAR_SPLIT * WEAR_SPLIT)))) : null;
+      const t = trims[garment][slot]!;
+      t.fill(-1);
+      if (cells) {
+        slotCells(garment, slot, 0).set(cells);
+        for (let i = 0; i < t.length; i++) t[i] = letterIndex(trimPart?.[i]);
+      } else if (inLook || entry !== undefined) {
         slots[garment][slot] = null;
         setWearArt(garment, wearPattern(slot), null);
       }
     }
   }
   return true;
+}
+
+/** The trims' part of a saved slot: `|` and a letter each (`.` for the garment's own color), or nothing when every trim keeps the garment's. */
+function trimText(t: readonly number[]): string {
+  return t.some((i) => i >= 0) ? `|${t.map((i) => (i >= 0 ? LETTERS[i]! : '.')).join('')}` : '';
+}
+
+/** A slot saved at one square a face (the first form) as today's squares: each one a WEAR_SPLIT × WEAR_SPLIT block. */
+function scaleUp(garment: WearGarment, coarse: Uint8Array | null): Uint8Array | null {
+  if (!coarse) return null;
+  const cells = new Uint8Array(wearSize(garment));
+  const at = wearOffsets(garment);
+  let k = 0;
+  wearPanels(garment).forEach((p, i) => {
+    const cols = p.cols / WEAR_SPLIT;
+    for (let r = 0; r < p.rows / WEAR_SPLIT; r++) {
+      for (let c = 0; c < cols; c++, k++) {
+        for (let j = 0; j < WEAR_SPLIT; j++) for (let x = 0; x < WEAR_SPLIT; x++) cells[at[i]! + (r * WEAR_SPLIT + j) * p.cols + c * WEAR_SPLIT + x] = coarse[k]!;
+      }
+    }
+  });
+  return cells;
 }
 
 function wearOf(skisText: string | null): Record<string, unknown> | null {

@@ -68,7 +68,7 @@ import { mountCrashHint, mountFocusHint } from './ui/hints.ts';
 import { ControlsScreen } from './ui/controlsMenu.ts';
 import { KeyTesterScreen } from './ui/keyTester.ts';
 import { mainKey } from './ui/keyNames.ts';
-import { LockerScreen } from './ui/lockerMenu.ts';
+import { LockerScreen, setPreviewControl } from './ui/lockerMenu.ts';
 import type { Online } from './online/index.ts';
 import { SkiEditorScreen } from './ui/skiEditor.ts';
 import { WearEditorScreen } from './ui/wearEditor.ts';
@@ -283,6 +283,8 @@ let skisDirty = false;
 /** A custom jacket or pants was painted (milestone 23 part 2): rebuild that garment on the next preview frame. */
 const wearDirty = new Set<Garment>();
 function showStage(screen: StageWindow | null): void {
+  // A window opening starts turning by itself, untilted and unzoomed.
+  if (screen && screen !== stageScreen) lockerStage.resetHand();
   stageScreen = screen;
   // The painted mountain fills round the window, from the title and from pause.
   menus.setScenery(screen !== null || !level);
@@ -294,6 +296,13 @@ function showStage(screen: StageWindow | null): void {
     });
   }
 }
+// A drag or the wheel on any preview window moves the stage's camera by hand.
+setPreviewControl({
+  grab: () => lockerStage.handGrab(),
+  drag: (dx, dy) => lockerStage.handDrag(dx, dy),
+  release: () => lockerStage.handRelease(),
+  zoom: (deltaY) => lockerStage.handZoom(deltaY),
+});
 const lockerScreen = new LockerScreen(
   {
     get: () => outfit,
