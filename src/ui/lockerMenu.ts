@@ -54,6 +54,9 @@ import { drawWear } from './wearGrid.ts';
 // board has a row of custom slots, each with Edit (the editor, skiEditor.ts),
 // and so (since milestone 23 part 2) do the jacket and the pants, under their
 // pattern tiles: a painted garment is worn as its pattern (wearEditor.ts).
+// Since milestone 24 a third tab, Market, holds the marketplace (the online
+// chunk's MarketPanel, which main mounts into it), and each painted custom
+// slot has Share under its Edit.
 
 export interface LockerHooks {
   get: () => Outfit;
@@ -66,7 +69,14 @@ export interface LockerHooks {
   edit: (gear: Gear, slot: number) => void;
   /** Opens the garment editor on the jacket's or the pants' custom slot. */
   editWear: (garment: Garment, slot: number) => void;
+  /** The Market tab's panel is showing (fill it), or null: it was left. */
+  market: (panel: HTMLElement | null) => void;
+  /** Share a painted slot on the marketplace. */
+  share: (kind: ShareKind, gear: Gear | Garment, slot: number) => void;
 }
+
+/** What a custom slot shares as. */
+export type ShareKind = 'skis' | 'board' | 'jacket' | 'pants';
 
 /** Segments in a stat bar; the park ski fills half. */
 const STAT_STEPS = 10;
@@ -101,6 +111,12 @@ const BOARD_HINTS = [
   [['Enter'], 'Pick'],
   [['Esc'], 'Back'],
 ] as const;
+const MARKET_HINTS = [
+  [['↑', '↓', '←', '→'], 'Move'],
+  [['Enter'], 'Pick'],
+  [['Esc'], 'Back'],
+] as const;
+const MARKET_TAB = 2;
 
 /** Small flat drawings for the headwear tiles. */
 const ICONS: Record<Headwear, string> = {
@@ -133,7 +149,7 @@ export class LockerScreen implements Screen, StageWindow {
   /** Each garment's pattern tiles and second-color strip. */
   private readonly patterns = new Map<Garment, { name: HTMLElement; tiles: Map<Pattern, HTMLButtonElement>; accent: PaintRow }>();
   /** Each garment's custom slots: the pick button, its note and its thumbnail. */
-  private readonly wearSlots: { garment: Garment; slot: number; button: HTMLButtonElement; note: HTMLElement; thumb: HTMLCanvasElement }[] = [];
+  private readonly wearSlots: { garment: Garment; slot: number; button: HTMLButtonElement; note: HTMLElement; thumb: HTMLCanvasElement; share: HTMLButtonElement }[] = [];
   private readonly poleButtons: HTMLButtonElement[] = [];
   private readonly skiTiles = new Map<SkiId, HTMLButtonElement>();
   /** Skis or Board, its board tiles, Regular / Goofy, and the rows only skis (or only a board) show. */
@@ -157,7 +173,7 @@ export class LockerScreen implements Screen, StageWindow {
   private readonly thumbs: { canvas: HTMLCanvasElement; base: boolean }[] = [];
   /** Each ski's and board's row of custom slots, and each slot's pick button, name and thumbnails. */
   private readonly customRows = new Map<Gear, HTMLElement>();
-  private readonly customs: { gear: Gear; slot: number; button: HTMLButtonElement; note: HTMLElement; thumbs: { canvas: HTMLCanvasElement; base: boolean }[] }[] = [];
+  private readonly customs: { gear: Gear; slot: number; button: HTMLButtonElement; note: HTMLElement; thumbs: { canvas: HTMLCanvasElement; base: boolean }[]; share: HTMLButtonElement }[] = [];
   private readonly foot: HTMLElement;
   private readonly rect: Rect = { x: 0, y: 0, width: 0, height: 0 };
   /** The preview's own canvas in the window (render/lockerStage.ts present copies it in). */
@@ -190,7 +206,7 @@ export class LockerScreen implements Screen, StageWindow {
     tabRow.className = 'locker-tabs';
     tabRow.setAttribute('role', 'tablist');
     choices.appendChild(tabRow);
-    for (const [i, name] of ['Outfit', 'Ride'].entries()) {
+    for (const [i, name] of ['Outfit', 'Ride', 'Market'].entries()) {
       const tab = document.createElement('button');
       tab.type = 'button';
       tab.className = 'locker-tab';
@@ -208,6 +224,10 @@ export class LockerScreen implements Screen, StageWindow {
     }
     this.buildOutfit(this.panels[0]!);
     this.buildSkis(this.panels[1]!);
+    const loading = document.createElement('p');
+    loading.className = 'setting-note';
+    loading.textContent = 'Loading the marketplace…';
+    this.panels[MARKET_TAB]!.appendChild(loading);
 
     layout.append(frame, choices);
     b.body.appendChild(layout);
@@ -220,6 +240,10 @@ export class LockerScreen implements Screen, StageWindow {
     this.sync();
     this.hooks.shown(true);
     const o = this.hooks.get();
+    if (this.onMarket()) {
+      this.hooks.market(this.panels[MARKET_TAB]!);
+      return this.tabs[MARKET_TAB]!;
+    }
     if (this.onSkis()) {
       this.hooks.skisShown(true);
       return (o.ride === 'board' ? this.boardTiles.get(o.board) : this.skiTiles.get(o.ski)) ?? null;
@@ -229,6 +253,13 @@ export class LockerScreen implements Screen, StageWindow {
 
   leave(): void {
     this.hooks.shown(false);
+    this.hooks.market(null);
+  }
+
+  /** Repaints the custom slots and the picks (the marketplace's Use changed them). */
+  refresh(): void {
+    this.paintCustoms();
+    this.sync();
   }
 
   /** Where the preview shows, in CSS pixels from the viewport's top left (read every frame while open). */
@@ -336,9 +367,10 @@ export class LockerScreen implements Screen, StageWindow {
       edit.textContent = 'Edit';
       edit.setAttribute('aria-label', `Edit ${garment.name.toLowerCase()} custom ${slot + 1}`);
       edit.addEventListener('click', () => this.hooks.editWear(garment.id, slot));
-      cell.append(button, edit);
+      const share = shareButton(`Share ${garment.name.toLowerCase()} custom ${slot + 1}`, () => this.hooks.share(garment.id, garment.id, slot));
+      cell.append(button, actions(edit, share));
       customs.appendChild(cell);
-      this.wearSlots.push({ garment: garment.id, slot, button, note, thumb });
+      this.wearSlots.push({ garment: garment.id, slot, button, note, thumb, share });
     }
     const row = document.createElement('div');
     row.className = 'paint-row pattern-row';
@@ -517,9 +549,10 @@ export class LockerScreen implements Screen, StageWindow {
         edit.textContent = 'Edit';
         edit.setAttribute('aria-label', `Edit ${name} custom ${slot + 1}`);
         edit.addEventListener('click', () => this.hooks.edit(gear, slot));
-        cell.append(button, edit);
+        const share = shareButton(`Share ${name} custom ${slot + 1}`, () => this.hooks.share(gearBoard(gear) ? 'board' : 'skis', gear, slot));
+        cell.append(button, actions(edit, share));
         row.appendChild(cell);
-        this.customs.push({ gear, slot, button, note, thumbs });
+        this.customs.push({ gear, slot, button, note, thumbs, share });
       }
       customBox.appendChild(row);
       this.customRows.set(gear, row);
@@ -592,6 +625,7 @@ export class LockerScreen implements Screen, StageWindow {
       const cells = wearCells(w.garment, w.slot);
       drawWear(w.thumb, wearPanels(w.garment), wearOffsets(w.garment), cells, EDIT_HEXES, WEAR_THUMB_PX, '#2b5582');
       w.note.textContent = cells ? '' : 'Empty: paint one';
+      w.share.hidden = !cells;
       w.button.setAttribute('aria-label', `${w.garment === 'jacket' ? 'Jacket' : 'Pants'}: Custom ${w.slot + 1}${cells ? '' : ', empty'}`);
     }
     for (const c of this.customs) {
@@ -603,6 +637,7 @@ export class LockerScreen implements Screen, StageWindow {
         else paintSkis(canvas, type, g ?? EMPTY_SLOT, base, RACK_PX_PER_M);
       }
       c.note.textContent = g ? '' : 'Empty: paint one';
+      c.share.hidden = !g;
       c.button.setAttribute('aria-label', `${type.name}${board ? ' board' : ''}: Custom ${c.slot + 1}${g ? '' : ', empty'}`);
     }
   }
@@ -613,10 +648,18 @@ export class LockerScreen implements Screen, StageWindow {
   }
 
   private showTab(index: number): void {
+    const was = this.onMarket();
     this.tabs.forEach((t, i) => t.setAttribute('aria-selected', String(i === index)));
     this.panels.forEach((p, i) => (p.hidden = i !== index));
-    setHints(this.foot, index === 1 ? (this.hooks.get().ride === 'board' ? BOARD_HINTS : SKI_HINTS) : OUTFIT_HINTS);
+    setHints(this.foot, index === MARKET_TAB ? MARKET_HINTS : index === 1 ? (this.hooks.get().ride === 'board' ? BOARD_HINTS : SKI_HINTS) : OUTFIT_HINTS);
     this.hooks.skisShown(index === 1);
+    // The constructor shows the first tab before the hooks may run anything.
+    if (index === MARKET_TAB) this.hooks.market(this.panels[MARKET_TAB]!);
+    else if (was) this.hooks.market(null);
+  }
+
+  private onMarket(): boolean {
+    return this.tabs[MARKET_TAB]?.getAttribute('aria-selected') === 'true';
   }
 
   private onSkis(): boolean {
@@ -693,6 +736,26 @@ export class LockerScreen implements Screen, StageWindow {
       bar.querySelectorAll('i').forEach((seg, i) => seg.classList.toggle('on', i < steps));
     }
   }
+}
+
+/** A custom slot's Share button (shown once the slot is painted). */
+function shareButton(label: string, onClick: () => void): HTMLButtonElement {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'ski-edit ski-share';
+  b.textContent = 'Share';
+  b.setAttribute('aria-label', label);
+  b.hidden = true;
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+/** Edit over Share, beside a custom slot. */
+function actions(edit: HTMLElement, share: HTMLElement): HTMLElement {
+  const box = document.createElement('div');
+  box.className = 'ski-custom-acts';
+  box.append(edit, share);
+  return box;
 }
 
 interface PaintRow {

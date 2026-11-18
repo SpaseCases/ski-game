@@ -33,6 +33,8 @@ export interface WearEditorHooks {
   repaint: (garment: WearGarment) => void;
   /** The editor opened (true) or closed or was covered (false). */
   shown: (open: boolean) => void;
+  /** Share this slot on the marketplace (milestone 24). */
+  share: (garment: WearGarment, slot: number) => void;
 }
 
 type Tool = 'pencil' | 'fill';
@@ -246,6 +248,9 @@ export class WearEditorScreen implements Screen, StageWindow {
       tools.appendChild(button);
       this.trimButtons.push({ button, swatch });
     }
+    const share = toolButton('Share', '', () => this.hooks.share(this.garment, this.slot));
+    share.title = 'Share this design on the marketplace';
+    tools.appendChild(share);
     const brushes = document.createElement('div');
     brushes.className = 'editor-brushes';
     brushes.setAttribute('role', 'group');

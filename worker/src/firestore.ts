@@ -1,5 +1,5 @@
 import { boardKind, RANK_LIMIT } from '../../src/online/limits.ts';
-import type { Look, ReadRow, Row, Store } from './store.ts';
+import type { Counter, Look, MarketItem, MarketQuery, Read, ReadRow, Row, Store } from './store.ts';
 
 // The real store: Firestore over its REST API, signed in as a Google service
 // account (the GCP_SERVICE_ACCOUNT secret, its JSON key). Requests made with
@@ -8,7 +8,10 @@ import type { Look, ReadRow, Row, Store } from './store.ts';
 //
 //   boards/<board>/names/<key>   name, look, and combo (points) or ms
 //   looks/<key>                  name, outfit, skis
-//   testBoards/..., testLooks/...  the same for ?boards=test
+//   market/<id>                  a marketplace item (milestone 24: store.ts MarketItem)
+//   marketDays/<day>-<n|a>-<key> one day's uploads by a name or an address hash
+//   testBoards/..., testLooks/..., testMarket/..., testMarketDays/...  the same for ?boards=test
+// The browse orders need the composite indexes in firestore.indexes.json.
 // https://firebase.google.com/docs/firestore/reference/rest
 
 const BASE = 'https://firestore.googleapis.com/v1/';
@@ -20,7 +23,9 @@ interface Value {
   stringValue?: string;
   integerValue?: string;
   doubleValue?: number;
+  booleanValue?: boolean;
   referenceValue?: string;
+  arrayValue?: { values?: Value[] };
 }
 
 interface Doc {
@@ -50,12 +55,16 @@ export class FirestoreStore implements Store {
   private readonly documents: string;
   private readonly boardsRoot: string;
   private readonly looksRoot: string;
+  private readonly marketRoot: string;
+  private readonly daysRoot: string;
   private readonly account: string;
 
   constructor(project: string, account: string, test: boolean) {
     this.documents = `projects/${project}/databases/(default)/documents`;
     this.boardsRoot = test ? 'testBoards' : 'boards';
     this.looksRoot = test ? 'testLooks' : 'looks';
+    this.marketRoot = test ? 'testMarket' : 'market';
+    this.daysRoot = test ? 'testMarketDays' : 'marketDays';
     this.account = account;
   }
 
@@ -142,14 +151,118 @@ export class FirestoreStore implements Store {
     });
   }
 
+  async marketPage(q: MarketQuery): Promise<MarketItem[]> {
+    const filters: object[] = [eq('hidden', { booleanValue: false })];
+    if (q.kind !== null) filters.push(eq('kind', str(q.kind)));
+    if (q.word !== null) filters.push({ fieldFilter: { field: { fieldPath: 'words' }, op: 'ARRAY_CONTAINS', value: str(q.word) } });
+    const fields = q.sort === 'new' ? ['created'] : ['uses', 'created'];
+    const query: Record<string, unknown> = {
+      from: [{ collectionId: this.marketRoot }],
+      where: and(filters),
+      orderBy: [...fields, '__name__'].map((f) => ({ field: { fieldPath: f }, direction: 'DESCENDING' })),
+      limit: q.n,
+    };
+    const after = q.after;
+    if (after) {
+      const values = after.map((v, i) => (i === after.length - 1 ? { referenceValue: `${this.documents}/${this.marketRoot}/${String(v)}` } : int(Number(v))));
+      query.startAt = { values, before: false };
+    }
+    const docs = await this.runQuery('', query);
+    return docs.flatMap((d) => toItem(d) ?? []);
+  }
+
+  async marketItem(id: string): Promise<Read<MarketItem> | null> {
+    const doc = await this.getDoc(`${this.marketRoot}/${id}`);
+    const item = doc ? toItem(doc) : null;
+    return item && doc ? { item, version: doc.updateTime ?? '' } : null;
+  }
+
+  async putMarketItem(item: MarketItem, version: string): Promise<boolean> {
+    try {
+      await this.call('PATCH', `${this.documents}/${this.marketRoot}/${item.id}?currentDocument.updateTime=${encodeURIComponent(version)}`, { fields: itemFields(item) });
+      return true;
+    } catch (err) {
+      if (err instanceof StoreError && (err.status === 400 || err.status === 404 || err.status === 409)) return false;
+      throw err;
+    }
+  }
+
+  async marketUse(id: string): Promise<number | null> {
+    try {
+      const res = await this.call<{ writeResults?: { transformResults?: Value[] }[] }>('POST', `${this.documents}:commit`, {
+        writes: [
+          {
+            transform: { document: `${this.documents}/${this.marketRoot}/${id}`, fieldTransforms: [{ fieldPath: 'uses', increment: { integerValue: '1' } }] },
+            currentDocument: { exists: true },
+          },
+        ],
+      });
+      const n = num(res.writeResults?.[0]?.transformResults?.[0]);
+      return Number.isFinite(n) ? n : 0;
+    } catch (err) {
+      // No such item: the precondition fails.
+      if (err instanceof StoreError && (err.status === 400 || err.status === 404)) return null;
+      throw err;
+    }
+  }
+
+  async deleteMarketItem(id: string): Promise<void> {
+    await this.call('DELETE', `${this.documents}/${this.marketRoot}/${id}`, undefined);
+  }
+
+  async marketHidden(n: number, before?: number): Promise<Read<MarketItem>[]> {
+    const filters: object[] = [eq('hidden', { booleanValue: true })];
+    if (before !== undefined) filters.push({ fieldFilter: { field: { fieldPath: 'hiddenAt' }, op: 'LESS_THAN', value: int(before) } });
+    const docs = await this.runQuery('', {
+      from: [{ collectionId: this.marketRoot }],
+      where: and(filters),
+      orderBy: [{ field: { fieldPath: 'hiddenAt' }, direction: 'ASCENDING' }],
+      limit: n,
+    });
+    return docs.flatMap((d) => {
+      const item = toItem(d);
+      return item ? [{ item, version: d.updateTime ?? '' }] : [];
+    });
+  }
+
+  async counters(keys: string[]): Promise<Counter[]> {
+    const rows = await this.call<{ found?: Doc; missing?: string }[]>('POST', `${this.documents}:batchGet`, {
+      documents: keys.map((k) => `${this.documents}/${this.daysRoot}/${k}`),
+    });
+    return keys.map((key) => {
+      const path = `${this.documents}/${this.daysRoot}/${key}`;
+      const doc = rows.find((r) => r.found?.name === path)?.found;
+      const count = num(doc?.fields?.count);
+      return { key, count: Number.isFinite(count) ? count : 0, version: doc ? (doc.updateTime ?? null) : null };
+    });
+  }
+
+  async createMarketItem(item: MarketItem, counters: Counter[]): Promise<boolean> {
+    const writes = [
+      { update: { name: `${this.documents}/${this.marketRoot}/${item.id}`, fields: itemFields(item) }, currentDocument: { exists: false } },
+      ...counters.map((c) => ({
+        update: { name: `${this.documents}/${this.daysRoot}/${c.key}`, fields: { count: int(c.count + 1) } },
+        currentDocument: c.version === null ? { exists: false } : { updateTime: c.version },
+      })),
+    ];
+    try {
+      await this.call('POST', `${this.documents}:commit`, { writes });
+      return true;
+    } catch (err) {
+      if (err instanceof StoreError && (err.status === 400 || err.status === 409)) return false;
+      throw err;
+    }
+  }
+
   /** Reads one document; null when it doesn't exist (batchGet answers that without a 404). */
   private async getDoc(path: string): Promise<Doc | null> {
     const rows = await this.call<{ found?: Doc }[]>('POST', `${this.documents}:batchGet`, { documents: [`${this.documents}/${path}`] });
     return rows.find((r) => r.found)?.found ?? null;
   }
 
+  /** A query under `parent` ('' for the database's top level). */
   private async runQuery(parent: string, query: object): Promise<Doc[]> {
-    const rows = await this.call<{ document?: Doc }[]>('POST', `${this.documents}/${urlPath(parent)}:runQuery`, { structuredQuery: query });
+    const rows = await this.call<{ document?: Doc }[]>('POST', parent ? `${this.documents}/${urlPath(parent)}:runQuery` : `${this.documents}:runQuery`, { structuredQuery: query });
     return rows.flatMap((r) => (r.document ? [r.document] : []));
   }
 
@@ -157,7 +270,7 @@ export class FirestoreStore implements Store {
     const res = await fetch(BASE + path, {
       method,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await accessToken(this.account)}` },
-      body: JSON.stringify(body),
+      body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) throw new StoreError(res.status, `Firestore ${method} answered ${res.status}: ${(await res.text()).slice(0, 300)}`);
@@ -175,6 +288,65 @@ function toRow(board: string, doc: Doc): Row | null {
   const value = num(f[fieldOf(board)]);
   if (!name || !Number.isFinite(value)) return null;
   return { name, look: f.look?.stringValue ?? '', value };
+}
+
+function eq(field: string, value: Value): object {
+  return { fieldFilter: { field: { fieldPath: field }, op: 'EQUAL', value } };
+}
+
+/** One filter as it is, more under AND. */
+function and(filters: object[]): object {
+  return filters.length === 1 ? filters[0]! : { compositeFilter: { op: 'AND', filters } };
+}
+
+function strings(list: readonly string[]): Value {
+  return { arrayValue: { values: list.map(str) } };
+}
+
+function itemFields(it: MarketItem): Record<string, Value> {
+  return {
+    kind: str(it.kind),
+    type: str(it.type),
+    title: str(it.title),
+    name: str(it.name),
+    created: int(it.created),
+    uses: int(it.uses),
+    reports: strings(it.reports),
+    hidden: { booleanValue: it.hidden },
+    hiddenAt: int(it.hiddenAt),
+    data: str(it.data),
+    look: str(it.look),
+    words: strings(it.words),
+  };
+}
+
+function toItem(doc: Doc): MarketItem | null {
+  const f = doc.fields ?? {};
+  const id = doc.name.slice(doc.name.lastIndexOf('/') + 1);
+  const s = (k: string): string | undefined => f[k]?.stringValue;
+  const list = (k: string): string[] => (f[k]?.arrayValue?.values ?? []).flatMap((v) => (v.stringValue === undefined ? [] : [v.stringValue]));
+  const kind = s('kind');
+  const data = s('data');
+  if (kind === undefined || data === undefined) return null;
+  const n = (k: string): number => {
+    const v = num(f[k]);
+    return Number.isFinite(v) ? v : 0;
+  };
+  return {
+    id,
+    kind,
+    type: s('type') ?? '',
+    title: s('title') ?? '',
+    name: s('name') ?? '',
+    created: n('created'),
+    uses: n('uses'),
+    reports: list('reports'),
+    hidden: f.hidden?.booleanValue === true,
+    hiddenAt: n('hiddenAt'),
+    data,
+    look: s('look') ?? '',
+    words: list('words'),
+  };
 }
 
 function str(v: string): Value {

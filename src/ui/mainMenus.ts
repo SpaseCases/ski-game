@@ -57,14 +57,30 @@ export interface TitleActions {
   setName: (name: string) => void;
   /** The name box was left or Enter pressed in it, with this name saved ('' for none). */
   nameDone: (name: string) => void;
+  /** Whether a name is the developer's nickname (core/devUnlock.ts): then the code box shows. */
+  isDev: (name: string) => Promise<boolean>;
+  /** The developer's code as saved on this computer, and saving it. */
+  devCode: () => string;
+  setDevCode: (code: string) => void;
+  /** Asks the Worker whether it takes the code. */
+  checkDevCode: (code: string) => Promise<'ok' | 'wrong' | 'offline'>;
 }
 
 const NAME_NOTE = 'A nickname, not your real name. 3 to 16 letters, digits, spaces, - and _.';
+const DEV_NOTE = 'Saved on this computer. Only the developer has one.';
+/** How long after typing the name is checked against the developer's (a slow hash). */
+const DEV_DELAY_MS = 300;
 
 export class TitleScreen extends PlankScreen {
   private readonly nameInput: HTMLInputElement;
   private readonly nameNote: HTMLElement;
   private readonly actions: TitleActions;
+  /** The developer's code box (milestone 24), shown only under the developer's nickname. */
+  private readonly devBox: HTMLElement;
+  private readonly devInput: HTMLInputElement;
+  private readonly devNote: HTMLElement;
+  private devTimer = 0;
+  private devToken = 0;
 
   constructor(actions: TitleActions) {
     super('Park Laps', 'title-screen');
@@ -99,19 +115,46 @@ export class TitleScreen extends PlankScreen {
     this.nameNote.id = 'name-note';
     this.nameNote.setAttribute('aria-live', 'polite');
     this.nameInput.setAttribute('aria-describedby', this.nameNote.id);
-    box.append(row, this.nameNote);
+    // The developer's code, under the name box only when the name is the developer's nickname.
+    this.devBox = document.createElement('div');
+    this.devBox.className = 'dev-box';
+    this.devBox.hidden = true;
+    const devRow = document.createElement('label');
+    devRow.className = 'name-row';
+    const devLabel = document.createElement('span');
+    devLabel.className = 'name-label';
+    devLabel.textContent = 'Dev code';
+    this.devInput = document.createElement('input');
+    this.devInput.type = 'password';
+    this.devInput.className = 'text-box name-input';
+    this.devInput.maxLength = 200;
+    this.devInput.autocomplete = 'off';
+    this.devInput.spellcheck = false;
+    devRow.append(devLabel, this.devInput);
+    this.devNote = document.createElement('p');
+    this.devNote.className = 'name-note';
+    this.devNote.setAttribute('aria-live', 'polite');
+    this.devBox.append(devRow, this.devNote);
+    box.append(row, this.nameNote, this.devBox);
     this.list.after(box);
     this.nameInput.addEventListener('input', () => this.typed());
     this.nameInput.addEventListener('blur', () => this.done());
+    this.devInput.addEventListener('input', () => this.actions.setDevCode(this.devInput.value.trim()));
+    this.devInput.addEventListener('change', () => this.checkCode());
   }
 
   enter(): HTMLElement | null {
     this.syncName();
+    this.checkDev(this.actions.name(), 0);
     return super.enter();
   }
 
-  /** Enter in the name box keeps it and goes back to the planks. */
+  /** Enter in the name box keeps it and goes back to the planks (in the code box, it checks the code there too). */
   onKey(e: KeyboardEvent): boolean {
+    if (e.target === this.devInput && e.key === 'Enter') {
+      this.list.querySelector('button')?.focus();
+      return true;
+    }
     if (e.target !== this.nameInput || e.key !== 'Enter') return false;
     this.typed();
     // Focus leaves the box, and its blur finishes the name (see done).
@@ -131,6 +174,46 @@ export class TitleScreen extends PlankScreen {
     if (!problem) this.actions.setName(name);
     this.nameNote.textContent = problem ? NAME_PROBLEM_TEXT[problem] : NAME_NOTE;
     this.nameNote.classList.toggle('is-problem', problem !== null);
+    this.checkDev(this.actions.name(), DEV_DELAY_MS);
+  }
+
+  /** Shows the code box when `name` is the developer's nickname (after `delay` ms: the hash is slow), else hides it. */
+  private checkDev(name: string, delay: number): void {
+    clearTimeout(this.devTimer);
+    const token = ++this.devToken;
+    const run = (): void => {
+      this.actions.isDev(name).then(
+        (dev) => {
+          if (token !== this.devToken) return;
+          const was = !this.devBox.hidden;
+          this.devBox.hidden = !dev;
+          if (dev && !was) {
+            this.devInput.value = this.actions.devCode();
+            this.devNote.textContent = DEV_NOTE;
+            this.devNote.classList.remove('is-problem');
+          }
+        },
+        () => {},
+      );
+    };
+    if (delay > 0) this.devTimer = window.setTimeout(run, delay);
+    else run();
+  }
+
+  /** The code box was left changed: the Worker says whether it takes the code. */
+  private checkCode(): void {
+    const code = this.devInput.value.trim();
+    if (!code) {
+      this.devNote.textContent = DEV_NOTE;
+      this.devNote.classList.remove('is-problem');
+      return;
+    }
+    this.devNote.textContent = 'Checking…';
+    void this.actions.checkDevCode(code).then((answer) => {
+      if (this.devInput.value.trim() !== code) return;
+      this.devNote.textContent = answer === 'ok' ? 'Code accepted. Remove shows on marketplace items.' : answer === 'wrong' ? 'The Worker refused that code.' : "Can't check it now (offline); it's saved.";
+      this.devNote.classList.toggle('is-problem', answer === 'wrong');
+    });
   }
 
   /** The box shows the saved name. */

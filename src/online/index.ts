@@ -1,9 +1,15 @@
 import '../ui/leaderboards.css';
+import '../ui/market.css';
 import type { Outfit } from '../core/outfit.ts';
 import type { MapId } from '../maps/registry.ts';
 import { FinishBoard } from '../ui/finishBoard.ts';
 import { LeaderboardScreen } from '../ui/leaderboardScreen.ts';
 import { LookPrompt } from '../ui/lookPrompt.ts';
+import { MarketPanel, type MarketHooks } from '../ui/marketPanel.ts';
+import { ShareSign, SlotPicker, type ShareRequest } from '../ui/marketSigns.ts';
+import type { Screen } from '../ui/menus.ts';
+import { ApiError } from './api.ts';
+import { checkCode } from './market.ts';
 import { boardFor, post, type BoardRef, type PostResult } from './boards.ts';
 import { encodeLook, setLookTables, type LookTables } from './look.ts';
 import { fetchLook, saveLook, type SavedLook } from './looks.ts';
@@ -12,7 +18,9 @@ import { fetchLook, saveLook, type SavedLook } from './looks.ts';
 // board opens or a score posts, so the first load never fetches it, and a
 // failed import (offline before it was ever loaded) leaves the game as it
 // was. It holds the Leaderboards screen, the finish-line board, the posts
-// made this visit, and the looks saved online under board names.
+// made this visit, and the looks saved online under board names; since
+// milestone 24 the marketplace (the Locker's Market tab, the Share sign and
+// the slot picker), whose game-side work main does through MarketHooks.
 
 export interface OnlineHooks {
   /** The name to post under ('' for none: nothing posts). */
@@ -27,6 +35,10 @@ export interface OnlineHooks {
   back: () => void;
   /** The finish board's ✕ was clicked. */
   closeFinish: () => void;
+  /** Opens a screen over the one on top (main's menus). */
+  push: (screen: Screen) => void;
+  /** What the marketplace needs from the game (thumbnails, Use, the outfit to share). */
+  market: MarketHooks;
 }
 
 export interface Online {
@@ -42,6 +54,15 @@ export interface Online {
   saveLook: (look: SavedLook) => Promise<boolean>;
   /** An outfit as the 13-character look its tiny skier is drawn from. */
   lookCode: (o: Outfit) => string;
+  /** The Locker's Market tab's content (main mounts it). */
+  market: MarketPanel;
+  /** The marketplace's signs (main adds them to the menus). */
+  shareSign: ShareSign;
+  slotPicker: SlotPicker;
+  /** Opens the Share sign on something to share. */
+  openShare: (request: ShareRequest) => void;
+  /** Whether the Worker takes the developer's code. */
+  checkCode: (code: string) => Promise<'ok' | 'wrong' | 'offline'>;
 }
 
 export function createOnline(hooks: OnlineHooks): Online {
@@ -60,9 +81,32 @@ export function createOnline(hooks: OnlineHooks): Online {
     close: hooks.closeFinish,
   });
 
+  const shareSign = new ShareSign(hooks.back);
+  const slotPicker = new SlotPicker(hooks.back);
+  const market = new MarketPanel(
+    hooks.market,
+    (what, thumbs) =>
+      new Promise((answer) => {
+        slotPicker.ask(what, thumbs, answer);
+        hooks.push(slotPicker);
+      }),
+  );
+
   return {
     screen,
     finish,
+    market,
+    shareSign,
+    slotPicker,
+    openShare: (request) => {
+      shareSign.ask(request, hooks.myName());
+      hooks.push(shareSign);
+    },
+    checkCode: (code) =>
+      checkCode(code).then(
+        () => 'ok' as const,
+        (err: unknown) => (err instanceof ApiError && err.status === 403 ? ('wrong' as const) : ('offline' as const)),
+      ),
     lookPrompt: new LookPrompt(),
     fetchLook,
     saveLook,

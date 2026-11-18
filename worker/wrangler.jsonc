@@ -1,7 +1,9 @@
 // The leaderboard API (worker/src/index.ts). Deployed by hand from this
 // folder: `npm run deploy`. Its one secret, the Google service account's
 // JSON key, is set with `npx wrangler secret put GCP_SERVICE_ACCOUNT` and
-// never goes in the repo. See worker/README.md.
+// never goes in the repo. The marketplace's removals (milestone 24) need a
+// second secret, the developer's code: `npx wrangler secret put DEV_CODE`.
+// See worker/README.md.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "parklaps-api",
@@ -19,6 +21,10 @@
   // Per address, per minute. A classroom shares one address, so these are loose.
   "ratelimits": [
     { "name": "READS", "namespace_id": "4101", "simple": { "limit": 600, "period": 60 } },
-    { "name": "WRITES", "namespace_id": "4102", "simple": { "limit": 120, "period": 60 } }
-  ]
+    { "name": "WRITES", "namespace_id": "4102", "simple": { "limit": 120, "period": 60 } },
+    // The developer's code (marketplace removals): a few tries a minute.
+    { "name": "DEV", "namespace_id": "4103", "simple": { "limit": 10, "period": 60 } }
+  ],
+  // Once a day: marketplace items hidden by reports a week ago come back (worker/src/market.ts restoreHidden).
+  "triggers": { "crons": ["17 9 * * *"] }
 }

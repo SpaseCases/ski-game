@@ -49,6 +49,8 @@ export interface SkiEditorHooks {
   repaint: () => void;
   /** The editor opened (true) or closed or was covered (false). */
   shown: (open: boolean) => void;
+  /** Share this slot on the marketplace (milestone 24). */
+  share: (gear: Gear, slot: number) => void;
 }
 
 type Tool = 'pencil' | 'fill';
@@ -332,7 +334,9 @@ export class SkiEditorScreen implements Screen, StageWindow {
     this.wallSwatch = document.createElement('span');
     this.wallSwatch.className = 'editor-swatch';
     this.wallsButton.querySelector('.editor-tool-name')!.prepend(this.wallSwatch);
-    tools.append(this.mirrorEndsButton, this.mirrorSidesButton, this.undoButton, clear, this.wallsButton);
+    const share = toolButton('Share', '', () => this.hooks.share(this.gear, this.slot));
+    share.title = 'Share this graphic on the marketplace';
+    tools.append(this.mirrorEndsButton, this.mirrorSidesButton, this.undoButton, clear, this.wallsButton, share);
     // Brush size: a square of 1 to 4 cells, drawn to scale on each button.
     const brushes = document.createElement('div');
     brushes.className = 'editor-brushes';

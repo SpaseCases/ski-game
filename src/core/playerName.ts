@@ -33,6 +33,11 @@ export function nameProblem(name: string): NameProblem | null {
   return null;
 }
 
+/** Whether any text (a marketplace title, milestone 24) holds a filtered word, by the same rules as a name. */
+export function blockedText(text: string): boolean {
+  return blocked(text.replace(/[^A-Za-z0-9 _-]+/g, ' '));
+}
+
 /** The name's entry key on every board: the same name in any case is one entry. */
 export function nameKey(name: string): string {
   return name.toLowerCase();

@@ -46,6 +46,8 @@ export interface Settings {
   autoRung: number;
   /** The name scores post under on the online leaderboards (see core/playerName.ts), or '' for none: then nothing posts. */
   name: string;
+  /** The developer's code (milestone 24, core/devUnlock.ts), saved on the developer's computer; '' everywhere else. */
+  devCode: string;
   bindings: Bindings;
 }
 
@@ -58,7 +60,7 @@ function isQuality(value: unknown): value is Quality {
 }
 
 export function defaultSettings(): Settings {
-  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, popWith: 'pop', camera: 'chase', firstAir: 'head', cornerMap: true, autoRung: 0, name: '', bindings: { ...DEFAULT_BINDINGS } };
+  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, popWith: 'pop', camera: 'chase', firstAir: 'head', cornerMap: true, autoRung: 0, name: '', devCode: '', bindings: { ...DEFAULT_BINDINGS } };
 }
 
 /** The saved settings, or the defaults for anything not saved (or unreadable). */
@@ -85,6 +87,7 @@ export function loadSettings(): Settings {
   if (typeof saved.cornerMap === 'boolean') out.cornerMap = saved.cornerMap;
   if (typeof saved.autoRung === 'number' && Number.isInteger(saved.autoRung)) out.autoRung = clampRung(saved.autoRung);
   if (typeof saved.name === 'string' && nameProblem(saved.name) === null) out.name = saved.name;
+  if (typeof saved.devCode === 'string' && saved.devCode.length <= 200) out.devCode = saved.devCode;
   out.bindings = readBindings(saved.bindings);
   return out;
 }

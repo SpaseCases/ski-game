@@ -1526,6 +1526,26 @@ body {
   outline-offset: 2px;
 }
 
+/* Edit over Share (milestone 24: Share shows once the slot is painted). */
+.ski-custom-acts {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+}
+
+.ski-custom-acts .ski-edit {
+  flex: 1;
+}
+
+.ski-custom-acts .ski-share {
+  border-top: 2px solid var(--enamel);
+  font-size: 12px;
+}
+
+.ski-share[hidden] {
+  display: none;
+}
+
 /*
  * The ski editor. The grid lies on a bench (the darker enamel) with a ruler
  * under it like a tape: the ends named, and the boots' place marked in the
@@ -2935,5 +2955,14 @@ body {
 /* The rows only skis (or only a board) show: their display would override `hidden`. */
 .ski-types[hidden],
 .poles-row[hidden] {
+  display: none;
+}
+
+/* The developer's code box under the board name (milestone 24). */
+.dev-box {
+  margin-top: 8px;
+}
+
+.dev-box[hidden] {
   display: none;
 }

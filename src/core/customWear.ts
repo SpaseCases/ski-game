@@ -184,6 +184,31 @@ export function paintedWear(skisText: string): number {
   return GARMENT_IDS.reduce((n, g) => n + (Array.isArray(wear[g]) ? (wear[g] as unknown[]).filter((s) => typeof s === 'string').length : 0), 0);
 }
 
+/** One slot's saved text (the marketplace shares it, milestone 24), or null while it has never been opened. */
+export function wearSlotText(garment: WearGarment, slot: number): string | null {
+  const cells = slots[garment][slot];
+  return cells ? runs(cells) + trimText(trims[garment][slot]!) : null;
+}
+
+/** A slot's saved text read: its squares and its trims' colors, or null if it can't be read (the first form scaled up). */
+export function wearFromText(garment: WearGarment, text: string): { cells: Uint8Array; trims: number[] } | null {
+  const [squares, trimPart] = text.split('|');
+  const cells = unruns(squares ?? '', wearSize(garment)) ?? scaleUp(garment, unruns(squares ?? '', wearSize(garment) / (WEAR_SPLIT * WEAR_SPLIT)));
+  if (!cells) return null;
+  return { cells, trims: Array.from({ length: WEAR_TRIMS[garment] }, (_, i) => letterIndex(trimPart?.[i])) };
+}
+
+/** Paints one slot from saved text and saves; false (nothing changed) if it can't be read. The caller rebuilds the garment. */
+export function setWearSlotText(garment: WearGarment, slot: number, text: string): boolean {
+  const read = wearFromText(garment, text);
+  if (!read) return false;
+  slotCells(garment, slot, 0).set(read.cells);
+  const t = trims[garment][slot]!;
+  for (let i = 0; i < t.length; i++) t[i] = read.trims[i]!;
+  saveCustomWear();
+  return true;
+}
+
 /** Reads customWear.v1's object (or a look's `wear` in it, `inLook`) into the slots: false when there was none to read. */
 function readSlots(text: string | null, inLook: boolean): boolean {
   const saved = inLook ? wearOf(text) : objectOf(parse(text));

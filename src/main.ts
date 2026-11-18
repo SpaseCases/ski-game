@@ -5,7 +5,8 @@ import { createInputState, Keyboard, type Bindings } from './core/input.ts';
 import { startLoop } from './core/loop.ts';
 import { PointerOrbit } from './core/pointerOrbit.ts';
 import { bestCombo, submitCombo } from './core/bests.ts';
-import { gearBoard, loadCustomSkis, lookSkisText, paintedSlots, setCustomSkisText } from './core/customSkis.ts';
+import { EDIT_PALETTE, gearBoard, loadCustomSkis, lookSkisText, paintedSlots, setCustomSkisText, type Gear } from './core/customSkis.ts';
+import { WEAR_TRIMS, wearSize } from './render/wearPanels.ts';
 import { loadCustomWear, paintedWear, setWearText, wearJson, wearPattern, wornOutfit } from './core/customWear.ts';
 import { BOARD_TYPES, mainColor, type BoardId } from './core/boards.ts';
 import { CUSTOM_PATTERNS, GARMENTS, HEADWEAR, loadOutfit, outfitFrom, PALETTE, PATTERNS, saveOutfit, type Garment, type Outfit } from './core/outfit.ts';
@@ -68,7 +69,9 @@ import { mountCrashHint, mountFocusHint } from './ui/hints.ts';
 import { ControlsScreen } from './ui/controlsMenu.ts';
 import { KeyTesterScreen } from './ui/keyTester.ts';
 import { mainKey } from './ui/keyNames.ts';
-import { LockerScreen, setPreviewControl } from './ui/lockerMenu.ts';
+import { LockerScreen, setPreviewControl, type ShareKind } from './ui/lockerMenu.ts';
+import { marketDescribe, marketThumb, outfitShare, slotShare, useItem } from './ui/marketGlue.ts';
+import { isDevName } from './core/devUnlock.ts';
 import type { Online } from './online/index.ts';
 import { SkiEditorScreen } from './ui/skiEditor.ts';
 import { WearEditorScreen } from './ui/wearEditor.ts';
@@ -170,6 +173,9 @@ keyboard.attach(window);
 // and the screens they open. The game waits while any is open.
 const menus = new Menus(hud, onRootBack, onGameKey, () => [...windowBar.querySelectorAll<HTMLElement>('a, button')]);
 menus.scenery.innerHTML = titleArt();
+/** Whether the board name is the developer's nickname (core/devUnlock.ts): with a saved code, the marketplace's Remove shows. */
+let devName = false;
+void isDevName(settings.name).then((d) => (devName = d));
 const titleScreen = new TitleScreen({
   play: openMapSelect,
   locker: openLocker,
@@ -182,6 +188,17 @@ const titleScreen = new TitleScreen({
     saveSettings(settings);
   },
   nameDone: nameChosen,
+  isDev: (name) =>
+    isDevName(name).then((d) => {
+      if (name === settings.name) devName = d;
+      return d;
+    }),
+  devCode: () => settings.devCode,
+  setDevCode: (code) => {
+    settings.devCode = code;
+    saveSettings(settings);
+  },
+  checkDevCode: (code) => loadOnline().then((o) => o.checkCode(code), () => 'offline' as const),
 });
 const pauseScreen = new PauseScreen({
   resume: closeMenus,
@@ -317,6 +334,8 @@ const lockerScreen = new LockerScreen(
       wearEditor.open(garment, slot);
       menus.push(wearEditor);
     },
+    market: showMarket,
+    share: shareSlot,
   },
   () => menus.back(),
 );
@@ -331,6 +350,7 @@ const skiEditor = new SkiEditorScreen(
       if (open) lockerStage.showSkis(true);
       showStage(open ? skiEditor : null);
     },
+    share: (gear, slot) => shareSlot(gearBoard(gear) ? 'board' : 'skis', gear, slot),
   },
   () => menus.back(),
 );
@@ -348,6 +368,7 @@ const wearEditor = new WearEditorScreen(
       if (open) lockerStage.showSkis(false);
       showStage(open ? wearEditor : null);
     },
+    share: (garment, slot) => shareSlot(garment, garment, slot),
   },
   () => menus.back(),
 );
@@ -388,10 +409,30 @@ function loadOnline(): Promise<Online> {
           boardHidden = true;
           o.finish.hide();
         },
+        push: (screen) => menus.push(screen),
+        market: {
+          thumb: marketThumb,
+          describe: marketDescribe,
+          use: (item, pick) =>
+            useItem(item, pick, {
+              outfit: () => outfit,
+              setOutfit,
+              skisChanged: () => (skisDirty = true),
+              wearChanged: (garment) => wearDirty.add(garment),
+              slotsChanged: () => {
+                repaintSkis();
+                lockerScreen.refresh();
+              },
+            }),
+          shareOutfit: () => o.openShare({ ...outfitShare(outfit), look: o.lookCode(outfit) }),
+          devCode: () => (devName ? settings.devCode : ''),
+        },
       });
       o.finish.setKey(mainKey(settings.bindings, 'board'));
       menus.add(o.screen);
       menus.add(o.lookPrompt);
+      menus.add(o.shareSign);
+      menus.add(o.slotPicker);
       online = o;
       return o;
     },
@@ -401,6 +442,21 @@ function loadOnline(): Promise<Online> {
     },
   );
   return onlineLoading;
+}
+
+// Dev builds only: the marketplace's copies of the grid sizes (src/online/marketRules.ts, shared with the Worker) still match the game's.
+if (import.meta.env.DEV) {
+  void import('./online/marketRules.ts').then((r) => {
+    const wrong: string[] = [];
+    for (const t of SKI_TYPES) if (String(r.SKI_GRIDS[t.id]) !== String([t.model.rows, t.model.cols])) wrong.push(`ski ${t.id}`);
+    for (const t of BOARD_TYPES) if (String(r.BOARD_GRIDS[t.id]) !== String([t.model.rows, t.model.cols])) wrong.push(`board ${t.id}`);
+    for (const g of ['jacket', 'pants'] as const) {
+      if (r.WEAR_SQUARES[g] !== wearSize(g)) wrong.push(`${g} squares`);
+      if (r.WEAR_TRIM_COUNT[g] !== WEAR_TRIMS[g]) wrong.push(`${g} trims`);
+    }
+    if (r.PALETTE_SIZE !== EDIT_PALETTE.length) wrong.push('palette');
+    if (wrong.length) console.error(`marketRules.ts is out of date: ${wrong.join(', ')}`);
+  });
 }
 
 /** The Leaderboards screen, on a map's board (on the Slalom, a course's). */
@@ -421,15 +477,63 @@ function openBoards(map: MapId, course = -1): void {
 }
 
 function offlineBoards(): Screen {
-  const b = board('Leaderboards', 'leaderboards-screen');
+  return offlineSign('Leaderboards', 'leaderboards-screen', 'Leaderboard offline. Your bests still save on this computer.');
+}
+
+/** A sign that only says the online part can't be reached (its chunk didn't load), with Back. */
+function offlineSign(heading: string, className: string, text: string): Screen {
+  const b = board(heading, className);
   addBackButton(b.head, () => menus.back());
   const status = document.createElement('p');
   status.className = 'board-status';
-  status.textContent = 'Leaderboard offline. Your bests still save on this computer.';
+  status.textContent = text;
   b.body.appendChild(status);
   const screen: Screen = { el: b.el, enter: () => null };
   menus.add(screen);
   return screen;
+}
+
+// The marketplace (milestone 24): its panel, signs and API live in the
+// online chunk, fetched the first time the Locker's Market tab opens or
+// something is shared; main draws the thumbnails and does Use and the
+// sharing's reading of slots (ui/marketGlue.ts).
+/** The Market tab's panel while it shows. */
+let marketShown: HTMLElement | null = null;
+/** Shown instead of the Share sign if the online chunk can't be fetched. */
+let shareOffline: Screen | null = null;
+const MARKET_OFFLINE = 'Marketplace offline. Your designs still save on this computer.';
+
+function showMarket(panel: HTMLElement | null): void {
+  marketShown = panel;
+  if (!panel) {
+    online?.market.unmount();
+    return;
+  }
+  loadOnline().then(
+    (o) => {
+      if (marketShown === panel) o.market.mount(panel);
+    },
+    () => {
+      if (marketShown !== panel) return;
+      const note = document.createElement('p');
+      note.className = 'setting-note';
+      note.textContent = MARKET_OFFLINE;
+      panel.replaceChildren(note);
+    },
+  );
+}
+
+/** Share a painted slot (from the Locker or an editor): the Share sign, or a note that the marketplace is offline. */
+function shareSlot(kind: ShareKind, gear: Gear | Garment, slot: number): void {
+  const request = slotShare(kind, gear, slot);
+  if (!request) return;
+  loadOnline().then(
+    (o) => o.openShare(request),
+    () => {
+      shareOffline ??= offlineSign('Share', 'share-sign', MARKET_OFFLINE);
+      menus.push(shareOffline);
+    },
+  );
 }
 
 /** Posts a new best combo (course -1) or a clean course time (ms) to its online board, if the player has a name. */

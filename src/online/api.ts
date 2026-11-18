@@ -14,12 +14,14 @@ const TIMEOUT_MS = 8000;
 /** Which boards and looks: the real ones, or the play-test copies. */
 export const SET = new URLSearchParams(window.location.search).get('boards') === 'test' ? 'test' : 'live';
 
-/** A request the Worker answered with something other than OK (400: refused, 429: too many). */
+/** A request the Worker answered with something other than OK (400: refused, 429: too many), with its short code ("limit", "slow down"...; '' if none). */
 export class ApiError extends Error {
   readonly status: number;
-  constructor(status: number, message: string) {
+  readonly code: string;
+  constructor(status: number, message: string, code = '') {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -40,7 +42,10 @@ async function call<T>(method: 'GET' | 'POST' | 'PUT', path: string, params: Rec
       cache: 'no-store',
       referrerPolicy: 'no-referrer',
     });
-    if (!res.ok) throw new ApiError(res.status, `Leaderboard ${method} ${path} answered ${res.status}`);
+    if (!res.ok) {
+      const code = await res.json().then((b: { error?: unknown }) => (typeof b.error === 'string' ? b.error : ''), () => '');
+      throw new ApiError(res.status, `Leaderboard ${method} ${path} answered ${res.status}`, code);
+    }
     return (await res.json()) as T;
   } finally {
     clearTimeout(timer);

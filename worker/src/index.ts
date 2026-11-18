@@ -1,6 +1,8 @@
 import { nameKey, nameProblem, tidyName } from '../../src/core/playerName.ts';
 import { boardKind, LIST_MAX, LOOK_FORMAT, OUTFIT_MAX, RANK_LIMIT, SKIS_MAX, valueInRange } from '../../src/online/limits.ts';
 import { FirestoreStore } from './firestore.ts';
+import { jsonBody, Refused, type RateLimit } from './http.ts';
+import { marketRoute, restoreHidden, type MarketEnv } from './market.ts';
 import { beats, MemoryStore, type Row, type Store } from './store.ts';
 
 // The leaderboard API: a Cloudflare Worker between the game and Firestore,
@@ -17,10 +19,13 @@ import { beats, MemoryStore, type Row, type Store } from './store.ts';
 //   POST /v1/post   {board, name, value, look}
 //   GET  /v1/look?name=              the look saved under a name, or null
 //   PUT  /v1/look   {name, outfit, skis}
+//   /v1/market...                    the marketplace (milestone 24: market.ts)
 //
 // Every request takes set=live or set=test (?boards=test in the game).
+// A daily cron (wrangler.jsonc "triggers") brings back marketplace items
+// hidden by reports a week ago, in both sets.
 
-export interface Env {
+export interface Env extends MarketEnv {
   /** The service account's JSON key (a secret: `npx wrangler secret put GCP_SERVICE_ACCOUNT`). */
   GCP_SERVICE_ACCOUNT?: string;
   /** The Firebase project. */
@@ -33,28 +38,11 @@ export interface Env {
   WRITES?: RateLimit;
 }
 
-/** Cloudflare's rate limiting binding (wrangler.jsonc "ratelimits"). */
-interface RateLimit {
-  limit(options: { key: string }): Promise<{ success: boolean }>;
-}
-
-/** The largest request body taken (a look with nine full ski slots is about 32 kB). */
-const BODY_MAX = 64 * 1024;
-
 /** The local store lives as long as the dev Worker does. */
 const memory = new MemoryStore();
 
-/** A refusal the game can read: a status and a short code. */
-class Refused extends Error {
-  readonly status: number;
-  constructor(status: number, code: string) {
-    super(code);
-    this.status = status;
-  }
-}
-
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const origin = request.headers.get('Origin');
     const allowed = env.ALLOWED_ORIGINS.split(',').map((s) => s.trim());
     // An entry ending in ":*" allows any port (the local dev server moves when its port is taken).
@@ -63,7 +51,11 @@ export default {
     if (origin && !cors) return reply(403, { error: 'origin' }, null);
     if (request.method === 'OPTIONS') return preflight(cors);
     try {
-      const body = await route(request, env);
+      const body = await route(request, env, ctx);
+      if (body instanceof Response) {
+        for (const [k, v] of Object.entries(corsHeaders(cors))) body.headers.set(k, v);
+        return body;
+      }
       return reply(200, body, cors);
     } catch (err) {
       if (err instanceof Refused) return reply(err.status, { error: err.message }, cors);
@@ -71,9 +63,20 @@ export default {
       return reply(502, { error: 'store' }, cors);
     }
   },
+
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    for (const test of [false, true]) {
+      try {
+        const back = await restoreHidden(storeFor(env, test));
+        if (back) console.log(`Marketplace: ${back} hidden item(s) back in ${test ? 'test' : 'live'}`);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  },
 };
 
-async function route(request: Request, env: Env): Promise<unknown> {
+async function route(request: Request, env: Env, ctx: ExecutionContext | undefined): Promise<unknown> {
   const url = new URL(request.url);
   const set = url.searchParams.get('set');
   if (set !== 'live' && set !== 'test') throw new Refused(400, 'set');
@@ -83,6 +86,15 @@ async function route(request: Request, env: Env): Promise<unknown> {
   if (limiter && !(await limiter.limit({ key: who })).success) throw new Refused(429, 'slow down');
   const store = storeFor(env, set === 'test');
   const q = url.searchParams;
+
+  if (url.pathname === '/v1/market' || url.pathname.startsWith('/v1/market/')) {
+    const answer = await marketRoute(request, url, env, store, set, who, ctx);
+    if (!answer) throw new Refused(404, 'route');
+    if ('json' in answer) return answer.json;
+    // A browse page: its text as kept, and where it came from (memory, edge or miss), for checking the cache.
+    const res = reply(200, null, null);
+    return new Response(answer.text, { status: 200, headers: { ...Object.fromEntries(res.headers), 'X-Market-Cache': answer.cache } });
+  }
 
   switch (`${request.method} ${url.pathname}`) {
     case 'GET /v1/top': {
@@ -175,18 +187,6 @@ function jsonText(value: unknown, max: number, what: string): string {
     throw new Refused(400, what);
   }
   return value;
-}
-
-async function jsonBody(request: Request): Promise<Record<string, unknown>> {
-  const text = await request.text();
-  if (text.length > BODY_MAX) throw new Refused(413, 'too big');
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
-  } catch {
-    // Falls through to the refusal.
-  }
-  throw new Refused(400, 'body');
 }
 
 /** A top list ranked in place: equal scores share a rank. */

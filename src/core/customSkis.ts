@@ -366,34 +366,63 @@ export function unruns(text: string, count: number): Uint8Array | null {
   return n === count ? cells : null;
 }
 
-/** Fills the slot from saved text; false (the slot untouched) if it can't be read. */
-function decode(text: string, gear: Gear, slot: number): boolean {
+/** A slot's saved text read: its two grids, the sidewalls' color and whether it's linked; null if it can't be read. */
+function parseSlot(text: string, gear: Gear): { top: Uint8Array; base: Uint8Array; wall: number; linked: boolean } | null {
   const { rows, cols } = gearType(gear).model;
   const board = gearBoard(gear) !== null;
   const width = board ? cols : cols * 2;
   const wall = letterIndex(text[0]);
-  if (wall < 0) return false;
+  if (wall < 0) return null;
   if (text[1] === '=' || text[1] === '~') {
     const [topText, baseText] = text.slice(2).split('/');
     const top = unruns(topText ?? '', rows * width);
     const base = unruns(baseText ?? '', rows * width);
-    if (!top || !base) return false;
-    const s = slotOf(gear, slot);
-    s.top.cells.set(top);
-    s.base.cells.set(base);
-    s.linked = !board && text[1] === '=';
-    setCustomSidewall(gear, slot, wall);
-    return true;
+    if (!top || !base) return null;
+    return { top, base, wall, linked: !board && text[1] === '=' };
   }
   // The first ski format: one ski's top sheet, the same on both, and one color underneath.
-  if (board) return false;
+  if (board) return null;
   const one = unruns(text.slice(1), rows * cols);
-  if (!one) return false;
-  const s = slotOf(gear, slot);
+  if (!one) return null;
+  const top = new Uint8Array(rows * width);
   for (let r = 0; r < rows; r++) {
-    for (let side = 0; side < 2; side++) s.top.cells.set(one.subarray(r * cols, (r + 1) * cols), r * cols * 2 + side * cols);
+    for (let side = 0; side < 2; side++) top.set(one.subarray(r * cols, (r + 1) * cols), r * cols * 2 + side * cols);
   }
-  s.base.cells.fill(wall);
-  setCustomSidewall(gear, slot, wall);
+  return { top, base: new Uint8Array(rows * width).fill(wall), wall, linked: false };
+}
+
+/** Fills the slot from saved text; false (the slot untouched) if it can't be read. */
+function decode(text: string, gear: Gear, slot: number): boolean {
+  const read = parseSlot(text, gear);
+  if (!read) return false;
+  const s = slotOf(gear, slot);
+  s.top.cells.set(read.top);
+  s.base.cells.set(read.base);
+  if (text[1] === '=' || text[1] === '~') s.linked = read.linked;
+  setCustomSidewall(gear, slot, read.wall);
   return true;
+}
+
+/** One slot's saved text (the marketplace shares it, milestone 24), or null while it has never been opened. */
+export function slotText(gear: Gear, slot: number): string | null {
+  return gearList(gear)[slot] ? encode(slotOf(gear, slot)) : null;
+}
+
+/** Paints one slot from saved text and saves; false (nothing changed) if it can't be read. The caller repaints. */
+export function setSlotText(gear: Gear, slot: number, text: string): boolean {
+  if (!decode(text, gear, slot)) return false;
+  saveCustom(gear);
+  return true;
+}
+
+/** A graphic drawn from saved text without touching any slot (a marketplace thumbnail), or null if it can't be read. */
+export function graphicFromText(gear: Gear, text: string): SkiGraphic | null {
+  const read = parseSlot(text, gear);
+  if (!read) return null;
+  const { rows, cols } = gearType(gear).model;
+  const pair = gearBoard(gear) === null;
+  const width = pair ? cols * 2 : cols;
+  const art = (cells: Uint8Array): PixelArt => ({ rows, cols: width, pair, cells, colors: HEXES });
+  const wall = HEXES[read.wall]!;
+  return { id: 'market', name: 'Market', base: wall, sidewall: wall, pair, layers: [{ pixels: art(read.top) }], baseLayers: [{ pixels: art(read.base) }] };
 }
