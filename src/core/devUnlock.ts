@@ -12,7 +12,7 @@ export const DEV_SALT = 'parklaps|dev-unlock|v1';
 export const DEV_ITERATIONS = 150000;
 
 /** The developer's nickname, hashed (devHash); '' while not set up, so nobody is the developer. Written by `node tools/dev/devHash.ts --write`. */
-export const DEV_HASH = '';
+export const DEV_HASH = 'c625cead0bf282f7a99a94c805214302090afa7ac2171e0544e63bc2d1551816';
 
 /** A nickname's salted hash (PBKDF2-SHA-256 over it in lower case), as hex. */
 export async function devHash(nickname: string): Promise<string> {
