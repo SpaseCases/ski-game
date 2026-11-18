@@ -22,11 +22,12 @@ const INCLUDE = /\/src\/(boot\.ts$|main\.ts$|poses\.ts$|ui\/.+\.ts$|online\/.+\.
  * Read on every frame or every key, left minified only: the corner map moves
  * every frame, and the ski painter (core/skis.ts drawSki, graphicColor) and
  * the flat ski pictures (ui/skiThumb.ts) run per pixel, and the editor's
- * grid (ui/paintGrid.ts) per cell, every frame of an editor stroke.
+ * grid (ui/paintGrid.ts) and the garment editor's (ui/wearGrid.ts, milestone
+ * 23 part 2) per cell, every frame of an editor stroke.
  * Obfuscated, each property read there became a call to the string table's
  * decoder: about 25 ms a frame on Low at CPU 4x (milestone 23).
  */
-const EXCLUDE = /\/src\/(core\/(loop|input|skis)|ui\/(cornerMap|skiThumb|paintGrid))\.ts$/;
+const EXCLUDE = /\/src\/(core\/(loop|input|skis)|ui\/(cornerMap|skiThumb|paintGrid|wearGrid))\.ts$/;
 
 /** @type {import('javascript-obfuscator').ObfuscatorOptions} */
 const OPTIONS = {

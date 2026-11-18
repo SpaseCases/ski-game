@@ -9,6 +9,7 @@ import { BOARD_TYPES } from '../../src/core/boards.ts';
 import { boardGear, customFace, customId } from '../../src/core/customSkis.ts';
 import { SKI_TYPES } from '../../src/core/skis.ts';
 import { SkierRig } from '../../src/render/skierRig.ts';
+import { setWearArt, wearOffsets, wearPanels, wearSize } from '../../src/render/wearPanels.ts';
 
 function count(o: Outfit, board = false): { calls: number; tris: number } {
   const rig = new SkierRig(o);
@@ -97,4 +98,31 @@ for (const t of BOARD_TYPES) {
   const c = count(o, true);
   const w = count({ ...o, headwear: 'hood', jacketPattern: 'plaid', pantsPattern: 'plaid' }, true);
   console.log(`custom board ${t.id.padEnd(9)} checkerboard ${String(c.calls).padStart(2)} draw calls, ${String(c.tris).padStart(5)} triangles; hood, plaid ${String(w.tris).padStart(5)}`);
+}
+
+// Painted garments (milestone 23 part 2) at their worst: a checkerboard
+// jacket and pants, every square its own color. They are cut into plaid's
+// faces, so each line should match plaid's; on skis (each ski type, with the
+// hood) and on each board type. Last again, so every line above stays the same.
+for (const garment of ['jacket', 'pants'] as const) {
+  const cells = new Uint8Array(wearSize(garment));
+  const at = wearOffsets(garment);
+  wearPanels(garment).forEach((p, i) => {
+    for (let r = 0; r < p.rows; r++) for (let c = 0; c < p.cols; c++) cells[at[i]! + r * p.cols + c] = (r + c) % 2;
+  });
+  setWearArt(garment, 'custom-1', { cells, colors: ['#2c3037', '#ece8de'] });
+}
+const painted: Partial<Outfit> = { jacketPattern: 'custom-1', pantsPattern: 'custom-1' };
+const plaid: Partial<Outfit> = { jacketPattern: 'plaid', pantsPattern: 'plaid' };
+for (const t of SKI_TYPES) {
+  const look = { ...DEFAULT_OUTFIT, headwear: 'hood' as const, ski: t.id, skiGraphic: t.graphics[0]!.id };
+  const c = count({ ...look, ...painted });
+  const p = count({ ...look, ...plaid });
+  console.log(`painted garments, hood, ${t.id.padEnd(7)} ski ${String(c.calls).padStart(2)} draw calls, ${String(c.tris).padStart(5)} triangles (plaid ${p.calls}, ${p.tris})`);
+}
+for (const t of BOARD_TYPES) {
+  const look = { ...DEFAULT_OUTFIT, headwear: 'hood' as const, board: t.id, boardGraphic: t.graphics[0]!.id };
+  const c = count({ ...look, ...painted }, true);
+  const p = count({ ...look, ...plaid }, true);
+  console.log(`painted garments, hood, ${t.id.padEnd(8)} board ${String(c.calls).padStart(2)} draw calls, ${String(c.tris).padStart(5)} triangles (plaid ${p.calls}, ${p.tris})`);
 }

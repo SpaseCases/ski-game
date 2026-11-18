@@ -79,7 +79,7 @@ export interface SettingsHooks {
 }
 
 const WIPE_NOTE =
-  'Settings, keys, your board name, your Locker look, custom skis, best combos and weather are kept in this browser. Erasing them starts the game fresh. Scores and looks already posted online stay there.';
+  'Settings, keys, your board name, your Locker look, custom skis, boards and clothes, best combos and weather are kept in this browser. Erasing them starts the game fresh. Scores and looks already posted online stay there.';
 const WIPE_ARMED_NOTE = 'Press Erase everything to confirm. This can’t be undone.';
 
 export class SettingsScreen implements Screen {

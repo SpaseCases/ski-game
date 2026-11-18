@@ -17,7 +17,7 @@ import {
   type WebGLRenderer,
 } from 'three';
 import { CONFIG } from '../config.ts';
-import type { Outfit } from '../core/outfit.ts';
+import type { Garment, Outfit } from '../core/outfit.ts';
 import { insideObstacle, type Obstacles } from '../sim/obstacles.ts';
 import { heightAt } from '../sim/terrain.ts';
 import type { Heightfield } from '../maps/types.ts';
@@ -121,6 +121,11 @@ export class LockerStage {
   /** Rebuilds the skis or the board (a custom graphic was painted). */
   repaintSkis(): void {
     this.rig?.repaintSkis();
+  }
+
+  /** Rebuilds a painted jacket or pants (its squares changed in the editor). */
+  repaintWear(garment: Garment): void {
+    this.rig?.repaintWear(garment);
   }
 
   /** Frames the skis (true) or the whole skier. */

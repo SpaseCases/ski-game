@@ -1505,10 +1505,50 @@ body {
  * under it like a tape: the ends named, and the boots' place marked in the
  * flag orange, since that middle stretch hides under the bindings. Below,
  * the ski at its true shape and the graphics to start from, then the
- * palette, the tools (each with its key) and the turning 3D skis.
+ * palette and the tools (each with its key). The garment editor (milestone
+ * 23 part 2) is built the same way. Both fit the window like the Locker:
+ * the sign sits at the top of the menu, grows with its content up to the
+ * window's height, and past that only the main part (.editor-main) scrolls,
+ * so the turning 3D window beside it (above it on a narrow screen) never
+ * moves. Under the sign's min-height the whole sign scrolls instead.
  */
 .editor-screen {
+  display: flex;
+  flex-direction: column;
   width: min(1240px, 100%);
+  max-height: 100%;
+  min-height: 360px;
+  margin: 0 auto;
+  align-self: flex-start;
+}
+
+.editor-screen .board {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-height: 0;
+}
+
+.editor-screen .board-body {
+  display: flex;
+  min-height: 0;
+}
+
+.editor-layout {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 260px);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 18px;
+  min-height: 0;
+}
+
+/* Everything but the 3D window: the part that scrolls (a little room each side for the focus outlines). */
+.editor-main {
+  min-height: 0;
+  margin: 0 -8px;
+  padding: 0 8px 4px;
+  overflow-y: auto;
 }
 
 .editor-screen .board-sub {
@@ -1687,7 +1727,7 @@ body {
 
 .editor-lower {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.95fr) minmax(200px, 0.8fr);
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.95fr);
   gap: 18px;
   align-items: stretch;
   margin-top: 14px;
@@ -1799,13 +1839,48 @@ body {
   min-height: 130px;
 }
 
+/* The garment editor's Start from tiles: a pattern swatch beside its name. */
+.wear-start-tile {
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+}
+
+.wear-start-tile .editor-blank {
+  width: 30px;
+  height: 20px;
+  border-radius: 2px;
+}
+
+.wear-mid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* A garment slot's thumbnail in the Locker: its pieces laid flat, a few pixels a square. */
+.wear-thumb {
+  display: block;
+  max-width: 100%;
+  image-rendering: pixelated;
+}
+
+.wear-customs {
+  margin-top: 6px;
+}
+
 @media (max-width: 900px) {
   .editor-mid,
   .editor-lower {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .editor-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  /* Above the scrolling part. */
   .locker-frame.editor-frame {
+    order: -1;
     height: 160px;
   }
 

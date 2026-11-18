@@ -6,8 +6,9 @@ import { startLoop } from './core/loop.ts';
 import { PointerOrbit } from './core/pointerOrbit.ts';
 import { bestCombo, submitCombo } from './core/bests.ts';
 import { gearBoard, loadCustomSkis, lookSkisText, paintedSlots, setCustomSkisText } from './core/customSkis.ts';
+import { loadCustomWear, paintedWear, setWearText, wearJson, wearPattern, wornOutfit } from './core/customWear.ts';
 import { BOARD_TYPES, mainColor, type BoardId } from './core/boards.ts';
-import { HEADWEAR, loadOutfit, outfitFrom, PALETTE, PATTERNS, saveOutfit, type Outfit } from './core/outfit.ts';
+import { CUSTOM_PATTERNS, GARMENTS, HEADWEAR, loadOutfit, outfitFrom, PALETTE, PATTERNS, saveOutfit, type Garment, type Outfit } from './core/outfit.ts';
 import { SKI_TYPES, type SkiId } from './core/skis.ts';
 import {
   clampRung,
@@ -70,6 +71,7 @@ import { mainKey } from './ui/keyNames.ts';
 import { LockerScreen } from './ui/lockerMenu.ts';
 import type { Online } from './online/index.ts';
 import { SkiEditorScreen } from './ui/skiEditor.ts';
+import { WearEditorScreen } from './ui/wearEditor.ts';
 import { PauseScreen, TitleScreen } from './ui/mainMenus.ts';
 import { MapSelect } from './ui/mapSelect.ts';
 import { addBackButton, board, Menus, type Screen } from './ui/menus.ts';
@@ -85,10 +87,11 @@ import { drawMapArt, TrailMap, type MapArt } from './ui/trailMap.ts';
 const app = byId('app');
 const hud = byId('hud');
 const settings = loadSettings();
-// The custom slots first, so the outfit can wear a custom ski or board graphic.
+// The custom slots first, so the outfit can wear a custom ski or board graphic, or a painted jacket or pants.
 loadCustomSkis();
+loadCustomWear();
 /** The skier's look from the Locker. */
-let outfit: Outfit = loadOutfit();
+let outfit: Outfit = wornOutfit(loadOutfit());
 setSkiScale(CONFIG.skis[outfit.ski]);
 // Skis or the snowboard, as the Locker saved it (milestone 22). For testing,
 // ?board=regular or ?board=goofy rides the saved board this visit, and
@@ -277,6 +280,8 @@ lockerStage.setRide(RIDE.board, RIDE.goofy);
 let stageScreen: StageWindow | null = null;
 /** A custom ski or board was painted: rebuild the skis (or the board) on the next preview frame. */
 let skisDirty = false;
+/** A custom jacket or pants was painted (milestone 23 part 2): rebuild that garment on the next preview frame. */
+const wearDirty = new Set<Garment>();
 function showStage(screen: StageWindow | null): void {
   stageScreen = screen;
   // The painted mountain fills round the window, from the title and from pause.
@@ -299,6 +304,10 @@ const lockerScreen = new LockerScreen(
       skiEditor.open(gear, slot);
       menus.push(skiEditor);
     },
+    editWear: (garment, slot) => {
+      wearEditor.open(garment, slot);
+      menus.push(wearEditor);
+    },
   },
   () => menus.back(),
 );
@@ -316,7 +325,24 @@ const skiEditor = new SkiEditorScreen(
   },
   () => menus.back(),
 );
-for (const screen of [titleScreen, pauseScreen, mapSelect, settingsScreen, controlsScreen, keyTester, cheatsScreen, lockerScreen, skiEditor]) menus.add(screen);
+const wearEditor = new WearEditorScreen(
+  {
+    get: () => outfit,
+    wear: (garment, slot) => {
+      const g = GARMENTS.find((x) => x.id === garment)!;
+      // The same slot worn already: its squares may have just been made, so rebuild it.
+      if (outfit[g.pattern] === wearPattern(slot)) wearDirty.add(garment);
+      setOutfit({ ...outfit, [g.pattern]: wearPattern(slot) });
+    },
+    repaint: (garment) => wearDirty.add(garment),
+    shown: (open) => {
+      if (open) lockerStage.showSkis(false);
+      showStage(open ? wearEditor : null);
+    },
+  },
+  () => menus.back(),
+);
+for (const screen of [titleScreen, pauseScreen, mapSelect, settingsScreen, controlsScreen, keyTester, cheatsScreen, lockerScreen, skiEditor, wearEditor]) menus.add(screen);
 
 // The online leaderboards (src/online, its own chunk): imported the first
 // time a board opens or a score posts, never at startup. Blocked or offline,
@@ -342,7 +368,8 @@ function loadOnline(): Promise<Online> {
         lookTables: {
           palette: PALETTE.map((c) => c.hex),
           headwear: HEADWEAR.map((h) => h.id),
-          patterns: PATTERNS.map((x) => x.id),
+          // The stock patterns, then the painted slots (milestone 23 part 2: digits 4 to 6, which an older game draws plain).
+          patterns: [...PATTERNS.map((x) => x.id), ...CUSTOM_PATTERNS],
           skis: SKI_TYPES.map((x) => x.id),
           boards: BOARD_TYPES.map((t) => ({ id: t.id, graphics: t.graphics.map((g) => g.id), colors: t.graphics.map((g) => mainColor(t, g)) })),
         },
@@ -434,7 +461,12 @@ let lookName = settings.name;
 let lookSaved = lookText();
 
 function lookText(): string {
-  return `${JSON.stringify(outfit)}\n${lookSkisText()}`;
+  return `${JSON.stringify(outfit)}\n${lookGearText()}`;
+}
+
+/** An online look's `skis` text: the custom skis and boards, and (milestone 23 part 2) the painted garments as `wear`. */
+function lookGearText(): string {
+  return lookSkisText({ wear: wearJson() });
 }
 
 /** The title's name box was finished with `name` saved: offer the look saved online under it. */
@@ -452,11 +484,13 @@ function nameChosen(name: string): void {
         }
         // Only over the title: anywhere else the player has moved on.
         if (menus.top !== titleScreen) return;
-        o.lookPrompt.ask(found.name, o.lookCode(outfitFrom(found.outfit)), paintedSlots(found.skis), () => {
-          // Custom skis first, so the outfit can wear one of them.
+        o.lookPrompt.ask(found.name, o.lookCode(outfitFrom(found.outfit)), paintedSlots(found.skis) + paintedWear(found.skis), () => {
+          // Custom skis and garments first, so the outfit can wear them.
           setCustomSkisText(found.skis);
-          setOutfit(outfitFrom(found.outfit));
+          setWearText(found.skis);
+          setOutfit(wornOutfit(outfitFrom(found.outfit)));
           skisDirty = true;
+          wearDirty.add('jacket').add('pants');
           repaintSkis();
           lookSaved = lookText();
           menus.back();
@@ -474,7 +508,7 @@ function saveLookOnline(always: boolean): void {
   if (!name || (!always && text === lookSaved)) return;
   lookSaved = text;
   loadOnline()
-    .then((o) => o.saveLook({ name, outfit: JSON.stringify(outfit), skis: lookSkisText() }))
+    .then((o) => o.saveLook({ name, outfit: JSON.stringify(outfit), skis: lookGearText() }))
     .catch(() => {
       // Offline: try again the next time the Locker closes.
       lookSaved = '';
@@ -758,8 +792,16 @@ function drawLocker(screen: StageWindow, realFrameTime: number): void {
 /** Where drawLocker draws the preview: the canvas's top left, at the window's size. */
 const stageRect: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
-/** Rebuilds the skier's and the preview's skis if a custom ski was painted since. */
+/** Rebuilds the skier's and the preview's skis if a custom ski was painted since, and a painted garment. */
 function repaintSkis(): void {
+  // Checked by size first: iterating a set allocates, and this runs every preview frame.
+  if (wearDirty.size > 0) {
+    for (const garment of wearDirty) {
+      skierView?.rig.repaintWear(garment);
+      lockerStage.repaintWear(garment);
+    }
+    wearDirty.clear();
+  }
   if (!skisDirty) return;
   skisDirty = false;
   skierView?.rig.repaintSkis();

@@ -47,14 +47,24 @@ export const HEADWEAR: readonly { readonly id: Headwear; readonly name: string }
   { id: 'pumpkin', name: "Jack-o'-lantern" },
 ];
 
-/** A garment's pattern, painted in its second color. */
-export type Pattern = 'plain' | 'stripes' | 'blocks' | 'plaid';
-export const PATTERNS: readonly { readonly id: Pattern; readonly name: string }[] = [
+/** A garment's stock pattern, painted in its second color. */
+export type StockPattern = 'plain' | 'stripes' | 'blocks' | 'plaid';
+/** A garment painted square by square (milestone 23 part 2): its custom slot, core/customWear.ts. */
+export type CustomPattern = `custom-${number}`;
+export type Pattern = StockPattern | CustomPattern;
+export const PATTERNS: readonly { readonly id: StockPattern; readonly name: string }[] = [
   { id: 'plain', name: 'Plain' },
   { id: 'stripes', name: 'Stripes' },
   { id: 'blocks', name: 'Blocks' },
   { id: 'plaid', name: 'Plaid' },
 ];
+/** Custom slots per garment: the patterns custom-1 to custom-3, after the stock ones (an online look's digits 4 to 6). */
+export const WEAR_SLOTS = 3;
+export const CUSTOM_PATTERNS: readonly CustomPattern[] = Array.from({ length: WEAR_SLOTS }, (_, i) => `custom-${i + 1}` as const);
+export function isCustomPattern(p: string): p is CustomPattern {
+  return (CUSTOM_PATTERNS as readonly string[]).includes(p);
+}
+
 /** The garments that take a pattern, and the outfit keys of their pattern and second color. */
 export const GARMENTS = [
   { id: 'jacket', name: 'Jacket', pattern: 'jacketPattern', accent: 'jacketAccent' },
@@ -162,7 +172,7 @@ export function outfitFrom(json: string | null): Outfit {
   if (HEADWEAR.some((h) => h.id === hw)) out.headwear = hw as Headwear;
   for (const g of GARMENTS) {
     const pattern = saved[g.pattern];
-    if (PATTERNS.some((p) => p.id === pattern)) out[g.pattern] = pattern as Pattern;
+    if (PATTERNS.some((p) => p.id === pattern) || (typeof pattern === 'string' && isCustomPattern(pattern))) out[g.pattern] = pattern as Pattern;
     const accent = saved[g.accent];
     out[g.accent] = typeof accent === 'string' && PALETTE.some((c) => c.hex === accent) ? accent : contrastColor(out[g.id]);
   }

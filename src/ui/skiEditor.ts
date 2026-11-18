@@ -63,9 +63,10 @@ const UNDO_MAX = 60;
 /** Grid cell size in CSS pixels: as big as fits, within these. */
 const CELL_MAX = 16;
 const CELL_MIN = 4;
-/** Side by side starts on when both grids fit with cells this big in the height the rest of the editor leaves (less this margin, px). */
+/** Side by side starts on when both grids fit with cells this big in the height the rest of the editor leaves in the window. */
 const PAIR_CELL_MIN = 6;
-const PAIR_MARGIN = 24;
+/** The menu's padding above and below the sign (style.css .menu), px. */
+const MENU_PAD = 74;
 /** Brush sizes: squares this many cells across. */
 const BRUSHES = [1, 2, 3, 4] as const;
 /** How far Shift + an arrow jumps. */
@@ -130,6 +131,8 @@ export class SkiEditorScreen implements Screen, StageWindow {
   private readonly undoButton: HTMLButtonElement;
   private readonly blankSwatches: HTMLElement[] = [];
   private readonly view: HTMLElement;
+  /** Everything but the 3D window: the part that scrolls (style.css .editor-main). */
+  private readonly main: HTMLElement;
   private readonly rect: Rect = { x: 0, y: 0, width: 0, height: 0 };
   /** The preview's own canvas in the window (render/lockerStage.ts present copies it in). */
   private readonly preview: CanvasRenderingContext2D | null;
@@ -360,8 +363,15 @@ export class SkiEditorScreen implements Screen, StageWindow {
     this.preview = previewCanvas(this.view);
     frame.appendChild(this.view);
 
-    lower.append(palette, tools, frame);
-    b.body.append(switches, this.bench, mid, lower);
+    lower.append(palette, tools);
+    // The 3D window beside the rest (above it on a narrow screen), never moving: only the rest scrolls.
+    this.main = document.createElement('div');
+    this.main.className = 'editor-main';
+    this.main.append(switches, this.bench, mid, lower);
+    const layout = document.createElement('div');
+    layout.className = 'editor-layout';
+    layout.append(this.main, frame);
+    b.body.append(layout);
     setHints(b.foot, HINTS);
   }
 
@@ -808,17 +818,25 @@ export class SkiEditorScreen implements Screen, StageWindow {
 
   // -------------------------------------------------------------- drawing
 
-  /** Cells this big fit both skis' grids (side by side) in the bench's width and the height the rest of the editor leaves in the window, so the 3D skis stay in view. */
+  /**
+   * Cells this big fit both skis' grids (side by side) in the bench's width
+   * and in the height the rest of the editor leaves in the window: the sign
+   * outside its scrolling part (the head, the hints, on a narrow screen the
+   * 3D window) and the rest of that part (the switches, the ruler, the strip
+   * and the tools), so the whole grid shows without scrolling. `extra` is
+   * what the strip under the grid gains side by side.
+   */
   private pairCell(width: number, extra = 0): number {
     const sign = this.el.firstElementChild?.getBoundingClientRect().height ?? 0;
-    const rest = sign - this.grid.getBoundingClientRect().height + extra;
-    return Math.min(CELL_MAX, Math.floor(width / this.rows), Math.floor((window.innerHeight - rest - PAIR_MARGIN) / (2 * this.cols)));
+    const outside = sign - this.main.clientHeight;
+    const others = this.main.scrollHeight - this.grid.getBoundingClientRect().height + extra;
+    return Math.min(CELL_MAX, Math.floor(width / this.rows), Math.floor((window.innerHeight - MENU_PAD - outside - others) / (2 * this.cols)));
   }
 
   /** Sizes the grid to the bench and the true-shape ski to its box (on opening and when the window resizes). */
   private layout(): void {
     if (!this.shown) return;
-    const width = this.bench.clientWidth;
+    const width = contentWidth(this.bench);
     // On opening, side by side when both grids fit at a readable size. The
     // strip under the grid is drawn first (a canvas not yet drawn has its
     // default size), and side by side it gains the second ski.
@@ -859,7 +877,7 @@ export class SkiEditorScreen implements Screen, StageWindow {
       if (this.refit) {
         this.refit = false;
         const before = this.cell;
-        this.sizeGrid(this.pairCell(this.bench.clientWidth));
+        this.sizeGrid(this.pairCell(contentWidth(this.bench)));
         if (this.cell !== before) this.queueDraw();
       }
     });
@@ -963,19 +981,25 @@ export class SkiEditorScreen implements Screen, StageWindow {
   }
 }
 
+/** An element's width inside its padding (the grid's bench: sized to its clientWidth, the grid overran the padding by 24 px). */
+export function contentWidth(el: HTMLElement): number {
+  const style = getComputedStyle(el);
+  return el.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0);
+}
+
 /** The model's widest half width (m): a board's strip and tiles are drawn as tall as the board. */
 function maxHalf(m: SkiModel): number {
   return Math.max(...m.width.map(([, hw]) => hw));
 }
 
-function label(name: string): HTMLElement {
+export function label(name: string): HTMLElement {
   const el = document.createElement('span');
   el.className = 'paint-part editor-label';
   el.textContent = name;
   return el;
 }
 
-function text(t: string): HTMLElement {
+export function text(t: string): HTMLElement {
   const el = document.createElement('span');
   el.textContent = t;
   return el;
@@ -993,7 +1017,7 @@ function segment(name: string, key: string, onPick: () => void): HTMLButtonEleme
 }
 
 /** A tool's button: its name, and its key as a keycap. */
-function toolButton(name: string, key: string, onPick: () => void): HTMLButtonElement {
+export function toolButton(name: string, key: string, onPick: () => void): HTMLButtonElement {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'editor-tool';

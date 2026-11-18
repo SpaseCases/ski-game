@@ -3,7 +3,7 @@ import { board, plank, setHints, type Screen } from './menus.ts';
 
 // The sign that comes up after a board name is entered on the title, when a
 // look is saved online under that name: load it (replacing this computer's
-// outfit and custom skis and boards) or keep this computer's. Part of the lazy
+// outfit and custom skis, boards and garments) or keep this computer's. Part of the lazy
 // leaderboard chunk.
 
 export class LookPrompt implements Screen {
@@ -39,12 +39,12 @@ export class LookPrompt implements Screen {
     ]);
   }
 
-  /** Before opening: whose look, its tiny skier (a 13-character look), how many custom ski and board graphics it has, and the two answers. */
+  /** Before opening: whose look, its tiny skier (a 13-character look), how many custom ski and board graphics and painted garments it has, and the two answers. */
   ask(name: string, look: string, customs: number, onLoad: () => void, onKeep: () => void): void {
     this.sub.textContent = `A look is saved online under “${name}”.`;
     this.preview.innerHTML = lookSvg(look);
-    const painted = customs === 0 ? 'no custom graphics' : customs === 1 ? '1 custom graphic' : `${customs} custom graphics`;
-    this.detail.textContent = `Its outfit and ${painted}. Loading it replaces the outfit and the custom skis and boards on this computer. Keep yours, and the next time you close the Locker your look replaces it online.`;
+    const painted = customs === 0 ? 'no custom designs' : customs === 1 ? '1 custom design' : `${customs} custom designs`;
+    this.detail.textContent = `Its outfit and ${painted}. Loading it replaces the outfit and the custom skis, boards and clothes on this computer. Keep yours, and the next time you close the Locker your look replaces it online.`;
     this.onLoad = onLoad;
     this.onKeep = onKeep;
   }

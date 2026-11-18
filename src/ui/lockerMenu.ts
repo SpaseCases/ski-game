@@ -5,8 +5,10 @@ import {
   contrastColor,
   GARMENTS,
   HEADWEAR,
+  isCustomPattern,
   PALETTE,
   PATTERNS,
+  WEAR_SLOTS,
   type ColorPart,
   type Garment,
   type Headwear,
@@ -14,7 +16,9 @@ import {
   type Pattern,
 } from '../core/outfit.ts';
 import { BOARD_TYPES, boardGraphic, boardStats, boardType, type BoardId } from '../core/boards.ts';
-import { boardGear, customGraphic, customId, gearBoard, gearType, type Gear } from '../core/customSkis.ts';
+import { boardGear, customGraphic, customId, EDIT_PALETTE, gearBoard, gearType, type Gear } from '../core/customSkis.ts';
+import { wearCells, wearPattern } from '../core/customWear.ts';
+import { wearOffsets, wearPanels } from '../render/wearPanels.ts';
 import {
   CUSTOM_SLOTS,
   riseAt,
@@ -32,6 +36,7 @@ import {
 import type { Rect, StageWindow } from '../render/lockerStage.ts';
 import { addBackButton, board, setHints, type Screen } from './menus.ts';
 import { paintSkis } from './skiThumb.ts';
+import { drawWear } from './wearGrid.ts';
 
 // The Locker: the skier turning slowly in a window on the left (drawn by the
 // game's renderer through a hole in the menu, see LockerStage), the choices
@@ -46,7 +51,9 @@ import { paintSkis } from './skiThumb.ts';
 // Board switch at its top; on Board the same rows show the three boards,
 // their graphics and stats (against the park board), and Regular | Goofy
 // stands where the poles switch is. Each ski and (since milestone 23) each
-// board has a row of custom slots, each with Edit (the editor, skiEditor.ts).
+// board has a row of custom slots, each with Edit (the editor, skiEditor.ts),
+// and so (since milestone 23 part 2) do the jacket and the pants, under their
+// pattern tiles: a painted garment is worn as its pattern (wearEditor.ts).
 
 export interface LockerHooks {
   get: () => Outfit;
@@ -57,6 +64,8 @@ export interface LockerHooks {
   skisShown: (skis: boolean) => void;
   /** Opens the editor on that ski's or board's custom slot. */
   edit: (gear: Gear, slot: number) => void;
+  /** Opens the garment editor on the jacket's or the pants' custom slot. */
+  editWear: (garment: Garment, slot: number) => void;
 }
 
 /** Segments in a stat bar; the park ski fills half. */
@@ -68,6 +77,9 @@ const RACK_PX_PER_M = RACK_WIDTH / Math.max(...SKI_TYPES.map((t) => t.model.leng
 const BOARD_MAX_HALF = Math.max(...BOARD_TYPES.flatMap((t) => t.model.width.map(([, hw]) => hw)));
 const LONGEST_SKI = Math.max(...SKI_TYPES.map((t) => t.model.length));
 const LONGEST_BOARD = Math.max(...BOARD_TYPES.map((t) => t.model.length));
+/** A garment slot's thumbnail: CSS pixels a square. */
+const WEAR_THUMB_PX = 3;
+const EDIT_HEXES = EDIT_PALETTE.map((c) => c.hex);
 /** A custom slot never painted: the ski's outline in the plank's hover blue. */
 const EMPTY_SLOT: SkiGraphic = { id: 'empty', name: 'Empty', base: '#2b5582', layers: [{ fill: '#2b5582' }] };
 
@@ -120,6 +132,8 @@ export class LockerScreen implements Screen, StageWindow {
   private readonly rows = new Map<ColorPart, PaintRow>();
   /** Each garment's pattern tiles and second-color strip. */
   private readonly patterns = new Map<Garment, { name: HTMLElement; tiles: Map<Pattern, HTMLButtonElement>; accent: PaintRow }>();
+  /** Each garment's custom slots: the pick button, its note and its thumbnail. */
+  private readonly wearSlots: { garment: Garment; slot: number; button: HTMLButtonElement; note: HTMLElement; thumb: HTMLCanvasElement }[] = [];
   private readonly poleButtons: HTMLButtonElement[] = [];
   private readonly skiTiles = new Map<SkiId, HTMLButtonElement>();
   /** Skis or Board, its board tiles, Regular / Goofy, and the rows only skis (or only a board) show. */
@@ -292,11 +306,45 @@ export class LockerScreen implements Screen, StageWindow {
       strip.appendChild(tile);
       tiles.set(id, tile);
     }
+    // The garment painted square by square (milestone 23 part 2): three slots, each with Edit.
+    const customs = document.createElement('div');
+    customs.className = 'ski-customs wear-customs';
+    customs.setAttribute('role', 'group');
+    customs.setAttribute('aria-label', `${garment.name}: your designs`);
+    for (let slot = 0; slot < WEAR_SLOTS; slot++) {
+      const cell = document.createElement('div');
+      cell.className = 'ski-custom';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'ski-graphic ski-custom-pick';
+      const thumb = document.createElement('canvas');
+      thumb.className = 'wear-thumb';
+      const name = document.createElement('span');
+      name.className = 'ski-custom-name';
+      name.textContent = `Custom ${slot + 1}`;
+      const note = document.createElement('span');
+      note.className = 'ski-custom-note';
+      name.appendChild(note);
+      button.append(thumb, name);
+      button.addEventListener('click', () => {
+        if (!wearCells(garment.id, slot)) this.hooks.editWear(garment.id, slot);
+        else this.pick({ [garment.pattern]: wearPattern(slot) });
+      });
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'ski-edit';
+      edit.textContent = 'Edit';
+      edit.setAttribute('aria-label', `Edit ${garment.name.toLowerCase()} custom ${slot + 1}`);
+      edit.addEventListener('click', () => this.hooks.editWear(garment.id, slot));
+      cell.append(button, edit);
+      customs.appendChild(cell);
+      this.wearSlots.push({ garment: garment.id, slot, button, note, thumb });
+    }
     const row = document.createElement('div');
     row.className = 'paint-row pattern-row';
     row.setAttribute('role', 'group');
     row.setAttribute('aria-label', `${garment.name} pattern`);
-    row.append(head, strip);
+    row.append(head, strip, customs);
     panel.appendChild(row);
     const accent = paintRow(`${garment.name} second color`, (hex) => this.pick({ [garment.accent]: hex }));
     panel.appendChild(accent.row);
@@ -540,6 +588,12 @@ export class LockerScreen implements Screen, StageWindow {
 
   /** Redraws the custom slots' thumbnails (they change in the editor). */
   private paintCustoms(): void {
+    for (const w of this.wearSlots) {
+      const cells = wearCells(w.garment, w.slot);
+      drawWear(w.thumb, wearPanels(w.garment), wearOffsets(w.garment), cells, EDIT_HEXES, WEAR_THUMB_PX, '#2b5582');
+      w.note.textContent = cells ? '' : 'Empty: paint one';
+      w.button.setAttribute('aria-label', `${w.garment === 'jacket' ? 'Jacket' : 'Pants'}: Custom ${w.slot + 1}${cells ? '' : ', empty'}`);
+    }
     for (const c of this.customs) {
       const g = customGraphic(c.gear, c.slot);
       const type = gearType(c.gear);
@@ -587,11 +641,14 @@ export class LockerScreen implements Screen, StageWindow {
         tile.setAttribute('aria-pressed', String(pattern === id));
         tile.querySelector('.pattern-swatch')!.innerHTML = patternSwatch(id, o[g.id], o[g.accent]);
       }
-      p.name.textContent = PATTERNS.find((x) => x.id === pattern)!.name;
-      p.accent.row.hidden = pattern === 'plain';
+      const custom = isCustomPattern(pattern);
+      p.name.textContent = custom ? `Custom ${pattern.slice(7)}` : PATTERNS.find((x) => x.id === pattern)!.name;
+      // A painted garment has no second color (its Start from uses the one kept here).
+      p.accent.row.hidden = pattern === 'plain' || custom;
       for (const [hex, chip] of p.accent.chips) chip.setAttribute('aria-pressed', String(o[g.accent] === hex));
       p.accent.name.textContent = colorName(o[g.accent]);
     }
+    for (const w of this.wearSlots) w.button.setAttribute('aria-pressed', String(o[GARMENTS.find((g) => g.id === w.garment)!.pattern] === wearPattern(w.slot)));
     this.poleButtons.forEach((b, i) => b.setAttribute('aria-pressed', String((i === 0) === o.poles)));
 
     // Skis or the board: each side's rows, picks and stats.
@@ -700,8 +757,8 @@ function switchRow(name: string, className: string, options: readonly (readonly 
   return { row, buttons };
 }
 
-/** A small flat drawing of a pattern in the garment's colors, for its tile (roughly as the 3D garment paints it). */
-function patternSwatch(pattern: Pattern, base: string, accent: string): string {
+/** A small flat drawing of a stock pattern in the garment's colors, for its tile (roughly as the 3D garment paints it). */
+export function patternSwatch(pattern: Pattern, base: string, accent: string): string {
   let art = '';
   if (pattern === 'stripes') art = `<rect y="5" width="30" height="4" fill="${accent}"/><rect y="12" width="30" height="4" fill="${accent}"/>`;
   else if (pattern === 'blocks') art = `<rect width="30" height="7" fill="${accent}"/>`;

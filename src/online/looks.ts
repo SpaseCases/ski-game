@@ -2,8 +2,9 @@ import { apiGet, apiSend } from './api.ts';
 import { OUTFIT_MAX, SKIS_MAX } from './limits.ts';
 
 // A look saved online under a board name: the Locker's outfit and every
-// custom ski slot, as the same JSON text this computer keeps them in
-// (outfit.v1, customSkis.v1). One per name (in any case); nobody owns a name,
+// custom ski, board and (milestone 23 part 2) garment slot, as the same JSON
+// text this computer keeps them in (outfit.v1, customSkis.v1 with the boards
+// and the garments appended as `boards` and `wear`). One per name (in any case); nobody owns a name,
 // so anyone can load or replace it. The leaderboard API (api.ts) checks the
 // name, the shape and the sizes. ?boards=test uses the test looks.
 

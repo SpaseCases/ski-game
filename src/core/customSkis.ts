@@ -257,9 +257,13 @@ export function customSkisText(): string {
   return JSON.stringify(slotsJson(SKI_GEARS));
 }
 
-/** What an online look stores: customSkis.v1's JSON with the boards' slots (customBoards.v1's) appended as `boards`, so the look only grows. */
-export function lookSkisText(): string {
-  return JSON.stringify({ ...slotsJson(SKI_GEARS), boards: slotsJson(BOARD_GEARS) });
+/**
+ * What an online look stores: customSkis.v1's JSON with the boards' slots
+ * (customBoards.v1's) appended as `boards`, and `more` after them (since
+ * milestone 23 part 2 the garments, `wear`: core/customWear.ts), so the look only grows.
+ */
+export function lookSkisText(more: Record<string, unknown> = {}): string {
+  return JSON.stringify({ ...slotsJson(SKI_GEARS), boards: slotsJson(BOARD_GEARS), ...more });
 }
 
 function slotsJson(gears: readonly Entry[]): Record<string, (string | null)[]> {
@@ -329,7 +333,8 @@ function encode(s: Slot): string {
   return `${LETTERS[s.sidewall]!}${s.linked ? '=' : '~'}${runs(s.top.cells)}/${runs(s.base.cells)}`;
 }
 
-function runs(cells: Uint8Array): string {
+/** Run-length text of palette letters (customSkis.v1's cells; core/customWear.ts saves garments the same way). */
+export function runs(cells: Uint8Array): string {
   let out = '';
   for (let i = 0; i < cells.length; ) {
     let j = i + 1;
@@ -346,7 +351,7 @@ function letterIndex(ch: string | undefined): number {
 }
 
 /** Fills `count` cells from run-length text, or returns null if it doesn't fit exactly. */
-function unruns(text: string, count: number): Uint8Array | null {
+export function unruns(text: string, count: number): Uint8Array | null {
   const cells = new Uint8Array(count);
   let n = 0;
   for (let k = 0; k < text.length; ) {
