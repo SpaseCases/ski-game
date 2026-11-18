@@ -23,8 +23,10 @@ import type { MarketItem, MarketQuery, Store } from './store.ts';
 // Every check the game makes is made again here (src/online/marketRules.ts:
 // kinds, sizes, the save formats; the word filter on titles and names).
 // Browse pages are cached for a minute: in this Worker instance's memory
-// (which works on workers.dev) and in Cloudflare's Cache API (which only
-// works on a custom domain, and does nothing on workers.dev). Reports are
+// and in Cloudflare's Cache API (shared by the instances in a data center;
+// Cloudflare's docs say it only works on a custom domain, but on the live
+// workers.dev Worker it answers, and kept pages past their max-age, so each
+// page carries the time it was stored and the Worker checks it). Reports are
 // counted per salted address hash, never the address; five hide an item,
 // and a hidden item comes back after a week (the daily cron, restoreHidden)
 // unless the developer removed it, which takes the DEV_CODE secret.
@@ -149,7 +151,9 @@ async function browse(url: URL, env: MarketEnv, store: Store, set: string, ctx: 
   if (kept && now - kept.at < CACHE_S * 1000) return { text: kept.body, cache: 'memory' };
   // The Cache API: keyed by a normalized URL, so the parameters' order doesn't matter.
   const edgeKey = new Request(`${url.origin}/v1/market-cache?k=${encodeURIComponent(key)}${env.STORE === 'memory' ? `&boot=${(boot ||= `${Date.now()}-${Math.random()}`)}` : ''}`);
-  const edge = typeof caches !== 'undefined' ? await caches.default.match(edgeKey).catch(() => undefined) : undefined;
+  const found = typeof caches !== 'undefined' ? await caches.default.match(edgeKey).catch(() => undefined) : undefined;
+  // The Cache API was seen keeping pages well past their max-age on workers.dev: each page carries when it was stored, and an old one is a miss.
+  const edge = found && now - Number(found.headers.get('X-Stored-At') ?? 0) < CACHE_S * 1000 ? found : undefined;
   if (edge) {
     const body = await edge.text();
     if (useMemory) remember(key, body, now);
@@ -163,7 +167,7 @@ async function browse(url: URL, env: MarketEnv, store: Store, set: string, ctx: 
   if (useMemory) remember(key, body, now);
   if (typeof caches !== 'undefined') {
     if (edgeKeys.size < MEMORY_PAGES) edgeKeys.add(edgeKey.url);
-    const put = caches.default.put(edgeKey, new Response(body, { headers: { 'Content-Type': 'application/json', 'Cache-Control': `max-age=${CACHE_S}` } })).catch(() => {});
+    const put = caches.default.put(edgeKey, new Response(body, { headers: { 'Content-Type': 'application/json', 'Cache-Control': `max-age=${CACHE_S}`, 'X-Stored-At': String(now) } })).catch(() => {});
     if (ctx) ctx.waitUntil(put);
     else await put;
   }
