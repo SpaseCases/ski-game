@@ -3,6 +3,7 @@ import { boardKind, LIST_MAX, LOOK_FORMAT, OUTFIT_MAX, RANK_LIMIT, SKIS_MAX, val
 import { FirestoreStore } from './firestore.ts';
 import { jsonBody, Refused, type RateLimit } from './http.ts';
 import { marketRoute, restoreHidden, type MarketEnv } from './market.ts';
+import { CLOSE, MESSAGE_MAX, quotaError, refusedSocket, Room } from './room.ts';
 import { beats, MemoryStore, type Row, type Store } from './store.ts';
 
 // The leaderboard API: a Cloudflare Worker between the game and Firestore,
@@ -20,6 +21,9 @@ import { beats, MemoryStore, type Row, type Store } from './store.ts';
 //   GET  /v1/look?name=              the look saved under a name, or null
 //   PUT  /v1/look   {name, outfit, skis}
 //   /v1/market...                    the marketplace (milestone 24: market.ts)
+//   GET  /v1/mp/hello                the socket test's plain HTTPS check (milestone 27)
+//   GET  /v1/mp/echo?fan=            a WebSocket to an echo room (room.ts)
+//   POST /v1/mp/poll?id=&fan=        the same echo over plain HTTPS (polling)
 //
 // Every request takes set=live or set=test (?boards=test in the game).
 // A daily cron (wrangler.jsonc "triggers") brings back marketplace items
@@ -36,7 +40,11 @@ export interface Env extends MarketEnv {
   ALLOWED_ORIGINS: string;
   READS?: RateLimit;
   WRITES?: RateLimit;
+  /** Multiplayer rooms (milestone 27): one Durable Object per room. */
+  ROOMS: DurableObjectNamespace<Room>;
 }
+
+export { Room };
 
 /** The local store lives as long as the dev Worker does. */
 const memory = new MemoryStore();
@@ -50,6 +58,8 @@ export default {
     const cors = origin && ok(origin) ? origin : null;
     if (origin && !cors) return reply(403, { error: 'origin' }, null);
     if (request.method === 'OPTIONS') return preflight(cors);
+    // Sockets first: a 101 answer's headers can't be changed afterwards.
+    if (new URL(request.url).pathname.startsWith('/v1/mp/')) return multiplayer(request, env, cors);
     try {
       const body = await route(request, env, ctx);
       if (body instanceof Response) {
@@ -75,6 +85,45 @@ export default {
     }
   },
 };
+
+/** Milestone 27's routes: for now the socket test (an echo room), its HTTPS check and its polling route. */
+async function multiplayer(request: Request, env: Env, cors: string | null): Promise<Response> {
+  const url = new URL(request.url);
+  const socket = request.headers.get('Upgrade') === 'websocket';
+  const who = request.headers.get('CF-Connecting-IP') ?? 'local';
+  const refuse = (status: number, code: string, closeCode: number): Response => (socket ? refusedSocket(closeCode, code) : reply(status, { error: code }, cors));
+  if (env.READS && !(await env.READS.limit({ key: who })).success) return refuse(429, 'slow down', CLOSE.bad);
+  // Local play-tests can ask for the refusals the live Worker gives when the day runs out.
+  const force = env.STORE === 'memory' ? url.searchParams.get('force') : null;
+  if (force === 'full') return refuse(503, 'full today', CLOSE.full);
+  if (force === 'down') return refuse(503, 'down', CLOSE.down);
+  const fan = url.searchParams.get('fan') ?? '1';
+  if (!/^\d{1,2}$/.test(fan)) return refuse(400, 'fan', CLOSE.bad);
+  try {
+    switch (`${request.method} ${url.pathname}`) {
+      case 'GET /v1/mp/hello': {
+        const cf = (request as Request & { cf?: { colo?: string } }).cf;
+        return reply(200, { ok: true, colo: cf?.colo ?? 'local' }, cors);
+      }
+      case 'GET /v1/mp/echo': {
+        if (!socket) return refuse(426, 'websocket', CLOSE.bad);
+        return await env.ROOMS.get(env.ROOMS.newUniqueId()).fetch(request);
+      }
+      case 'POST /v1/mp/poll': {
+        const id = url.searchParams.get('id') ?? '';
+        if (!/^[a-z0-9]{8,16}$/.test(id)) return refuse(400, 'id', CLOSE.bad);
+        if (Number(request.headers.get('Content-Length') ?? 0) > MESSAGE_MAX) return refuse(413, 'too big', CLOSE.bad);
+        const answer = await env.ROOMS.getByName(`poll-${id}`).fetch(request);
+        return new Response(answer.body, { status: answer.status, headers: { ...Object.fromEntries(answer.headers), ...corsHeaders(cors) } });
+      }
+      default:
+        return refuse(404, 'route', CLOSE.bad);
+    }
+  } catch (err) {
+    console.error(err);
+    return quotaError(err) ? refuse(503, 'full today', CLOSE.full) : refuse(503, 'down', CLOSE.down);
+  }
+}
 
 async function route(request: Request, env: Env, ctx: ExecutionContext | undefined): Promise<unknown> {
   const url = new URL(request.url);

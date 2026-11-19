@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Network test</title>
+<style>
+  :root { --bg: #f4f6f8; --card: #fff; --ink: #17202a; --dim: #5b6773; --line: #d5dbe1; --ok: #1e7b45; --bad: #b3261e; --warn: #8a5a00; --accent: #1f5fae; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #12161b; --card: #1b2128; --ink: #e8edf2; --dim: #9aa6b2; --line: #2f3843; --ok: #5cc98a; --bad: #ff8a80; --warn: #e7b65a; --accent: #7fb2ff; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p.lead { margin: 0 0 14px; color: var(--dim); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button, select { font: inherit; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+  button.main { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; font-size: 13px; }
+  .ok { color: var(--ok); font-weight: 600; } .bad { color: var(--bad); font-weight: 600; } .warn { color: var(--warn); font-weight: 600; }
+  #verdict { font-size: 17px; font-weight: 600; }
+  #log { height: 260px; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; margin: 8px 0 0; font: 12px/1.4 ui-monospace, Consolas, monospace; white-space: pre-wrap; }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 14px; margin: 0; }
+  dt { color: var(--dim); } dd { margin: 0; overflow-wrap: anywhere; }
+  .scroll { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Park Laps network test</h1>
+  <p class="lead">Checks whether multiplayer can get through this network. Press <b>Run test</b> and leave this tab in front for about 3 minutes. Then press <b>Copy log</b> and paste it back.</p>
+
+  <div class="card">
+    <div class="row">
+      <button class="main" id="run">Run test (3 min)</button>
+      <button id="long">Long run (10 min)</button>
+      <button id="stop" disabled>Stop</button>
+      <label>Rate <select id="rate"><option>5</option><option selected>8</option><option>10</option></select> a second</label>
+      <button id="copy">Copy log</button>
+    </div>
+    <p id="verdict" style="margin:10px 0 0">Not run yet.</p>
+  </div>
+
+  <div class="card">
+    <dl id="info"></dl>
+  </div>
+
+  <div class="card scroll">
+    <table>
+      <thead><tr><th>Route</th><th>Result</th><th>Connect</th><th>Round trip median / 95% / worst</th><th>Jitter</th><th>Sent / back / lost</th><th>Drops</th></tr></thead>
+      <tbody id="routes"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="row"><b>Log</b><span style="color:var(--dim)">(newest at the bottom)</span></div>
+    <pre id="log"></pre>
+  </div>
+</main>
+<script>
+(() => {
+  'use strict';
+  // The Worker's address, base64 (like the game's own page text). ?api= overrides it; a localhost page uses the local Worker.
+  const LIVE = atob('aHR0cHM6Ly9wYXJrbGFwcy1hcGkucGFya2xhcHMtYXBpLndvcmtlcnMuZGV2');
+  const params = new URLSearchParams(location.search);
+  const local = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  const API = (params.get('api') || (local ? 'http://localhost:8787' : LIVE)).replace(/\/$/, '');
+  const WS = API.replace(/^http/, 'ws');
+  // Copies of each message the echo sends back: the other riders in a room of 8.
+  const FAN = 7;
+  const POLL_SECONDS = 30;
+  const POLL_RATE = 4;
+  const STALL_MS = 5000;
+  const PING_MS = 2000;
+  // Local play-tests only (the live Worker ignores it): ?force=full or down asks for that refusal.
+  const FORCE = params.get('force') ? `&force=${encodeURIComponent(params.get('force'))}` : '';
+
+  const $ = (id) => document.getElementById(id);
+  const logEl = $('log');
+  const lines = [];
+  const t0 = performance.now();
+  const stamp = () => ((performance.now() - t0) / 1000).toFixed(1).padStart(6) + 's';
+  function log(text) {
+    const line = `${stamp()}  ${text}`;
+    lines.push(line);
+    const atEnd = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 4;
+    logEl.textContent += line + '\n';
+    if (atEnd) logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  // ---- What this computer is ----
+  const info = [];
+  function addInfo(k, v) { info.push([k, v]); const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; $('info').append(dt, dd); }
+  const ua = navigator.userAgent;
+  const chrome = /Chrome\/([\d.]+)/.exec(ua);
+  const cros = /CrOS \S+ ([\d.]+)/.exec(ua);
+  addInfo('Page', location.origin + location.pathname);
+  addInfo('Test server', API.replace(/^https?:\/\//, ''));
+  addInfo('Chrome', chrome ? chrome[1] : 'not Chrome');
+  addInfo('ChromeOS', cros ? cros[1] + ' (from the user agent)' : 'not ChromeOS');
+  addInfo('Online', String(navigator.onLine));
+  const conn = navigator.connection;
+  if (conn) addInfo('Connection', `${conn.effectiveType || '?'}, ~${conn.rtt ?? '?'} ms, ~${conn.downlink ?? '?'} Mb/s`);
+  addInfo('User agent', ua);
+  if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+    navigator.userAgentData.getHighEntropyValues(['platformVersion', 'fullVersionList', 'model']).then((h) => {
+      const full = (h.fullVersionList || []).find((b) => /Chrome|Chromium/.test(b.brand));
+      if (full) addInfo('Chrome (full)', full.version);
+      addInfo('Platform', `${h.platform || '?'} ${h.platformVersion || ''}`.trim() + (h.model ? `, ${h.model}` : ''));
+      log(`Platform ${h.platform} ${h.platformVersion}; Chrome ${full ? full.version : '?'}`);
+    }).catch(() => {});
+  }
+  log(`Page ${location.href}`);
+  log(`UA ${ua}`);
+
+  // ---- Page life: hidden tabs, sleep, the network going away ----
+  document.addEventListener('visibilitychange', () => log(`Tab ${document.visibilityState}`));
+  document.addEventListener('freeze', () => log('Page frozen by Chrome'));
+  document.addEventListener('resume', () => log('Page resumed'));
+  addEventListener('online', () => log('Browser says: online'));
+  addEventListener('offline', () => log('Browser says: offline'));
+  let lastTick = performance.now();
+  setInterval(() => {
+    const now = performance.now();
+    if (now - lastTick > 3000) log(`Timers were stopped for ${((now - lastTick) / 1000).toFixed(1)} s (tab hidden, throttled or asleep)`);
+    lastTick = now;
+  }, 1000);
+
+  // ---- Numbers ----
+  function stats(list) {
+    if (!list.length) return null;
+    const s = [...list].sort((a, b) => a - b);
+    const at = (p) => s[Math.min(s.length - 1, Math.floor(p * s.length))];
+    let jit = 0;
+    for (let i = 1; i < list.length; i++) jit += Math.abs(list[i] - list[i - 1]);
+    return { median: at(0.5), p95: at(0.95), worst: s[s.length - 1], jitter: list.length > 1 ? jit / (list.length - 1) : 0 };
+  }
+  const ms = (v) => (v == null ? '–' : `${Math.round(v)} ms`);
+
+  // A message the size the game will send: position, velocity, orientation, pose bits, a sequence number.
+  function riderMessage(q) {
+    const r = (v, d) => Math.round(v * d) / d;
+    const t = q / 8;
+    return JSON.stringify({ q, p: [r(Math.sin(t) * 120.5, 100), r(400 - t * 3.3, 100), r(t * 15.7, 100)],
+      v: [r(Math.cos(t) * 9.1, 10), r(-3.2, 10), r(14.6, 10)], o: [r(Math.sin(t / 3), 1000), 0.212, r(Math.cos(t / 3), 1000), 0.054],
+      f: q % 64, g: 3, k: 12 });
+  }
+
+  // ---- Routes ----
+  const rows = {};
+  function routeRow(key, label) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${label}</td><td>…</td><td>–</td><td>–</td><td>–</td><td>–</td><td>–</td>`;
+    $('routes').append(tr);
+    rows[key] = tr;
+  }
+  function setRow(key, cells) {
+    const td = rows[key].children;
+    cells.forEach((c, i) => { if (c != null) { td[i + 1].innerHTML = c; } });
+  }
+
+  let running = false;
+  let stopAll = null;
+  const results = {};
+
+  async function httpCheck() {
+    routeRow('https', 'HTTPS to the server');
+    const start = performance.now();
+    try {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 10000);
+      const res = await fetch(`${API}/v1/mp/hello`, { signal: ctl.signal, cache: 'no-store' });
+      clearTimeout(timer);
+      const body = await res.json();
+      const took = performance.now() - start;
+      setRow('https', [`<span class="ok">reached</span> (data center ${body.colo})`, ms(took)]);
+      log(`HTTPS check: ${res.status} in ${Math.round(took)} ms, data center ${body.colo}`);
+      results.https = true;
+    } catch (err) {
+      setRow('https', [`<span class="bad">blocked or down</span>`, '–']);
+      log(`HTTPS check failed after ${Math.round(performance.now() - start)} ms: ${err && err.name} ${err && err.message}`);
+      results.https = false;
+    }
+  }
+
+  function socketTest(seconds, rate) {
+    return new Promise((done) => {
+      routeRow('ws', 'WebSocket');
+      const end = performance.now() + seconds * 1000;
+      const rtts = [];
+      const pings = [];
+      let sent = 0, back = 0, copies = 0, serverGot = 0, drops = 0, opened = 0, reconnects = 0;
+      let ws = null, sendTimer = 0, pingTimer = 0, uiTimer = 0, connectStart = 0, lastHeard = 0, pingAt = 0;
+      let connectMs = null, finished = false, stalled = false;
+      const sentAt = new Map();
+      const closes = [];
+
+      function draw(result) {
+        const s = stats(rtts);
+        const lost = Math.max(0, sent - back);
+        setRow('ws', [result, ms(connectMs), s ? `${ms(s.median)} / ${ms(s.p95)} / ${ms(s.worst)}` : '–', s ? ms(s.jitter) : '–',
+          `${sent} / ${back} / ${lost}` + (copies ? `<br><small>copies ${copies}</small>` : ''), drops ? `<span class="warn">${drops}</span>` : '0']);
+      }
+
+      function connect() {
+        connectStart = performance.now();
+        log(`WebSocket: connecting to ${WS}/v1/mp/echo`);
+        try {
+          ws = new WebSocket(`${WS}/v1/mp/echo?fan=${FAN}${FORCE}`);
+        } catch (err) {
+          log(`WebSocket could not start: ${err.message}`);
+          return finish('<span class="bad">could not start</span>');
+        }
+        ws.onopen = () => {
+          const took = performance.now() - connectStart;
+          if (connectMs == null) connectMs = took;
+          opened++;
+          lastHeard = performance.now();
+          log(`WebSocket open in ${Math.round(took)} ms` + (opened > 1 ? ` (reconnect ${opened - 1})` : ''));
+          clearInterval(sendTimer); clearInterval(pingTimer);
+          sendTimer = setInterval(sendOne, 1000 / rate);
+          pingTimer = setInterval(ping, PING_MS);
+        };
+        ws.onmessage = (ev) => {
+          const now = performance.now();
+          lastHeard = now;
+          if (stalled) { stalled = false; log('WebSocket: hearing the server again'); }
+          if (ev.data === 'pong') { if (pingAt) { pings.push(now - pingAt); pingAt = 0; } return; }
+          let m;
+          try { m = JSON.parse(ev.data); } catch { return log(`Odd message: ${String(ev.data).slice(0, 80)}`); }
+          if (m.end != null) { serverGot += m.end; return; }
+          if (m.o != null) { copies++; return; }
+          if (m.e != null) {
+            const at = sentAt.get(m.e);
+            if (at != null) { rtts.push(now - at); sentAt.delete(m.e); back++; }
+          }
+        };
+        ws.onclose = (ev) => {
+          clearInterval(sendTimer); clearInterval(pingTimer);
+          const why = `code ${ev.code}${ev.reason ? ` "${ev.reason}"` : ''}${ev.wasClean ? '' : ', not clean'}`;
+          if (finished) { log(`WebSocket closed at the end (${why})`); return; }
+          closes.push(why);
+          // 4000 to 4999 are the server's own refusals: retrying won't help.
+          if (ev.code >= 4000 && ev.code <= 4999) {
+            const plain = { 4429: 'multiplayer full today', 4503: 'server down', 4400: 'refused' }[ev.code] || 'refused';
+            log(`WebSocket refused by the server: ${plain} (${why})`);
+            return finish(`<span class="bad">${plain}</span><br><small>${why}</small>`);
+          }
+          if (!opened) {
+            log(`WebSocket never opened (${why}) after ${Math.round(performance.now() - connectStart)} ms`);
+            return finish(`<span class="bad">blocked</span><br><small>${why}</small>`);
+          }
+          drops++;
+          log(`WebSocket dropped: ${why}. Reconnecting in 1 s.`);
+          if (performance.now() < end) { reconnects++; setTimeout(connect, 1000); }
+          else finish(`<span class="warn">dropped at the end</span>`);
+        };
+        ws.onerror = () => log('WebSocket error event (the close code follows)');
+      }
+
+      let q = 0;
+      function sendOne() {
+        if (!ws || ws.readyState !== 1) return;
+        const now = performance.now();
+        if (now >= end) return finish(null);
+        if (now - lastHeard > STALL_MS && !stalled) { stalled = true; log(`WebSocket: nothing heard for ${STALL_MS / 1000} s (a dead socket would look like this)`); }
+        q++;
+        sentAt.set(q, now);
+        ws.send(riderMessage(q));
+        sent++;
+        // A reply that never comes is a lost message; forget it after 10 s.
+        if (q % 50 === 0) for (const [k, at] of sentAt) if (now - at > 10000) sentAt.delete(k);
+      }
+      function ping() {
+        if (ws && ws.readyState === 1 && !pingAt) { pingAt = performance.now(); ws.send('ping'); }
+        else if (pingAt && performance.now() - pingAt > STALL_MS) { log('WebSocket: a ping went unanswered for 5 s'); pingAt = 0; }
+      }
+
+      function finish(result) {
+        if (finished) return;
+        finished = true;
+        clearInterval(sendTimer); clearInterval(pingTimer); clearInterval(uiTimer);
+        const wrap = () => {
+          const s = stats(rtts), p = stats(pings);
+          const lost = Math.max(0, sent - back);
+          results.ws = { opened: opened > 0, s, lost, sent, drops };
+          if (result == null) result = drops ? `<span class="warn">works, ${drops} drop(s)</span>` : '<span class="ok">works</span>';
+          draw(result);
+          if (opened) {
+            log(`WebSocket result: sent ${sent}, echoed ${back}, lost ${lost} (${sent ? ((lost / sent) * 100).toFixed(1) : 0}%), copies ${copies} of ${back * (FAN - 1)} expected`);
+            if (serverGot) log(`  the server got ${serverGot} on the last connection`);
+            if (s) log(`  round trip median ${ms(s.median)}, 95% ${ms(s.p95)}, worst ${ms(s.worst)}, jitter ${ms(s.jitter)}`);
+            if (p) log(`  pings (free auto-reply) median ${ms(p.median)}, worst ${ms(p.worst)}`);
+            log(`  connect ${ms(connectMs)}, drops ${drops}, reconnects ${reconnects}${closes.length ? `, closes: ${closes.join('; ')}` : ''}`);
+          }
+          try { if (ws && ws.readyState <= 1) ws.close(1000, 'done'); } catch {}
+          done();
+        };
+        // Ask for the server's count, then wait a moment for stragglers.
+        try { if (ws && ws.readyState === 1) ws.send('{"t":"end"}'); } catch {}
+        setTimeout(wrap, 1500);
+      }
+
+      stopAll = () => finish('<span class="warn">stopped</span>');
+      uiTimer = setInterval(() => draw('<span class="warn">running…</span>'), 500);
+      // A connection that hangs without opening or closing counts as blocked.
+      setTimeout(() => { if (!opened && !finished) { log('WebSocket: still not open after 15 s'); try { ws && ws.close(); } catch {} finish('<span class="bad">no answer (15 s)</span>'); } }, 15000);
+      connect();
+    });
+  }
+
+  function pollTest() {
+    return new Promise((done) => {
+      routeRow('poll', 'HTTPS polling (fallback)');
+      const id = Math.random().toString(36).slice(2, 12).padEnd(10, '0');
+      const end = performance.now() + POLL_SECONDS * 1000;
+      const rtts = [];
+      let sent = 0, back = 0, fails = 0, q = 0, finished = false;
+      const timer = setInterval(async () => {
+        if (performance.now() >= end || finished) return finish();
+        q++; sent++;
+        const at = performance.now();
+        try {
+          const res = await fetch(`${API}/v1/mp/poll?id=${id}&fan=${FAN}`, { method: 'POST', body: riderMessage(q), headers: { 'Content-Type': 'text/plain' }, cache: 'no-store' });
+          await res.text();
+          if (res.ok) { back++; rtts.push(performance.now() - at); } else { fails++; if (fails < 4) log(`Poll answer ${res.status}`); }
+        } catch (err) { fails++; if (fails < 4) log(`Poll failed: ${err.name} ${err.message}`); }
+        const s = stats(rtts);
+        setRow('poll', ['<span class="warn">running…</span>', null, s ? `${ms(s.median)} / ${ms(s.p95)} / ${ms(s.worst)}` : '–', s ? ms(s.jitter) : '–', `${sent} / ${back} / ${sent - back}`, null]);
+      }, 1000 / POLL_RATE);
+      function finish() {
+        if (finished) return; finished = true; clearInterval(timer);
+        setTimeout(() => {
+          const s = stats(rtts);
+          results.poll = { ok: back > 0, s };
+          setRow('poll', [back ? (fails ? `<span class="warn">works, ${fails} failed</span>` : '<span class="ok">works</span>') : '<span class="bad">blocked</span>', '–',
+            s ? `${ms(s.median)} / ${ms(s.p95)} / ${ms(s.worst)}` : '–', s ? ms(s.jitter) : '–', `${sent} / ${back} / ${sent - back}`, '–']);
+          log(`Polling result (${POLL_RATE} a second for ${POLL_SECONDS} s): sent ${sent}, answered ${back}, failed ${fails}` + (s ? `; round trip median ${ms(s.median)}, 95% ${ms(s.p95)}, worst ${ms(s.worst)}` : ''));
+          done();
+        }, 1200);
+      }
+      stopAll = finish;
+    });
+  }
+
+  function verdict() {
+    const v = $('verdict');
+    const w = results.ws;
+    if (w && w.opened && w.s) {
+      const good = w.s.p95 < 400 && w.lost / Math.max(1, w.sent) < 0.02;
+      v.innerHTML = good ? '<span class="ok">WebSockets work here. Multiplayer should run on this network.</span>'
+        : `<span class="warn">WebSockets connect, but the connection is slow or loses messages (95% ${ms(w.s.p95)}).</span>`;
+    } else if (results.poll && results.poll.ok) {
+      v.innerHTML = '<span class="warn">WebSockets are blocked, but plain HTTPS gets through: only the slower polling route would work.</span>';
+    } else if (results.https) {
+      v.innerHTML = '<span class="bad">The server answers, but neither route carried messages.</span>';
+    } else {
+      v.innerHTML = '<span class="bad">The test server is blocked on this network (or down).</span>';
+    }
+    log(`Verdict: ${v.textContent}`);
+  }
+
+  async function run(seconds) {
+    if (running) return;
+    running = true;
+    $('run').disabled = $('long').disabled = true; $('stop').disabled = false;
+    $('routes').textContent = '';
+    for (const k of Object.keys(results)) delete results[k];
+    const rate = Number($('rate').value);
+    log(`=== Test started: WebSocket ${seconds} s at ${rate} a second (${FAN} copies back each), then polling ${POLL_SECONDS} s`);
+    $('verdict').textContent = 'Running… keep this tab in front.';
+    await httpCheck();
+    await socketTest(seconds, rate);
+    if (running) await pollTest();
+    verdict();
+    log('=== Test finished. Press Copy log and paste it back.');
+    running = false; stopAll = null;
+    $('run').disabled = $('long').disabled = false; $('stop').disabled = true;
+  }
+
+  $('run').onclick = () => run(Number(params.get('seconds')) || 180);
+  $('long').onclick = () => run(600);
+  $('stop').onclick = () => { if (stopAll) { log('Stopped by hand'); const s = stopAll; running = false; s(); } };
+  $('copy').onclick = async () => {
+    const text = ['Park Laps network test', ...info.map(([k, v]) => `${k}: ${v}`), '', ...lines].join('\n');
+    try { await navigator.clipboard.writeText(text); log('Log copied.'); return; } catch {}
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.append(ta); ta.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch {}
+    ta.remove();
+    log(ok ? 'Log copied.' : 'Copy failed: select the log text by hand (Ctrl+A inside it) and copy.');
+  };
+})();
+</script>
+</body>
+</html>

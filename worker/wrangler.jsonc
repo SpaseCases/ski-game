@@ -25,6 +25,9 @@
     // The developer's code (marketplace removals): a few tries a minute.
     { "name": "DEV", "namespace_id": "4103", "simple": { "limit": 10, "period": 60 } }
   ],
+  // Multiplayer (milestone 27): one Durable Object per room, SQLite-backed (the only kind on Workers Free).
+  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "Room" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
   // Once a day: marketplace items hidden by reports a week ago come back (worker/src/market.ts restoreHidden).
   "triggers": { "crons": ["17 9 * * *"] }
 }
