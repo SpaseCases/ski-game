@@ -39,7 +39,7 @@
       <button class="main" id="run">Run test (3 min)</button>
       <button id="long">Long run (10 min)</button>
       <button id="stop" disabled>Stop</button>
-      <label>Rate <select id="rate"><option>5</option><option selected>8</option><option>10</option></select> a second</label>
+      <label>Rate <select id="rate"><option selected>5</option><option>8</option><option>10</option></select> a second</label>
       <button id="copy">Copy log</button>
     </div>
     <p id="verdict" style="margin:10px 0 0">Not run yet.</p>
@@ -145,9 +145,10 @@
   function riderMessage(q) {
     const r = (v, d) => Math.round(v * d) / d;
     const t = q / 8;
-    return JSON.stringify({ q, p: [r(Math.sin(t) * 120.5, 100), r(400 - t * 3.3, 100), r(t * 15.7, 100)],
-      v: [r(Math.cos(t) * 9.1, 10), r(-3.2, 10), r(14.6, 10)], o: [r(Math.sin(t / 3), 1000), 0.212, r(Math.cos(t / 3), 1000), 0.054],
-      f: q % 64, g: 3, k: 12 });
+    // Two samples a message (the game samples 10 times a second and sends 5).
+    const sample = (u) => ({ p: [r(Math.sin(u) * 120.5, 100), r(400 - u * 3.3, 100), r(u * 15.7, 100)],
+      v: [r(Math.cos(u) * 9.1, 10), r(-3.2, 10), r(14.6, 10)], o: [r(Math.sin(u / 3), 1000), 0.212, r(Math.cos(u / 3), 1000), 0.054], f: q % 64, g: 3 });
+    return JSON.stringify({ q, a: sample(t), b: sample(t + 0.1), k: 12 });
   }
 
   // ---- Routes ----
