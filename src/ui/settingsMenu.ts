@@ -1,7 +1,7 @@
-import { DEFAULT_BINDINGS, type Action, type Bindings } from '../core/input.ts';
+import { DEFAULT_BINDINGS, DEFAULT_PAD_BINDINGS, type Action, type Bindings } from '../core/input.ts';
 import { assignKey, clearSecondKey, KEY_SLOTS, QUALITIES, wantsAntialias, type CameraView, type FirstAir, type PopWith, type Quality, type Settings } from '../core/settings.ts';
 import { CONFIG } from '../config.ts';
-import { actionName, keyName, mainKey } from './keyNames.ts';
+import { actionName, INPUT_LOOK, keyName, mainKey, mainPad, padName } from './keyNames.ts';
 import { addBackButton, board, setHints, type Screen } from './menus.ts';
 
 // The Settings screen: the quality preset (applied at once), sound volumes
@@ -9,6 +9,9 @@ import { addBackButton, board, setHints, type Screen } from './menus.ts';
 // action.
 // Changing a key listens for the next key pressed: Esc is refused (it stays
 // the menu and pause key), and a key another action has swaps the two.
+// Since milestone 26 a Keyboard | Controller switch shows the pad's buttons
+// in the same table instead, rebound the same way (listening for the next
+// button or stick direction; LT then the right stick is the second layer).
 
 const QUALITY_TEXT: Record<Quality, [string, string]> = {
   auto: ['Auto', 'Picks for this computer: starts on Medium and steps down while riding if the frame rate drops.'],
@@ -70,6 +73,10 @@ export interface SettingsHooks {
   /** First person in the air: head-locked or level. */
   setFirstAir: (air: FirstAir) => void;
   setBindings: (b: Bindings) => void;
+  /** New controller buttons (milestone 26). */
+  setPadBindings: (b: Bindings) => void;
+  /** Hands every pad press and release to `fn` and nothing else (null: stop listening). */
+  listenPad: (fn: ((code: string, down: boolean) => void) | null) => void;
   /** The Controls screen (what every key does, and the key tester). */
   openControls: () => void;
   /** Hands the next key pressed to `fn` and nothing else (null: stop listening). */
@@ -102,6 +109,12 @@ export class SettingsScreen implements Screen {
   private readonly slots = new Map<string, HTMLButtonElement>();
   private readonly status: HTMLElement;
   private listening: HTMLButtonElement | null = null;
+  /** Which bindings the table shows and changes: the keys, or the controller's buttons (milestone 26). */
+  private view: 'keys' | 'pad' = 'keys';
+  private readonly viewButtons = new Map<'keys' | 'pad', HTMLButtonElement>();
+  private readonly slotHeads: HTMLElement[] = [];
+  private readonly reset: HTMLButtonElement;
+  private listenTimer = 0;
   private readonly wipe: HTMLButtonElement;
   private readonly wipeCancel: HTMLButtonElement;
   private readonly wipeNote: HTMLElement;
@@ -277,9 +290,20 @@ export class SettingsScreen implements Screen {
     this.popNote = document.createElement('p');
     this.popNote.className = 'setting-note';
     keys.append(labelRow('Pop with', popGroup), this.popNote);
+    const changeGroup = segmented('Change', [
+      ['keys', 'Keyboard'],
+      ['pad', 'Controller'],
+    ] as const, this.viewButtons, (v) => {
+      this.stopListening();
+      this.view = v;
+      this.syncKeys();
+      this.say('');
+    });
+    keys.append(labelRow('Change', changeGroup));
     const table = document.createElement('table');
     table.className = 'keys-table';
     table.innerHTML = '<thead><tr><th scope="col">Action</th><th scope="col">Key</th><th scope="col">Second key</th></tr></thead>';
+    this.slotHeads.push(...table.querySelectorAll<HTMLElement>('thead th:not(:first-child)'));
     for (const [name, actions] of KEY_GROUPS) {
       const tbody = document.createElement('tbody');
       tbody.innerHTML = `<tr class="keys-group"><th scope="rowgroup" colspan="3">${name}</th></tr>`;
@@ -296,7 +320,7 @@ export class SettingsScreen implements Screen {
           btn.className = 'key-slot';
           btn.dataset.action = action;
           btn.dataset.slot = String(slot);
-          btn.addEventListener('click', () => this.listen(btn, action, slot));
+          btn.addEventListener('click', () => (this.view === 'pad' ? this.listenPad(btn, action, slot) : this.listen(btn, action, slot)));
           td.appendChild(btn);
           tr.appendChild(td);
           this.slots.set(`${action}:${slot}`, btn);
@@ -311,10 +335,12 @@ export class SettingsScreen implements Screen {
     reset.textContent = 'Reset keys to defaults';
     reset.addEventListener('click', () => {
       this.stopListening();
-      this.hooks.setBindings({ ...DEFAULT_BINDINGS });
+      if (this.view === 'pad') this.hooks.setPadBindings({ ...DEFAULT_PAD_BINDINGS });
+      else this.hooks.setBindings({ ...DEFAULT_BINDINGS });
       this.syncKeys();
-      this.say('Every key is back to its default.');
+      this.say(this.view === 'pad' ? 'Every button is back to its default.' : 'Every key is back to its default.');
     });
+    this.reset = reset;
     this.status = document.createElement('p');
     this.status.className = 'board-status';
     this.status.setAttribute('aria-live', 'polite');
@@ -335,6 +361,11 @@ export class SettingsScreen implements Screen {
       [['Enter'], 'Pick or change a key'],
       [['Delete'], 'Clear a second key'],
       [['Esc'], 'Back'],
+    ], [
+      [['D-pad'], 'Choose'],
+      [['PadA'], 'Pick or change a button'],
+      [['PadX'], 'Clear a second button'],
+      [['PadB'], 'Back'],
     ]);
   }
 
@@ -347,6 +378,8 @@ export class SettingsScreen implements Screen {
     this.syncSoundLabels();
     this.score.setAttribute('aria-pressed', String(s.score));
     this.syncScoreLabel();
+    // The table shows what was used last: a pad's buttons, or the keys.
+    this.view = INPUT_LOOK.pad ? 'pad' : 'keys';
     this.syncKeys();
     this.status.textContent = '';
     this.armWipe(false);
@@ -372,12 +405,61 @@ export class SettingsScreen implements Screen {
     const el = document.activeElement;
     if (!(el instanceof HTMLButtonElement) || !el.classList.contains('key-slot') || el.dataset.slot !== '1') return false;
     const action = el.dataset.action as Action;
-    const b = this.hooks.get().bindings;
+    const pad = this.view === 'pad';
+    const b = pad ? this.hooks.get().padBindings : this.hooks.get().bindings;
     if (b[action].length < 2) return true;
-    this.hooks.setBindings(clearSecondKey(b, action));
+    if (pad) this.hooks.setPadBindings(clearSecondKey(b, action));
+    else this.hooks.setBindings(clearSecondKey(b, action));
     this.syncKeys();
-    this.say(`${actionName(action)}: second key cleared.`);
+    this.say(`${actionName(action)}: second ${pad ? 'button' : 'key'} cleared.`);
     return true;
+  }
+
+  /**
+   * Listens for the next pad button or stick direction for `action`'s slot
+   * (milestone 26). LT pressed and let go alone is LT; LT held and then the
+   * right stick is that direction's second layer. Any key, a click or
+   * CONFIG.pad.listenTime seconds with nothing pressed cancels.
+   */
+  private listenPad(btn: HTMLButtonElement, action: Action, slot: number): void {
+    this.stopListening();
+    this.listening = btn;
+    btn.classList.add('is-listening');
+    btn.textContent = 'Press a button';
+    this.say(`Press the new button or stick direction for ${actionName(action)} on the controller. A key or a click cancels.`);
+    let ltDown = false;
+    const done = (code: string): void => {
+      this.stopListening();
+      const result = assignKey(this.hooks.get().padBindings, action, slot, code);
+      this.hooks.setPadBindings(result.bindings);
+      this.syncKeys();
+      const name = padName(code);
+      const d = result.displaced;
+      if (!d) this.say(`${actionName(action)}: ${name}.`);
+      else if (d.unbound) this.say(`${name} was the button for ${actionName(d.action)}, which has no button now. Give it one below.`);
+      else this.say(`${name} was the button for ${actionName(d.action)}, so the two swapped: ${actionName(d.action)} is now ${padName(d.now ?? '')}.`);
+      btn.focus();
+    };
+    this.hooks.listenPad((code, down) => {
+      if (code === 'PadLT') {
+        // Wait: LT may be the start of the second layer.
+        if (down) ltDown = true;
+        else if (ltDown) done('PadLT');
+        return;
+      }
+      if (down) done(code);
+    });
+    this.hooks.trapNextKey(() => {
+      this.stopListening();
+      this.say('');
+      btn.focus();
+    });
+    window.addEventListener('pointerdown', this.cancelOnClick, true);
+    this.listenTimer = window.setTimeout(() => {
+      this.stopListening();
+      this.say('No button pressed: nothing changed.');
+      btn.focus();
+    }, CONFIG.pad.listenTime * 1000);
   }
 
   private listen(btn: HTMLButtonElement, action: Action, slot: number): void {
@@ -418,6 +500,8 @@ export class SettingsScreen implements Screen {
     if (!this.listening) return;
     this.listening = null;
     this.hooks.trapNextKey(null);
+    this.hooks.listenPad(null);
+    window.clearTimeout(this.listenTimer);
     window.removeEventListener('pointerdown', this.cancelOnClick, true);
     this.syncKeys();
   }
@@ -425,8 +509,9 @@ export class SettingsScreen implements Screen {
   /** The Pop with switch, named by the keys bound now, and what it means. */
   private syncPop(): void {
     const s = this.hooks.get();
-    const pop = mainKey(s.bindings, 'pop');
-    const up = mainKey(s.bindings, 'up');
+    const pad = this.view === 'pad';
+    const pop = pad ? mainPad(s.padBindings, 'pop') : mainKey(s.bindings, 'pop');
+    const up = pad ? mainPad(s.padBindings, 'up') : mainKey(s.bindings, 'up');
     for (const [key, btn] of this.popButtons) {
       btn.textContent = key === 'pop' ? pop : up;
       btn.setAttribute('aria-pressed', String(key === s.popWith));
@@ -497,7 +582,13 @@ export class SettingsScreen implements Screen {
     this.syncCamera();
     this.syncPop();
     const s = this.hooks.get();
-    const b = s.bindings;
+    const pad = this.view === 'pad';
+    const b = pad ? s.padBindings : s.bindings;
+    const name = pad ? (code: string) => padName(code) : keyName;
+    for (const [v, btn] of this.viewButtons) btn.setAttribute('aria-pressed', String(v === this.view));
+    this.slotHeads[0]!.textContent = pad ? 'Button' : 'Key';
+    this.slotHeads[1]!.textContent = pad ? 'Second button' : 'Second key';
+    this.reset.textContent = pad ? 'Reset buttons to defaults' : 'Reset keys to defaults';
     for (const btn of this.slots.values()) {
       const action = btn.dataset.action as Action;
       const slot = Number(btn.dataset.slot);
@@ -513,8 +604,10 @@ export class SettingsScreen implements Screen {
         continue;
       }
       btn.classList.toggle('is-empty', !code);
-      btn.textContent = code ? keyName(code) : slot === 0 ? 'none' : 'Add';
-      btn.setAttribute('aria-label', `${actionName(action)}, ${slot === 0 ? 'key' : 'second key'}: ${code ? keyName(code) : 'none'}. Press Enter to change.`);
+      btn.classList.toggle('is-pad', pad);
+      btn.textContent = code ? name(code) : slot === 0 ? 'none' : 'Add';
+      const what = pad ? 'button' : 'key';
+      btn.setAttribute('aria-label', `${actionName(action)}, ${slot === 0 ? what : `second ${what}`}: ${code ? name(code) : 'none'}. Press Enter to change.`);
     }
   }
 

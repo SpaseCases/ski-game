@@ -1,5 +1,8 @@
-// Keyboard input with rebindable keys. Bindings use KeyboardEvent.code, so
-// they follow key position rather than the layout's printed letter.
+// Keyboard and controller input with rebindable keys and buttons. Key
+// bindings use KeyboardEvent.code, so they follow key position rather than
+// the layout's printed letter; pad bindings use core/gamepad.ts's codes
+// (milestone 26). Both feed the same actions, so the sim never knows which
+// one pressed.
 
 export type Action =
   | 'left'
@@ -100,6 +103,47 @@ export const DEFAULT_BINDINGS: Bindings = {
   styleSpreadEagle: ['Digit2'],
 };
 
+/**
+ * The controller's defaults (milestone 26, the user's pick): the left stick
+ * and the d-pad steer, spin and flip like the arrows; A pops, RT tucks,
+ * LB / RB loop, B respawns, X sets the checkpoint, Y goes back to the top
+ * at the finish, Start pauses, View shows the corner map, L3 switches the
+ * camera and R3 the finish board. The right stick grabs in eight
+ * directions, and with LT held it has a second layer (the right hand's nose
+ * and tail, and the style moves).
+ */
+export const DEFAULT_PAD_BINDINGS: Bindings = {
+  left: ['PadLSLeft', 'PadLeft'],
+  right: ['PadLSRight', 'PadRight'],
+  up: ['PadLSUp', 'PadUp'],
+  down: ['PadLSDown', 'PadDown'],
+  pop: ['PadA'],
+  pole: ['PadRT'],
+  lincolnLeft: ['PadLB'],
+  lincolnRight: ['PadRB'],
+  respawn: ['PadB'],
+  checkpoint: ['PadX'],
+  confirm: ['PadY'],
+  trailMap: ['PadView'],
+  board: ['PadR3'],
+  camera: ['PadL3'],
+  pause: ['PadStart'],
+  grabLeftMute: ['PadRSLeft'],
+  grabLeftSafety: ['PadRSDownLeft'],
+  grabLeftJapan: ['PadRSUpLeft'],
+  grabLeftTail: ['PadRSDown'],
+  grabRightMute: ['PadRSRight'],
+  grabRightSafety: ['PadRSDownRight'],
+  grabRightJapan: ['PadRSUpRight'],
+  grabRightTail: ['PadLT+RSDown'],
+  grabLeftNose: ['PadRSUp'],
+  grabRightNose: ['PadLT+RSUp'],
+  styleSeaman: ['PadLT+RSLeft'],
+  styleDaffy: ['PadLT+RSRight'],
+  styleIronCross: ['PadLT+RSUpLeft'],
+  styleSpreadEagle: ['PadLT+RSUpRight'],
+};
+
 export interface ButtonState {
   held: boolean;
   /** Went down since the previous simulation step. */
@@ -122,6 +166,8 @@ export function createInputState(): InputState {
  */
 export class Keyboard {
   private actionsByCode = new Map<string, Action[]>();
+  /** The controller's codes (milestone 26), kept apart from the keys' so each set rebinds on its own. */
+  private actionsByPad = new Map<string, Action[]>();
   private heldCodes = new Set<string>();
   private heldCount = new Map<Action, number>();
   private pressedLatch = new Set<Action>();
@@ -131,19 +177,18 @@ export class Keyboard {
   /** "Pop with: ↑": the up key crouches and pops too, and the pop key does nothing. */
   private popWithUp = false;
 
-  constructor(bindings: Bindings) {
+  constructor(bindings: Bindings, padBindings: Bindings = DEFAULT_PAD_BINDINGS) {
     this.setBindings(bindings);
+    this.setPadBindings(padBindings);
   }
 
   setBindings(bindings: Bindings): void {
-    this.actionsByCode.clear();
-    for (const action of ACTIONS) {
-      for (const code of bindings[action]) {
-        const list = this.actionsByCode.get(code);
-        if (list) list.push(action);
-        else this.actionsByCode.set(code, [action]);
-      }
-    }
+    fill(this.actionsByCode, bindings);
+    this.releaseAll();
+  }
+
+  setPadBindings(bindings: Bindings): void {
+    fill(this.actionsByPad, bindings);
     this.releaseAll();
   }
 
@@ -171,6 +216,26 @@ export class Keyboard {
     return this.actionsByCode.get(code)?.includes(action) ?? false;
   }
 
+  /** True when the pad code is bound to `action`. */
+  isPadBound(action: Action, code: string): boolean {
+    return this.actionsByPad.get(code)?.includes(action) ?? false;
+  }
+
+  /**
+   * A pad code going down or up (core/gamepad.ts, once a frame before the
+   * steps): counted exactly like a key, so a key and a button held for the
+   * same action hold it until both are let go. Off while a menu is open.
+   */
+  padKey(code: string, down: boolean): void {
+    if (down) {
+      if (!this.enabled) return;
+      const actions = this.actionsByPad.get(code);
+      if (actions) this.press(code, actions);
+    } else {
+      this.lift(code, this.actionsByPad.get(code));
+    }
+  }
+
   /** Copies the current state into `out` and clears the latched edges. */
   sample(out: InputState): void {
     for (const action of ACTIONS) {
@@ -191,8 +256,17 @@ export class Keyboard {
     const actions = this.actionsByCode.get(e.code);
     if (!actions) return;
     e.preventDefault(); // stop arrows and Tab from scrolling or moving focus
-    if (this.heldCodes.has(e.code)) return; // auto-repeat
-    this.heldCodes.add(e.code);
+    this.press(e.code, actions);
+  }
+
+  private onKeyUp(e: KeyboardEvent): void {
+    this.lift(e.code, this.actionsByCode.get(e.code));
+  }
+
+  /** A key or pad code down: each of its actions held once more (a code already held is auto-repeat). */
+  private press(code: string, actions: readonly Action[]): void {
+    if (this.heldCodes.has(code)) return;
+    this.heldCodes.add(code);
     for (const action of actions) {
       const count = this.heldCount.get(action) ?? 0;
       if (count === 0) this.pressedLatch.add(action);
@@ -200,9 +274,9 @@ export class Keyboard {
     }
   }
 
-  private onKeyUp(e: KeyboardEvent): void {
-    if (!this.heldCodes.delete(e.code)) return;
-    for (const action of this.actionsByCode.get(e.code) ?? []) {
+  private lift(code: string, actions: readonly Action[] | undefined): void {
+    if (!this.heldCodes.delete(code)) return;
+    for (const action of actions ?? []) {
       const count = (this.heldCount.get(action) ?? 1) - 1;
       this.heldCount.set(action, count);
       if (count === 0) this.releasedLatch.add(action);
@@ -215,6 +289,18 @@ export class Keyboard {
     this.heldCount.clear();
     this.pressedLatch.clear();
     this.releasedLatch.clear();
+  }
+}
+
+/** Each code's actions, from a set of bindings. */
+function fill(map: Map<string, Action[]>, bindings: Bindings): void {
+  map.clear();
+  for (const action of ACTIONS) {
+    for (const code of bindings[action]) {
+      const list = map.get(code);
+      if (list) list.push(action);
+      else map.set(code, [action]);
+    }
   }
 }
 

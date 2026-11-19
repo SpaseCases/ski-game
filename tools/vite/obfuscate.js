@@ -28,8 +28,11 @@ const INCLUDE = /\/src\/(boot\.ts$|main\.ts$|poses\.ts$|ui\/.+\.ts$|online\/.+\.
  * decoder: about 25 ms a frame on Low at CPU 4x (milestone 23).
  * The developer's keys (core/devKeys.ts) and scope (ui/devScope.ts,
  * milestone 25) run every step and frame of the developer's powers.
+ * The controllers (milestone 26): core/gamepad.ts polls every frame,
+ * ui/padNav.ts repeats and scrolls every frame a menu is open, and
+ * ui/padTesterDraw.ts draws the controller tester every frame it shows.
  */
-const EXCLUDE = /\/src\/(core\/(loop|input|skis|devKeys)|ui\/(cornerMap|skiThumb|paintGrid|wearGrid|devScope))\.ts$/;
+const EXCLUDE = /\/src\/(core\/(loop|input|skis|devKeys|gamepad)|ui\/(cornerMap|skiThumb|paintGrid|wearGrid|devScope|padNav|padTesterDraw))\.ts$/;
 
 /** @type {import('javascript-obfuscator').ObfuscatorOptions} */
 const OPTIONS = {

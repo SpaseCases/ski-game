@@ -1325,6 +1325,34 @@ export const CONFIG = {
   },
 
   /**
+   * Controllers (milestone 26, core/gamepad.ts and ui/padNav.ts): read once
+   * a frame through the Gamepad API's standard mapping into the same actions
+   * as the keyboard, so the sim never knows which pressed. Sticks are
+   * digital, like the arrow keys: past `stickPress` a direction is held, and
+   * it lets go under `stickRelease` (so a stick resting near the edge
+   * doesn't flicker).
+   */
+  pad: {
+    /** A stick direction is held past this (0..1 of the throw), and let go under `stickRelease`. */
+    stickPress: 0.5,
+    stickRelease: 0.4,
+    /** The right stick's 8 grab directions: a direction held stays picked until the stick is this far (degrees) past the middle of the next one's 45° sector. */
+    sectorKeep: 8,
+    /** A trigger (LT, RT) is held past this, and let go under `triggerRelease`. */
+    triggerPress: 0.5,
+    triggerRelease: 0.35,
+    /** Menus: a direction held repeats after `menuDelay` s, then every `menuRepeat` s. */
+    menuDelay: 0.4,
+    menuRepeat: 0.12,
+    /** Menus: the right stick scrolls this many px a second at full throw (nothing under `stickRelease`). */
+    scrollSpeed: 1100,
+    /** The controller tester: B held this long (s) goes back (everything else, B included, just lights up). */
+    testerBack: 1,
+    /** Settings: listening for a new button gives up after this long (s) with no press. */
+    listenTime: 8,
+  },
+
+  /**
    * The developer's powers (milestone 25): only with the dev unlock, run
    * from a lazy chunk nobody else fetches. Read straight from CONFIG.
    */

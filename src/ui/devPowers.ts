@@ -1,10 +1,10 @@
 import type { Scene } from 'three';
 import { playShot, prepareShot } from '../audio/devShot.ts';
 import type { AudioEngine } from '../audio/engine.ts';
-import { DEV_CODES, DevKeys } from '../core/devKeys.ts';
+import { DEV_CODES, DEV_PADS, DevKeys } from '../core/devKeys.ts';
 import { DevPowers } from '../render/devPowers.ts';
 import { DevScope } from './devScope.ts';
-import { keycap, keyName } from './keyNames.ts';
+import { keycap, keyName, padcap, padName } from './keyNames.ts';
 
 // The developer's powers (milestone 25): the chunk main imports only once
 // the dev unlock is confirmed (the board name hashes to DEV_HASH and the
@@ -27,6 +27,10 @@ export interface Dev {
   controls(): HTMLElement;
   /** The key tester's names for the developer's keys, by KeyboardEvent.code. */
   readonly testerKeys: ReadonlyMap<string, string>;
+  /** The controller tester's names for the developer's buttons (milestone 26), by pad code. */
+  readonly testerPads: ReadonlyMap<string, string>;
+  /** A pad code going down or up while riding (milestone 26). */
+  padKey(code: string, down: boolean): void;
 }
 
 export function createDevPowers(h: DevHooks): Dev {
@@ -57,24 +61,31 @@ export function createDevPowers(h: DevHooks): Dev {
     [DEV_CODES.aim, 'Dev: aim'],
     [DEV_CODES.fire, 'Dev: fire'],
   ]);
-  return { powers, controls: () => controlsTable(), testerKeys };
+  const testerPads = new Map<string, string>([
+    [DEV_PADS.fly, 'Dev: take off / land'],
+    [DEV_PADS.aim, 'Dev: aim'],
+    [DEV_PADS.fire, 'Dev: fire'],
+    [DEV_PADS.space, 'Dev: hover'],
+  ]);
+  return { powers, controls: () => controlsTable(), testerKeys, testerPads, padKey: (code, down) => keys.pad(code, down) };
 }
 
 function controlsTable(): HTMLElement {
   const table = document.createElement('table');
   table.className = 'controls-table grabs-table';
-  table.innerHTML = '<caption>Dev (only with the dev unlock on this computer; never posts)</caption><thead><tr><th scope="col">Key</th><th scope="col">What it does</th></tr></thead>';
+  table.innerHTML = '<caption>Dev (only with the dev unlock on this computer; never posts)</caption><thead><tr><th scope="col">Key</th><th scope="col">Controller</th><th scope="col">What it does</th></tr></thead>';
   const body = document.createElement('tbody');
-  const rows: [string[], string][] = [
-    [[DEV_CODES.fly], 'Take off into flight. Flying: glide down and land (you ride away, no crash). Gliding: fly on.'],
-    [['ArrowLeft', 'ArrowRight'], 'Flying: turn'],
-    [['ArrowUp', 'ArrowDown'], 'Flying: climb or dive'],
-    [['ShiftLeft'], 'Flying: fast (held)'],
-    [[DEV_CODES.space], 'Flying: hover (held)'],
-    [[DEV_CODES.aim], 'Hold to look through the scope; the arrows aim (Shift held: fine) and the rider coasts straight'],
-    [[DEV_CODES.fire], 'Fire (Space too while aiming)'],
+  // Each row: its keys, its pad buttons (milestone 26: the game's own for steering and the tuck), what it does.
+  const rows: [string[], string[], string][] = [
+    [[DEV_CODES.fly], [DEV_PADS.fly], 'Take off into flight. Flying: glide down and land (you ride away, no crash). Gliding: fly on.'],
+    [['ArrowLeft', 'ArrowRight'], ['PadLSLeft', 'PadLSRight'], 'Flying: turn'],
+    [['ArrowUp', 'ArrowDown'], ['PadLSUp', 'PadLSDown'], 'Flying: climb or dive'],
+    [['ShiftLeft'], ['PadRT'], 'Flying: fast (held)'],
+    [[DEV_CODES.space], [DEV_PADS.space], 'Flying: hover (held)'],
+    [[DEV_CODES.aim], [DEV_PADS.aim], 'Hold to look through the scope; the arrows or the left stick aim (Shift or RT held: fine) and the rider coasts straight'],
+    [[DEV_CODES.fire], [DEV_PADS.fire], 'Fire (Space or A too while aiming)'],
   ];
-  for (const [codes, what] of rows) {
+  for (const [codes, pads, what] of rows) {
     const tr = document.createElement('tr');
     const th = document.createElement('th');
     th.scope = 'row';
@@ -83,9 +94,15 @@ function controlsTable(): HTMLElement {
       if (i > 0) th.append(document.createTextNode(' / '));
       th.append(keycap(keyName(code)));
     });
+    const pad = document.createElement('td');
+    pad.className = 'keys-cell';
+    pads.forEach((code, i) => {
+      if (i > 0) pad.append(document.createTextNode(' / '));
+      pad.append(padcap(padName(code)));
+    });
     const td = document.createElement('td');
     td.textContent = what;
-    tr.append(th, td);
+    tr.append(th, pad, td);
     body.appendChild(tr);
   }
   table.appendChild(body);

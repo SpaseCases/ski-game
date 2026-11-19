@@ -287,9 +287,9 @@ export class PauseScreen extends PlankScreen {
   }
 
   /** The map name under the heading, and the keys shown on the planks (as bound now). */
-  setInfo(mapName: string, pauseKey: string, respawnKey: string, isPauseKey: (code: string) => boolean): void {
+  setInfo(mapName: string, resumeKeys: readonly string[], respawnKey: string, isPauseKey: (code: string) => boolean): void {
     this.sub.textContent = mapName;
-    setPlankKeys(this.resume, [pauseKey, 'Esc']);
+    setPlankKeys(this.resume, resumeKeys);
     setPlankKeys(this.respawn, [respawnKey]);
     this.resumeKey = isPauseKey;
   }

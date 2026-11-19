@@ -1,5 +1,7 @@
 // The page's entry: a start screen that waits for the player. Until the first
-// click, tap or key press nothing else is fetched or run: no Three.js, no
+// click, tap, key press or controller button nothing else is fetched or run
+// (the browser tells a page about a controller only once a button is
+// pressed on it: one event, no polling, milestone 26): no Three.js, no
 // WebGL, no game loop. An idle tab, or a Google Sites page with the game
 // embedded and not yet played, costs a Chromebook next to nothing. Then the
 // game (main.ts, a lazy chunk) loads and removes this screen.
@@ -19,6 +21,7 @@ function start(): void {
   if (started) return;
   started = true;
   window.removeEventListener('keydown', onKey, true);
+  window.removeEventListener('gamepadconnected', start);
   boot?.removeEventListener('pointerdown', start);
   boot?.classList.add('is-loading');
   if (note) note.textContent = 'Loading…';
@@ -40,6 +43,7 @@ function onKey(e: KeyboardEvent): void {
 
 function listen(): void {
   window.addEventListener('keydown', onKey, true);
+  window.addEventListener('gamepadconnected', start);
   boot?.addEventListener('pointerdown', start);
 }
 

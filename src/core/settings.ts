@@ -1,5 +1,6 @@
 import { CONFIG } from '../config.ts';
-import { ACTIONS, DEFAULT_BINDINGS, type Action, type Bindings } from './input.ts';
+import { isPadCode } from './gamepad.ts';
+import { ACTIONS, DEFAULT_BINDINGS, DEFAULT_PAD_BINDINGS, type Action, type Bindings } from './input.ts';
 import { nameProblem } from './playerName.ts';
 import { readStored, writeStored } from './storage.ts';
 
@@ -49,6 +50,8 @@ export interface Settings {
   /** The developer's code (milestone 24, core/devUnlock.ts), saved on the developer's computer; '' everywhere else. */
   devCode: string;
   bindings: Bindings;
+  /** The controller's buttons (milestone 26): core/gamepad.ts codes, up to KEY_SLOTS per action like the keys. Missing in older saves: the defaults. */
+  padBindings: Bindings;
 }
 
 const KEY = 'settings.v1';
@@ -60,7 +63,7 @@ function isQuality(value: unknown): value is Quality {
 }
 
 export function defaultSettings(): Settings {
-  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, popWith: 'pop', camera: 'chase', firstAir: 'head', cornerMap: true, autoRung: 0, name: '', devCode: '', bindings: { ...DEFAULT_BINDINGS } };
+  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, popWith: 'pop', camera: 'chase', firstAir: 'head', cornerMap: true, autoRung: 0, name: '', devCode: '', bindings: { ...DEFAULT_BINDINGS }, padBindings: { ...DEFAULT_PAD_BINDINGS } };
 }
 
 /** The saved settings, or the defaults for anything not saved (or unreadable). */
@@ -88,7 +91,8 @@ export function loadSettings(): Settings {
   if (typeof saved.autoRung === 'number' && Number.isInteger(saved.autoRung)) out.autoRung = clampRung(saved.autoRung);
   if (typeof saved.name === 'string' && nameProblem(saved.name) === null) out.name = saved.name;
   if (typeof saved.devCode === 'string' && saved.devCode.length <= 200) out.devCode = saved.devCode;
-  out.bindings = readBindings(saved.bindings);
+  out.bindings = readBindings(saved.bindings, DEFAULT_BINDINGS, (k) => k !== 'Escape' && !isPadCode(k));
+  out.padBindings = readBindings(saved.padBindings, DEFAULT_PAD_BINDINGS, isPadCode);
   return out;
 }
 
@@ -107,7 +111,9 @@ function unit(value: unknown, fallback: number): number {
 }
 
 /**
- * Saved bindings, checked: each action keeps its saved keys if they're a
+ * Saved bindings (keys, or since milestone 26 pad buttons, each set with its
+ * own defaults and its own test for a code it may hold), checked: each
+ * action keeps its saved keys if they're a
  * list of up to KEY_SLOTS key codes (none: unbound by a swap), else its
  * defaults, so an action added in a later version gets its default key,
  * minus any key the saved bindings already use (a player who moved
@@ -115,26 +121,26 @@ function unit(value: unknown, fallback: number): number {
  * there). A key may belong to one action only; if saved data breaks that,
  * the defaults are used.
  */
-function readBindings(value: unknown): Bindings {
-  if (!value || typeof value !== 'object') return { ...DEFAULT_BINDINGS };
+function readBindings(value: unknown, defaults: Bindings, codeOk: (code: string) => boolean): Bindings {
+  if (!value || typeof value !== 'object') return { ...defaults };
   const saved = value as Record<string, unknown>;
-  const out = { ...DEFAULT_BINDINGS };
+  const out = { ...defaults };
   const taken = new Set<string>();
   const missing: Action[] = [];
   for (const action of ACTIONS) {
     const keys = saved[action];
-    if (Array.isArray(keys) && keys.length <= KEY_SLOTS && keys.every((k) => typeof k === 'string' && k !== '' && k !== 'Escape')) {
+    if (Array.isArray(keys) && keys.length <= KEY_SLOTS && keys.every((k) => typeof k === 'string' && k !== '' && codeOk(k))) {
       out[action] = keys as string[];
       for (const k of keys as string[]) taken.add(k);
     } else {
       missing.push(action);
     }
   }
-  for (const action of missing) out[action] = DEFAULT_BINDINGS[action].filter((k) => !taken.has(k));
+  for (const action of missing) out[action] = defaults[action].filter((k) => !taken.has(k));
   const seen = new Set<string>();
   for (const action of ACTIONS) {
     for (const code of out[action]) {
-      if (seen.has(code)) return { ...DEFAULT_BINDINGS };
+      if (seen.has(code)) return { ...defaults };
       seen.add(code);
     }
   }

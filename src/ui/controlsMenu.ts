@@ -1,7 +1,7 @@
 import type { Action, Bindings } from '../core/input.ts';
 import type { Settings } from '../core/settings.ts';
 import { RIDE } from '../sim/tuning.ts';
-import { actionName, keycap, keyName } from './keyNames.ts';
+import { actionName, INPUT_LOOK, keycap, keyName, padcap, padName } from './keyNames.ts';
 import { addBackButton, board, setHints, type Screen } from './menus.ts';
 
 // The Controls screen: GAME_DESIGN.md's key tables, built from the current
@@ -91,7 +91,7 @@ export class ControlsScreen implements Screen {
   /** One more table after the style moves, when this returns one (milestone 25: set by main, filled only for the developer). */
   extra: (() => HTMLElement | null) | null = null;
 
-  constructor(settings: () => Settings, onTester: () => void, onBack: () => void) {
+  constructor(settings: () => Settings, onTester: () => void, onPadTester: () => void, onBack: () => void) {
     this.settings = settings;
     const b = board('Controls', 'controls-screen');
     this.el = b.el;
@@ -105,10 +105,16 @@ export class ControlsScreen implements Screen {
     open.className = 'plank plank-small';
     open.textContent = 'Key tester';
     open.addEventListener('click', onTester);
+    // Milestone 26: the controller tester beside it.
+    const openPad = document.createElement('button');
+    openPad.type = 'button';
+    openPad.className = 'plank plank-small';
+    openPad.textContent = 'Controller tester';
+    openPad.addEventListener('click', onPadTester);
     const about = document.createElement('p');
     about.className = 'setting-note';
-    about.textContent = 'Some keyboards can’t tell when certain keys are held together. Hold your usual combos in the tester to see which ones yours drops.';
-    this.tester.append(open, about);
+    about.textContent = 'Some keyboards can’t tell when certain keys are held together. Hold your usual combos in the tester to see which ones yours drops. The controller tester shows each button and stick as the browser reads it.';
+    this.tester.append(open, openPad, about);
     setHints(b.foot, [
       [['↑', '↓'], 'Scroll'],
       [['Esc'], 'Back'],
@@ -135,14 +141,18 @@ export class ControlsScreen implements Screen {
 
   private build(): void {
     const settings = this.settings();
-    const keys = settings.bindings;
+    // With a pad used last (milestone 26) the tables name its buttons.
+    const pad = INPUT_LOOK.pad;
+    const keys = pad ? settings.padBindings : settings.bindings;
     const popWithUp = settings.popWith === 'up';
     const popKey = mainKeyName(keys, popWithUp ? 'up' : 'pop');
     const cell = (k: Keys): HTMLElement => {
       const td = document.createElement('th');
       td.scope = 'row';
       td.className = 'keys-cell';
-      for (const part of k) {
+      // A pad has no Esc: its pause button is the pause action's.
+      const parts = pad ? k.filter((p, i) => p !== 'Esc' && !(p === '/' && k[i - 1] === 'Esc')) : k;
+      for (const part of parts) {
         if (part === '/') td.append(document.createTextNode(' / '));
         else if (part === 'Esc') td.append(keycap('Esc'));
         else {
@@ -150,7 +160,7 @@ export class ControlsScreen implements Screen {
           if (codes.length === 0) td.append(keycap('none'));
           codes.forEach((code, i) => {
             if (i > 0) td.append(document.createTextNode(' '));
-            td.append(keycap(keyName(code)));
+            td.append(pad ? padcap(padName(code)) : keycap(keyName(code)));
           });
         }
       }
@@ -159,7 +169,7 @@ export class ControlsScreen implements Screen {
 
     const main = document.createElement('table');
     main.className = 'controls-table';
-    main.innerHTML = '<caption>Riding</caption><thead><tr><th scope="col">Key</th><th scope="col">On the snow</th><th scope="col">In the air</th><th scope="col">On a rail or box</th></tr></thead>';
+    main.innerHTML = `<caption>Riding</caption><thead><tr><th scope="col">${pad ? 'Button' : 'Key'}</th><th scope="col">On the snow</th><th scope="col">In the air</th><th scope="col">On a rail or box</th></tr></thead>`;
     const tbody = document.createElement('tbody');
     for (const row of rows(popWithUp, popKey)) {
       const tr = document.createElement('tr');
@@ -178,7 +188,7 @@ export class ControlsScreen implements Screen {
     const grabs = document.createElement('table');
     grabs.className = 'controls-table grabs-table';
     const board = RIDE.board;
-    grabs.innerHTML = `<caption>Grabs (hold in the air, let go to release)</caption><thead><tr><th scope="col">Key</th><th scope="col">${board ? 'Front hand' : 'Left hand'}</th><th scope="col">Key</th><th scope="col">${board ? 'Rear hand' : 'Right hand'}</th></tr></thead>`;
+    grabs.innerHTML = `<caption>Grabs (hold in the air, let go to release)</caption><thead><tr><th scope="col">${pad ? 'Button' : 'Key'}</th><th scope="col">${board ? 'Front hand' : 'Left hand'}</th><th scope="col">${pad ? 'Button' : 'Key'}</th><th scope="col">${board ? 'Rear hand' : 'Right hand'}</th></tr></thead>`;
     const gbody = document.createElement('tbody');
     for (const [la, ln, ra, rn] of board ? BOARD_GRABS.map(([f, r]) => [f, actionName(f), r, actionName(r)] as const) : GRABS) {
       const tr = document.createElement('tr');
@@ -189,7 +199,7 @@ export class ControlsScreen implements Screen {
 
     const style = document.createElement('table');
     style.className = 'controls-table grabs-table';
-    style.innerHTML = '<caption>Style moves (hold in the air, let go to release)</caption><thead><tr><th scope="col">Key</th><th scope="col">Move</th><th scope="col">What it looks like</th></tr></thead>';
+    style.innerHTML = `<caption>Style moves (hold in the air, let go to release)</caption><thead><tr><th scope="col">${pad ? 'Button' : 'Key'}</th><th scope="col">Move</th><th scope="col">What it looks like</th></tr></thead>`;
     const sbody = document.createElement('tbody');
     for (const [action, name, look] of board ? BOARD_STYLE.map(([a, look]) => [a, actionName(a), look] as const) : STYLE) {
       const tr = document.createElement('tr');
@@ -209,9 +219,12 @@ export class ControlsScreen implements Screen {
       board
         ? 'Land on a rail or box to slide it: along it is a 50-50; across it is a boardslide if the nose crossed over it, a lipslide if the tail did. Landing sideways to your travel on the snow crashes.'
         : 'Land on a rail or box to slide it. There is no grind button.',
-      `At the finish, ${keys.confirm[0] ? keyName(keys.confirm[0]) : 'the Back to top button'} takes you back to the top.`,
+      `At the finish, ${keys.confirm[0] ? (pad ? padName(keys.confirm[0]) : keyName(keys.confirm[0])) : 'the Back to top button'} takes you back to the top.`,
       'Drag the game view with the mouse to look around the skier.',
-      'Change any key, and whether Space or ↑ pops, in Settings.',
+      pad
+        ? `With a controller: the sticks count as the arrow keys once pushed past halfway. The right stick grabs (${padName('PadLT')} held: its second layer). In menus the d-pad or left stick moves, ${padName('PadA')} picks and ${padName('PadB')} goes back.`
+        : 'A controller works too (Xbox, PlayStation and most USB pads): press a button on it and these tables name its buttons.',
+      'Change any key or button, and whether Space or ↑ pops, in Settings.',
     ]) {
       const li = document.createElement('li');
       li.textContent = text;
@@ -229,9 +242,10 @@ export class ControlsScreen implements Screen {
   }
 }
 
-/** The main key of an action ("none" when it has none). */
+/** The main key (or with a pad used last, button) of an action ("none" when it has none). */
 function mainKeyName(keys: Bindings, action: Action): string {
-  return keys[action][0] ? keyName(keys[action][0]) : 'none';
+  const code = keys[action][0];
+  return code ? (INPUT_LOOK.pad ? padName(code) : keyName(code)) : 'none';
 }
 
 /** The main keys of two actions, "G / B" (or "none"). */

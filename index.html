@@ -6,7 +6,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Park Laps</title>
     <style>
-      /* The start screen (src/boot.ts): nothing else loads until it's clicked or a key is pressed. Then it says Loading… until the game removes it. */
+      /* The start screen (src/boot.ts): nothing else loads until it's clicked, a key is pressed or a controller button. Then it says Loading… until the game removes it. */
       #boot {
         position: fixed;
         inset: 0;
@@ -47,7 +47,7 @@
   <body>
     <div id="app"></div>
     <div id="hud"></div>
-    <div id="boot"><b>Park Laps</b><span>Click or press any key to start</span></div>
+    <div id="boot"><b>Park Laps</b><span>Click or press any key or button to start</span></div>
     <noscript>This game needs JavaScript turned on.</noscript>
     <script type="module" src="/src/boot.ts"></script>
   </body>

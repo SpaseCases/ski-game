@@ -2966,3 +2966,297 @@ body {
 .dev-box[hidden] {
   display: none;
 }
+
+/* Controllers (milestone 26). A pad button's keycap: rounder, so hints read as buttons. */
+.key.key-pad {
+  border-radius: 999px;
+  padding: 2px 8px 1px;
+}
+
+/* With a pad used last, focus always shows (the browser keeps its own ring for keyboard use). */
+.pad-used .menu :focus {
+  outline: 3px solid var(--flag);
+  outline-offset: 2px;
+}
+
+.pad-used .menu .plank:focus,
+.pad-used .menu .pad-drawing:focus,
+.pad-used .menu .tester-board:focus {
+  outline: none;
+}
+
+.key-slot.is-pad {
+  font-size: 12px;
+}
+
+/* The controller tester: a pad drawn in place, Xbox-style (PlayStation swaps the left stick and the d-pad). */
+.pad-tester-name {
+  margin: 0 0 6px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.pad-drawing {
+  position: relative;
+  width: 540px;
+  height: 310px;
+  /* Room above for the triggers, which stand up off the pad's top. */
+  margin: 40px auto 0;
+  border-radius: 90px 90px 140px 140px;
+  background: var(--enamel-deep);
+  outline: none;
+  color: var(--frost);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.pad-part {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-bottom: 3px solid #0a1a2c;
+  background: #2a3f58;
+}
+
+.pad-part.is-held {
+  background: var(--flag);
+  border-bottom-color: #b44f06;
+  color: var(--ink);
+}
+
+.pad-lt,
+.pad-rt {
+  top: -34px;
+  width: 64px;
+  height: 52px;
+  border-radius: 10px 10px 4px 4px;
+}
+
+.pad-lt {
+  left: 70px;
+}
+
+.pad-rt {
+  right: 70px;
+}
+
+.pad-fill {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 122, 26, 0.55);
+  transform: scaleY(0);
+  transform-origin: bottom;
+}
+
+.pad-lb,
+.pad-rb {
+  top: 22px;
+  width: 110px;
+  height: 24px;
+  border-radius: 8px;
+}
+
+.pad-lb {
+  left: 50px;
+}
+
+.pad-rb {
+  right: 50px;
+}
+
+.pad-view,
+.pad-start,
+.pad-home {
+  top: 92px;
+  width: 54px;
+  height: 24px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+.pad-view {
+  left: 186px;
+}
+
+.pad-start {
+  right: 186px;
+}
+
+.pad-home {
+  top: 132px;
+  left: 252px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+
+.pad-a,
+.pad-b,
+.pad-x,
+.pad-y {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.pad-y {
+  top: 66px;
+  right: 74px;
+}
+
+.pad-a {
+  top: 150px;
+  right: 74px;
+}
+
+.pad-x {
+  top: 108px;
+  right: 116px;
+}
+
+.pad-b {
+  top: 108px;
+  right: 32px;
+}
+
+.pad-up,
+.pad-down,
+.pad-left,
+.pad-right {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+}
+
+.pad-up {
+  top: 172px;
+  left: 160px;
+}
+
+.pad-down {
+  top: 240px;
+  left: 160px;
+}
+
+.pad-left {
+  top: 206px;
+  left: 126px;
+}
+
+.pad-right {
+  top: 206px;
+  left: 194px;
+}
+
+.pad-up::after {
+  content: '↑';
+}
+
+.pad-down::after {
+  content: '↓';
+}
+
+.pad-left::after {
+  content: '←';
+}
+
+.pad-right::after {
+  content: '→';
+}
+
+.pad-stick {
+  position: absolute;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: #0a1a2c;
+}
+
+.pad-ls {
+  top: 60px;
+  left: 56px;
+}
+
+.pad-rs {
+  top: 178px;
+  right: 150px;
+}
+
+.pad-drawing.is-ps .pad-ls {
+  top: 178px;
+  left: 150px;
+}
+
+.pad-drawing.is-ps .pad-up {
+  top: 64px;
+  left: 90px;
+}
+
+.pad-drawing.is-ps .pad-down {
+  top: 132px;
+  left: 90px;
+}
+
+.pad-drawing.is-ps .pad-left {
+  top: 98px;
+  left: 56px;
+}
+
+.pad-drawing.is-ps .pad-right {
+  top: 98px;
+  left: 124px;
+}
+
+/* The dead zone: past this ring a stick counts as an arrow key. */
+.pad-dead {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border: 1px dashed var(--frost);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0.6;
+}
+
+.pad-dot-x {
+  position: absolute;
+  top: 35px;
+  left: 35px;
+  width: 26px;
+  height: 26px;
+}
+
+.pad-dot {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--frost);
+}
+
+/* L3 / R3: the stick pressed lights its ring; the name sits under it. */
+.pad-stick .pad-l3,
+.pad-stick .pad-r3 {
+  inset: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  overflow: visible;
+}
+
+.pad-stick .pad-l3.is-held,
+.pad-stick .pad-r3.is-held {
+  background: rgba(255, 122, 26, 0.45);
+}
+
+.pad-stick .pad-l3::after,
+.pad-stick .pad-r3::after {
+  content: attr(data-label);
+  position: absolute;
+  bottom: -20px;
+  font-size: 11px;
+  color: var(--frost);
+}

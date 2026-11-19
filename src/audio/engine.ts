@@ -46,7 +46,10 @@ export class AudioEngine {
   private readonly ended = (): void => {
     this.playing--;
   };
-  private readonly onGesture = (): void => this.unlock();
+  /** Only a real key, click or touch: the controller's made-up key presses in menus (ui/padNav.ts, milestone 26) can't start sound, so they don't try. */
+  private readonly onGesture = (e: Event): void => {
+    if (e.isTrusted) this.unlock();
+  };
 
   constructor(masterVolume: number, sfxVolume: number, muted: boolean) {
     this.masterVolume = masterVolume;

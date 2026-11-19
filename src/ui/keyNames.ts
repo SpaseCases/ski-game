@@ -1,3 +1,4 @@
+import type { PadKind } from '../core/gamepad.ts';
 import type { Action, Bindings } from '../core/input.ts';
 import { RIDE } from '../sim/tuning.ts';
 
@@ -130,5 +131,50 @@ export function keycap(label: string): HTMLElement {
   const el = document.createElement('kbd');
   el.className = 'key';
   el.textContent = label;
+  return el;
+}
+
+/**
+ * What the player used last (milestone 26): hints and HUD labels name the
+ * pad's buttons while `pad` is true (a pad pressed something), the keys
+ * again after a key press; `kind` is how that pad names its buttons. Set by
+ * main (`setInputLook`).
+ */
+export const INPUT_LOOK: { pad: boolean; kind: PadKind } = { pad: false, kind: 'xbox' };
+
+const ARROW: Record<string, string> = { Up: '↑', Down: '↓', Left: '←', Right: '→', UpRight: '↗', DownRight: '↘', DownLeft: '↙', UpLeft: '↖' };
+
+/** Each pad's own names for its buttons. */
+const BUTTON_NAMES: Record<PadKind, Record<string, string>> = {
+  xbox: { A: 'A', B: 'B', X: 'X', Y: 'Y', LB: 'LB', RB: 'RB', LT: 'LT', RT: 'RT', View: 'View', Start: 'Menu', L3: 'LS', R3: 'RS' },
+  ps: { A: '✕', B: '○', X: '□', Y: '△', LB: 'L1', RB: 'R1', LT: 'L2', RT: 'R2', View: 'Create', Start: 'Options', L3: 'L3', R3: 'R3' },
+};
+
+/** A short name for a pad code (core/gamepad.ts) on this kind of pad: "A", "✕", "D-pad ↑", "R stick ↖", "LT + R stick ↑". */
+export function padName(code: string, kind: PadKind = INPUT_LOOK.kind): string {
+  const names = BUTTON_NAMES[kind];
+  const rest = code.startsWith('Pad') ? code.slice(3) : code;
+  if (rest.startsWith('LT+RS')) return `${names.LT} + R stick ${ARROW[rest.slice(5)] ?? ''}`;
+  if (rest.startsWith('RS')) return `R stick ${ARROW[rest.slice(2)] ?? ''}`;
+  if (rest.startsWith('LS')) return `L stick ${ARROW[rest.slice(2)] ?? ''}`;
+  if (rest in ARROW) return `D-pad ${ARROW[rest]}`;
+  return names[rest] ?? rest;
+}
+
+/** The name of an action's main pad button, or "none". */
+export function mainPad(pads: Bindings, action: Action): string {
+  const code = pads[action][0];
+  return code ? padName(code) : 'none';
+}
+
+/** An action's main key, or its main button while a pad was used last: what a hint should name. */
+export function mainInput(keys: Bindings, pads: Bindings, action: Action): string {
+  return INPUT_LOOK.pad ? mainPad(pads, action) : mainKey(keys, action);
+}
+
+/** A keycap for a pad button (styled as one). */
+export function padcap(label: string): HTMLElement {
+  const el = keycap(label);
+  el.classList.add('key-pad');
   return el;
 }

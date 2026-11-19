@@ -20,7 +20,7 @@ import type { Rect, StageWindow } from '../render/lockerStage.ts';
 import { keycap } from './keyNames.ts';
 import { PaintGrid } from './paintGrid.ts';
 import { previewCanvas } from './lockerMenu.ts';
-import { board, setHints, type Screen } from './menus.ts';
+import { board, EDITOR_PAD_HINTS, EDITOR_PAD_KEYS, setHints, type Screen } from './menus.ts';
 import { paintSkis } from './skiThumb.ts';
 import { signText } from './signText.ts';
 
@@ -102,6 +102,8 @@ const BOARD_HINTS = HINTS.filter(([keys]) => keys[0] !== 'V');
 
 export class SkiEditorScreen implements Screen, StageWindow {
   readonly el: HTMLElement;
+  /** The pad (milestone 26): X undoes, Y takes the color under the cursor, LB / RB the color before or after. */
+  readonly padKeys = EDITOR_PAD_KEYS;
   private readonly hooks: SkiEditorHooks;
   private readonly title: HTMLElement;
   private readonly sub: HTMLElement;
@@ -376,7 +378,7 @@ export class SkiEditorScreen implements Screen, StageWindow {
     layout.className = 'editor-layout';
     layout.append(this.main, frame);
     b.body.append(layout);
-    setHints(b.foot, HINTS);
+    setHints(b.foot, HINTS, EDITOR_PAD_HINTS);
   }
 
   /** Points the editor at a ski's or board's custom slot (painting it for the first time makes it) and puts it on the skier. */
@@ -409,7 +411,7 @@ export class SkiEditorScreen implements Screen, StageWindow {
     this.tipLabel.textContent = this.g.onBoard ? 'Nose' : 'Tip';
     this.view.setAttribute('aria-label', this.g.onBoard ? 'Your board, turning slowly' : 'Your skis, turning slowly');
     this.wallsButton.title = this.g.onBoard ? 'The board’s edges take the picked color' : 'The sidewalls and ends take the picked color';
-    setHints(this.foot, this.g.onBoard ? BOARD_HINTS : HINTS);
+    setHints(this.foot, this.g.onBoard ? BOARD_HINTS : HINTS, EDITOR_PAD_HINTS);
     // The ruler's mark: where the boots stand on a ski, the bindings on a board.
     const m = this.model;
     const span = this.g.onBoard ? BINDING_SPAN : BOOT_LENGTH;

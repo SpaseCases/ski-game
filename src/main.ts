@@ -2,6 +2,7 @@ import './style.css';
 import { Vector2, Vector3 } from 'three';
 import { GameAudio } from './audio/index.ts';
 import { createInputState, Keyboard, type Bindings } from './core/input.ts';
+import { Gamepads, type PadKind } from './core/gamepad.ts';
 import { startLoop } from './core/loop.ts';
 import { PointerOrbit } from './core/pointerOrbit.ts';
 import { bestCombo, submitCombo } from './core/bests.ts';
@@ -68,7 +69,9 @@ import { mountFpsMeter } from './ui/fps.ts';
 import { mountCrashHint, mountFocusHint } from './ui/hints.ts';
 import { ControlsScreen } from './ui/controlsMenu.ts';
 import { KeyTesterScreen } from './ui/keyTester.ts';
-import { mainKey } from './ui/keyNames.ts';
+import { INPUT_LOOK, mainInput, mainKey, mainPad } from './ui/keyNames.ts';
+import { PadNav } from './ui/padNav.ts';
+import { PadTesterScreen } from './ui/padTester.ts';
 import { LockerScreen, setPreviewControl, type ShareKind } from './ui/lockerMenu.ts';
 import { marketDescribe, marketThumb, outfitShare, slotShare, useItem } from './ui/marketGlue.ts';
 import { isDevName } from './core/devUnlock.ts';
@@ -77,6 +80,7 @@ import type { Dev } from './ui/devPowers.ts';
 import { SkiEditorScreen } from './ui/skiEditor.ts';
 import { WearEditorScreen } from './ui/wearEditor.ts';
 import { PauseScreen, TitleScreen } from './ui/mainMenus.ts';
+import { refreshHints } from './ui/menus.ts';
 import { MapSelect } from './ui/mapSelect.ts';
 import { addBackButton, board, Menus, type Screen } from './ui/menus.ts';
 import { SettingsScreen } from './ui/settingsMenu.ts';
@@ -166,9 +170,50 @@ const trailMap = new TrailMap(hud, closeTrailMap);
 /** The small trail map in the HUD's corner (milestone 21): the trail-map key shows and hides it, and the game keeps running. */
 const cornerMap = new CornerMap(hud);
 cornerMap.setShown(settings.cornerMap);
-const keyboard = new Keyboard(settings.bindings);
+const keyboard = new Keyboard(settings.bindings, settings.padBindings);
 keyboard.setPopWithUp(settings.popWith === 'up');
 keyboard.attach(window);
+/** Controllers (milestone 26): read once a frame (the loop's poll), into the same actions as the keys. */
+const pads = new Gamepads();
+/** Settings listening for a new button: every pad press and release goes there and nowhere else. */
+let padListen: ((code: string, down: boolean) => void) | null = null;
+/** Whether the note that sound needs a key or a click has been shown this visit. */
+let soundNoteShown = false;
+// A real key press: hints name keys again.
+window.addEventListener(
+  'keydown',
+  (e) => {
+    if (e.isTrusted) setInputLook(false, INPUT_LOOK.kind);
+  },
+  true,
+);
+pads.onUse = (kind) => setInputLook(true, kind);
+pads.onConnect = () => {
+  if (padTester.isShown) padTester.sync();
+};
+pads.sink = (code, down) => {
+  if (padListen) {
+    padListen(code, down);
+    return;
+  }
+  if (!gameWaits()) {
+    // Riding: the pad is the keyboard (and for the developer, the powers' buttons).
+    keyboard.padKey(code, down);
+    if (devLive()) dev?.padKey(code, down);
+    if (down && keyboard.isPadBound('pause', code)) openPause();
+    return;
+  }
+  if (padTester.isShown && menus.top === padTester) {
+    padTester.button(code, down);
+    return;
+  }
+  // The full trail map: its own button closes it, as B does.
+  if (down && trailMap.isOpen && !menus.isOpen && keyboard.isPadBound('trailMap', code)) {
+    closeTrailMap();
+    return;
+  }
+  padNav.button(code, down);
+};
 
 // The menus: the title before any map is loaded, the pause menu while riding,
 // and the screens they open. The game waits while any is open.
@@ -272,6 +317,16 @@ const settingsScreen = new SettingsScreen(
       saveSettings(settings);
     },
     setBindings,
+    setPadBindings: (b) => {
+      settings.padBindings = b;
+      keyboard.setPadBindings(b);
+      saveSettings(settings);
+      syncKeyLabels();
+    },
+    listenPad: (fn) => {
+      padListen = fn;
+      padNav.reset();
+    },
     openControls,
     trapNextKey: (fn) => menus.trapNextKey(fn),
     wipeLocal: () => {
@@ -283,11 +338,15 @@ const settingsScreen = new SettingsScreen(
   () => menus.back(),
 );
 const keyTester = new KeyTesterScreen(() => settings.bindings, () => menus.back());
+const padTester = new PadTesterScreen(pads, () => settings.padBindings, () => menus.back());
 const controlsScreen = new ControlsScreen(
   () => settings,
   () => menus.push(keyTester),
+  () => menus.push(padTester),
   () => menus.back(),
 );
+/** Menus by pad (milestone 26): the d-pad and left stick move, A picks, B goes back. */
+const padNav = new PadNav(menus);
 const cheatsScreen = new CheatsScreen(
   {
     isOn: (id) => CHEATS[id],
@@ -385,7 +444,7 @@ const wearEditor = new WearEditorScreen(
   },
   () => menus.back(),
 );
-for (const screen of [titleScreen, pauseScreen, mapSelect, settingsScreen, controlsScreen, keyTester, cheatsScreen, lockerScreen, skiEditor, wearEditor]) menus.add(screen);
+for (const screen of [titleScreen, pauseScreen, mapSelect, settingsScreen, controlsScreen, keyTester, padTester, cheatsScreen, lockerScreen, skiEditor, wearEditor]) menus.add(screen);
 
 // The online leaderboards (src/online, its own chunk): imported the first
 // time a board opens or a score posts, never at startup. Blocked or offline,
@@ -439,6 +498,7 @@ function devAnswer(code: string, answer: 'ok' | 'wrong' | 'offline'): void {
       dev = m.createDevPowers({ hud, scene, audio: sound.engine, listening: () => !gameWaits() });
       controlsScreen.extra = () => (devLive() && dev ? dev.controls() : null);
       keyTester.extraKeys = () => (devLive() && dev ? dev.testerKeys : null);
+      padTester.extraPad = () => (devLive() && dev ? dev.testerPads : null);
     },
     () => {
       devLoading = null;
@@ -490,7 +550,7 @@ function loadOnline(): Promise<Online> {
           devCode: () => (devName ? settings.devCode : ''),
         },
       });
-      o.finish.setKey(mainKey(settings.bindings, 'board'));
+      o.finish.setKey(mainInput(settings.bindings, settings.padBindings, 'board'));
       menus.add(o.screen);
       menus.add(o.lookPrompt);
       menus.add(o.shareSign);
@@ -895,7 +955,8 @@ function openPause(): void {
   trailMap.close();
   keyboard.setEnabled(false);
   const b = settings.bindings;
-  pauseScreen.setInfo(mapEntry(level.id)?.name ?? '', mainKey(b, 'pause'), mainKey(b, 'respawn'), (code) => keyboard.isBound('pause', code));
+  const resume = INPUT_LOOK.pad ? [mainPad(settings.padBindings, 'pause')] : [mainKey(b, 'pause'), 'Esc'];
+  pauseScreen.setInfo(mapEntry(level.id)?.name ?? '', resume, mainInput(b, settings.padBindings, 'respawn'), (code) => keyboard.isBound('pause', code));
   menus.setScenery(false);
   menus.open(pauseScreen);
 }
@@ -1034,7 +1095,7 @@ function toggleCornerMap(): void {
   settings.cornerMap = !settings.cornerMap;
   cornerMap.setShown(settings.cornerMap);
   saveSettings(settings);
-  if (!settings.cornerMap) toast.show(`Corner map hidden (${mainKey(settings.bindings, 'trailMap')} shows it; the full map is in the pause menu)`);
+  if (!settings.cornerMap) toast.show(`Corner map hidden (${mainInput(settings.bindings, settings.padBindings, 'trailMap')} shows it; the full map is in the pause menu)`);
 }
 
 /** A key pressed while no menu is open (the menus see it first, in Menus). */
@@ -1066,14 +1127,40 @@ function setBindings(b: Bindings): void {
   syncKeyLabels();
 }
 
-/** HUD labels that name a key, as bound now. */
+/** HUD labels that name a key (or with a pad used last, a button), as bound now. */
 function syncKeyLabels(): void {
-  const b = settings.bindings;
-  setButtonKey(pauseButton, mainKey(b, 'pause'));
-  crashHint.setKey(mainKey(b, 'respawn'), settings.crashWait);
-  runHud.setKeys(mainKey(b, 'confirm'), mainKey(b, 'respawn'));
-  raceAgainHint = `${mainKey(b, 'respawn')}: race it again`;
-  online?.finish.setKey(mainKey(b, 'board'));
+  const name = (a: Parameters<typeof mainKey>[1]): string => mainInput(settings.bindings, settings.padBindings, a);
+  setButtonKey(pauseButton, name('pause'));
+  crashHint.setKey(name('respawn'), settings.crashWait);
+  runHud.setKeys(name('confirm'), name('respawn'));
+  raceAgainHint = `${name('respawn')}: race it again`;
+  online?.finish.setKey(name('board'));
+}
+
+/**
+ * Whether hints name the pad's buttons (a pad pressed something last) or the
+ * keys (a key did), and how that pad names them (milestone 26). On a change
+ * every label naming a key is drawn again. The first time a pad is used
+ * while sound can't start yet (a pad press isn't a gesture the browser lets
+ * start sound with), a note says what will.
+ */
+function setInputLook(pad: boolean, kind: PadKind): void {
+  if (pad && !soundNoteShown && !sound.engine.running) {
+    soundNoteShown = true;
+    toast.show('Sound starts after a click or a key press');
+  }
+  if (INPUT_LOOK.pad === pad && INPUT_LOOK.kind === kind) return;
+  INPUT_LOOK.pad = pad;
+  INPUT_LOOK.kind = kind;
+  document.body.classList.toggle('pad-used', pad);
+  syncKeyLabels();
+  refreshHints();
+  if (padTester.isShown) padTester.sync();
+  // The pause menu names the keys that close it.
+  if (level && menus.top === pauseScreen) {
+    const resume = pad ? [mainPad(settings.padBindings, 'pause')] : [mainKey(settings.bindings, 'pause'), 'Esc'];
+    pauseScreen.setInfo(mapEntry(level.id)?.name ?? '', resume, mainInput(settings.bindings, settings.padBindings, 'respawn'), (code) => keyboard.isBound('pause', code));
+  }
 }
 
 /** The chase camera or first person: eased into, saved, and (from the camera key) said in a toast. */
@@ -1082,7 +1169,7 @@ function setCameraView(v: CameraView, announce: boolean): void {
   gameCamera.view = v;
   saveSettings(settings);
   if (!announce) return;
-  const key = mainKey(settings.bindings, 'camera');
+  const key = mainInput(settings.bindings, settings.padBindings, 'camera');
   toast.show(v === 'first' ? `First person (${key}: chase camera)` : `Chase camera (${key}: first person)`);
 }
 
@@ -1359,7 +1446,7 @@ startLoop(
     }
     // The chairlift (milestone 17): say what's happening as the skier gets on, and cut straight to the top on a skip.
     if (skier.lift >= 0 && skierPrev.lift < 0) toast.show('Chairlift: the next chair picks you up');
-    if (skier.liftChair >= 0 && skierPrev.liftChair < 0) toast.show('Hold Enter to skip the ride');
+    if (skier.liftChair >= 0 && skierPrev.liftChair < 0) toast.show(`Hold ${mainInput(settings.bindings, settings.padBindings, 'confirm')} to skip the ride`);
     if (skier.liftChair === -2 && skierPrev.liftChair >= 0 && skier.liftT > 0.5) snapView = true;
     sound.step(skierPrev, skier, built.course.rails);
     const event = updateRun(run, built.map, skierPrev.position, skier);
@@ -1461,6 +1548,13 @@ startLoop(
     tuningPanel?.update(pose, skier);
   },
   gameWaits,
+  (frameTime) => {
+    // Controllers (milestone 26): read once a frame, before any step; nothing at all while none is connected.
+    pads.poll();
+    if (padTester.isShown) padTester.frame(frameTime);
+    else if (gameWaits() && !padListen) padNav.frame(frameTime, pads.present ? pads.axes[3]! : 0);
+    else padNav.reset();
+  },
 );
 
 function mountCheatsTag(parent: HTMLElement): HTMLElement {

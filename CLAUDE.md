@@ -7,15 +7,15 @@ Browser-based 3D freeski game for Chromebooks. Read `GAME_DESIGN.md` before star
 - TypeScript (strict), Vite
 - No accounts. Static build output in `/dist`
 - One optional online service: the leaderboards and the looks saved under a board name (milestone 13), stored in Firestore (project `parklaps-3b60f`) and reached **only through the leaderboard Worker** (`worker/`, a Cloudflare Worker, the user's choice): the game `fetch`es the Worker's small JSON API (`src/online/api.ts`, address in `VITE_API_URL`), and the Worker calls Firestore's REST API as a service account (no Firebase SDK anywhere). The client code is its own lazy chunk (`src/online/`) that the first load never fetches. Blocked or offline, the game works the same and the board says "Leaderboard offline"
-- Production builds are obfuscated (`tools/vite/obfuscate.js`, javascript-obfuscator, the user's choice): the menu, online and core modules get encoded strings and hex names, and the page's title and loading text are base64 in the HTML. The per-frame code (sim, render, maps, audio, config, and the modules in `obfuscate.js`'s `EXCLUDE`: `core/input.ts`, `core/loop.ts`, `core/skis.ts`, `ui/cornerMap.ts`, `ui/skiThumb.ts`, `ui/paintGrid.ts`) is only minified, so measure per-frame UI on a production build; keep runtime-costly options (control-flow flattening, dead code, self-defending) off
+- Production builds are obfuscated (`tools/vite/obfuscate.js`, javascript-obfuscator, the user's choice): the menu, online and core modules get encoded strings and hex names, and the page's title and loading text are base64 in the HTML. The per-frame code (sim, render, maps, audio, config, and the modules in `obfuscate.js`'s `EXCLUDE`: `core/input.ts`, `core/loop.ts`, `core/skis.ts`, `core/gamepad.ts`, `ui/cornerMap.ts`, `ui/skiThumb.ts`, `ui/paintGrid.ts`, `ui/padNav.ts`, `ui/padTesterDraw.ts`) is only minified, so measure per-frame UI on a production build; keep runtime-costly options (control-flow flattening, dead code, self-defending) off
 - lil-gui panel for live-tuning physics values, lazy-loaded in its own chunk: in production it loads only when opened from the Cheats screen (milestone 6b), so it never adds to the first load
 - No physics engine in v1. Rapier comes in only if ragdoll crashes are added later
 
 ## Hard constraints
 - **Target hardware:** low-end Chromebooks: ~4GB RAM, Celeron/MediaTek-class CPU, integrated GPU, 1366×768 screen. Must hold 60fps on the Low preset there and never drop below 30.
-- **Keyboard only for playing.** No pointer lock, no right-click, and no mouse-look while just moving the mouse. The mouse clicks menus, and the one exception (the user's request): click-and-drag on the game view orbits the camera around the skier, which eases back behind once riding.
+- **Keyboard or controller for playing** (controllers since milestone 26: the Gamepad API's standard mapping, read into the same actions as the keys, sticks digital past a dead zone). No pointer lock, no right-click, and no mouse-look while just moving the mouse. The mouse clicks menus, and the one exception (the user's request): click-and-drag on the game view orbits the camera around the skier, which eases back behind once riding.
 - **Runs inside an iframe:** a Google Sites page embeds the GitHub Pages URL. Detect `window.self !== window.top`; when embedded, show an "Open in new tab" button. Only show a Fullscreen button when `document.fullscreenEnabled` is true.
-- **No sound before the first user input** (browser autoplay rules).
+- **No sound before the first user input** (browser autoplay rules). Sound starts only on a real key press, click or touch: a controller press fires no event the audio could start on (and starting it without a gesture would warn in the console), so a pad-only player gets a one-time note to click or press a key.
 - **localStorage can throw or get wiped.** Wrap every read and write in try/catch; the game must work without it.
 - **Original work only.** The game is inspired by Shredsauce but has its own name, art, sounds, and code. Never copy Shredsauce assets, level files, logos, or text.
 
@@ -26,7 +26,7 @@ Browser-based 3D freeski game for Chromebooks. Read `GAME_DESIGN.md` before star
 - Lighting: one directional light plus one hemisphere light. No shadow maps on Low; use a blob-shadow decal under the skier instead
 - Quality presets Low / Medium / High plus Auto, which lowers the pixel ratio when frame time stays over budget. Low = pixelRatio 1, antialias off
 - No allocations in the per-frame loop (reuse vectors and quaternions)
-- Nothing loads or runs before the player's first input: `src/boot.ts` shows a start screen and imports the game on the first click or key. Don't add a static import, preload or timer that starts game work before then
+- Nothing loads or runs before the player's first input: `src/boot.ts` shows a start screen and imports the game on the first click, key or controller button (`gamepadconnected`, an event: no polling). Don't add a static import, preload or timer that starts game work before then
 - With no map loaded the menus' painted backdrop covers the canvas, so the frame loop doesn't draw the 3D scene then
 
 ## Architecture

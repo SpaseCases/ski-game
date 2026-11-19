@@ -1,5 +1,5 @@
 import { inTuningPanel } from '../core/input.ts';
-import { keycap } from './keyNames.ts';
+import { INPUT_LOOK, keycap, padcap, padName } from './keyNames.ts';
 import { signText } from './signText.ts';
 
 // The menu system: one overlay holding a stack of screens (title, pause, map
@@ -26,7 +26,43 @@ export interface Screen {
   onKey?(e: KeyboardEvent): boolean;
   /** Builds anything enter() would build, with no other effect (for prewarm). */
   prebuild?(): void;
+  /**
+   * Milestone 26: the keys the pad's X, Y, LB and RB press on this screen
+   * (ui/padNav.ts), when they mean more here than in other menus (the
+   * editors: undo, take a color, the colors before and after).
+   */
+  padKeys?: PadKeys;
 }
+
+/** A key the pad sends as a key press (`key` and `code` as a KeyboardEvent has them). */
+export interface PadKey {
+  key: string;
+  code: string;
+}
+
+export type PadKeys = Partial<Record<'x' | 'y' | 'lb' | 'rb', PadKey>>;
+
+/** The painting editors' pad keys: X undo (Z), Y take a color (I), LB / RB the color before or after ([ ]). */
+export const EDITOR_PAD_KEYS: PadKeys = {
+  x: { key: 'z', code: 'KeyZ' },
+  y: { key: 'i', code: 'KeyI' },
+  lb: { key: '[', code: 'BracketLeft' },
+  rb: { key: ']', code: 'BracketRight' },
+};
+
+/** The painting editors' hints with a pad: the d-pad moves the cursor on the grid, the left stick moves between the tools. */
+export const EDITOR_PAD_HINTS = [
+  [['D-pad'], 'Move'],
+  [['PadA'], 'Paint'],
+  [['PadLB', 'PadRB'], 'Color'],
+  [['PadY'], 'Take the color under the cursor'],
+  [['PadX'], 'Undo'],
+  [['L stick'], 'Palette and tools'],
+  [['PadB'], 'Done'],
+] as const;
+
+/** A direction for moving focus (the arrows, or the pad's left stick). */
+export type FocusDir = 'up' | 'down' | 'left' | 'right';
 
 interface Entry {
   screen: Screen;
@@ -249,16 +285,33 @@ export class Menus {
         // Sliders keep left and right for their value, text boxes for the caret.
         if (horizontal && active instanceof HTMLInputElement && (active.type === 'range' || active.type === 'text')) return;
         e.preventDefault();
-        if (at < 0) {
-          items[0]?.focus();
-          return;
-        }
-        const dir = e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 1;
-        const next = horizontal ? across(items, at, dir) : upDown(items, at, dir);
-        next?.focus();
+        this.moveFocus(e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : e.key === 'ArrowLeft' ? 'left' : 'right');
         return;
       }
     }
+  }
+
+  /**
+   * Moves focus to the next item in `dir`, as the arrows do (the pad's left
+   * stick calls this directly, past any screen's own use of the arrows, so it
+   * can leave an editor's grid).
+   */
+  moveFocus(dir: FocusDir): void {
+    const items = this.focusables();
+    const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const at = active ? items.indexOf(active) : -1;
+    if (at < 0) {
+      items[0]?.focus();
+      return;
+    }
+    const step = dir === 'up' || dir === 'left' ? -1 : 1;
+    const next = dir === 'left' || dir === 'right' ? across(items, at, step) : upDown(items, at, step);
+    next?.focus();
+  }
+
+  /** Whether a key trap is set (Settings listening for a key). */
+  get trapped(): boolean {
+    return this.trap !== null;
   }
 }
 
@@ -370,16 +423,71 @@ export function setPlankKeys(b: HTMLElement, keys: readonly string[]): void {
   box?.replaceChildren(...keys.map(keycap));
 }
 
-/** The key hints along a board's foot: pairs of keys and what they do. */
-export function setHints(foot: HTMLElement, hints: readonly (readonly [readonly string[], string])[]): void {
+export type Hints = readonly (readonly [readonly string[], string])[];
+
+/** The menus' keys as a pad presses them (ui/padNav.ts): what a key hint becomes once a pad was used last. */
+const PAD_FOR_KEY: Record<string, string> = { Enter: 'PadA', Space: 'PadA', Esc: 'PadB', Delete: 'PadX' };
+const ARROW_KEYS = new Set(['↑', '↓', '←', '→']);
+
+/** Each board foot's hints, kept so they can be drawn again when the player switches between keys and a pad. */
+const feet = new Map<HTMLElement, { keys: Hints; pad: Hints | null }>();
+/** Every Back button's keycap (Esc, or the pad's B). */
+const backCaps: HTMLElement[] = [];
+
+/**
+ * The key hints along a board's foot: pairs of keys and what they do. With
+ * a pad used last (milestone 26) they show `pad` (pairs of pad codes, or
+ * 'D-pad' / 'L stick') if given, else the keys the pad presses in menus
+ * (the arrows as the d-pad, Enter as A, Esc as B, Delete as X; a hint with
+ * any other key is left out).
+ */
+export function setHints(foot: HTMLElement, hints: Hints, pad: Hints | null = null): void {
+  feet.set(foot, { keys: hints, pad });
+  drawHints(foot);
+}
+
+function drawHints(foot: HTMLElement): void {
+  const h = feet.get(foot);
+  if (!h) return;
+  const usePad = INPUT_LOOK.pad;
+  const list = usePad ? (h.pad ?? padHints(h.keys)) : h.keys;
   foot.replaceChildren(
-    ...hints.map(([keys, what]) => {
+    ...list.map(([keys, what]) => {
       const span = document.createElement('span');
       span.className = 'hint';
-      span.append(...keys.map(keycap), document.createTextNode(what));
+      span.append(...keys.map((k) => (usePad ? padcap(k.startsWith('Pad') ? padName(k) : k) : keycap(k))), document.createTextNode(what));
       return span;
     }),
   );
+}
+
+/** A screen's key hints as a pad gives them, where it can. */
+function padHints(hints: Hints): Hints {
+  const out: (readonly [readonly string[], string])[] = [];
+  for (const [keys, what] of hints) {
+    const codes: string[] = [];
+    let ok = true;
+    for (const k of keys) {
+      if (ARROW_KEYS.has(k)) {
+        if (!codes.includes('D-pad')) codes.push('D-pad');
+      } else if (PAD_FOR_KEY[k]) codes.push(PAD_FOR_KEY[k]!);
+      else ok = false;
+    }
+    if (ok) out.push([codes, what]);
+  }
+  return out;
+}
+
+/** Draws every board's hints and Back button again for keys or a pad (the player switched). */
+export function refreshHints(): void {
+  for (const foot of [...feet.keys()]) {
+    if (foot.isConnected) drawHints(foot);
+    else feet.delete(foot);
+  }
+  for (const cap of backCaps) {
+    cap.textContent = INPUT_LOOK.pad ? padName('PadB') : 'Esc';
+    cap.classList.toggle('key-pad', INPUT_LOOK.pad);
+  }
 }
 
 /** The Back button at the top of a screen's board, for the mouse (Esc does the same). */
@@ -387,7 +495,9 @@ export function addBackButton(head: HTMLElement, onBack: () => void): HTMLButton
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'board-back';
-  b.append(document.createTextNode('Back'), keycap('Esc'));
+  const cap = keycap('Esc');
+  backCaps.push(cap);
+  b.append(document.createTextNode('Back'), cap);
   b.addEventListener('click', onBack);
   head.appendChild(b);
   return b;

@@ -5,7 +5,7 @@ import type { Rect, StageWindow } from '../render/lockerStage.ts';
 import { BODY_PANEL, CUFFS, layoutSize, POCKETS, wearOffsets, wearPanels, type WearGarment } from '../render/wearPanels.ts';
 import { keycap } from './keyNames.ts';
 import { patternSwatch, previewCanvas } from './lockerMenu.ts';
-import { board, setHints, type Screen } from './menus.ts';
+import { board, EDITOR_PAD_HINTS, EDITOR_PAD_KEYS, setHints, type Screen } from './menus.ts';
 import { signText } from './signText.ts';
 import { contentWidth, label, text, toolButton } from './skiEditor.ts';
 import { WearGrid } from './wearGrid.ts';
@@ -70,6 +70,8 @@ const PANTS_HINTS = [...HINTS.slice(0, 6), [['C', 'O'], 'Cuffs, pockets'], ...HI
 
 export class WearEditorScreen implements Screen, StageWindow {
   readonly el: HTMLElement;
+  /** The pad (milestone 26): X undoes, Y takes the color under the cursor, LB / RB the color before or after. */
+  readonly padKeys = EDITOR_PAD_KEYS;
   private readonly hooks: WearEditorHooks;
   private readonly title: HTMLElement;
   private readonly sub: HTMLElement;
@@ -290,7 +292,7 @@ export class WearEditorScreen implements Screen, StageWindow {
     layout.append(main, frame);
     b.body.appendChild(layout);
     this.foot = b.foot;
-    setHints(b.foot, HINTS);
+    setHints(b.foot, HINTS, EDITOR_PAD_HINTS);
   }
 
   /** Points the editor at a garment's custom slot (painting it for the first time makes it, from what the garment wears now) and puts it on the skier. */
@@ -320,7 +322,7 @@ export class WearEditorScreen implements Screen, StageWindow {
       garment === 'jacket'
         ? `Custom ${slot + 1} for your jacket: every square of it, laid flat with the front in the middle. The collar, cuffs, pockets, hood and hem stay your jacket color. It saves as you paint.`
         : `Custom ${slot + 1} for your pants: the seat and both legs, hip to hem, laid flat with the front in the middle. Cuffs and Pockets give the hem's folds and the pockets a color of their own. It saves as you paint.`;
-    setHints(this.foot, garment === 'pants' ? PANTS_HINTS : HINTS);
+    setHints(this.foot, garment === 'pants' ? PANTS_HINTS : HINTS, EDITOR_PAD_HINTS);
     saveCustomWear();
     this.hooks.wear(garment, slot);
   }

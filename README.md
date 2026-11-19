@@ -1,6 +1,6 @@
 # Park Laps
 
-A small, physics-driven, low-poly 3D freeski game that runs in the browser on school Chromebooks. Keyboard only, no accounts, no backend.
+A small, physics-driven, low-poly 3D freeski game that runs in the browser on school Chromebooks. Keyboard or controller, no accounts.
 
 - **Play:** https://parklaps.web.app (Firebase Hosting; GitHub is blocked on school networks). Also at https://spasecases.github.io/ski-game/
 - **Embed test:** https://parklaps.web.app/embed-test.html (loads the game in an iframe like a Google Sites page)

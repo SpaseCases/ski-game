@@ -10,6 +10,13 @@ export const DEV_CODES = { fly: 'KeyY', aim: 'KeyU', fire: 'KeyI', space: 'Space
 
 export type DevKey = keyof typeof DEV_CODES;
 
+/**
+ * The same on a controller (milestone 26, the user's pick): Y takes off and
+ * lands, LT held aims, RT fires; A hovers while flying (it fires too while
+ * aiming), as Space does. Only this chunk knows them.
+ */
+export const DEV_PADS = { fly: 'PadY', aim: 'PadLT', fire: 'PadRT', space: 'PadA' } as const;
+
 export interface DevButton {
   held: boolean;
   pressed: boolean;
@@ -40,6 +47,19 @@ export class DevKeys {
       if (key) this.down[key] = false;
     });
     window.addEventListener('blur', () => this.clear());
+  }
+
+  /** A pad code going down or up (main hands every one over while riding): its power, if it has one. */
+  pad(code: string, down: boolean): void {
+    const key = code === DEV_PADS.fly ? 'fly' : code === DEV_PADS.aim ? 'aim' : code === DEV_PADS.fire ? 'fire' : code === DEV_PADS.space ? 'space' : null;
+    if (!key) return;
+    if (!down) {
+      this.down[key] = false;
+      return;
+    }
+    if (!this.listening() || this.down[key]) return;
+    this.down[key] = true;
+    this.latch[key] = true;
   }
 
   /** Copies the held keys and the presses since the last sample into the buttons. */

@@ -17,8 +17,11 @@ export type RenderFn = (alpha: number, frameTime: number) => void;
  * motion), so the sim still steps at stepHz, just fewer times. While
  * `paused()` is true no step runs and no time builds up: the accumulator
  * holds still, so the drawn frame (and its interpolation) stays put.
+ * `poll` (milestone 26: the controllers) runs first in every frame, paused or
+ * not, before any step, so a button pressed between frames reaches the
+ * next step just as a key does.
  */
-export function startLoop(step: StepFn, render: RenderFn, paused: () => boolean): void {
+export function startLoop(step: StepFn, render: RenderFn, paused: () => boolean, poll?: (frameTime: number) => void): void {
   const dt = 1 / CONFIG.sim.stepHz;
   let accumulator = 0;
   let last = -1;
@@ -30,6 +33,7 @@ export function startLoop(step: StepFn, render: RenderFn, paused: () => boolean)
     let frameTime = (now - last) / 1000;
     last = now;
     if (frameTime > CONFIG.sim.maxFrameTime) frameTime = CONFIG.sim.maxFrameTime;
+    poll?.(frameTime);
 
     if (!paused()) accumulator += frameTime * TUNING.sim.timeScale;
     while (accumulator >= dt) {
