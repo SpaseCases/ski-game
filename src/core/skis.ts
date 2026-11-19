@@ -499,10 +499,17 @@ export function skiType(id: SkiId): SkiType {
   return SKI_TYPES.find((s) => s.id === id) ?? PARK;
 }
 
-/** The graphic with this id on that ski (a stock one or a painted custom slot), or the ski's first. */
+/**
+ * Other riders' painted skis and boards (milestone 27), read from their
+ * looks by the multiplayer chunk under ids of its own; empty for everyone
+ * riding alone.
+ */
+export const RIDER_GRAPHICS = new Map<string, SkiGraphic>();
+
+/** The graphic with this id on that ski (a stock one, a painted custom slot or another rider's), or the ski's first. */
 export function skiGraphic(id: SkiId, graphic: string): SkiGraphic {
   const type = skiType(id);
-  return type.graphics.find((g) => g.id === graphic) ?? CUSTOM[type.id].find((g) => g?.id === graphic) ?? type.graphics[0]!;
+  return type.graphics.find((g) => g.id === graphic) ?? CUSTOM[type.id].find((g) => g?.id === graphic) ?? RIDER_GRAPHICS.get(graphic) ?? type.graphics[0]!;
 }
 
 // ------------------------------------------------------------- the model

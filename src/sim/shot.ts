@@ -15,7 +15,8 @@ import { groundAt, heightAt } from './terrain.ts';
 // multiplayer) can add riders as another kind of target. Allocates nothing.
 
 /** What a shot hit. */
-export const HIT = { none: 0, snow: 1, hard: 2, tree: 3, rail: 4 } as const;
+/** What a shot hit. `rider` (milestone 27) is another rider in a multiplayer lobby, found by the multiplayer chunk, never by castShot. */
+export const HIT = { none: 0, snow: 1, hard: 2, tree: 3, rail: 4, rider: 5 } as const;
 
 export interface ShotHit {
   /** One of HIT. */

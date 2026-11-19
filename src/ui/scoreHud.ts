@@ -210,6 +210,9 @@ export class ScoreHud {
     }
   }
 
+  /** The last trick shown, as the chain names it (milestone 27: sent to the lobby with a banked combo). */
+  lastTrick = '';
+
   private take(ev: ScoreEvent): void {
     this.blank = false;
     if (ev.kind === 'trick') {
@@ -218,6 +221,7 @@ export class ScoreHud {
       this.lines.push(line);
       this.tricks.appendChild(line.el);
       line.name.textContent = trickText(ev);
+      this.lastTrick = line.name.textContent;
       line.points.textContent = `+${pointsText(ev.points)}`;
       line.tags.textContent = trickTags(ev);
       line.el.classList.toggle('is-sketchy', ev.landing === 'sketchy' || ev.landing === 'airbag');

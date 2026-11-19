@@ -378,6 +378,19 @@ export class SkierRig {
     return { pelvis, torso, hem: this.hem.mesh, head, upperArms, forearms, thighs, shins, feet, poles, board };
   }
 
+  /**
+   * Fades the body's main material (milestone 27: another rider shown as
+   * away); 1 is solid. The shared cloth parts (a hat, the hood) stay solid.
+   */
+  setOpacity(opacity: number): void {
+    const see = opacity < 1;
+    if (this.material.transparent !== see) {
+      this.material.transparent = see;
+      this.material.needsUpdate = true;
+    }
+    this.material.opacity = opacity;
+  }
+
   /** Frees every geometry and material (the rig is not used again). */
   dispose(): void {
     const seen = new Set<BufferGeometry>();
@@ -1104,6 +1117,29 @@ const ZIP_FIRST = 1;
 const ZIP_LAST = 8;
 const ZIP_HALF = 0.007;
 /**
+ * Each ring's points at the angles fit() uses, worked out once: height,
+ * radius, depth, sine and cosine (RING_FIELDS) for each of its segments, then
+ * the zip's two sides. Calling `at` for every point every pose boxed each
+ * number it passed and returned (about 5 kB a frame a rider), which milestone
+ * 27's other riders multiplied. The same arithmetic, so the same points.
+ */
+const RING_FIELDS = 5;
+const RING_SLOTS = LOWER_SEGMENTS + 2;
+const RING_TABLE: readonly Float64Array[] = LOWER_RINGS.map((def) => {
+  const t = new Float64Array(RING_SLOTS * RING_FIELDS);
+  const r0 = def.at(0)[1]!;
+  for (let slot = 0; slot < RING_SLOTS; slot++) {
+    const a = slot < LOWER_SEGMENTS ? (slot / LOWER_SEGMENTS) * Math.PI * 2 : (slot === LOWER_SEGMENTS ? -ZIP_HALF : ZIP_HALF) / r0;
+    const at = def.at(a);
+    t[slot * RING_FIELDS] = at[0]!;
+    t[slot * RING_FIELDS + 1] = at[1]!;
+    t[slot * RING_FIELDS + 2] = at[2]!;
+    t[slot * RING_FIELDS + 3] = Math.sin(a);
+    t[slot * RING_FIELDS + 4] = Math.cos(a);
+  }
+  return t;
+});
+/**
  * How the lower jacket's mesh is laid out, for checks (tools/model): its faces
  * run band by band between the rings, `segments` quads a band; the last two
  * bands are the hem's edge and its turned-under lip, the rest the jacket's body.
@@ -1265,7 +1301,7 @@ class JacketLower {
   /** The split bands' in-between points from the fitted ring points: halfway round each ring, halfway down to the next, and each face's middle. */
   private fitFine(): void {
     const pts = this.points;
-    const at = (ring: number, seg: number): number => (ring * LOWER_SEGMENTS + (seg % LOWER_SEGMENTS)) * 3;
+    const at = ringIndex;
     for (let k = 0; k < 3; k++) {
       for (let row = 0; row < FINE_RINGS; row++) {
         for (let seg = 0; seg < LOWER_SEGMENTS; seg++) {
@@ -1298,13 +1334,12 @@ class JacketLower {
     const pts = this.points;
     for (let ring = 0; ring < LOWER_RINGS.length; ring++) {
       for (let seg = 0; seg < LOWER_SEGMENTS; seg++) {
-        this.ringPoint(ring, (seg / LOWER_SEGMENTS) * Math.PI * 2, 1);
+        this.ringPoint(ring, seg, 1);
         lowerP.toArray(pts, (ring * LOWER_SEGMENTS + seg) * 3);
       }
       if (ring < ZIP_FIRST || ring > ZIP_LAST) continue;
       for (let side = 0; side < 2; side++) {
-        const r = LOWER_RINGS[ring]!.at(0)[1]!;
-        this.ringPoint(ring, (side === 0 ? -ZIP_HALF : ZIP_HALF) / r, 1.012);
+        this.ringPoint(ring, LOWER_SEGMENTS + side, 1.012);
         lowerP.toArray(pts, (this.ringPoints + (ring - ZIP_FIRST) * 2 + side) * 3);
       }
     }
@@ -1320,12 +1355,13 @@ class JacketLower {
     this.position.needsUpdate = true;
   }
 
-  /** One point of a ring at angle `a`, scaled out by `grow`, into lowerP (pelvis space). */
-  private ringPoint(ring: number, a: number, grow: number): void {
+  /** One point of a ring (`slot`: a segment's angle, or after them the zip's two sides; RING_TABLE), scaled out by `grow`, into lowerP (pelvis space). */
+  private ringPoint(ring: number, slot: number, grow: number): void {
     const def = LOWER_RINGS[ring]!;
-    const at = def.at(a);
-    const r = at[1]! * grow;
-    lowerP.set(r * Math.sin(a), at[0]!, -r * Math.cos(a) * at[2]!);
+    const t = RING_TABLE[ring]!;
+    const o = slot * RING_FIELDS;
+    const r = t[o + 1]! * grow;
+    lowerP.set(r * t[o + 3]!, t[o]!, -r * t[o + 4]! * t[o + 2]!);
     if (def.bend > 0) lowerP.applyQuaternion(lowerBend[ring]!);
     if (!def.push) return;
     // Twice, so a point pushed out of one thigh into the other ends up clear of both.
@@ -1333,6 +1369,11 @@ class JacketLower {
       for (let i = 0; i < 2; i++) pushOutOfThigh(lowerP, lowerHips[i]!, lowerKnees[i]!);
     }
   }
+}
+
+/** Where a ring's point sits in the jacket's points (fitFine; a function, not a closure made per pose). */
+function ringIndex(ring: number, seg: number): number {
+  return (ring * LOWER_SEGMENTS + (seg % LOWER_SEGMENTS)) * 3;
 }
 
 const lowerMaterial = new MeshLambertMaterial({ vertexColors: true, flatShading: true, side: DoubleSide });

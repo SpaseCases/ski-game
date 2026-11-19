@@ -17,7 +17,7 @@
 import JavaScriptObfuscator from 'javascript-obfuscator';
 
 /** Modules to obfuscate (paths with forward slashes). */
-const INCLUDE = /\/src\/(boot\.ts$|main\.ts$|poses\.ts$|ui\/.+\.ts$|online\/.+\.ts$|core\/.+\.ts$)/;
+const INCLUDE = /\/src\/(boot\.ts$|main\.ts$|poses\.ts$|ui\/.+\.ts$|online\/.+\.ts$|core\/.+\.ts$|multiplayer\/.+\.ts$)/;
 /**
  * Read on every frame or every key, left minified only: the corner map moves
  * every frame, and the ski painter (core/skis.ts drawSki, graphicColor) and
@@ -31,8 +31,12 @@ const INCLUDE = /\/src\/(boot\.ts$|main\.ts$|poses\.ts$|ui\/.+\.ts$|online\/.+\.
  * The controllers (milestone 26): core/gamepad.ts polls every frame,
  * ui/padNav.ts repeats and scrolls every frame a menu is open, and
  * ui/padTesterDraw.ts draws the controller tester every frame it shows.
+ * Multiplayer (milestone 27): its frame (multiplayer/index.ts), the others'
+ * timelines and drawing (remote.ts, riders.ts), the wire format (wire.ts,
+ * and the shared online/mpRules.ts it reads) run every frame or every
+ * message (up to 75 a second), and the socket (connection.ts) every message.
  */
-const EXCLUDE = /\/src\/(core\/(loop|input|skis|devKeys|gamepad)|ui\/(cornerMap|skiThumb|paintGrid|wearGrid|devScope|padNav|padTesterDraw))\.ts$/;
+const EXCLUDE = /\/src\/(core\/(loop|input|skis|devKeys|gamepad)|ui\/(cornerMap|skiThumb|paintGrid|wearGrid|devScope|padNav|padTesterDraw)|multiplayer\/(index|remote|riders|wire|connection)|online\/mpRules)\.ts$/;
 
 /** @type {import('javascript-obfuscator').ObfuscatorOptions} */
 const OPTIONS = {

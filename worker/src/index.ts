@@ -3,7 +3,9 @@ import { boardKind, LIST_MAX, LOOK_FORMAT, OUTFIT_MAX, RANK_LIMIT, SKIS_MAX, val
 import { FirestoreStore } from './firestore.ts';
 import { jsonBody, Refused, type RateLimit } from './http.ts';
 import { marketRoute, restoreHidden, type MarketEnv } from './market.ts';
-import { CLOSE, MESSAGE_MAX, quotaError, refusedSocket, Room } from './room.ts';
+import { CLOSE, CODE_LENGTH, CODE_FORMAT, CODE_LETTERS, lobbyTitleProblem, MP_MAPS, tidyTitle } from '../../src/online/mpRules.ts';
+import { Lobbies } from './lobbies.ts';
+import { MESSAGE_MAX, quotaError, refusedSocket, Room, type LobbyMeta } from './room.ts';
 import { beats, MemoryStore, type Row, type Store } from './store.ts';
 
 // The leaderboard API: a Cloudflare Worker between the game and Firestore,
@@ -21,8 +23,12 @@ import { beats, MemoryStore, type Row, type Store } from './store.ts';
 //   GET  /v1/look?name=              the look saved under a name, or null
 //   PUT  /v1/look   {name, outfit, skis}
 //   /v1/market...                    the marketplace (milestone 24: market.ts)
-//   GET  /v1/mp/hello                the socket test's plain HTTPS check (milestone 27)
-//   GET  /v1/mp/echo?fan=            a WebSocket to an echo room (room.ts)
+//   GET  /v1/mp/lobbies?map=         a map's open lobbies (multiplayer, milestone 27: lobbies.ts)
+//   GET  /v1/mp/lobby?code=          one lobby's map, title and riders
+//   POST /v1/mp/create {map, title, open}   a new lobby: its code
+//   GET  /v1/mp/join?code=           the lobby's WebSocket (room.ts)
+//   GET  /v1/mp/hello                the socket test's plain HTTPS check
+//   GET  /v1/mp/echo?fan=            the socket test: a WebSocket to an echo
 //   POST /v1/mp/poll?id=&fan=        the same echo over plain HTTPS (polling)
 //
 // Every request takes set=live or set=test (?boards=test in the game).
@@ -40,11 +46,12 @@ export interface Env extends MarketEnv {
   ALLOWED_ORIGINS: string;
   READS?: RateLimit;
   WRITES?: RateLimit;
-  /** Multiplayer rooms (milestone 27): one Durable Object per room. */
+  /** Multiplayer (milestone 27): one Durable Object per lobby, and one list of open lobbies per map. */
   ROOMS: DurableObjectNamespace<Room>;
+  LOBBIES: DurableObjectNamespace<Lobbies>;
 }
 
-export { Room };
+export { Lobbies, Room };
 
 /** The local store lives as long as the dev Worker does. */
 const memory = new MemoryStore();
@@ -86,21 +93,54 @@ export default {
   },
 };
 
-/** Milestone 27's routes: for now the socket test (an echo room), its HTTPS check and its polling route. */
+/** Milestone 27's routes: lobbies, joining one, and the socket test (an echo, its HTTPS check and its polling route). */
 async function multiplayer(request: Request, env: Env, cors: string | null): Promise<Response> {
   const url = new URL(request.url);
   const socket = request.headers.get('Upgrade') === 'websocket';
   const who = request.headers.get('CF-Connecting-IP') ?? 'local';
   const refuse = (status: number, code: string, closeCode: number): Response => (socket ? refusedSocket(closeCode, code) : reply(status, { error: code }, cors));
-  if (env.READS && !(await env.READS.limit({ key: who })).success) return refuse(429, 'slow down', CLOSE.bad);
+  // Per address: a whole school shares one, so these allow about 40 riders joining and rejoining (READS: 600 a minute).
+  const limiter = request.method === 'POST' && url.pathname === '/v1/mp/create' ? env.WRITES : env.READS;
+  if (limiter && !(await limiter.limit({ key: who })).success) return refuse(429, 'slow down', CLOSE.tooFast);
   // Local play-tests can ask for the refusals the live Worker gives when the day runs out.
   const force = env.STORE === 'memory' ? url.searchParams.get('force') : null;
-  if (force === 'full') return refuse(503, 'full today', CLOSE.full);
+  if (force === 'full') return refuse(503, 'full today', CLOSE.fullToday);
   if (force === 'down') return refuse(503, 'down', CLOSE.down);
   const fan = url.searchParams.get('fan') ?? '1';
   if (!/^\d{1,2}$/.test(fan)) return refuse(400, 'fan', CLOSE.bad);
   try {
     switch (`${request.method} ${url.pathname}`) {
+      case 'GET /v1/mp/lobbies': {
+        const map = mapParam(url.searchParams.get('map'));
+        if (!map) return refuse(400, 'map', CLOSE.bad);
+        return reply(200, { lobbies: await env.LOBBIES.getByName(`lobbies-${map}`).list() }, cors);
+      }
+      case 'GET /v1/mp/lobby': {
+        const code = url.searchParams.get('code') ?? '';
+        if (!CODE_FORMAT.test(code)) return refuse(400, 'code', CLOSE.bad);
+        const info = await env.ROOMS.getByName(`room-${code}`).info();
+        return info ? reply(200, { lobby: { code, ...info } }, cors) : refuse(404, 'no lobby', CLOSE.noLobby);
+      }
+      case 'POST /v1/mp/create': {
+        const b = await jsonBody(request);
+        const map = mapParam(b.map);
+        const title = typeof b.title === 'string' ? tidyTitle(b.title) : '';
+        if (!map || lobbyTitleProblem(title) || typeof b.open !== 'boolean') return refuse(400, 'lobby', CLOSE.bad);
+        for (let tries = 0; tries < 8; tries++) {
+          const code = newCode();
+          const meta: LobbyMeta = { code, map, title, open: b.open, created: Date.now() };
+          if (await env.ROOMS.getByName(`room-${code}`).init(meta)) return reply(200, { code }, cors);
+        }
+        return refuse(503, 'busy', CLOSE.down);
+      }
+      case 'GET /v1/mp/join': {
+        if (!socket) return refuse(426, 'websocket', CLOSE.bad);
+        const code = url.searchParams.get('code') ?? '';
+        if (!CODE_FORMAT.test(code)) return refuse(400, 'code', CLOSE.bad);
+        const inner = new Request(request);
+        inner.headers.set('X-Mode', 'room');
+        return await env.ROOMS.getByName(`room-${code}`).fetch(inner);
+      }
       case 'GET /v1/mp/hello': {
         const cf = (request as Request & { cf?: { colo?: string } }).cf;
         return reply(200, { ok: true, colo: cf?.colo ?? 'local' }, cors);
@@ -120,9 +160,22 @@ async function multiplayer(request: Request, env: Env, cors: string | null): Pro
         return refuse(404, 'route', CLOSE.bad);
     }
   } catch (err) {
+    if (err instanceof Refused) return refuse(err.status, err.message, CLOSE.bad);
     console.error(err);
-    return quotaError(err) ? refuse(503, 'full today', CLOSE.full) : refuse(503, 'down', CLOSE.down);
+    return quotaError(err) ? refuse(503, 'full today', CLOSE.fullToday) : refuse(503, 'down', CLOSE.down);
   }
+}
+
+function mapParam(value: unknown): string | null {
+  return typeof value === 'string' && (MP_MAPS as readonly string[]).includes(value) ? value : null;
+}
+
+/** A random lobby code (CODE_FORMAT). */
+function newCode(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(CODE_LENGTH));
+  let code = '';
+  for (const b of bytes) code += CODE_LETTERS[b % CODE_LETTERS.length];
+  return code;
 }
 
 async function route(request: Request, env: Env, ctx: ExecutionContext | undefined): Promise<unknown> {

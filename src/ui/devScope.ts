@@ -7,7 +7,7 @@
 
 const RING = 'min(88vmin, 92vw)';
 /** What a shot hit, by sim/shot.ts's HIT kind (none, snow, hard, tree, rail). */
-const KINDS = ['', 'snow', 'rock or wall', 'tree', 'rail'];
+const KINDS = ['', 'snow', 'rock or wall', 'tree', 'rail', 'rider'];
 
 export class DevScope {
   private readonly el: HTMLElement;

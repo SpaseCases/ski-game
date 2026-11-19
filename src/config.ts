@@ -1452,4 +1452,62 @@ export const CONFIG = {
       hideFirst: 0.3,
     },
   },
+  /**
+   * Multiplayer (milestone 27, the multiplayer chunk: src/multiplayer/). The
+   * Worker's own limits (room size, message sizes and rates, chat) are in
+   * src/online/mpRules.ts, which it shares.
+   */
+  mp: {
+    /** Samples of the rider taken a second (render frames, from the drawn pose), and how many go in one message: 10 and 2 send 5 messages a second. */
+    sampleRate: 10,
+    samplesPerMessage: 2,
+    /** With nothing to send (standing still, a menu open), a keep-alive this often (s), so the others don't mark the rider away. */
+    keepAlive: 2,
+    /**
+     * Others are drawn this far behind the newest sample (s): the jitter
+     * measured (the mean arrival error, times `jitterMul`) plus one message's
+     * span, held between min and max. Never ahead of the newest sample.
+     */
+    delayMin: 0.25,
+    delayMax: 0.8,
+    jitterMul: 2.5,
+    /** How quickly the measured jitter follows (0..1 per message), and how fast an estimate of when messages should arrive drifts later (s per s) so a slow sender's clock can't run away. */
+    jitterFollow: 0.06,
+    arrivalDrift: 0.02,
+    /** A message this much later than expected (s) starts that rider's timeline over (they were away, or the network stalled). */
+    resync: 1,
+    /** Silence (s) before a rider shows as away (faded, "away" on the tag), and before they're removed. */
+    away: 5,
+    remove: 60,
+    /** How faded an away rider is (0..1 opacity of the body). */
+    awayFade: 0.45,
+    /** The connection: a ping this often (s; Cloudflare answers it free), dead after this long with no answer (s). */
+    ping: 2,
+    dead: 6,
+    /** Reconnect waits (s): the first, doubling up to the last; and how long the first connect may take before saying it can't reach the server (s). */
+    retryFirst: 1,
+    retryMax: 15,
+    connectTimeout: 10,
+    /** How often the lobby list refreshes while open (s). */
+    listEvery: 5,
+    /** Riders drawn in full by detail level (the nearest first); the rest are simple stand-ins, as is anyone past `near` m. Name tags on the nearest `tags`. */
+    draw: {
+      low: { full: 4, near: 60, tags: 8 },
+      medium: { full: 8, near: 100, tags: 12 },
+      high: { full: 15, near: 100, tags: 15 },
+    },
+    /** Name tags: height over the head (m) and size on screen (fraction of the view's height). */
+    tagHeight: 2.15,
+    tagSize: 0.032,
+    /** A shot hits a rider whose body (a capsule this wide, from the snow to this height) the ray passes through (m). */
+    hitRadius: 0.45,
+    hitHeight: 1.8,
+    /** A rider hit (sim/skier.ts knockDown): pushed this fast along the shot and up (m/s), tumbling at this rate (rad/s). */
+    knock: 5,
+    knockUp: 2.5,
+    knockSpin: 7,
+    /** Chat lines shown at once, and how long each stays (s). */
+    chatLines: 6,
+    chatShow: 12,
+  },
 };

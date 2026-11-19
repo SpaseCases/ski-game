@@ -38,6 +38,42 @@ export function blockedText(text: string): boolean {
   return blocked(text.replace(/[^A-Za-z0-9 _-]+/g, ' '));
 }
 
+/**
+ * Whether chat text (milestone 27) holds a slur. Chat filters only slurs
+ * (the user's pick: swearing is allowed), word by word, with the same
+ * look-alike reading as names; letters typed apart ("n i g g") are read as
+ * one word too. The Worker checks it again.
+ */
+export function slurText(text: string): boolean {
+  const raw = text.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 0);
+  // Runs of single characters read as one word.
+  const words: string[] = [];
+  let run = '';
+  for (const w of raw) {
+    if (w.length === 1) {
+      run += w;
+      continue;
+    }
+    if (run.length > 1) words.push(run);
+    run = '';
+    words.push(w);
+  }
+  if (run.length > 1) words.push(run);
+  const squeezed = (s: string): string => s.replace(/(.)\1+/g, '$1');
+  return words.some((w) => {
+    let l = unsafe(letters(w));
+    for (const safe of CHAT_SAFE) l = l.split(safe).join('.');
+    const sq = squeezed(l);
+    return SLURS.some((s) => l.includes(s) || sq.includes(s)) || SLUR_START.some((s) => l.startsWith(s) || sq.startsWith(s));
+  });
+}
+
+// Slurs only (ROT13, like the lists below): anywhere in a word, or (short ones) only at a word's start.
+const SLURS = words('avtt avtn snttbg sntbg puvax genaal ergneq jrgonpx gbjryurnq enturnq furznyr ornare qnexvr tbyyvjbt artebvq xlxr mvccreurnq');
+const SLUR_START = words('snt fcvp xvxr tbbx pbba cnxv qlxr jbc tlcb');
+/** Ordinary words with a slur's letters in them (chat only; names keep their own SAFE list). */
+const CHAT_SAFE = ['snigger', 'spicy', 'spick', 'cocoon', 'tycoon', 'raccoon', 'pakistan', 'pakistani'];
+
 /** The name's entry key on every board: the same name in any case is one entry. */
 export function nameKey(name: string): string {
   return name.toLowerCase();

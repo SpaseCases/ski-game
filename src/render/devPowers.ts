@@ -97,6 +97,12 @@ export class DevPowers {
   /** Seconds (game time) until the next shot can go. */
   private reload = 0;
   private fireQueued = false;
+  /**
+   * Multiplayer (milestone 27): the other riders as a target. Given the
+   * shot and how far it may reach, the distance to the rider it hits (and the
+   * hit is sent), or -1. Null when not in a lobby.
+   */
+  riderShot: ((from: Vector3, dir: Vector3, range: number) => number) | null = null;
   private tag = false;
   private bodyHidden = false;
   private readonly hit: ShotHit = createShotHit();
@@ -296,6 +302,12 @@ export class DevPowers {
     this.out.playShot();
     const hit = this.hit;
     const any = castShot(course, shotFrom, shotDir, S.range, hit);
+    // Another rider in a multiplayer lobby nearer than what the ray hit (milestone 27): the lobby crashes them.
+    const rider = this.riderShot ? this.riderShot(shotFrom, shotDir, any ? hit.distance : S.range) : -1;
+    if (rider >= 0) {
+      this.out.shotAt(rider, HIT.rider);
+      return;
+    }
     this.out.shotAt(any ? hit.distance : null, hit.kind);
     if (any) burstAt(snow, hit);
   }

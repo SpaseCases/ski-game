@@ -1,0 +1,216 @@
+/* Multiplayer (milestone 27): its own CSS chunk, loaded with the multiplayer chunk. Colors are the menus' (src/style.css :root). */
+
+/* The lobby list and the lobby you're in: wider than a plank sign. */
+.lobby-screen {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.lobby-rows,
+.lobby-riders {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 34vh;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.lobby-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.lobby-row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lobby-row-count {
+  flex: none;
+  color: var(--frost);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+}
+
+.lobby-row[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.lobby-note {
+  margin: 4px 0;
+  color: var(--frost);
+  font-size: 15px;
+}
+
+.lobby-make {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 2px solid var(--plank);
+}
+
+.lobby-head {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.lobby-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.lobby-title-input {
+  flex: 1 1 200px;
+}
+
+.lobby-code-input {
+  width: 7ch;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-variant-numeric: tabular-nums;
+}
+
+.lobby-seg {
+  display: flex;
+  gap: 4px;
+}
+
+.lobby-go {
+  flex: none;
+}
+
+.lobby-rider {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) 7.5em minmax(0, 1.5fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--enamel-deep);
+  font-size: 15px;
+}
+
+.lobby-rider > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lobby-rider-head {
+  background: none;
+  color: var(--frost);
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 0;
+}
+
+.lobby-rider-best {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.lobby-rider-trick {
+  color: var(--frost);
+}
+
+.lobby-mute {
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.lobby-leave {
+  margin-top: 14px;
+}
+
+/* On the riding screen: the lobby chip (top middle) and the chat (bottom left). */
+.mp-chip {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(60vw, 520px);
+  padding: 5px 12px;
+  border-radius: 14px;
+  background: rgba(15, 36, 60, 0.78);
+  color: var(--snow);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.mp-chip.is-problem {
+  background: rgba(120, 50, 10, 0.88);
+}
+
+.mp-chat {
+  position: absolute;
+  left: 12px;
+  bottom: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: min(44vw, 420px);
+  pointer-events: none;
+}
+
+.mp-line {
+  margin: 0;
+  padding: 3px 9px;
+  border-radius: 4px;
+  background: rgba(15, 36, 60, 0.7);
+  color: var(--snow);
+  font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  transition: opacity 1s;
+}
+
+.mp-line b {
+  color: #ffd29a;
+}
+
+.mp-line.is-note {
+  color: var(--frost);
+  font-style: italic;
+}
+
+.mp-line.is-old {
+  opacity: 0;
+}
+
+.mp-chat-box {
+  position: absolute;
+  left: 12px;
+  bottom: 22px;
+  width: min(44vw, 420px);
+}
+
+.mp-chat-input {
+  width: 100%;
+}
+
+@media (max-width: 700px) {
+  .lobby-rider {
+    grid-template-columns: minmax(0, 1fr) 6em auto;
+  }
+  .lobby-rider-trick {
+    display: none;
+  }
+  .mp-chat,
+  .mp-chat-box {
+    width: calc(100vw - 24px);
+  }
+}

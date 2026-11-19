@@ -22,6 +22,11 @@ export class MapSelect implements Screen {
   private readonly weather: WeatherHooks;
   /** The card focused last, for the Leaderboards button. */
   private picked: MapId = MAPS[0]!.id;
+  /** "Ride with others" (milestone 27): off by default, for the visit. */
+  private others = false;
+  private readonly othersButton: HTMLButtonElement;
+  /** With "Ride with others" on, a pick opens the map's lobbies (main loads the multiplayer chunk). */
+  onLobbies: ((entry: MapEntry) => void) | null = null;
 
   /** `onPick`: a map's card was chosen. `onBack`: the Back button. `weather`: the weather picked and picking it. `onBoards`: the Leaderboards button, with the card focused last. */
   constructor(onPick: (entry: MapEntry) => void, onBack: () => void, weather: WeatherHooks, onBoards: (id: MapId) => void) {
@@ -33,7 +38,12 @@ export class MapSelect implements Screen {
     boards.className = 'board-back board-link';
     boards.textContent = 'Leaderboards';
     boards.addEventListener('click', () => onBoards(this.picked));
-    b.head.appendChild(boards);
+    // Milestone 27: with this on, picking a map opens its lobby list instead of riding alone.
+    this.othersButton = document.createElement('button');
+    this.othersButton.type = 'button';
+    this.othersButton.className = 'board-back board-link mp-toggle';
+    this.othersButton.addEventListener('click', () => this.setOthers(!this.others));
+    b.head.append(this.othersButton, boards);
     addBackButton(b.head, onBack);
 
     const grid = document.createElement('div');
@@ -53,7 +63,9 @@ export class MapSelect implements Screen {
         `<span class="map-badge">${entry.load ? '' : 'Coming soon'}</span>`;
       pick.addEventListener('focus', () => (this.picked = entry.id));
       pick.addEventListener('click', () => {
-        if (entry.load && !this.busy) onPick(entry);
+        if (!entry.load || this.busy) return;
+        if (this.others && this.onLobbies) this.onLobbies(entry);
+        else onPick(entry);
       });
       const opts = document.createElement('div');
       opts.className = 'map-options';
@@ -77,6 +89,7 @@ export class MapSelect implements Screen {
       [['Enter'], 'Ride'],
       [['Esc'], 'Back'],
     ]);
+    this.setOthers(false);
   }
 
   /** Before showing: the map being ridden (null if none) and the one to focus when none is. */
@@ -101,6 +114,13 @@ export class MapSelect implements Screen {
 
   canGoBack(): boolean {
     return !this.busy;
+  }
+
+  /** "Ride with others" on or off. */
+  setOthers(on: boolean): void {
+    this.others = on;
+    this.othersButton.textContent = on ? 'Ride with others: on' : 'Ride with others: off';
+    this.othersButton.setAttribute('aria-pressed', String(on));
   }
 
   /** A row under a map's card for its options (after the weather). */

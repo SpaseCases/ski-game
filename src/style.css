@@ -3260,3 +3260,9 @@ body {
   font-size: 11px;
   color: var(--frost);
 }
+
+/* Map select's "Ride with others" switch (milestone 27), beside Leaderboards. */
+.mp-toggle[aria-pressed='true'] {
+  background: var(--flag);
+  color: var(--ink);
+}

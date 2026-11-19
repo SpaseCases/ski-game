@@ -6,9 +6,9 @@ import { Gamepads, type PadKind } from './core/gamepad.ts';
 import { startLoop } from './core/loop.ts';
 import { PointerOrbit } from './core/pointerOrbit.ts';
 import { bestCombo, submitCombo } from './core/bests.ts';
-import { EDIT_PALETTE, gearBoard, loadCustomSkis, lookSkisText, paintedSlots, setCustomSkisText, type Gear } from './core/customSkis.ts';
+import { boardGear, customId, EDIT_PALETTE, gearBoard, graphicFromText, loadCustomSkis, lookSkisText, paintedSlots, setCustomSkisText, type Gear } from './core/customSkis.ts';
 import { WEAR_TRIMS, wearSize } from './render/wearPanels.ts';
-import { loadCustomWear, paintedWear, setWearText, wearJson, wearPattern, wornOutfit } from './core/customWear.ts';
+import { loadCustomWear, paintedWear, setWearText, wearFromText, wearJson, wearPattern, wornOutfit } from './core/customWear.ts';
 import { BOARD_TYPES, mainColor, type BoardId } from './core/boards.ts';
 import { CUSTOM_PATTERNS, GARMENTS, HEADWEAR, loadOutfit, outfitFrom, PALETTE, PATTERNS, saveOutfit, type Garment, type Outfit } from './core/outfit.ts';
 import { SKI_TYPES, type SkiId } from './core/skis.ts';
@@ -58,7 +58,7 @@ import {
 import { createRace, resetRace, stepRace, type CourseDef, type RaceState } from './sim/race.ts';
 import { createScore, endCombo, resetScore, stepScore, taintCombo } from './sim/score.ts';
 import { placeInAvalanches, stepAvalanches } from './sim/avalanche.ts';
-import { copySkierState, createSkierState, placeSkierAt, stepSkier } from './sim/skier.ts';
+import { copySkierState, createSkierState, knockDown, placeSkierAt, stepSkier } from './sim/skier.ts';
 import { heightAt } from './sim/terrain.ts';
 import { anyCheat, CHEATS, configChanged, rebuildTuning, RIDE, setCheat, setRide, setSkiScale, TUNING } from './sim/tuning.ts';
 import { CheatsScreen } from './ui/cheatsMenu.ts';
@@ -77,6 +77,7 @@ import { marketDescribe, marketThumb, outfitShare, slotShare, useItem } from './
 import { isDevName } from './core/devUnlock.ts';
 import type { Online } from './online/index.ts';
 import type { Dev } from './ui/devPowers.ts';
+import type { Multiplayer } from './multiplayer/index.ts';
 import { SkiEditorScreen } from './ui/skiEditor.ts';
 import { WearEditorScreen } from './ui/wearEditor.ts';
 import { PauseScreen, TitleScreen } from './ui/mainMenus.ts';
@@ -162,6 +163,8 @@ const scoreHud = new ScoreHud(
     sound.combo(note === 'best' || note === 'cheatsBest' ? 'best' : 'bank');
     // A new personal best goes on the map's online board too.
     if (level && (note === 'best' || note === 'cheatsBest')) postScore(level.id, -1, note === 'cheatsBest', total);
+    // Multiplayer (milestone 27): the lobby hears the best combo this visit and the last trick.
+    mp?.banked(total, scoreHud.lastTrick);
     return note;
   },
   () => sound.combo('lost'),
@@ -269,6 +272,7 @@ const pauseScreen = new PauseScreen({
     backToTop();
   },
   trailMap: () => openTrailMap(true),
+  lobby: () => mp?.openRoom(),
   maps: openMapSelect,
   locker: openLocker,
   settings: openSettings,
@@ -281,6 +285,12 @@ const pauseScreen = new PauseScreen({
   setWeather,
 });
 const mapSelect = new MapSelect((entry) => void loadMap(entry), () => menus.back(), { get: () => weather, set: setWeather }, (id) => openBoards(id));
+mapSelect.onLobbies = (entry) => {
+  loadMultiplayer().then(
+    (m) => m.openLobbies(entry.id),
+    () => mapSelect.setError("Couldn't load multiplayer. Check the connection and try again, or ride alone."),
+  );
+};
 const settingsScreen = new SettingsScreen(
   {
     get: () => ({ ...settings, quality }),
@@ -496,6 +506,8 @@ function devAnswer(code: string, answer: 'ok' | 'wrong' | 'offline'): void {
   devLoading ??= import('./ui/devPowers.ts').then(
     (m) => {
       dev = m.createDevPowers({ hud, scene, audio: sound.engine, listening: () => !gameWaits() });
+      // Multiplayer (milestone 27): the other riders in a lobby are a target too; a hit crashes them in their game.
+      dev.powers.riderShot = (from, dir, range) => (mp && devLive() ? mp.shoot(from, dir, range) : -1);
       controlsScreen.extra = () => (devLive() && dev ? dev.controls() : null);
       keyTester.extraKeys = () => (devLive() && dev ? dev.testerKeys : null);
       padTester.extraPad = () => (devLive() && dev ? dev.testerPads : null);
@@ -505,6 +517,47 @@ function devAnswer(code: string, answer: 'ok' | 'wrong' | 'offline'): void {
     },
   );
 }
+// Multiplayer (milestone 27): its chunk (multiplayer/index.ts) is imported
+// only when a player turns "Ride with others" on and picks a map. Riding
+// alone never fetches it; blocked or offline, the game goes on alone.
+let mp: Multiplayer | null = null;
+let mpLoading: Promise<Multiplayer> | null = null;
+
+function loadMultiplayer(): Promise<Multiplayer> {
+  mpLoading ??= import('./multiplayer/index.ts').then(({ createMultiplayer }) => {
+    mp = createMultiplayer({
+      scene,
+      hud,
+      push: (screen) => menus.push(screen),
+      back: () => menus.back(),
+      name: () => settings.name,
+      outfitJson: () => JSON.stringify(outfit),
+      // Dev builds' play-tests may give the local Worker's throwaway code (?mpdev=); production strips it, and the Worker checks the code either way.
+      devCode: () => (devLive() ? settings.devCode : import.meta.env.DEV ? new URLSearchParams(window.location.search).get('mpdev') : null),
+      mapName: (id) => mapEntry(id)?.name ?? id,
+      currentMap: () => level?.id ?? null,
+      loadMap: async (id) => {
+        const entry = mapEntry(id);
+        if (!entry?.load) return false;
+        await loadMap(entry);
+        return level?.id === id;
+      },
+      hf: () => level?.built.hf ?? null,
+      detail: () => drawn.detail,
+      ridingKeys: (on) => keyboard.setEnabled(on && !menus.isOpen && !trailMap.isOpen),
+      inLobby: (on) => pauseScreen.setLobby(on),
+      toast: (text) => toast.show(text),
+      chatKey: () => mainKey(settings.bindings, 'chat'),
+      paint: { customId, boardGear, graphicFromText, wearFromText, hexes: EDIT_PALETTE.map((c) => c.hex) },
+    });
+    for (const screen of mp.screens) menus.add(screen);
+    return mp;
+  });
+  // A failed load can be tried again.
+  mpLoading.catch(() => (mpLoading = null));
+  return mpLoading;
+}
+
 /** Whether the finish being shown has had its board opened (see the frame), and whether the player hid it. */
 let finishSeen = false;
 let boardHidden = false;
@@ -888,6 +941,7 @@ async function loadMap(entry: MapEntry): Promise<void> {
     scene.add(world.group);
     applyMap(view, built);
     level = { id: entry.id, built, world, run: createRun(map), race: built.race ? createRace(built.race) : null };
+    mp?.mapChanged(entry.id);
     sound.setMap(built);
     if (skierView && chase) {
       skierView.hf = built.hf;
@@ -933,6 +987,7 @@ function toMainMenu(): void {
   if (scoring()) endCombo(score, skier);
   trailMap.close();
   online?.finish.hide();
+  mp?.leave();
   level.world.dispose();
   level = null;
   mapArt = null;
@@ -1100,6 +1155,8 @@ function toggleCornerMap(): void {
 
 /** A key pressed while no menu is open (the menus see it first, in Menus). */
 function onGameKey(e: KeyboardEvent): void {
+  // Typing in the multiplayer chat (milestone 27): the box handles its own keys.
+  if (mp?.typing) return;
   // Riding, Tab never moves focus: it's the checkpoint key (or was, before rebinding).
   if (e.key === 'Tab') e.preventDefault();
   if (e.repeat) return;
@@ -1321,6 +1378,16 @@ if (import.meta.env.DEV) {
       setQuality,
       setWeather,
       loadMap: (id: MapId) => loadMap(mapEntry(id)!),
+      /** Multiplayer (milestone 27): make a lobby (resolves to its code), join one by code, and what this game sees. */
+      mpCreate: async (map: string, title: string, open = true) => {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/v1/mp/create`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ map, title, open }) });
+        return ((await res.json()) as { code: string }).code;
+      },
+      mpJoin: async (code: string) => (await loadMultiplayer()).join(code),
+      mpDebug: () => mp?.debug() ?? null,
+      get mp() {
+        return mp;
+      },
       /** The developer's powers (milestone 25), with the dev unlock: aim at (x, y, z) from the eye, held steady. */
       devAimAt: (x: number, y: number, z: number) => dev?.powers.aimAt(x, y, z),
       /** Looks from (x, y, z) at (tx, ty, tz) until called with no arguments, which goes back to the chase camera. */
@@ -1423,6 +1490,7 @@ startLoop(
     }
     if (keys.board.pressed && run.finished) toggleFinishBoard();
     if (keys.camera.pressed) setCameraView(settings.camera === 'first' ? 'chase' : 'first', true);
+    if (keys.chat.pressed) mp?.openChat();
     if (keys.checkpoint.pressed) {
       if (timedRun()) {
         toast.show('No checkpoints on a timed run');
@@ -1435,6 +1503,9 @@ startLoop(
     }
 
     copySkierState(skierPrev, skier);
+    // Multiplayer (milestone 27): shot by the developer in the lobby crashes this rider, along the shot.
+    const shot = mp?.takeHit();
+    if (shot) knockDown(skier, built.hf, shot.x, shot.z);
     // The developer's powers (milestone 25): the fly key, aiming (it takes the arrows), a shot.
     dev?.powers.step(devLive(), skier, keys, dt);
     stepSkier(skier, keys, built.course, dt);
@@ -1498,6 +1569,8 @@ startLoop(
         camera.position.copy(freeCamera.from);
         camera.lookAt(freeCamera.at);
       }
+      // Multiplayer (milestone 27): this rider's pose out, the others drawn from theirs (after every camera override: name tags face the camera drawn from).
+      mp?.frame(pose, camera, realFrameTime, waits);
       level.world.view(camera.position.x, camera.position.z, camera.far, snapped || rebuildView, freeCamera !== null);
       rebuildView = false;
       level.world.update(level.run, level.race, frameTime, alpha);

@@ -202,6 +202,8 @@ export class SkierView {
   private lastPolePhase = 1;
   /** How far the arms have dropped from holding poles to hanging loose: up while skating, back down once it stops. */
   private skateArms = 0;
+  /** How solid the rider is drawn (setFade). */
+  private fadeBy = 1;
 
   constructor(scene: Scene, hf: Heightfield, outfit: Outfit = DEFAULT_OUTFIT) {
     this.hf = hf;
@@ -414,7 +416,29 @@ export class SkierView {
     this.shadow.quaternion.setFromUnitVectors(UP, this.groundNormal);
     const fade = Math.max(0.15, 1 - height / 6);
     this.shadow.scale.setScalar(0.75 + 0.25 * fade);
-    this.shadowMaterial.opacity = SHADOW_OPACITY * fade;
+    this.shadowMaterial.opacity = SHADOW_OPACITY * fade * this.fadeBy;
+  }
+
+  /** Shows or hides the rider and its shadow (milestone 27: another rider, drawn as a stand-in instead). */
+  setVisible(on: boolean): void {
+    this.root.visible = on;
+    this.shadow.visible = on;
+  }
+
+  /** Fades the body and shadow (milestone 27: another rider shown as away); 1 is solid. */
+  setFade(fade: number): void {
+    if (fade === this.fadeBy) return;
+    this.fadeBy = fade;
+    this.rig.setOpacity(fade);
+  }
+
+  /** Takes the rider out of the scene and frees it (milestone 27: another rider left). */
+  dispose(): void {
+    this.root.removeFromParent();
+    this.shadow.removeFromParent();
+    this.rig.dispose();
+    this.shadow.geometry.dispose();
+    this.shadowMaterial.dispose();
   }
 
   /**

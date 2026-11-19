@@ -19,6 +19,7 @@ export type Action =
   | 'trailMap'
   | 'board'
   | 'camera'
+  | 'chat'
   | 'pause'
   | GrabAction;
 
@@ -61,6 +62,7 @@ export const ACTIONS: readonly Action[] = [
   'trailMap',
   'board',
   'camera',
+  'chat',
   'pause',
   ...GRAB_ACTIONS,
 ];
@@ -85,6 +87,8 @@ export const DEFAULT_BINDINGS: Bindings = {
   board: ['KeyL'],
   // Switches between the chase camera and first person (milestone 18).
   camera: ['KeyH'],
+  // Opens the chat box in a multiplayer lobby (milestone 27).
+  chat: ['KeyY'],
   // Esc opens the pause menu too, but it isn't a binding: in fullscreen the browser takes it.
   pause: ['KeyP'],
   grabLeftMute: ['KeyA'],
@@ -127,6 +131,8 @@ export const DEFAULT_PAD_BINDINGS: Bindings = {
   trailMap: ['PadView'],
   board: ['PadR3'],
   camera: ['PadL3'],
+  // Chat needs a keyboard: no button.
+  chat: [],
   pause: ['PadStart'],
   grabLeftMute: ['PadRSLeft'],
   grabLeftSafety: ['PadRSDownLeft'],

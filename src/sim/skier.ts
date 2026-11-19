@@ -50,7 +50,7 @@ import { groundAt, heightAt } from './terrain.ts';
 // skis on round its bends only while they're fast enough.
 
 /** Why the last landing was a crash ('' if it was clean). */
-export type BailReason = '' | 'pitch' | 'edge' | 'sideways' | 'impact' | 'head' | 'obstacle' | 'avalanche';
+export type BailReason = '' | 'pitch' | 'edge' | 'sideways' | 'impact' | 'head' | 'obstacle' | 'avalanche' | 'shot';
 
 export interface SkierState {
   /** Feet position on the snow. */
@@ -1304,6 +1304,28 @@ export function buryInSlide(s: SkierState, hf: Heightfield, vx: number, vz: numb
   s.velocity.set(vx, 0, vz);
   s.velocity.addScaledVector(n, -s.velocity.dot(n));
   s.airTime = 0;
+}
+
+/**
+ * Shot by the developer in a multiplayer lobby (milestone 27): a crash
+ * where the rider is, knocked along the shot's flat direction (x, z, a unit
+ * vector). On the snow it tumbles from there; in the air it falls and tumbles.
+ * Only main calls it, when the lobby passes on a hit; no tool does, so the
+ * sim is unchanged everywhere else. Nothing on the chairlift or in flight.
+ */
+export function knockDown(s: SkierState, hf: Heightfield, x: number, z: number): void {
+  if (s.bailed || s.lift >= 0 || s.flight !== 0) return;
+  const K = CONFIG.mp;
+  const air = !s.grounded;
+  if (air) contactNormal.set(0, 1, 0);
+  else s.position.y = groundAt(hf, s.position.x, s.position.z, contactNormal);
+  crash(s, 'shot');
+  if (air) s.grounded = false;
+  s.velocity.x += x * K.knock;
+  s.velocity.z += z * K.knock;
+  s.velocity.y += K.knockUp;
+  // Tumbling about the axis across the shot.
+  s.spin.set(z, 0, -x).multiplyScalar(K.knockSpin);
 }
 
 /** Crash: the body rolls and slides to a stop. The game decides when to respawn. */

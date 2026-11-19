@@ -79,6 +79,27 @@ If the Worker is down or blocked, the game still plays, and the boards say
 5. **Check** with `node tools/dev/devHash.ts --check` that neither the
    nickname nor the code is in the repo or `dist/`.
 
+## Multiplayer (milestone 27)
+
+`src/room.ts` (one Durable Object per lobby: joins, the relay, chat, scores,
+the developer's hits, rate limits; and the socket test's echo) and
+`src/lobbies.ts` (each map's list of open lobbies), both SQLite-backed (the only
+kind on the free plan), bound in `wrangler.jsonc` with migrations `v1` and
+`v2`. The rules both sides share are in `src/online/mpRules.ts`.
+
+- **Test locally:** `npm run dev` in one terminal, `npm run test:mp` in
+  another (about a minute; prints each check). `node test/bots.mjs <code> <n>`
+  puts `n` riders circling the Park's start in a lobby, for frame-time checks.
+- **The socket test page** is `public/net-test.html` on the game's site
+  (`https://parklaps.web.app/net-test.html`): it shows its own results and
+  log, for a managed Chromebook without DevTools.
+- **Deploy** with `npm run deploy` (it changes the live game: ask first), and
+  deploy the Worker before pushing a game that needs a newer layout.
+- **Cost** on Workers Free: a socket's opening is one request, incoming
+  messages 20 to one; the game sends 5 a second while riding (about 111
+  rider-hours a day for everyone). Past the day's quota, joining says
+  "Multiplayer is full today" and riding alone goes on.
+
 ## Changing it later
 
 - A new board (a map or a Slalom course): add it to `src/online/limits.ts` and

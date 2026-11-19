@@ -68,6 +68,7 @@ export const ACTION_NAMES: Record<Action, string> = {
   trailMap: 'Corner map',
   board: 'Leaderboard at the finish',
   camera: 'Camera: chase or first person',
+  chat: 'Chat (in a lobby)',
   pause: 'Pause',
   grabLeftMute: 'Left mute',
   grabLeftSafety: 'Left safety',

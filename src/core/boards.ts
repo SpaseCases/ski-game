@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.ts';
-import { aspectOf, CUSTOM_SLOTS, graphicColor, statsFrom, type Layer, type SkiGraphic, type SkiModel, type SkiStat, type UV } from './skis.ts';
+import { aspectOf, CUSTOM_SLOTS, graphicColor, RIDER_GRAPHICS, statsFrom, type Layer, type SkiGraphic, type SkiModel, type SkiStat, type UV } from './skis.ts';
 
 // The snowboards (milestone 22), as data in the ski's format (core/skis.ts),
 // so the ski painter and render/skiModel.ts build them and the Locker's rack
@@ -282,7 +282,7 @@ export const CUSTOM_BOARDS: Record<BoardId, (SkiGraphic | null)[]> = {
 /** The graphic with this id on that board (a stock one or a painted custom slot), or the board's first. */
 export function boardGraphic(id: BoardId, graphic: string): SkiGraphic {
   const type = boardType(id);
-  return type.graphics.find((g) => g.id === graphic) ?? CUSTOM_BOARDS[type.id].find((g) => g?.id === graphic) ?? type.graphics[0]!;
+  return type.graphics.find((g) => g.id === graphic) ?? CUSTOM_BOARDS[type.id].find((g) => g?.id === graphic) ?? RIDER_GRAPHICS.get(graphic) ?? type.graphics[0]!;
 }
 
 /** How the board compares with the park board (1), as the skis' stat bars (core/skis.ts skiStats). */
