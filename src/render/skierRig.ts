@@ -194,7 +194,7 @@ export class SkierRig {
       this.forearms.push(add(new BufferGeometry()));
       this.thighs.push(add(buildThigh(pants, side)));
       this.shins.push(add(new BufferGeometry()));
-      this.feet.push(add(buildFoot(side, c.boots, buildSki(outfit, side))));
+      this.feet.push(add(buildFoot(c.boots, buildSki(outfit, side))));
       this.poles.push(add(pole));
     }
     this.setShins(pants, c.boots);
@@ -227,7 +227,7 @@ export class SkierRig {
     const boots = colors(this.outfit).boots;
     this.feet.forEach((m, i) => {
       const side = i === 0 ? -1 : 1;
-      swap([m], on ? buildBoardFoot(side, boots) : buildFoot(side, boots, buildSki(this.outfit, side)));
+      swap([m], on ? buildBoardFoot(side, boots) : buildFoot(boots, buildSki(this.outfit, side)));
     });
     swap([this.board], on ? buildBoard(this.outfit) : new BufferGeometry());
     this.board.visible = on;
@@ -259,7 +259,7 @@ export class SkierRig {
     if (changed('boots', 'ski', 'skiGraphic')) {
       this.feet.forEach((m, i) => {
         const side = i === 0 ? -1 : 1;
-        swap([m], this.boardMode ? buildBoardFoot(side, c.boots) : buildFoot(side, c.boots, buildSki(next, side)));
+        swap([m], this.boardMode ? buildBoardFoot(side, c.boots) : buildFoot(c.boots, buildSki(next, side)));
       });
     }
     // The hood is the jacket's color.
@@ -280,7 +280,7 @@ export class SkierRig {
     const boots = colors(this.outfit).boots;
     this.feet.forEach((m, i) => {
       const side = i === 0 ? -1 : 1;
-      swap([m], buildFoot(side, boots, buildSki(this.outfit, side)));
+      swap([m], buildFoot(boots, buildSki(this.outfit, side)));
     });
   }
 
@@ -2423,8 +2423,8 @@ function buildShin(w: Wear, boot: Color, side: number): BufferGeometry {
 /** Baggy park pants: thigh and knee radius, and the flared hem's. */
 const PANTS = { thigh: THIGH_RADIUS, knee: 0.116, hem: 0.132 };
 
-/** Boot (shell, sole, buckles), binding and `ski` (from buildSki), in the foot frame (origin at the ankle). */
-function buildFoot(side: number, boot: Color, ski: BufferGeometry): BufferGeometry {
+/** Boot (shell, sole), binding (with its heel buckle) and `ski` (from buildSki), in the foot frame (origin at the ankle). */
+function buildFoot(boot: Color, ski: BufferGeometry): BufferGeometry {
   const parts = [
     paint(bootShell(), boot),
     paint(new BoxGeometry(0.118, 0.022, 0.33).translate(0, -0.104, -0.015), FIXED.bootSole),
@@ -2435,14 +2435,10 @@ function buildFoot(side: number, boot: Color, ski: BufferGeometry): BufferGeomet
     paint(new BoxGeometry(0.05, 0.012, 0.03).translate(0, -0.074, 0.19), FIXED.buckle),
     ski,
   ];
-  // Buckles on the outside of the instep and cuff.
-  for (const [y, z] of [
-    [-0.035, -0.07],
-    [0.0, 0.0],
-    [0.06, 0.02],
-  ] as const) {
-    parts.push(paint(new BoxGeometry(0.014, 0.02, 0.056).translate(side * 0.069, y, z), FIXED.buckle));
-  }
+  // No buckles on the boot's sides (milestone 28): under the pants' flared
+  // hem they never showed, and with the legs hidden in first person (a
+  // grab's view, level air, the dev scope) the two on the cuff, which the
+  // shin carries, were left floating beside the boot as white dots.
   return merge(parts);
 }
 

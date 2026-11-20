@@ -674,6 +674,14 @@ export const CONFIG = {
     firstTurnRate: 9,
     firstAirPitchMin: -0.8,
     firstAirPitchMax: 0.3,
+    /**
+     * Milestone 28. Head-locked in the air, the look over the shoulder that
+     * riding switch needs unwinds through a spin (or winds up, normal to
+     * switch) at firstStanceRate per second, so a 180 lands looking down the
+     * hill. (On the snow, slow, the view leans toward the end of the skis
+     * nearer where it looks: the tips, or the tails riding switch.)
+     */
+    firstStanceRate: 7,
     /** Share of the body's turn lean the view rolls with on the snow, eased at firstLeanRate per second. */
     firstLeanShare: 0.33,
     firstLeanRate: 8,
@@ -688,10 +696,12 @@ export const CONFIG = {
     /** Lowest the eye goes over the drawn snow (m). */
     firstClearance: 0.3,
     /**
-     * Holding a grab or style move in the air, the view pans straight down
-     * at the snow below (the way it was heading at the top of the screen),
-     * showing only the mittens, poles, boots and skis, easing in and out at
-     * firstGrabRate per second.
+     * Holding a grab or style move in the air, the view looks from the head
+     * down the body at the skis, their tips (the board's nose) at the top of
+     * the screen, and turns with the body through flips and corks (milestone
+     * 28; before, it panned straight down at the snow), showing only the
+     * mittens, poles, boots and skis, easing in and out at firstGrabRate per
+     * second.
      */
     firstGrabRate: 6,
     /** Drag to look: how far (radians) up and down, and either way round. */
@@ -1405,6 +1415,8 @@ export const CONFIG = {
       /** Recoil: the kick up (rad), and how quickly it settles (1/s). */
       kick: 0.05,
       settle: 5,
+      /** Slower than this (m/s) on the snow when the aim begins, the rider is held where it stands until the aim ends (milestone 28). */
+      pinSpeed: 0.5,
     },
     shot: {
       /** Seconds between shots (a bolt action), and how far a shot reaches (m). */

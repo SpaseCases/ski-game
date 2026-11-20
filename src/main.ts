@@ -1509,6 +1509,8 @@ startLoop(
     // The developer's powers (milestone 25): the fly key, aiming (it takes the arrows), a shot.
     dev?.powers.step(devLive(), skier, keys, dt);
     stepSkier(skier, keys, built.course, dt);
+    // Stopped when the aim began (milestone 28): held where it stood until the aim ends.
+    dev?.powers.hold(skier);
     // Avalanches (milestone 21): their slides run on the course, after the skier.
     const slides = built.course.avalanches;
     if (slides) {

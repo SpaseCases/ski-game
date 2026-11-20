@@ -28,16 +28,18 @@ const qStep = new Quaternion();
 const qAxis = new Quaternion();
 const inverse = new Quaternion();
 const headUp = new Vector3();
-const DOWN = new Vector3(0, -1, 0);
 /** Grabs (GRAB_ACTIONS indices) that read only with the legs drawn while looking down: both japans and the spread eagle. */
 const LEG_GRABS: readonly number[] = [2, 6, 13];
 /** On a snowboard (milestone 22): the method, the japan, the roast beef, the poke and the stiffy, which read only with the legs (the rocket air's front knee comes up to the eye, so its view shows the board, boots and hands). */
 const BOARD_LEG_GRABS: readonly number[] = [2, 3, 6, 11, 13];
-const heading = new Vector3();
-const toBoard = new Vector3();
-/** A board grab's view leans from straight down toward the board by at most this (m across per m down). */
-const BOARD_AIM_MAX = 0.6;
+const toFeet = new Vector3();
+/** A grab's view leans from the body's down toward the feet by at most this (m across per m down). */
+const FEET_AIM_MAX = 0.6;
 const grabView = new Quaternion();
+const bodyUp = new Vector3();
+const bodyDown = new Vector3();
+const bodyTips = new Vector3();
+const bodyRight = new Vector3();
 const chasePos = new Vector3();
 const chaseQ = new Quaternion();
 const chaseUp = new Vector3();
@@ -73,19 +75,37 @@ export class FirstPerson {
   /** How far the view has turned to look down at the skis for a grab (0..1), and the grab it last looked at (kept while easing back up). */
   grabLook = 0;
   lastGrab = -1;
-  /** The way the grab view's top points: the flight path's heading across the ground (kept while too slow to say). */
-  private readonly grabHeading = new Vector3();
+  /**
+   * Head-locked in the air (milestone 28): the turn (radians round the
+   * world's up) added to the head-locked view so the look over the shoulder
+   * that riding switch needs unwinds through a spin to the stance the skis
+   * now face (or winds up, normal to switch): a 180 lands looking down the
+   * hill, with no half turn of the view after. `stanceAtTakeoff` is that
+   * stance (0 forward, π switch); `bodyHeading` the body's last heading
+   * across the ground and `spinSide` which way it last turned.
+   */
+  private unwind = 0;
+  /** What `unwind` eases toward, and the stance, the head's turn on the body (radians) at takeoff and the stance now. */
+  private owed = 0;
+  private headAtTakeoff = 0;
+  private stanceNow = 0;
+  private stanceAtTakeoff = 0;
+  private bodyHeading = 0;
+  private spinSide = 1;
   private lookYaw = 0;
   private lookPitch = 0;
   private sinceDrag = Infinity;
   private bobPhase = 0;
   /** The last heading looked along on the snow (for a stop, when travel says nothing). */
   private heading = 0;
+  /** This update drops all easing (see update's `snap`). */
+  private snapping = false;
 
   /** Works out this frame's view. `snap` drops all easing (a respawn, a skipped lift ride, switching in at rest). */
   update(pose: SkierPose, rig: SkierRig, hf: Heightfield, frameTime: number, drag: OrbitDrag, air: FirstAir, snap: boolean): void {
     const c = CONFIG.camera;
     rig.eye(this.middle, this.head);
+    this.snapping = snap;
     if (snap) {
       this.lookYaw = 0;
       this.lookPitch = 0;
@@ -102,15 +122,39 @@ export class FirstPerson {
 
     const flying = !pose.grounded && !pose.bailed;
     if (flying && air === 'head') {
-      if (snap || !this.locked) {
+      const v = pose.velocity;
+      if (v.x * v.x + v.z * v.z > 0.25) this.heading = Math.atan2(-v.x, -v.z);
+      const takeoff = snap || !this.locked;
+      const body = this.bodyFacing(pose, takeoff);
+      // The stance the body is in against the flight path: past a quarter turn either way it's switch.
+      const stance = Math.abs(wrapAngle(body - this.heading)) > Math.PI / 2 ? Math.PI : 0;
+      // How the head is turned on the body (riding switch it looks back over a shoulder, on a board more so).
+      const headOnBody = wrapAngle(headingOf(this.head, body) - body);
+      if (takeoff) {
         if (snap) this.targetView(pose, true, this.base);
         this.locked = true;
         this.takeoffHead.copy(this.head);
         this.takeoffView.copy(this.base);
+        this.unwind = 0;
+        this.stanceAtTakeoff = stance;
+        this.stanceNow = stance;
+        this.headAtTakeoff = headOnBody;
       }
-      // view = (head now × head at takeoff⁻¹) × view at takeoff
+      // The turn still owed: from takeoff's stance to this one (0 or a half
+      // turn), less the head's own turn on the body since takeoff, so the
+      // view turns with the body's spin. Taken the nearest way round; as the
+      // stance changes, against the spin, so the view comes back rather than
+      // spinning on past.
+      const owed = this.stanceAtTakeoff - stance - wrapAngle(headOnBody - this.headAtTakeoff);
+      // Kept continuous with last frame's (whole turns apart); a stance change moves it half a turn, against the spin.
+      const from = stance === this.stanceNow ? this.owed : this.owed - this.spinSide * Math.PI;
+      this.stanceNow = stance;
+      this.owed = takeoff ? 0 : owed + Math.round((from - owed) / (2 * Math.PI)) * 2 * Math.PI;
+      this.unwind += (this.owed - this.unwind) * (snap ? 1 : smoothing(c.firstStanceRate, frameTime));
+      // view = turn owed × (head now × head at takeoff⁻¹) × view at takeoff
       inverse.copy(this.takeoffHead).invert();
       this.base.copy(this.head).multiply(inverse).multiply(this.takeoffView);
+      if (this.unwind !== 0) this.base.premultiply(qAxis.setFromAxisAngle(UP, this.unwind));
     } else {
       this.locked = false;
       this.targetView(pose, flying, target);
@@ -147,26 +191,26 @@ export class FirstPerson {
     if (this.roll !== 0) q.multiply(qAxis.setFromAxisAngle(Z_AXIS, this.roll));
     if (this.lookPitch !== 0) q.multiply(qAxis.setFromAxisAngle(X_AXIS, this.lookPitch));
     if (this.grabLook > 0.001) {
-      // Panned straight down at the snow below, the way the rider is flying at
-      // the top of the screen (no roll). The heading comes from the flight
-      // path, not the view: upside down in a flip the view's own forward
-      // points back the other way, and taking the heading from it spun the
-      // downward view half round mid-flip.
-      const v = pose.velocity;
-      if (v.x * v.x + v.z * v.z > 1) this.grabHeading.set(v.x, 0, v.z).normalize();
-      else if (snap || this.grabHeading.lengthSq() < 0.5) this.grabHeading.set(-Math.sin(pose.yaw), 0, -Math.cos(pose.yaw));
-      heading.copy(this.grabHeading);
-      // On a snowboard (milestone 22) the head is out over the toes in a grab, not over the board: the
-      // view leans from straight down toward the board (by its offset across the ground, so it never
-      // jumps however the body is turned).
-      if (rig.onBoard) {
-        rig.root.updateWorldMatrix(true, false);
-        toBoard.copy(rig.feetCenter).applyMatrix4(rig.root.matrixWorld).sub(this.middle).setY(0);
-        const across = toBoard.length();
-        if (across > BOARD_AIM_MAX) toBoard.multiplyScalar(BOARD_AIM_MAX / across);
-        toBoard.y = -1;
-        look.lookAt(ORIGIN, toBoard.normalize(), heading);
-      } else look.lookAt(ORIGIN, DOWN, heading);
+      // Looking from the head down the body to the skis, their tips (the
+      // board's nose) at the top of the screen, turned with the body
+      // (milestone 28): through a flip or a cork the skis stay in view and
+      // the sky and the slope swing past behind them. (Before, it panned
+      // straight down at the snow, so upside down the skis left the view.)
+      bodyUp.set(0, 1, 0).applyQuaternion(pose.orient);
+      bodyTips.set(0, 0, -1).applyQuaternion(pose.orient);
+      bodyDown.copy(bodyUp).negate();
+      // The head is seldom right over the feet in a grab (on a board it's
+      // out over the toes; on skis the crouch puts the feet behind it): the
+      // view leans from the body's down toward the feet (by their offset
+      // across the body, at most FEET_AIM_MAX, so it never jumps however the
+      // body is turned).
+      rig.root.updateWorldMatrix(true, false);
+      toFeet.copy(rig.feetCenter).applyMatrix4(rig.root.matrixWorld).sub(this.middle);
+      toFeet.addScaledVector(bodyUp, -toFeet.dot(bodyUp));
+      const across = toFeet.length();
+      if (across > FEET_AIM_MAX) toFeet.multiplyScalar(FEET_AIM_MAX / across);
+      bodyDown.add(toFeet).normalize();
+      look.lookAt(ORIGIN, bodyDown, bodyTips);
       grabView.setFromRotationMatrix(look);
       const g = this.grabLook;
       q.slerp(grabView, g * g * (3 - 2 * g));
@@ -192,6 +236,15 @@ export class FirstPerson {
     p.y = Math.max(p.y, drawnHeightAt(hf, p.x, p.z) + c.firstClearance);
   }
 
+  /** The body's heading across the ground (headingOf, kept through a cork), noting which way it turned since last frame (`spinSide`) unless `reset`. */
+  private bodyFacing(pose: SkierPose, reset: boolean): number {
+    const heading = headingOf(pose.orient, this.bodyHeading);
+    const turned = wrapAngle(heading - this.bodyHeading);
+    if (!reset && Math.abs(turned) > 1e-4) this.spinSide = turned > 0 ? 1 : -1;
+    this.bodyHeading = heading;
+    return heading;
+  }
+
   /** Where the view eases toward when not head-locked: along the travel (level in the air), or the chair's heading. */
   private targetView(pose: SkierPose, flying: boolean, out: Quaternion): void {
     const c = CONFIG.camera;
@@ -214,7 +267,22 @@ export class FirstPerson {
     } else {
       // Along the travel, toward where the skis point when slow (as the chase heading), down the slope or the rail.
       const t = clamp((hspeed - c.travelMinSpeed) / (c.travelFullSpeed - c.travelMinSpeed), 0, 1);
-      this.heading = pose.yaw + wrapAngle(Math.atan2(-v.x, -v.z) - pose.yaw) * t;
+      // Slow, it leans toward the end of the skis nearer where the view looks
+      // now (the tips going forward, the tails riding switch), never across
+      // them (milestone 28: blending the angle from the tips flipped sides as
+      // switch riding crossed a half turn, and a slow turn from switch
+      // whipped the view most of the way round in a second). A pivot from
+      // switch to forward on the spot hands the view from the tails to the
+      // tips as they pass it, so it stays looking down the hill.
+      // (Snapping in, a respawn say, the view from before says nothing: the tips.)
+      forward.set(0, 0, -1).applyQuaternion(this.base);
+      const looking = this.snapping ? pose.yaw : forward.x * forward.x + forward.z * forward.z > 0.01 ? Math.atan2(-forward.x, -forward.z) : this.heading;
+      const end = Math.cos(looking - pose.yaw) >= 0 ? 1 : -1;
+      // (Under travelMinSpeed, t is 0: just that end.)
+      const hx = -Math.sin(pose.yaw) * end * (1 - t) + (t > 0 ? (v.x / hspeed) * t : 0);
+      const hz = -Math.cos(pose.yaw) * end * (1 - t) + (t > 0 ? (v.z / hspeed) * t : 0);
+      if (hx * hx + hz * hz > 0.01) this.heading = Math.atan2(-hx, -hz);
+      else this.heading = end > 0 ? pose.yaw : wrapAngle(pose.yaw + Math.PI);
       flat.set(-Math.sin(this.heading), 0, -Math.cos(this.heading));
       if (pose.onRail && v.length() > 1) forward.copy(v).normalize();
       else forward.copy(flat).addScaledVector(pose.normal, -flat.dot(pose.normal)).normalize();
@@ -290,6 +358,20 @@ export class GameCamera {
     const grab = !atEye || first.grabLook <= 0.2 ? 0 : legs.includes(first.lastGrab) ? 2 : 1;
     rig.setHidden(atEye, atEye && flying && this.firstAir === 'level', grab);
   }
+}
+
+/**
+ * The heading across the ground (radians, as the sim's yaw) that something
+ * turned by `q` faces, from its right-hand side (+X) so a flip, which turns
+ * round that side, leaves it be; `fallback` while that side stands near
+ * upright (a cork).
+ */
+function headingOf(q: Quaternion, fallback: number): number {
+  bodyRight.set(1, 0, 0).applyQuaternion(q);
+  // Forward across the ground: up × right.
+  const fx = bodyRight.z;
+  const fz = -bodyRight.x;
+  return fx * fx + fz * fz > 0.09 ? Math.atan2(-fx, -fz) : fallback;
 }
 
 function setFov(camera: PerspectiveCamera, fov: number): void {

@@ -82,6 +82,15 @@ export class DevPowers {
   private readonly modelFore = new Vector3();
   /** Held U this step (and not crashed): the arrows aim instead of steering. */
   private aiming = false;
+  /**
+   * Stopped on the snow when the aim began (milestone 28): held exactly
+   * where it stood (`pinAt`, `pinCenter`) until the aim ends, however steep
+   * the slope. Aiming takes ↓, so a rider stopped by the brake used to let
+   * go of it and slide off.
+   */
+  private pinned = false;
+  private readonly pinAt = new Vector3();
+  private readonly pinCenter = new Vector3();
   private aimX = 0;
   private aimY = 0;
   /** The pole key held while aiming: fine aim. */
@@ -131,6 +140,7 @@ export class DevPowers {
     this.keys.sample();
     if (!on) {
       this.aiming = false;
+      this.pinned = false;
       this.fireQueued = false;
       flightKeys.hover = false;
       if (s.flight === 1) toggleLanding(s);
@@ -141,7 +151,14 @@ export class DevPowers {
       if (s.flight === 0) startFlight(s);
       else toggleLanding(s);
     }
+    const was = this.aiming;
     this.aiming = k.aim.held && !s.bailed;
+    if (this.aiming && !was) {
+      this.pinned = s.grounded && s.rail < 0 && s.lift < 0 && s.liftChair === -1 && s.flight === 0 && s.velocity.length() < CONFIG.dev.scope.pinSpeed;
+      this.pinAt.copy(s.position);
+      this.pinCenter.copy(s.center);
+    }
+    if (!this.aiming || s.flight !== 0) this.pinned = false;
     flightKeys.hover = k.space.held && !this.aiming;
     if (this.aiming) {
       this.aimX = (input.right.held ? 1 : 0) - (input.left.held ? 1 : 0);
@@ -162,6 +179,23 @@ export class DevPowers {
       this.fireQueued = true;
       this.reload = CONFIG.dev.shot.reload;
     }
+  }
+
+  /**
+   * After each fixed step (milestone 28): a rider pinned for the aim is put
+   * back where it stood, at rest. Anything that crashes it (an avalanche, a
+   * shot in a lobby) lets go.
+   */
+  hold(s: SkierState): void {
+    if (!this.pinned) return;
+    if (s.bailed || !s.grounded) {
+      this.pinned = false;
+      return;
+    }
+    s.position.copy(this.pinAt);
+    s.center.copy(this.pinCenter);
+    s.velocity.set(0, 0, 0);
+    s.yawRate = 0;
   }
 
   /**
