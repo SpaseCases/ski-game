@@ -982,7 +982,8 @@ const terrain = {
   lanes,
   hills: { amplitude: 20, wavelength: 200 },
 };
-const peaks = { seed: 41, count: 12, rings: 3, distance: [12000, 30000], base: -900, height: [1400, 3000], snowLine: 500 };
+// The foothills stay low for 1.2 km past the map's ground, so they stand back from the base.
+const peaks = { seed: 41, count: 12, rings: 3, distance: [12000, 30000], base: -900, height: [1400, 3000], snowLine: 500, clear: 1200 };
 const map = { name: 'Proving Ground', terrain, features, spawn, flags, finishes: [finish], decor, runs, colors: { sky: '#7fb4e6', fog: '#d6e6f4' }, peaks, gaps };
 
 // ---------------------------------------------------------------- the loop

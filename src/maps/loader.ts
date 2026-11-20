@@ -148,6 +148,7 @@ function parsePeaks(raw: unknown): PeaksDef {
     base: n('base'),
     height: pair(o.height, 'peaks.height'),
     snowLine: n('snowLine'),
+    clear: n('clear', 0),
   };
 }
 

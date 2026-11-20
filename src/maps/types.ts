@@ -977,6 +977,12 @@ export interface PeaksDef {
   height: [number, number];
   /** Snow line (m): rock below it, snow above. */
   snowLine: number;
+  /**
+   * How far (m) past the map's ground the foothills stay low (at the height
+   * of the map's edge) before their ridges start to rise (default 0).
+   * Proving Ground's push them back from its base.
+   */
+  clear: number;
 }
 
 /**

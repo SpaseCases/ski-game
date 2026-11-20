@@ -723,7 +723,7 @@ function skylineGeometry(map: MapDef, hf: Heightfield): BufferGeometry | null {
   const tall = map.features.filter((f): f is BuildingFeature => {
     if (f.type !== 'building' || f.eave < SKYLINE_EAVE) return false;
     const mid = framePoint(townFrame(f), f.length / 2, 0);
-    return Math.hypot(mid.x - ring.cx, mid.z - ring.cz) + Math.hypot(f.length, f.width) / 2 < ring.inner + STAND_IN_CLIP;
+    return ringOut(ring, mid.x, mid.z) + Math.hypot(f.length, f.width) / 2 < STAND_IN_CLIP;
   });
   if (tall.length === 0) return null;
   const pos: number[] = [];
@@ -821,13 +821,53 @@ function fogGroundGeometry(hf: Heightfield): BufferGeometry {
   return g;
 }
 
-/** The ring the foothills start on: round the heightfield's middle (a mountain's summit, or halfway down a long slope), a little in from its nearer edges. */
-function plainRing(hf: Heightfield): { cx: number; cz: number; inner: number } {
+/**
+ * The ring the foothills start on, a little in from the heightfield's edges
+ * all round: round its middle (a mountain's summit, or halfway down a long
+ * slope) with radius `inner`, drawn out along a longer side by `half` m
+ * each way (a stadium; a circle on square ground). Before (milestone 28's
+ * follow-up), it was a circle the size of the shorter side, so on a long
+ * slope (Proving Ground: 579 m by 1,911 m) the foothills lay over the top
+ * and bottom of the ridable ground: riders skied under them and saw the sky
+ * through them from below.
+ */
+interface PlainRing {
+  cx: number;
+  cz: number;
+  inner: number;
+  half: number;
+  /** The longer side runs along x (else along z). */
+  alongX: boolean;
+}
+
+function plainRing(hf: Heightfield): PlainRing {
+  const hw = ((hf.cols - 1) * hf.cellSize) / 2 - 60;
+  const hl = ((hf.rows - 1) * hf.cellSize) / 2 - 60;
   return {
     cx: hf.originX + ((hf.cols - 1) * hf.cellSize) / 2,
     cz: hf.originZ + ((hf.rows - 1) * hf.cellSize) / 2,
-    inner: ((Math.min(hf.cols, hf.rows) - 1) * hf.cellSize) / 2 - 60,
+    inner: Math.min(hw, hl),
+    half: Math.abs(hw - hl),
+    alongX: hw > hl,
   };
+}
+
+/** How far (m) a point lies outside the ring (negative inside): its distance from the ring's middle line, less `inner`. */
+function ringOut(ring: PlainRing, x: number, z: number): number {
+  const u = ring.alongX ? x - ring.cx : z - ring.cz;
+  const v = ring.alongX ? z - ring.cz : x - ring.cx;
+  return Math.hypot(Math.max(0, Math.abs(u) - ring.half), v) - ring.inner;
+}
+
+/** How far the ring is from its middle along a direction (dx, dz), a unit vector across the ground. */
+function ringReach(ring: PlainRing, dx: number, dz: number): number {
+  const u = Math.abs(ring.alongX ? dx : dz);
+  const v = Math.abs(ring.alongX ? dz : dx);
+  const R = ring.inner;
+  const L = ring.half;
+  // Out through a straight side, or else through a round end.
+  if (v > 0 && R * u <= L * v) return R / v;
+  return u * L + Math.sqrt(Math.max(0, R * R - L * L * v * v));
 }
 
 /** The heightfield's ground at (x, z), between its samples (clamped to its edges). */
@@ -875,7 +915,7 @@ function litGroundGeometry(hf: Heightfield, trees: readonly ScatterItem[]): Buff
       const k = r * (nc + 1) + c;
       const x = hf.originX + col * hf.cellSize;
       const z = hf.originZ + row * hf.cellSize;
-      const tuck = Math.hypot(x - ring.cx, z - ring.cz) > ring.inner + STAND_IN_CLIP ? STAND_IN_TUCK : 0;
+      const tuck = ringOut(ring, x, z) > STAND_IN_CLIP ? STAND_IN_TUCK : 0;
       px[k * 3] = x;
       px[k * 3 + 1] = (hf.heights[row * hf.cols + col] ?? 0) - STAND_IN_SINK - tuck;
       px[k * 3 + 2] = z;
@@ -973,7 +1013,8 @@ function plainTint(x: number, y: number, z: number, def: PeaksDef): Color {
  * gentler haze further out (see relightPeaks).
  */
 function plainGeometry(hf: Heightfield, def: PeaksDef): PeakColors {
-  const { cx, cz, inner } = plainRing(hf);
+  const ring = plainRing(hf);
+  const { cx, cz } = ring;
   const outer = def.distance[0] * 0.92;
   const relief = (def.height[0] - def.base) * PLAIN_RELIEF;
   const sun = new Vector3(CONFIG.light.sunFrom.x, CONFIG.light.sunFrom.y, CONFIG.light.sunFrom.z).normalize();
@@ -984,10 +1025,14 @@ function plainGeometry(hf: Heightfield, def: PeaksDef): PeakColors {
   const tints = new Map<Vector3, Color>();
   for (let i = 0; i < rings; i++) {
     const t = i / (rings - 1);
-    const rr0 = inner + (outer - inner) * t ** 1.5;
     const row: Vector3[] = [];
     for (let j = 0; j < around; j++) {
       const a = ((j + (i % 2) * 0.5) / around) * Math.PI * 2;
+      // From the ring (round the map's ground), out to the ranges' foot.
+      const inner = ringReach(ring, -Math.sin(a), -Math.cos(a));
+      const rr0 = inner + (outer - inner) * t ** 1.5;
+      // How far on toward the ranges, counted from the end of the map's clear stretch (def.clear) past its ground.
+      const tc = def.clear > 0 ? (Math.max(0, rr0 - inner - def.clear) / (outer - inner - def.clear)) ** (2 / 3) : t;
       const rr = rr0 * (1 + (i === 0 ? 0 : 0.02 * hash2(i, j, def.seed + 11)));
       const x = cx - Math.sin(a) * rr;
       const z = cz - Math.cos(a) * rr;
@@ -996,8 +1041,8 @@ function plainGeometry(hf: Heightfield, def: PeaksDef): PeakColors {
       // noise) growing from nothing and smaller rolls on them.
       const from = groundAt(hf, cx - Math.sin(a) * inner, cz - Math.cos(a) * inner);
       const ridge = 1 - Math.abs(fbm(x / 2400, z / 2400, def.seed + 21));
-      const grow = smoothstep(0.04, 0.5, t);
-      const y = from + (def.base - from) * t + grow * (relief * ridge * ridge + relief * 0.25 * fbm(x / 800, z / 800, def.seed + 13));
+      const grow = smoothstep(0.04, 0.5, tc);
+      const y = from + (def.base - from) * tc + grow * (relief * ridge * ridge + relief * 0.25 * fbm(x / 800, z / 800, def.seed + 13));
       const p = new Vector3(x, y, z);
       row.push(p);
       tints.set(p, plainTint(x, y, z, def));
@@ -1038,7 +1083,7 @@ function plainGeometry(hf: Heightfield, def: PeaksDef): PeakColors {
     const far = 1 - Math.pow(0.5, d / HAZE_HALF);
     hazes.push(Math.min(1, far * 1.45 + 0.1 + VALLEY_HAZE * smoothstep(VALLEY_TOP, 0, my - def.base)));
     dist.push(d);
-    blend.push(smoothstep(inner, inner + PLAIN_BLEND, d));
+    blend.push(smoothstep(0, PLAIN_BLEND, ringOut(ring, mx, mz)));
     for (const p of flip ? [p0, p2, p1] : [p0, p1, p2]) positions.push(p.x, p.y, p.z);
   };
   for (let i = 0; i < rings - 1; i++) {
