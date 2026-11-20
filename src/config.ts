@@ -676,12 +676,15 @@ export const CONFIG = {
     firstAirPitchMax: 0.3,
     /**
      * Milestone 28. Head-locked in the air, the look over the shoulder that
-     * riding switch needs unwinds through a spin (or winds up, normal to
-     * switch) at firstStanceRate per second, so a 180 lands looking down the
-     * hill. (On the snow, slow, the view leans toward the end of the skis
-     * nearer where it looks: the tips, or the tails riding switch.)
+     * riding switch needs unwinds (or winds up, normal to switch) at
+     * firstStanceRate per second once the body spins slower than
+     * firstSpinHold (rad/s), so a 180 lands looking down the hill and a 360
+     * never turns the view away. (On the snow, slow, the view leans toward
+     * the end of the skis nearer where it looks: the tips, or the tails
+     * riding switch.)
      */
     firstStanceRate: 7,
+    firstSpinHold: 1.5,
     /** Share of the body's turn lean the view rolls with on the snow, eased at firstLeanRate per second. */
     firstLeanShare: 0.33,
     firstLeanRate: 8,

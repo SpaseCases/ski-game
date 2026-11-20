@@ -78,19 +78,19 @@ export class FirstPerson {
   /**
    * Head-locked in the air (milestone 28): the turn (radians round the
    * world's up) added to the head-locked view so the look over the shoulder
-   * that riding switch needs unwinds through a spin to the stance the skis
-   * now face (or winds up, normal to switch): a 180 lands looking down the
-   * hill, with no half turn of the view after. `stanceAtTakeoff` is that
-   * stance (0 forward, π switch); `bodyHeading` the body's last heading
-   * across the ground and `spinSide` which way it last turned.
+   * that riding switch needs unwinds, once a spin stops, to the stance the
+   * skis then face (or winds up, normal to switch): a 180 lands looking down
+   * the hill, with no half turn of the view after, and a 360 (the same
+   * stance) never turns it at all. `stanceAtTakeoff` is that stance (0
+   * forward, π switch), `headAtTakeoff` the head's turn on the body then;
+   * `bodyHeading` the body's last heading across the ground, `bodyTurn` how
+   * far it turned last frame and `spinSide` which way it last turned.
    */
   private unwind = 0;
-  /** What `unwind` eases toward, and the stance, the head's turn on the body (radians) at takeoff and the stance now. */
-  private owed = 0;
   private headAtTakeoff = 0;
-  private stanceNow = 0;
   private stanceAtTakeoff = 0;
   private bodyHeading = 0;
+  private bodyTurn = 0;
   private spinSide = 1;
   private lookYaw = 0;
   private lookPitch = 0;
@@ -137,20 +137,22 @@ export class FirstPerson {
         this.takeoffView.copy(this.base);
         this.unwind = 0;
         this.stanceAtTakeoff = stance;
-        this.stanceNow = stance;
         this.headAtTakeoff = headOnBody;
       }
-      // The turn still owed: from takeoff's stance to this one (0 or a half
-      // turn), less the head's own turn on the body since takeoff, so the
-      // view turns with the body's spin. Taken the nearest way round; as the
-      // stance changes, against the spin, so the view comes back rather than
-      // spinning on past.
-      const owed = this.stanceAtTakeoff - stance - wrapAngle(headOnBody - this.headAtTakeoff);
-      // Kept continuous with last frame's (whole turns apart); a stance change moves it half a turn, against the spin.
-      const from = stance === this.stanceNow ? this.owed : this.owed - this.spinSide * Math.PI;
-      this.stanceNow = stance;
-      this.owed = takeoff ? 0 : owed + Math.round((from - owed) / (2 * Math.PI)) * 2 * Math.PI;
-      this.unwind += (this.owed - this.unwind) * (snap ? 1 : smoothing(c.firstStanceRate, frameTime));
+      // While the body spins (faster than firstSpinHold) the view just turns
+      // with it: mid-360 the stance passes switch and back, and unwinding
+      // then pulled the view back and forth. Once the spin stops it eases
+      // toward the turn owed: from takeoff's stance to this one (0 or a half
+      // turn), less the head's own turn on the body since takeoff. Taken the
+      // nearest way round; a half turn away, against the spin just done, so
+      // the view comes back rather than spinning on past.
+      const spinning = frameTime > 0 && Math.abs(this.bodyTurn) > c.firstSpinHold * frameTime;
+      if (!takeoff && !spinning) {
+        let owed = this.stanceAtTakeoff - stance - wrapAngle(headOnBody - this.headAtTakeoff);
+        owed += Math.round((this.unwind - owed) / (2 * Math.PI)) * 2 * Math.PI;
+        if (Math.abs(owed - this.unwind) > Math.PI - 0.3 && (owed - this.unwind) * this.spinSide > 0) owed -= this.spinSide * 2 * Math.PI;
+        this.unwind += (owed - this.unwind) * (snap ? 1 : smoothing(c.firstStanceRate, frameTime));
+      }
       // view = turn owed × (head now × head at takeoff⁻¹) × view at takeoff
       inverse.copy(this.takeoffHead).invert();
       this.base.copy(this.head).multiply(inverse).multiply(this.takeoffView);
@@ -236,11 +238,12 @@ export class FirstPerson {
     p.y = Math.max(p.y, drawnHeightAt(hf, p.x, p.z) + c.firstClearance);
   }
 
-  /** The body's heading across the ground (headingOf, kept through a cork), noting which way it turned since last frame (`spinSide`) unless `reset`. */
+  /** The body's heading across the ground (headingOf, kept through a cork), noting how far (`bodyTurn`) and which way (`spinSide`) it turned since last frame unless `reset`. */
   private bodyFacing(pose: SkierPose, reset: boolean): number {
     const heading = headingOf(pose.orient, this.bodyHeading);
-    const turned = wrapAngle(heading - this.bodyHeading);
-    if (!reset && Math.abs(turned) > 1e-4) this.spinSide = turned > 0 ? 1 : -1;
+    const turned = reset ? 0 : wrapAngle(heading - this.bodyHeading);
+    this.bodyTurn = turned;
+    if (Math.abs(turned) > 1e-4) this.spinSide = turned > 0 ? 1 : -1;
     this.bodyHeading = heading;
     return heading;
   }
