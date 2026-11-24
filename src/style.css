@@ -645,6 +645,15 @@ body {
   padding-right: 14px;
 }
 
+/* The map select's "Open lobbies" (multiplayer, 2026-11-24): beside "Ride with others", shown only while it's on. */
+.board-link.mp-all {
+  margin-left: 0;
+}
+
+.board-link.mp-all[hidden] {
+  display: none;
+}
+
 /* Map select. */
 .map-grid {
   display: grid;
@@ -2590,6 +2599,32 @@ body {
 
 .corner-map-you svg {
   display: block;
+}
+
+/* The other riders in a lobby (2026-11-24): a dot in their jacket's color, faded while away, under the rider's own arrow. */
+.corner-map-rider {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+}
+
+.corner-map-rider[hidden] {
+  display: none;
+}
+
+.corner-map-rider-dot {
+  width: 11px;
+  height: 11px;
+  margin: -5.5px 0 0 -5.5px;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #4a6fa5;
+  box-shadow: 0 1px 2px rgb(20 32 48 / 0.55);
+}
+
+.corner-map-rider-dot.is-away {
+  opacity: 0.45;
 }
 
 /* A small embed: smaller, so it keeps clear of the score in the middle. */
