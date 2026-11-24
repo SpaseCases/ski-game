@@ -51,6 +51,10 @@ chat, a commit or a file in the repo.
    (Cloudflare stores it encrypted; then delete the downloaded file.)
 4. **Deploy.** `npm run deploy`. Wrangler prints the address,
    `https://parklaps-api.<your-subdomain>.workers.dev`.
+   Away from the PC, the repo's Actions tab has a manual **Deploy Worker**
+   workflow that does the same. It needs the repo secrets `CLOUDFLARE_API_TOKEN`
+   (a Cloudflare token from the *Edit Cloudflare Workers* template) and
+   `CLOUDFLARE_ACCOUNT_ID`. It never runs on a push.
 5. **Check it.** Open
    `https://parklaps-api.<your-subdomain>.workers.dev/v1/top?set=live&board=park`
    in a browser. It should list the current Park board.
