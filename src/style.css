@@ -1810,6 +1810,73 @@ body {
   gap: 4px;
 }
 
+/* The slot's own colors (typed as hex codes): a row of chips like the palette's, dashed where a place is free. */
+.editor-own {
+  margin-top: 6px;
+}
+
+.editor-own-gap {
+  aspect-ratio: 1;
+  min-width: 0;
+  max-height: 26px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.22);
+  background: repeating-linear-gradient(135deg, transparent 0 3px, rgb(255 255 255 / 0.07) 3px 5px);
+}
+
+.editor-own-gap[hidden],
+.editor-own .chip[hidden] {
+  display: none;
+}
+
+/* The hex box: a code typed (Enter or Add), or the browser's own picker. */
+.editor-hex {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  font-size: 14px;
+}
+
+.editor-hex-input.text-box {
+  width: 6.2em;
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.editor-hex-pick {
+  flex: none;
+  width: 36px;
+  height: 32px;
+  padding: 2px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--plank);
+  cursor: pointer;
+}
+
+.editor-hex-pick:focus {
+  outline: 3px solid var(--flag);
+  outline-offset: 2px;
+}
+
+.editor-hex-add.editor-tool {
+  padding: 4px 12px;
+}
+
+.editor-hex-note {
+  min-height: 0;
+  margin: 4px 0 0;
+  color: var(--frost);
+  font-size: 13px;
+}
+
+.editor-hex-note:empty {
+  display: none;
+}
+
 .editor-tools {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -1,8 +1,11 @@
 import {
+  colorName,
   copyStock,
+  customColor,
   customFace,
   customId,
   customLinked,
+  customPalette,
   customSidewall,
   EDIT_PALETTE,
   gearBoard,
@@ -20,6 +23,7 @@ import type { Rect, StageWindow } from '../render/lockerStage.ts';
 import { keycap } from './keyNames.ts';
 import { PaintGrid } from './paintGrid.ts';
 import { previewCanvas } from './lockerMenu.ts';
+import { HexColors } from './hexColors.ts';
 import { board, EDITOR_PAD_HINTS, EDITOR_PAD_KEYS, setHints, type Screen } from './menus.ts';
 import { paintSkis } from './skiThumb.ts';
 import { signText } from './signText.ts';
@@ -134,6 +138,8 @@ export class SkiEditorScreen implements Screen, StageWindow {
   private readonly brushButtons: HTMLButtonElement[] = [];
   private readonly undoButton: HTMLButtonElement;
   private readonly blankSwatches: HTMLElement[] = [];
+  /** A hex code typed or picked, and the slot's own colors (ui/hexColors.ts). */
+  private readonly hex: HexColors;
   private readonly view: HTMLElement;
   /** Everything but the 3D window: the part that scrolls (style.css .editor-main). */
   private readonly main: HTMLElement;
@@ -313,7 +319,12 @@ export class SkiEditorScreen implements Screen, StageWindow {
       chipGrid.appendChild(chip);
       this.chips.push(chip);
     });
-    palette.append(paletteHead, chipGrid);
+    this.hex = new HexColors({
+      palette: () => customPalette(this.gear, this.slot),
+      add: (hex) => customColor(this.gear, this.slot, hex, (i) => this.undo.some((u) => u.sidewall === i || u.top.includes(i) || u.base.includes(i))),
+      pick: (i) => this.setColor(i),
+    });
+    palette.append(paletteHead, chipGrid, this.hex.own, this.hex.el, this.hex.note);
 
     const tools = document.createElement('div');
     tools.className = 'editor-tools';
@@ -395,6 +406,9 @@ export class SkiEditorScreen implements Screen, StageWindow {
     this.g.pair = false;
     this.pickPair = !this.g.onBoard;
     this.g.art = customFace(gear, slot, 'top');
+    // A color of the last slot's own that this one doesn't have: back to the first color new slots get for their bases.
+    if (this.g.color >= customPalette(gear, slot).length) this.g.color = 22;
+    this.hex.reset();
     this.along = Math.floor(this.rows / 2);
     this.x = Math.floor(this.cols / 2);
     this.hoverAlong = -1;
@@ -458,6 +472,12 @@ export class SkiEditorScreen implements Screen, StageWindow {
   }
 
   onKey(e: KeyboardEvent): boolean {
+    // Typing a hex code: the keys are the box's (Esc goes back to the grid).
+    if (this.hex.owns(e.target)) {
+      if (e.key !== 'Escape') return false;
+      this.grid.focus();
+      return true;
+    }
     const onGrid = document.activeElement === this.grid;
     if (onGrid) {
       const move = MOVES[e.key];
@@ -484,7 +504,7 @@ export class SkiEditorScreen implements Screen, StageWindow {
         return true;
       case '[':
       case ']':
-        this.setColor((this.g.color + (key === ']' ? 1 : -1) + EDIT_PALETTE.length) % EDIT_PALETTE.length);
+        this.stepColor(key === ']' ? 1 : -1);
         return true;
     }
     if (e.repeat) return false;
@@ -716,6 +736,12 @@ export class SkiEditorScreen implements Screen, StageWindow {
     this.queueDraw();
   }
 
+  /** [ and ]: the color before or after, round the palette and the slot's own colors. */
+  private stepColor(by: number): void {
+    const n = customPalette(this.gear, this.slot).length;
+    this.setColor((this.g.color + by + n) % n);
+  }
+
   private setTool(tool: Tool): void {
     this.tool = tool;
     this.sync();
@@ -905,7 +931,7 @@ export class SkiEditorScreen implements Screen, StageWindow {
     // The cells and lines, then where the tool would paint under the mouse and the keyboard cursor's box.
     const hover = this.dragging ? -1 : this.hoverAlong;
     this.g.draw(ctx, s, dpr, this.tool === 'pencil', hover, this.hoverX, document.activeElement === this.grid, this.along, this.x);
-    const name = EDIT_PALETTE[cells[this.g.index(this.along, this.x)]!]!.name;
+    const name = colorName(this.g.art.colors, cells[this.g.index(this.along, this.x)]!);
     const where = `${this.place(this.g.sideAt(this.x))}, ${this.face}`;
     this.status.textContent = `${where}: ${this.along + 1} of ${rows} along, ${this.g.colAt(this.x) + 1} of ${cols} across, ${name}`;
   }
@@ -962,12 +988,14 @@ export class SkiEditorScreen implements Screen, StageWindow {
   /** Marks the picked color, tool and switches. */
   private sync(): void {
     this.g.linked = this.linked;
-    const hex = EDIT_PALETTE[this.g.color]!.hex;
+    const palette = customPalette(this.gear, this.slot);
+    const hex = palette[this.g.color]!;
     this.chips.forEach((chip, i) => chip.setAttribute('aria-pressed', String(i === this.g.color)));
-    this.colorName.textContent = EDIT_PALETTE[this.g.color]!.name;
+    this.hex.sync(this.g.color);
+    this.colorName.textContent = colorName(palette, this.g.color);
     this.colorSwatch.style.background = hex;
     for (const s of this.blankSwatches) s.style.background = hex;
-    this.wallSwatch.style.background = EDIT_PALETTE[customSidewall(this.gear, this.slot)]!.hex;
+    this.wallSwatch.style.background = palette[customSidewall(this.gear, this.slot)]!;
     const linked = this.linked;
     const side = this.g.sideAt(this.x);
     this.sideButtons.forEach((b, i) => b.setAttribute('aria-pressed', String(!linked && i === side)));

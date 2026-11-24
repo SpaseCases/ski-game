@@ -95,6 +95,32 @@
   filter: drop-shadow(0 2px 0 rgb(0 0 0 / 0.35));
 }
 
+/* A ski or board card draws its top sheets and its bases; the Top / Base switch shows one. */
+.mk-faces {
+  display: contents;
+}
+
+.mk-grid .mk-face-base,
+.mk-grid.mk-bases .mk-face-top {
+  display: none;
+}
+
+.mk-grid.mk-bases .mk-face-base {
+  display: block;
+}
+
+.mk-faces-pick {
+  flex: 0 0 auto;
+}
+
+.mk-faces-pick .segment {
+  padding: 0 10px;
+}
+
+.mk-faces-pick[hidden] {
+  display: none;
+}
+
 .mk-thumb .lb-look,
 .mk-look .lb-look {
   width: 60px;

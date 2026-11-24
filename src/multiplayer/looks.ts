@@ -23,9 +23,8 @@ export interface PaintKit {
   customId(gear: Gear, slot: number): string;
   boardGear(id: Outfit['board']): Gear;
   graphicFromText(gear: Gear, text: string): SkiGraphic | null;
-  wearFromText(garment: WearGarment, text: string): { cells: Uint8Array; trims: number[] } | null;
-  /** The editor palette's colors (EDIT_PALETTE). */
-  hexes: readonly string[];
+  /** A painted garment slot read, with its palette (EDIT_PALETTE's colors, then the slot's own hex colors). */
+  wearFromText(garment: WearGarment, text: string): { cells: Uint8Array; trims: number[]; colors: readonly string[] } | null;
 }
 let kit: PaintKit | null = null;
 export function setPaintKit(k: PaintKit): void {
@@ -88,7 +87,7 @@ export function paintedLook(outfitJson: string, skisText: string | null, n: numb
   const worn: WornLook = { outfit: out, graphics: [], patterns: [] };
   const saved = parse(skisText);
   if (!saved || !kit) return worn;
-  const { customId, boardGear, graphicFromText, wearFromText, hexes } = kit;
+  const { customId, boardGear, graphicFromText, wearFromText } = kit;
   const slotOf = (gear: Gear, id: string): number => [0, 1, 2].find((s) => customId(gear, s) === id) ?? -1;
   // Skis: customSkis.v1's lists by ski type.
   const skiSlot = slotOf(o.ski, o.skiGraphic);
@@ -122,7 +121,7 @@ export function paintedLook(outfitJson: string, skisText: string | null, n: numb
     const read = text ? wearFromText(g.id, text) : null;
     if (!read) return;
     const pattern = `custom-${1000 + n * 2 + gi}`;
-    setWearArt(g.id, pattern, { cells: read.cells, colors: hexes, trims: read.trims });
+    setWearArt(g.id, pattern, { cells: read.cells, colors: read.colors, trims: read.trims });
     out[g.pattern] = pattern as Outfit['jacketPattern'];
     worn.patterns.push({ garment: g.id, pattern });
   });

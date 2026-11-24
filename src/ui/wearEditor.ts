@@ -1,5 +1,6 @@
-import { EDIT_PALETTE } from '../core/customSkis.ts';
-import { fillStock, openWear, saveCustomWear, wearTrims } from '../core/customWear.ts';
+import { colorName, EDIT_PALETTE } from '../core/customSkis.ts';
+import { fillStock, openWear, saveCustomWear, wearColor, wearPalette, wearTrims } from '../core/customWear.ts';
+import { HexColors } from './hexColors.ts';
 import { GARMENTS, PATTERNS, type Outfit, type StockPattern } from '../core/outfit.ts';
 import type { Rect, StageWindow } from '../render/lockerStage.ts';
 import { BODY_PANEL, CUFFS, layoutSize, POCKETS, wearOffsets, wearPanels, type WearGarment } from '../render/wearPanels.ts';
@@ -84,6 +85,8 @@ export class WearEditorScreen implements Screen, StageWindow {
   private readonly starts: HTMLElement;
   private readonly startSwatches: { el: HTMLElement; pattern: StockPattern | null }[] = [];
   private readonly chips: HTMLButtonElement[] = [];
+  /** A hex code typed or picked, and the slot's own colors (ui/hexColors.ts). */
+  private readonly hex: HexColors;
   private readonly colorName: HTMLElement;
   private readonly colorSwatch: HTMLElement;
   private readonly toolButtons = new Map<Tool, HTMLButtonElement>();
@@ -216,7 +219,12 @@ export class WearEditorScreen implements Screen, StageWindow {
       chipGrid.appendChild(chip);
       this.chips.push(chip);
     });
-    palette.append(paletteHead, chipGrid);
+    this.hex = new HexColors({
+      palette: () => wearPalette(this.garment, this.slot),
+      add: (hex) => wearColor(this.garment, this.slot, hex, (i) => this.undo.some((u) => u.cells.includes(i) || u.trims.includes(i))),
+      pick: (i) => this.setColor(i),
+    });
+    palette.append(paletteHead, chipGrid, this.hex.own, this.hex.el, this.hex.note);
 
     const tools = document.createElement('div');
     tools.className = 'editor-tools';
@@ -303,6 +311,10 @@ export class WearEditorScreen implements Screen, StageWindow {
     this.g.panels = panels;
     this.g.offsets = wearOffsets(garment);
     this.g.cells = openWear(garment, slot, this.hooks.get());
+    this.g.colors = wearPalette(garment, slot);
+    // A color of the last slot's own that this one doesn't have: back to the editor's first color.
+    if (this.g.color >= this.g.colors.length) this.g.color = 22;
+    this.hex.reset();
     const size = layoutSize(garment);
     this.g.width = size.width;
     this.g.height = size.height;
@@ -361,6 +373,12 @@ export class WearEditorScreen implements Screen, StageWindow {
   }
 
   onKey(e: KeyboardEvent): boolean {
+    // Typing a hex code: the keys are the box's (Esc goes back to the grid).
+    if (this.hex.owns(e.target)) {
+      if (e.key !== 'Escape') return false;
+      this.grid.focus();
+      return true;
+    }
     if (document.activeElement === this.grid) {
       const move = MOVES[e.key];
       if (move) {
@@ -388,7 +406,7 @@ export class WearEditorScreen implements Screen, StageWindow {
         return true;
       case '[':
       case ']':
-        this.setColor((this.g.color + (key === ']' ? 1 : -1) + EDIT_PALETTE.length) % EDIT_PALETTE.length);
+        this.setColor((this.g.color + (key === ']' ? 1 : -1) + this.g.colors.length) % this.g.colors.length);
         return true;
     }
     if (e.repeat) return false;
@@ -655,7 +673,7 @@ export class WearEditorScreen implements Screen, StageWindow {
     const i = this.g.index(this.x, this.y);
     if (panel >= 0 && i >= 0) {
       const p = this.g.panels[panel]!;
-      this.status.textContent = `${PANEL_NAMES[this.garment][panel]}: row ${this.y - p.y + 1} of ${p.rows}, square ${this.x - p.x + 1} of ${p.cols} round, ${EDIT_PALETTE[this.g.cells[i]!]!.name}`;
+      this.status.textContent = `${PANEL_NAMES[this.garment][panel]}: row ${this.y - p.y + 1} of ${p.rows}, square ${this.x - p.x + 1} of ${p.cols} round, ${colorName(this.g.colors, this.g.cells[i]!)}`;
     }
   }
 
@@ -686,9 +704,11 @@ export class WearEditorScreen implements Screen, StageWindow {
   private sync(): void {
     const o = this.hooks.get();
     const g = GARMENTS.find((x) => x.id === this.garment)!;
-    const hex = EDIT_PALETTE[this.g.color]!.hex;
+    const palette = this.g.colors;
+    const hex = palette[this.g.color]!;
     this.chips.forEach((chip, i) => chip.setAttribute('aria-pressed', String(i === this.g.color)));
-    this.colorName.textContent = EDIT_PALETTE[this.g.color]!.name;
+    this.hex.sync(this.g.color);
+    this.colorName.textContent = colorName(palette, this.g.color);
     this.colorSwatch.style.background = hex;
     for (const s of this.startSwatches) {
       if (s.pattern) s.el.innerHTML = patternSwatch(s.pattern, o[g.id], o[g.accent]);
@@ -703,7 +723,7 @@ export class WearEditorScreen implements Screen, StageWindow {
     this.trimButtons.forEach(({ button, swatch }, i) => {
       button.hidden = i >= t.length;
       const c = t[i] ?? -1;
-      swatch.style.background = c >= 0 ? EDIT_PALETTE[c]!.hex : own;
+      swatch.style.background = c >= 0 ? (palette[c] ?? own) : own;
       button.setAttribute('aria-pressed', String(c >= 0));
     });
     const what = this.garment === 'jacket' ? 'The jacket laid flat: the right sleeve, the body round from the back with the front in the middle, the left sleeve' : 'The pants laid flat: the seat, then the right leg and the left';

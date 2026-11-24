@@ -53,6 +53,10 @@ export class MarketPanel {
   private readonly kindButtons = new Map<MarketKind | 'all' | 'hidden', HTMLButtonElement>();
   private readonly sortButtons: HTMLButtonElement[] = [];
   private readonly sortRow: HTMLElement;
+  /** Top sheets or bases on the ski and board cards (2026-11-24, the user's ask to see ski bottoms), as in the Locker's rack. */
+  private readonly faceRow: HTMLElement;
+  private readonly faceButtons: HTMLButtonElement[] = [];
+  private bases = false;
   private readonly find: HTMLInputElement;
   private readonly grid: HTMLElement;
   private readonly status: HTMLElement;
@@ -110,7 +114,20 @@ export class MarketPanel {
       clearTimeout(this.searchTimer);
       this.searchTimer = window.setTimeout(() => void this.load(false), SEARCH_DELAY_MS);
     });
-    this.sortRow.append(sorts, this.find);
+    this.faceRow = document.createElement('div');
+    this.faceRow.className = 'segmented mk-faces-pick';
+    this.faceRow.setAttribute('role', 'group');
+    this.faceRow.setAttribute('aria-label', 'Skis and boards show');
+    for (const [base, label] of [
+      [false, 'Top'],
+      [true, 'Base'],
+    ] as const) {
+      const b = segment(label, () => this.setBases(base));
+      b.setAttribute('aria-pressed', String(base === this.bases));
+      this.faceRow.appendChild(b);
+      this.faceButtons.push(b);
+    }
+    this.sortRow.append(sorts, this.faceRow, this.find);
 
     this.grid = document.createElement('div');
     this.grid.className = 'mk-grid';
@@ -165,6 +182,13 @@ export class MarketPanel {
     void this.load(false);
   }
 
+  /** Shows the bases of the ski and board cards (or their top sheets): both are drawn, the grid's class picks. */
+  private setBases(bases: boolean): void {
+    this.bases = bases;
+    this.grid.classList.toggle('mk-bases', bases);
+    this.faceButtons.forEach((b, i) => b.setAttribute('aria-pressed', String((i === 1) === bases)));
+  }
+
   private setSort(sort: MarketSort): void {
     this.sort = sort;
     void this.load(false);
@@ -189,6 +213,8 @@ export class MarketPanel {
       b.disabled = word !== '' || hidden;
     });
     this.find.disabled = hidden;
+    // Top or base only matters where skis or boards show.
+    this.faceRow.hidden = this.kind !== 'all' && this.kind !== 'skis' && this.kind !== 'board' && this.kind !== 'hidden';
     const token = ++this.token;
     if (!more) this.next = null;
     this.more.hidden = true;
