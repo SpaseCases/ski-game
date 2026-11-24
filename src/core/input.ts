@@ -87,8 +87,10 @@ export const DEFAULT_BINDINGS: Bindings = {
   board: ['KeyL'],
   // Switches between the chase camera and first person (milestone 18).
   camera: ['KeyH'],
-  // Opens the chat box in a multiplayer lobby (milestone 27).
-  chat: ['KeyY'],
+  // Opens the chat box in a multiplayer lobby (milestone 27). Y until the
+  // polish after milestone 28: Y is the developer's fly key, so chat moved
+  // to / (core/settings.ts moves a saved Y once).
+  chat: ['Slash'],
   // Esc opens the pause menu too, but it isn't a binding: in fullscreen the browser takes it.
   pause: ['KeyP'],
   grabLeftMute: ['KeyA'],
@@ -182,6 +184,8 @@ export class Keyboard {
   private enabled = true;
   /** "Pop with: ↑": the up key crouches and pops too, and the pop key does nothing. */
   private popWithUp = false;
+  /** Keys that drive no action now (the developer's keys while the powers work, set by main), or null. */
+  private skipped: readonly string[] | null = null;
 
   constructor(bindings: Bindings, padBindings: Bindings = DEFAULT_PAD_BINDINGS) {
     this.setBindings(bindings);
@@ -215,6 +219,15 @@ export class Keyboard {
   setPopWithUp(on: boolean): void {
     this.popWithUp = on;
     this.releaseAll();
+  }
+
+  /**
+   * Keys that drive no action while set (null: none): main passes the
+   * developer's own keys while the powers work, so Y takes off without also
+   * opening the chat (or anything else bound there).
+   */
+  setSkipped(codes: readonly string[] | null): void {
+    this.skipped = codes;
   }
 
   /** True when the key with this code is bound to `action` (whether or not game keys are on). */
@@ -260,7 +273,7 @@ export class Keyboard {
     // Enter and Space on a focused HUD button or link work it, not the game.
     if (isPressable(e.target) && (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space')) return;
     const actions = this.actionsByCode.get(e.code);
-    if (!actions) return;
+    if (!actions || this.skipped?.includes(e.code)) return;
     e.preventDefault(); // stop arrows and Tab from scrolling or moving focus
     this.press(e.code, actions);
   }

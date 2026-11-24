@@ -52,7 +52,16 @@ export interface Settings {
   bindings: Bindings;
   /** The controller's buttons (milestone 26): core/gamepad.ts codes, up to KEY_SLOTS per action like the keys. Missing in older saves: the defaults. */
   padBindings: Bindings;
+  /**
+   * Which one-off key moves a save has had (missing: 0). 1: chat off Y onto
+   * / (the polish after milestone 28; Y is the developer's fly key), so a
+   * player who binds chat to Y again afterwards keeps it.
+   */
+  keysRev: number;
 }
+
+/** The newest one-off key move (see Settings.keysRev). */
+const KEYS_REV = 1;
 
 const KEY = 'settings.v1';
 /** Before settings.v1 only the quality preset was saved, under this key. */
@@ -63,7 +72,7 @@ function isQuality(value: unknown): value is Quality {
 }
 
 export function defaultSettings(): Settings {
-  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, popWith: 'pop', camera: 'chase', firstAir: 'head', cornerMap: true, autoRung: 0, name: '', devCode: '', bindings: { ...DEFAULT_BINDINGS }, padBindings: { ...DEFAULT_PAD_BINDINGS } };
+  return { quality: 'auto', masterVolume: 0.8, sfxVolume: 0.8, muted: false, score: true, crashWait: false, popWith: 'pop', camera: 'chase', firstAir: 'head', cornerMap: true, autoRung: 0, name: '', devCode: '', bindings: { ...DEFAULT_BINDINGS }, padBindings: { ...DEFAULT_PAD_BINDINGS }, keysRev: KEYS_REV };
 }
 
 /** The saved settings, or the defaults for anything not saved (or unreadable). */
@@ -93,7 +102,19 @@ export function loadSettings(): Settings {
   if (typeof saved.devCode === 'string' && saved.devCode.length <= 200) out.devCode = saved.devCode;
   out.bindings = readBindings(saved.bindings, DEFAULT_BINDINGS, (k) => k !== 'Escape' && !isPadCode(k));
   out.padBindings = readBindings(saved.padBindings, DEFAULT_PAD_BINDINGS, isPadCode);
+  const rev = typeof saved.keysRev === 'number' && Number.isInteger(saved.keysRev) ? saved.keysRev : 0;
+  if (rev < 1) out.bindings = moveChatOffY(out.bindings);
+  out.keysRev = KEYS_REV;
   return out;
+}
+
+/** Chat's old default, Y, swapped for the new one (/) when / is free; any other chat key is kept. */
+function moveChatOffY(b: Bindings): Bindings {
+  const chat = b.chat;
+  if (!chat.includes('KeyY')) return b;
+  const free = !ACTIONS.some((a) => a !== 'chat' && b[a].includes('Slash')) && !chat.includes('Slash');
+  const moved = chat.flatMap((k) => (k === 'KeyY' ? (free ? ['Slash'] : []) : [k]));
+  return { ...b, chat: moved };
 }
 
 export function saveSettings(s: Settings): void {

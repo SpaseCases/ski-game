@@ -50,13 +50,18 @@ export class DevScope {
     ring.appendChild(this.readout);
     parent.appendChild(el);
     this.el = el;
+    // No cursor over the game view while looking through the ring (core/pointerOrbit.ts sets the canvas's own cursor inline, so this one is !important).
+    const style = document.createElement('style');
+    style.textContent = '.dev-scoped canvas{cursor:none!important}';
+    document.head.appendChild(style);
   }
 
-  /** Shows the ring (looking through it) or hides it. */
+  /** Shows the ring (looking through it) or hides it; the cursor is hidden over the game view meanwhile (the mouse aims). */
   show(on: boolean): void {
     if (on === this.shown) return;
     this.shown = on;
     this.el.style.opacity = on ? '1' : '0';
+    document.documentElement.classList.toggle('dev-scoped', on);
   }
 
   /** The last shot's distance in meters and what it hit, or none (a miss: nothing within reach). */

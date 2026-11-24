@@ -15,10 +15,10 @@ import { TUNING } from './tuning.ts';
 //
 // Flying: no gravity and no crashes. The rider flies forward on their own
 // (CONFIG.dev.flight.cruise; the pole key held, `fast`), ← → turn, ↑
-// climbs, ↓ dives, and Space (flightKeys.hover, set by the developer's keys
-// each step) slows to a hover. The snow and the map's edge stop them (they
+// climbs, ↓ dives (the pole key held, `fastDive`), and Space
+// (flightKeys.hover, set by the developer's keys each step) slows to a hover. The snow and the map's edge stop them (they
 // skim over it); trees, rocks, buildings and rails are flown through.
-// Landing glides down to the snow below and rides away with the speed,
+// Landing glides down to the snow below (faster the higher it starts) and rides away with the speed,
 // with no landing check. While flying, `yaw` is the heading in the world
 // (the body's forward), not the snow's frame.
 
@@ -100,10 +100,15 @@ export function flightStep(s: SkierState, input: InputState, course: Course, dt:
   along = approach(along, want, (hover && along > want ? F.hoverBrake : F.accel) * dt);
   s.velocity.x = hx * along;
   s.velocity.z = hz * along;
-  // Up and down: ↑ climbs, ↓ dives; gliding down to land sinks at `glide`.
-  const climb = (input.up.held ? F.climb : 0) - (input.down.held ? F.dive : 0);
-  const vy = s.flight === 2 ? Math.min(-F.glide, climb) : climb;
-  s.velocity.y = approach(s.velocity.y, vy, F.climbAccel * dt);
+  // Up and down: ↑ climbs, ↓ dives (faster with the pole key); gliding down
+  // to land sinks at `glide` near the snow, faster the higher it is.
+  const diving = input.down.held && !input.up.held;
+  const climb = (input.up.held ? F.climb : 0) - (input.down.held ? (input.pole.held ? F.fastDive : F.dive) : 0);
+  const above = s.position.y - groundAt(hf, s.position.x, s.position.z, normal);
+  const sink = Math.min(F.glideMax, F.glide + F.glideFar * Math.max(0, above));
+  const vy = s.flight === 2 ? Math.min(-sink, climb) : climb;
+  const falling = vy < s.velocity.y && (diving || s.flight === 2);
+  s.velocity.y = approach(s.velocity.y, vy, (falling ? F.diveAccel : F.climbAccel) * dt);
 
   s.position.addScaledVector(s.velocity, dt);
   keepInside(hf.bounds, s.position, s.velocity);
