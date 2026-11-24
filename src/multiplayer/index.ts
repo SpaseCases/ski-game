@@ -5,7 +5,7 @@ import type { Heightfield } from '../maps/types.ts';
 import { BEST_MAX, chatAllowed, FIELD_COUNT, SCALE, tidyChat, TRICK_MAX, trickOk, type LobbyEntry } from '../online/mpRules.ts';
 import type { SkierPose } from '../render/skierView.ts';
 import type { Screen } from '../ui/menus.ts';
-import { Link, lobbyApi, lobbyErrorText } from './connection.ts';
+import { Link, lobbyApi, LobbyError, lobbyErrorText } from './connection.ts';
 import { MpHud } from './hud.ts';
 import { freeLook, lookText, paintedLook, paints, setPaintKit, stockLook, type PaintKit } from './looks.ts';
 import { hitAt, Remote, RiderScene, shootRiders, type Detail } from './riders.ts';
@@ -50,17 +50,23 @@ export interface MultiplayerHooks {
 }
 
 export interface Multiplayer {
-  /** The map select's pick with "Ride with others" on: the map's lobby list. */
+  /** The map select's pick with "Ride with others" on: the map's lobby list, then the other maps'; '' (its "Open lobbies") for every map's. */
   openLobbies(map: string): void;
   /** Pause's Lobby plank: who's here, mute, leave. */
   openRoom(): void;
   leave(): void;
   readonly joined: boolean;
   readonly typing: boolean;
-  /** Each drawn frame: sends this rider's pose (unless `waits`) and draws the others. */
-  frame(pose: SkierPose, camera: Camera, realDt: number, waits: boolean): void;
+  /** Each drawn frame: sends this rider's pose (unless `waits`) and draws the others (hidden while `alone`: the Locker's preview of the paused world, 2026-11-24). */
+  frame(pose: SkierPose, camera: Camera, realDt: number, waits: boolean, alone: boolean): void;
   /** A hit from the developer's rifle waiting to be taken (the direction it came along), or null. */
   takeHit(): { x: number; z: number } | null;
+  /**
+   * The corner map's dots (2026-11-24): for each other rider drawn on this
+   * map, x, z, away (1 or 0) and the jacket's color into `out`, `stride`
+   * numbers apart, at most `max`. Returns how many. Allocates nothing.
+   */
+  riderSpots(out: Float32Array, stride: number, max: number): number;
   /** The developer's shot along `dir` (unit): the distance to the rider it hits (and the hit is sent), or -1. */
   shoot(from: Vector3, dir: Vector3, range: number): number;
   openChat(): void;
@@ -114,6 +120,8 @@ export function createMultiplayer(h: MultiplayerHooks): Multiplayer {
   const inA = createSample();
   const inB = createSample();
   const muted = new Set<string>();
+  /** The Worker answered without the every-map list (deployed before it): ask for one map's lobbies only. */
+  let oldList = false;
 
   const myName = (): string => h.name() || standIn;
 
@@ -165,7 +173,20 @@ export function createMultiplayer(h: MultiplayerHooks): Multiplayer {
   });
 
   const list = new LobbyListScreen({
-    list: async (map) => (await lobbyApi<{ lobbies: LobbyEntry[] }>('GET', '/v1/mp/lobbies', { map })).lobbies,
+    list: async (map) => {
+      // Every map's open lobbies in one request; a Worker from before the every-map list refuses a missing map, and then only this map's are shown (asked for directly from then on).
+      if (!oldList) {
+        try {
+          return { lobbies: (await lobbyApi<{ lobbies: LobbyEntry[] }>('GET', '/v1/mp/lobbies', {})).lobbies, every: true };
+        } catch (err) {
+          if (!(err instanceof LobbyError && err.status === 400)) throw err;
+          oldList = true;
+        }
+      }
+      if (!map) return { lobbies: [], every: false };
+      return { lobbies: (await lobbyApi<{ lobbies: LobbyEntry[] }>('GET', '/v1/mp/lobbies', { map })).lobbies, every: false };
+    },
+    mapName: h.mapName,
     create: async (map, title, open) => (await lobbyApi<{ code: string }>('POST', '/v1/mp/create', {}, { map, title, open })).code,
     join: (code) => {
       // Leaving any lobby first closes it, which clears `joining`: set it after.
@@ -400,14 +421,14 @@ export function createMultiplayer(h: MultiplayerHooks): Multiplayer {
       return hud.typing;
     },
     openLobbies(map) {
-      list.prepare(map, h.mapName(map));
+      list.prepare(map, map ? h.mapName(map) : '');
       h.push(list);
     },
     openRoom() {
       h.push(room);
     },
     leave,
-    frame(pose, camera, realDt, waits) {
+    frame(pose, camera, realDt, waits, alone) {
       const now = performance.now() / 1000;
       if (!lobby) {
         if (riders.length) clearRiders();
@@ -446,8 +467,23 @@ export function createMultiplayer(h: MultiplayerHooks): Multiplayer {
         }
       }
       const hf = h.hf();
-      if (h.currentMap() !== lobby.map) scene.hide(riders);
+      if (h.currentMap() !== lobby.map || alone) scene.hide(riders);
       else scene.frame(riders, camera, hf, h.detail(), now, realDt);
+    },
+    riderSpots(out, stride, max) {
+      if (!lobby || h.currentMap() !== lobby.map) return 0;
+      let n = 0;
+      for (const r of riders) {
+        if (n >= max) break;
+        if (!r.hasPose) continue;
+        const k = n * stride;
+        out[k] = r.pose.position.x;
+        out[k + 1] = r.pose.position.z;
+        out[k + 2] = r.away ? 1 : 0;
+        out[k + 3] = r.color.getHex();
+        n++;
+      }
+      return n;
     },
     takeHit() {
       const hit = pendingHit;

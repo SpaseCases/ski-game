@@ -103,6 +103,8 @@ async function main() {
   ok(a.welcome?.riders.length === 0 && a.welcome.you >= 1 && a.welcome.title === 'Park laps 1', 'A is welcomed alone, with an id and the title');
   let list = await get('/v1/mp/lobbies', 'map=park');
   ok(list.body.lobbies.some((l) => l.code === code && l.riders === 1), 'the open lobby is listed with 1 rider');
+  let every = await get('/v1/mp/lobbies', '');
+  ok(every.status === 200 && every.body.lobbies.some((l) => l.code === code && l.map === 'park' && l.riders === 1), 'the every-map list has it too, with its map');
   const b = rider(code, 'Beta');
   ok(await b.hello(), 'B joins');
   ok(b.welcome.riders.length === 1 && b.welcome.riders[0].name === 'Alpha' && b.welcome.riders[0].outfit.includes('jacket'), 'B sees A with A\'s outfit');
@@ -231,6 +233,8 @@ async function main() {
   await sleep(300);
   list = await get('/v1/mp/lobbies', 'map=freeride');
   ok(!list.body.lobbies.some((l) => l.code === kept.body.code), 'once everyone has left it drops off the list');
+  every = await get('/v1/mp/lobbies', '');
+  ok(!every.body.lobbies.some((l) => l.code === kept.body.code), 'and off the every-map list');
   const back = rider(kept.body.code, 'Comeback');
   ok((await back.hello()) && back.welcome !== null, 'and its code still lets someone back in');
   back.ws.close();
@@ -241,6 +245,8 @@ async function main() {
   await p.hello();
   list = await get('/v1/mp/lobbies', 'map=park');
   ok(!list.body.lobbies.some((l) => l.code === priv.body.code) && p.welcome?.open === false, 'a private lobby is joinable by code and never listed');
+  every = await get('/v1/mp/lobbies', '');
+  ok(!every.body.lobbies.some((l) => l.code === priv.body.code), 'nor on the every-map list');
   p.ws.close();
   const gone = rider('ZZZZ', 'Lost');
   await gone.until(() => gone.closed !== null);

@@ -94,12 +94,16 @@ export interface LobbyEntry {
   title: string;
   riders: number;
   max: number;
+  /** The lobby's map (in the every-map list; a Worker from before 2026-11-24 leaves it out). */
+  map?: string;
   /** When the lobby last reported (ms, the Worker's clock). */
   at: number;
 }
 
-/** The most lobbies one map's list shows. */
+/** The most lobbies one map's list shows (the every-map list too). */
 export const LIST_MAX_LOBBIES = 40;
+/** The every-map list's object (worker/src/lobbies.ts): every open lobby reports there as well as to its map's. */
+export const LIST_ALL = 'lobbies-all';
 
 /** WebSocket close codes the game reads (4000 to 4999 are ours). */
 export const CLOSE = {

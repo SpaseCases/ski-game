@@ -90,7 +90,7 @@ import { formatTime, missedText, RaceHud } from './ui/raceHud.ts';
 import { RunHud } from './ui/runHud.ts';
 import { ScoreHud } from './ui/scoreHud.ts';
 import { Toast } from './ui/toast.ts';
-import { CornerMap } from './ui/cornerMap.ts';
+import { CORNER_RIDERS, CornerMap, SPOT_STRIDE } from './ui/cornerMap.ts';
 import { drawMapArt, TrailMap, type MapArt } from './ui/trailMap.ts';
 
 const app = byId('app');
@@ -285,12 +285,15 @@ const pauseScreen = new PauseScreen({
   setWeather,
 });
 const mapSelect = new MapSelect((entry) => void loadMap(entry), () => menus.back(), { get: () => weather, set: setWeather }, (id) => openBoards(id));
-mapSelect.onLobbies = (entry) => {
+mapSelect.onLobbies = (entry) => openLobbies(entry.id);
+mapSelect.onAllLobbies = () => openLobbies('');
+/** A map's lobby list (and the other maps' open lobbies), or with '' every map's. */
+function openLobbies(map: string): void {
   loadMultiplayer().then(
-    (m) => m.openLobbies(entry.id),
+    (m) => m.openLobbies(map),
     () => mapSelect.setError("Couldn't load multiplayer. Check the connection and try again, or ride alone."),
   );
-};
+}
 const settingsScreen = new SettingsScreen(
   {
     get: () => ({ ...settings, quality }),
@@ -1576,7 +1579,8 @@ startLoop(
         camera.lookAt(freeCamera.at);
       }
       // Multiplayer (milestone 27): this rider's pose out, the others drawn from theirs (after every camera override: name tags face the camera drawn from).
-      mp?.frame(pose, camera, realFrameTime, waits);
+      // The Locker's preview shows the paused world with only this rider in it (2026-11-24, the user's ask).
+      mp?.frame(pose, camera, realFrameTime, waits, stageScreen !== null);
       level.world.view(camera.position.x, camera.position.z, camera.far, snapped || rebuildView, freeCamera !== null);
       rebuildView = false;
       level.world.update(level.run, level.race, frameTime, alpha);
@@ -1616,7 +1620,8 @@ startLoop(
       if (finished) showFinishBoard();
       else online?.finish.hide();
     }
-    if (level) cornerMap.update(pose.position.x, pose.position.z, pose.yaw, level.run.passed);
+    // Multiplayer: the other riders in the lobby as dots on the corner map (none outside a lobby).
+    if (level) cornerMap.update(pose.position.x, pose.position.z, pose.yaw, level.run.passed, mp ? mp.riderSpots(cornerMap.spots, SPOT_STRIDE, CORNER_RIDERS) : 0);
     fps.frame(realFrameTime);
     // Auto quality judges riding frames only (it holds off after jumps, loads and menus).
     if (quality === 'auto' && level) {

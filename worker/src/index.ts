@@ -3,7 +3,7 @@ import { boardKind, LIST_MAX, LOOK_FORMAT, OUTFIT_MAX, RANK_LIMIT, SKIS_MAX, val
 import { FirestoreStore } from './firestore.ts';
 import { jsonBody, Refused, type RateLimit } from './http.ts';
 import { marketRoute, restoreHidden, type MarketEnv } from './market.ts';
-import { CLOSE, CODE_LENGTH, CODE_FORMAT, CODE_LETTERS, lobbyTitleProblem, MP_MAPS, tidyTitle } from '../../src/online/mpRules.ts';
+import { CLOSE, CODE_LENGTH, CODE_FORMAT, CODE_LETTERS, LIST_ALL, lobbyTitleProblem, MP_MAPS, tidyTitle } from '../../src/online/mpRules.ts';
 import { Lobbies } from './lobbies.ts';
 import { MESSAGE_MAX, quotaError, refusedSocket, Room, type LobbyMeta } from './room.ts';
 import { beats, MemoryStore, type Row, type Store } from './store.ts';
@@ -111,7 +111,10 @@ async function multiplayer(request: Request, env: Env, cors: string | null): Pro
   try {
     switch (`${request.method} ${url.pathname}`) {
       case 'GET /v1/mp/lobbies': {
-        const map = mapParam(url.searchParams.get('map'));
+        // No map: every map's open lobbies, each with its map (one request for the whole list, 2026-11-24).
+        const asked = url.searchParams.get('map');
+        if (asked === null) return reply(200, { lobbies: await env.LOBBIES.getByName(LIST_ALL).list() }, cors);
+        const map = mapParam(asked);
         if (!map) return refuse(400, 'map', CLOSE.bad);
         return reply(200, { lobbies: await env.LOBBIES.getByName(`lobbies-${map}`).list() }, cors);
       }

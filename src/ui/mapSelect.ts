@@ -25,8 +25,11 @@ export class MapSelect implements Screen {
   /** "Ride with others" (milestone 27): off by default, for the visit. */
   private others = false;
   private readonly othersButton: HTMLButtonElement;
+  private readonly allButton: HTMLButtonElement;
   /** With "Ride with others" on, a pick opens the map's lobbies (main loads the multiplayer chunk). */
   onLobbies: ((entry: MapEntry) => void) | null = null;
+  /** "Open lobbies" (shown with "Ride with others" on, 2026-11-24): every map's open lobbies, no map picked. */
+  onAllLobbies: (() => void) | null = null;
 
   /** `onPick`: a map's card was chosen. `onBack`: the Back button. `weather`: the weather picked and picking it. `onBoards`: the Leaderboards button, with the card focused last. */
   constructor(onPick: (entry: MapEntry) => void, onBack: () => void, weather: WeatherHooks, onBoards: (id: MapId) => void) {
@@ -43,7 +46,14 @@ export class MapSelect implements Screen {
     this.othersButton.type = 'button';
     this.othersButton.className = 'board-back board-link mp-toggle';
     this.othersButton.addEventListener('click', () => this.setOthers(!this.others));
-    b.head.append(this.othersButton, boards);
+    this.allButton = document.createElement('button');
+    this.allButton.type = 'button';
+    this.allButton.className = 'board-back board-link mp-all';
+    this.allButton.textContent = 'Open lobbies';
+    this.allButton.addEventListener('click', () => {
+      if (!this.busy) this.onAllLobbies?.();
+    });
+    b.head.append(this.othersButton, this.allButton, boards);
     addBackButton(b.head, onBack);
 
     const grid = document.createElement('div');
@@ -121,6 +131,7 @@ export class MapSelect implements Screen {
     this.others = on;
     this.othersButton.textContent = on ? 'Ride with others: on' : 'Ride with others: off';
     this.othersButton.setAttribute('aria-pressed', String(on));
+    this.allButton.hidden = !on;
   }
 
   /** A row under a map's card for its options (after the weather). */

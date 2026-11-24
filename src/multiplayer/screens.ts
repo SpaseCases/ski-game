@@ -5,9 +5,21 @@ import { CODE_FORMAT, lobbyTitleProblem, ROOM_MAX, TITLE_MAX, tidyTitle, type Lo
 // the list comes first, every time), with a lobby to make (a title, open or
 // private) and a code to type; and, from pause, the lobby you're in: who's
 // riding, their best combo this visit and last trick, mute, and Leave.
+// Since 2026-11-24 (the user's ask, "see what lobbies are open") the list
+// also shows the open lobbies on every other map, each with its map's name
+// (joining one loads that map), and the map select's "Open lobbies" shows
+// every map's at once, with no map picked (no lobby to make then).
+
+/** The open lobbies: every map's (each with `map`), or, from a Worker older than the every-map list, only `map`'s. */
+export interface LobbyLists {
+  lobbies: LobbyEntry[];
+  every: boolean;
+}
 
 export interface LobbyListHooks {
-  list(map: string): Promise<LobbyEntry[]>;
+  /** `map` is '' when no map was picked (every map's lobbies). */
+  list(map: string): Promise<LobbyLists>;
+  mapName(id: string): string;
   create(map: string, title: string, open: boolean): Promise<string>;
   join(code: string): void;
   back(): void;
@@ -29,6 +41,7 @@ export class LobbyListScreen implements Screen {
   private readonly privateButton: HTMLButtonElement;
   private readonly createButton: HTMLButtonElement;
   private readonly codeInput: HTMLInputElement;
+  private readonly make: HTMLElement;
   private readonly hooks: LobbyListHooks;
   private map = '';
   private open = true;
@@ -49,6 +62,7 @@ export class LobbyListScreen implements Screen {
 
     const make = document.createElement('div');
     make.className = 'lobby-make';
+    this.make = make;
     const makeHead = document.createElement('h3');
     makeHead.className = 'lobby-head';
     makeHead.textContent = 'Make a lobby';
@@ -71,7 +85,7 @@ export class LobbyListScreen implements Screen {
     this.createButton.type = 'button';
     this.createButton.className = 'plank plank-small lobby-go';
     this.createButton.textContent = 'Make it';
-    this.createButton.addEventListener('click', () => void this.make());
+    this.createButton.addEventListener('click', () => void this.makeLobby());
     row.append(this.titleInput, seg, this.createButton);
     this.titleNote = document.createElement('p');
     this.titleNote.className = 'name-note';
@@ -99,7 +113,7 @@ export class LobbyListScreen implements Screen {
       if (e.key === 'Enter') this.joinCode();
     });
     this.titleInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') void this.make();
+      if (e.key === 'Enter') void this.makeLobby();
     });
     const codeGo = document.createElement('button');
     codeGo.type = 'button';
@@ -121,10 +135,11 @@ export class LobbyListScreen implements Screen {
     this.setOpen(true);
   }
 
-  /** Before showing: which map's lobbies, by id and name. */
+  /** Before showing: which map's lobbies, by id and name; '' for every map's (from the map select, nothing to make). */
   prepare(map: string, mapName: string): void {
     this.map = map;
-    this.sub.textContent = `${mapName}: pick a lobby, make one, or type a code.`;
+    this.sub.textContent = map ? `${mapName}: pick a lobby, make one, or type a code.` : 'Open lobbies on every map: pick one to join its map, or type a code.';
+    this.make.hidden = !map;
     this.rows.replaceChildren(note('Looking for lobbies…'));
     this.say('');
   }
@@ -136,7 +151,7 @@ export class LobbyListScreen implements Screen {
     void this.refresh();
     clearInterval(this.timer);
     this.timer = window.setInterval(() => void this.refresh(), this.hooks.every * 1000);
-    return this.rows.querySelector<HTMLElement>('button') ?? this.titleInput;
+    return this.rows.querySelector<HTMLElement>('button') ?? (this.map ? this.titleInput : this.codeInput);
   }
 
   leave(): void {
@@ -163,45 +178,65 @@ export class LobbyListScreen implements Screen {
   private async refresh(): Promise<void> {
     const map = this.map;
     try {
-      const lobbies = await this.hooks.list(map);
+      const lists = await this.hooks.list(map);
       if (!this.shown || map !== this.map) return;
-      this.draw(lobbies);
+      this.draw(lists);
     } catch (err) {
       if (!this.shown || map !== this.map) return;
       this.rows.replaceChildren(note(this.hooks.errorText(err)));
     }
   }
 
-  private draw(lobbies: LobbyEntry[]): void {
+  private draw(lists: LobbyLists): void {
     const focusedCode = (document.activeElement as HTMLElement | null)?.dataset?.code;
-    if (lobbies.length === 0) {
-      this.rows.replaceChildren(note('No open lobbies on this map yet. Make one below.'));
-      return;
+    const map = this.map;
+    const here: LobbyEntry[] = [];
+    const elsewhere: LobbyEntry[] = [];
+    // An older Worker's list is this map's alone, without the map on each.
+    for (const l of lists.lobbies) ((l.map ?? map) === map ? here : elsewhere).push(l);
+    const out: HTMLElement[] = [];
+    if (map) {
+      if (here.length === 0) out.push(note('No open lobbies on this map yet. Make one below.'));
+      for (const l of here) out.push(this.row(l, ''));
+      if (elsewhere.length > 0) out.push(head('Other maps'));
+    } else if (elsewhere.length === 0) {
+      out.push(note(lists.every ? 'No open lobbies right now. Pick a map to make one.' : "Pick a map to see its lobbies."));
     }
-    const buttons = lobbies.map((l) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'plank lobby-row';
-      b.dataset.code = l.code;
-      const full = l.riders >= (l.max || ROOM_MAX);
-      const title = document.createElement('span');
-      title.className = 'lobby-row-title';
-      title.textContent = l.title;
-      const count = document.createElement('span');
-      count.className = 'lobby-row-count';
-      count.textContent = full ? 'Full' : `${l.riders} / ${l.max || ROOM_MAX}`;
-      b.append(title, count);
-      if (full) b.setAttribute('aria-disabled', 'true');
-      b.addEventListener('click', () => {
-        if (!full) this.join(l.code);
-      });
-      return b;
-    });
-    this.rows.replaceChildren(...buttons);
-    if (focusedCode) buttons.find((b) => b.dataset.code === focusedCode)?.focus();
+    for (const l of elsewhere) out.push(this.row(l, this.hooks.mapName(l.map ?? '')));
+    this.rows.replaceChildren(...out);
+    if (focusedCode) this.rows.querySelector<HTMLElement>(`[data-code="${focusedCode}"]`)?.focus();
   }
 
-  private async make(): Promise<void> {
+  /** One lobby's button: its title, its map's name (a lobby on another map) and the riders in it. */
+  private row(l: LobbyEntry, mapName: string): HTMLButtonElement {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'plank lobby-row';
+    b.dataset.code = l.code;
+    const full = l.riders >= (l.max || ROOM_MAX);
+    const title = document.createElement('span');
+    title.className = 'lobby-row-title';
+    title.textContent = l.title;
+    b.appendChild(title);
+    if (mapName) {
+      const where = document.createElement('span');
+      where.className = 'lobby-row-map';
+      where.textContent = mapName;
+      b.appendChild(where);
+    }
+    const count = document.createElement('span');
+    count.className = 'lobby-row-count';
+    count.textContent = full ? 'Full' : `${l.riders} / ${l.max || ROOM_MAX}`;
+    b.appendChild(count);
+    b.setAttribute('aria-label', `${l.title}${mapName ? `, on ${mapName}` : ''}, ${full ? 'full' : `${l.riders} of ${l.max || ROOM_MAX} riders`}`);
+    if (full) b.setAttribute('aria-disabled', 'true');
+    b.addEventListener('click', () => {
+      if (!full) this.join(l.code);
+    });
+    return b;
+  }
+
+  private async makeLobby(): Promise<void> {
     if (this.busy) return;
     const title = tidyTitle(this.titleInput.value);
     const problem = lobbyTitleProblem(title);
@@ -350,6 +385,13 @@ function segButton(label: string, onClick: () => void): HTMLButtonElement {
   b.textContent = label;
   b.addEventListener('click', onClick);
   return b;
+}
+
+function head(text: string): HTMLElement {
+  const h = document.createElement('h3');
+  h.className = 'lobby-head lobby-rows-head';
+  h.textContent = text;
+  return h;
 }
 
 function note(text: string): HTMLElement {

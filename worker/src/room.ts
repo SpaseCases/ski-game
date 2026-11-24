@@ -2,7 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { nameProblem, tidyName } from '../../src/core/playerName.ts';
 import { OUTFIT_MAX } from '../../src/online/limits.ts';
 import {
-  BEST_MAX, CHAT_GAP_MS, chatAllowed, CLOSE, HEADER_BYTES, KIND_STATE, RATE_MAX, RATE_STRIKES, REPORT_EVERY_S, ROOM_MAX, SAMPLE_BYTES,
+  BEST_MAX, CHAT_GAP_MS, chatAllowed, CLOSE, HEADER_BYTES, KIND_STATE, LIST_ALL, RATE_MAX, RATE_STRIKES, REPORT_EVERY_S, ROOM_MAX, SAMPLE_BYTES,
   SILENT_CLOSE_S, STAND_IN_NAME, STATE_MAX, STATE_MIN, stateLength, TEXT_MAX, tidyChat, TOKEN_FORMAT, trickOk,
 } from '../../src/online/mpRules.ts';
 import type { Lobbies } from './lobbies.ts';
@@ -362,13 +362,15 @@ export class Room extends DurableObject<RoomEnv> {
     void this.report();
   }
 
-  /** Tells the map's lobby list how many ride here (a private lobby is never listed). */
+  /** Tells the map's lobby list and the every-map list how many ride here (a private lobby is never listed). */
   private async report(): Promise<void> {
     if (!this.meta) return;
     this.lastReport = Date.now();
     const { code, title, map, open } = this.meta;
     try {
-      await this.env.LOBBIES.getByName(`lobbies-${map}`).report({ code, title, riders: this.riders().length, max: ROOM_MAX, at: 0 }, open);
+      const entry = { code, title, map, riders: this.riders().length, max: ROOM_MAX, at: 0 };
+      // The map's own list, and the every-map list (the lobby list's "Other maps", 2026-11-24).
+      await Promise.all([this.env.LOBBIES.getByName(`lobbies-${map}`).report(entry, open), this.env.LOBBIES.getByName(LIST_ALL).report(entry, open)]);
     } catch (err) {
       console.error('lobby list', err);
     }

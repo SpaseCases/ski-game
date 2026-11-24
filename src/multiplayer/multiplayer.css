@@ -31,6 +31,23 @@
   white-space: nowrap;
 }
 
+/* A lobby on another map: its map's name before the count (2026-11-24). */
+.lobby-row-map {
+  flex: none;
+  margin-left: auto;
+  color: var(--frost);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.lobby-rows-head {
+  margin: 10px 0 2px;
+}
+
+.lobby-rows-head:first-child {
+  margin-top: 0;
+}
+
 .lobby-row-count {
   flex: none;
   color: var(--frost);

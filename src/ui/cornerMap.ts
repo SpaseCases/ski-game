@@ -10,6 +10,45 @@ import { drawFlags, type MapArt } from './trailMap.ts';
 // frame allocates nothing, and the canvas is only redrawn when a flag is
 // passed or the run resets. Read every frame, so it's left out of the
 // production build's obfuscation (tools/vite/obfuscate.js EXCLUDE).
+//
+// In a multiplayer lobby (2026-11-24, the user's ask) the other riders show
+// as dots in their jacket's color: the multiplayer chunk writes where they
+// are into `spots` each frame and `update` gets the count. Each dot is two
+// nested elements moved by made-once translate strings like the art, so
+// they allocate nothing either; one past the window's edge is hidden.
+
+/** The most other riders shown (a lobby holds 16, mpRules.ts ROOM_MAX). */
+export const CORNER_RIDERS = 15;
+/** Numbers per rider in `spots`: x, z (m), away (1 or 0), the jacket's color (0xrrggbb). */
+export const SPOT_STRIDE = 4;
+/** How far from the middle a dot can be drawn (px); past it, it's hidden (the window is at most 200 px). */
+const SPOT_REACH = 120;
+
+class RiderDot {
+  readonly x: HTMLElement;
+  readonly y: HTMLElement;
+  lastX = 1e9;
+  lastY = 1e9;
+  color = -1;
+  away = false;
+  shown = false;
+
+  constructor(parent: HTMLElement) {
+    this.x = document.createElement('div');
+    this.x.className = 'corner-map-rider';
+    this.x.hidden = true;
+    this.y = document.createElement('div');
+    this.y.className = 'corner-map-rider-dot';
+    this.x.appendChild(this.y);
+    parent.appendChild(this.x);
+  }
+
+  show(on: boolean): void {
+    if (on === this.shown) return;
+    this.shown = on;
+    this.x.hidden = !on;
+  }
+}
 
 export class CornerMap {
   private readonly root: HTMLElement;
@@ -28,6 +67,13 @@ export class CornerMap {
   private lastTurn = -1;
   /** Flags passed when the canvas was last drawn (-1: not yet). */
   private passedCount = -1;
+  /** Where the other riders in a lobby are (SPOT_STRIDE numbers each), written by the multiplayer chunk. */
+  readonly spots = new Float32Array(CORNER_RIDERS * SPOT_STRIDE);
+  private readonly dots: RiderDot[] = [];
+  /** `translateX(Npx)` and `translateY(Npx)` from -SPOT_REACH to SPOT_REACH. */
+  private readonly dotXs: string[] = [];
+  private readonly dotYs: string[] = [];
+  private dotsShown = 0;
 
   constructor(hud: HTMLElement) {
     this.root = document.createElement('div');
@@ -44,9 +90,16 @@ export class CornerMap {
     this.arrow = document.createElement('div');
     this.arrow.className = 'corner-map-you';
     this.arrow.innerHTML = '<svg viewBox="-10 -12 20 24" width="20" height="24"><path d="M0 -11 L8 9 L0 4 L-8 9 Z" fill="#e53935" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>';
-    this.root.append(this.panX, this.arrow);
+    this.root.append(this.panX);
+    for (let i = 0; i < CORNER_RIDERS; i++) this.dots.push(new RiderDot(this.root));
+    // The rider's own arrow on top of the others.
+    this.root.appendChild(this.arrow);
     hud.appendChild(this.root);
     for (let d = 0; d < 360; d++) this.turns.push(`rotate(${d}deg)`);
+    for (let p = -SPOT_REACH; p <= SPOT_REACH; p++) {
+      this.dotXs.push(`translateX(${p}px)`);
+      this.dotYs.push(`translateY(${p}px)`);
+    }
   }
 
   /** The map being ridden's art, or null (no map: hidden). */
@@ -85,8 +138,8 @@ export class CornerMap {
     this.root.hidden = !this.shown || this.art === null;
   }
 
-  /** Each frame: the rider at (x, z) facing `heading` (radians), and the flags passed. */
-  update(x: number, z: number, heading: number, passed: readonly boolean[]): void {
+  /** Each frame: the rider at (x, z) facing `heading` (radians), the flags passed, and how many other riders `spots` holds. */
+  update(x: number, z: number, heading: number, passed: readonly boolean[], others: number): void {
     const art = this.art;
     if (!art || !this.shown) return;
     let count = 0;
@@ -118,6 +171,47 @@ export class CornerMap {
       this.lastTurn = turn;
       this.arrow.style.transform = this.turns[turn]!;
     }
+    this.placeOthers(others, ix, iy);
+  }
+
+  /** The other riders' dots, around the window's middle (the art's pixel `ix`, `iy`). */
+  private placeOthers(count: number, ix: number, iy: number): void {
+    const f = this.art!.frame;
+    const n = Math.min(count, CORNER_RIDERS);
+    for (let i = 0; i < n; i++) {
+      const dot = this.dots[i]!;
+      const k = i * SPOT_STRIDE;
+      const ox = this.spots[k]! - f.cx;
+      const oz = this.spots[k + 1]! - f.cz;
+      const dx = Math.round(f.width / 2 + (ox * f.rightX + oz * f.rightZ) * f.scale) - ix;
+      const dy = Math.round(f.height / 2 + (ox * f.downX + oz * f.downZ) * f.scale) - iy;
+      if (dx < -SPOT_REACH || dx > SPOT_REACH || dy < -SPOT_REACH || dy > SPOT_REACH) {
+        dot.show(false);
+        continue;
+      }
+      dot.show(true);
+      if (dx !== dot.lastX) {
+        dot.lastX = dx;
+        dot.x.style.transform = this.dotXs[dx + SPOT_REACH]!;
+      }
+      if (dy !== dot.lastY) {
+        dot.lastY = dy;
+        dot.y.style.transform = this.dotYs[dy + SPOT_REACH]!;
+      }
+      const away = this.spots[k + 2]! > 0.5;
+      if (away !== dot.away) {
+        dot.away = away;
+        dot.y.classList.toggle('is-away', away);
+      }
+      const color = this.spots[k + 3]! | 0;
+      if (color !== dot.color) {
+        // Only when the rider in this slot changes (a join, a leave): the one string made.
+        dot.color = color;
+        dot.y.style.backgroundColor = `#${color.toString(16).padStart(6, '0')}`;
+      }
+    }
+    for (let i = n; i < this.dotsShown; i++) this.dots[i]!.show(false);
+    this.dotsShown = n;
   }
 
   /** The art, with the flags passed so far in green. */
