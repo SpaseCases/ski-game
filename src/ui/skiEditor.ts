@@ -23,6 +23,7 @@ import { previewCanvas } from './lockerMenu.ts';
 import { board, EDITOR_PAD_HINTS, EDITOR_PAD_KEYS, setHints, type Screen } from './menus.ts';
 import { paintSkis } from './skiThumb.ts';
 import { signText } from './signText.ts';
+import { menuPadY } from './phone.ts';
 
 // The ski editor, opened from a custom slot's Edit in the Locker: one ski's
 // top sheet or base (the base seen from above, through the ski, as in the
@@ -67,8 +68,6 @@ const CELL_MAX = 16;
 const CELL_MIN = 4;
 /** Side by side starts on when both grids fit with cells this big in the height the rest of the editor leaves in the window. */
 const PAIR_CELL_MIN = 6;
-/** The menu's padding above and below the sign (style.css .menu), px. */
-const MENU_PAD = 74;
 /** Brush sizes: squares this many cells across. */
 const BRUSHES = [1, 2, 3, 4] as const;
 /** How far Shift + an arrow jumps. */
@@ -836,7 +835,7 @@ export class SkiEditorScreen implements Screen, StageWindow {
     const sign = this.el.firstElementChild?.getBoundingClientRect().height ?? 0;
     const outside = sign - this.main.clientHeight;
     const others = this.main.scrollHeight - this.grid.getBoundingClientRect().height + extra;
-    return Math.min(CELL_MAX, Math.floor(width / this.rows), Math.floor((window.innerHeight - MENU_PAD - outside - others) / (2 * this.cols)));
+    return Math.min(CELL_MAX, Math.floor(width / this.rows), Math.floor((window.innerHeight - menuPadY(this.el) - outside - others) / (2 * this.cols)));
   }
 
   /** Sizes the grid to the bench and the true-shape ski to its box (on opening and when the window resizes). */

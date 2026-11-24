@@ -1,4 +1,5 @@
 import './style.css';
+import './ui/phone.css';
 import { Vector2, Vector3 } from 'three';
 import { GameAudio } from './audio/index.ts';
 import { createInputState, Keyboard, type Bindings } from './core/input.ts';
@@ -90,6 +91,8 @@ import { formatTime, missedText, RaceHud } from './ui/raceHud.ts';
 import { RunHud } from './ui/runHud.ts';
 import { ScoreHud } from './ui/scoreHud.ts';
 import { Toast } from './ui/toast.ts';
+import { isTouchScreen } from './ui/phone.ts';
+import { registerOffline } from './core/offline.ts';
 import { CORNER_RIDERS, CornerMap, SPOT_STRIDE } from './ui/cornerMap.ts';
 import { drawMapArt, TrailMap, type MapArt } from './ui/trailMap.ts';
 
@@ -143,6 +146,8 @@ renderer.domElement.addEventListener('webglcontextlost', (e) => {
 
 const windowBar = mountWindowButtons(hud);
 mountFocusHint(hud);
+// A phone or the installed game keeps a copy of the build for playing offline (core/offline.ts).
+registerOffline();
 const fps = mountFpsMeter(hud);
 const crashHint = mountCrashHint(hud);
 const fader = new Fader(hud);
@@ -1207,7 +1212,7 @@ function syncKeyLabels(): void {
 function setInputLook(pad: boolean, kind: PadKind): void {
   if (pad && !soundNoteShown && !sound.engine.running) {
     soundNoteShown = true;
-    toast.show('Sound starts after a click or a key press');
+    toast.show(isTouchScreen() ? 'Sound starts after a tap' : 'Sound starts after a click or a key press');
   }
   if (INPUT_LOOK.pad === pad && INPUT_LOOK.kind === kind) return;
   INPUT_LOOK.pad = pad;

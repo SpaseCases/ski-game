@@ -1,3 +1,5 @@
+import { isTouchScreen } from './phone.ts';
+
 /** "Crashed" notice shown while the skier tumbles, naming the respawn key. */
 export function mountCrashHint(hud: HTMLElement): { show(visible: boolean): void; setKey(key: string, wait: boolean): void } {
   const el = document.createElement('div');
@@ -22,7 +24,7 @@ export function mountCrashHint(hud: HTMLElement): { show(visible: boolean): void
 export function mountFocusHint(hud: HTMLElement): void {
   const el = document.createElement('div');
   el.className = 'focus-hint';
-  el.textContent = 'Click to play';
+  el.textContent = isTouchScreen() ? 'Tap to play' : 'Click to play';
   hud.appendChild(el);
 
   const sync = (): void => {

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { obfuscate } from './tools/vite/obfuscate.js';
+import { offline } from './tools/vite/offline.js';
 import { wavSink } from './tools/vite/wavSink.js';
 
 // Relative asset paths, so one build works wherever it's served from:
@@ -9,8 +10,9 @@ export default defineConfig({
   base: './',
   // Dev builds can save every sound as a WAV file (src/audio/wav.ts);
   // production builds obfuscate the menu, online and core code and the
-  // page's words (tools/vite/obfuscate.js).
-  plugins: [wavSink(), obfuscate()],
+  // page's words (tools/vite/obfuscate.js) and write the offline service
+  // worker over the finished build (tools/vite/offline.js).
+  plugins: [wavSink(), obfuscate(), offline()],
   build: {
     // Three.js alone is ~530 kB minified (~135 kB gzipped), plus the shared
     // modules obfuscated by tools/vite/obfuscate.js; warn only past that.

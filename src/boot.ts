@@ -29,7 +29,7 @@ function start(): void {
     console.error(err);
     started = false;
     boot?.classList.remove('is-loading');
-    if (note) note.textContent = 'The game couldn’t load. Check the connection, then click to try again.';
+    if (note) note.textContent = `The game couldn’t load. Check the connection, then ${touchScreen() ? 'tap' : 'click'} to try again.`;
     listen();
   });
 }
@@ -45,6 +45,32 @@ function listen(): void {
   window.addEventListener('keydown', onKey, true);
   window.addEventListener('gamepadconnected', start);
   boot?.addEventListener('pointerdown', start);
+}
+
+/** True on a phone or tablet: a finger taps, so the words say "tap". */
+function touchScreen(): boolean {
+  try {
+    return window.matchMedia('(pointer: coarse)').matches;
+  } catch {
+    return false;
+  }
+}
+
+// Phones (2026-11-24). A finger's tap starts the game like a click (the
+// pointerdown above). Held upright, a phone shows a sign over everything
+// (index.html's #rotate, shown by CSS only while upright and narrow) asking
+// to turn it sideways, with a button to play upright anyway.
+if (touchScreen()) {
+  if (note && !boot?.classList.contains('is-loading')) note.textContent = 'Tap or press a controller button to start';
+  const rotate = document.createElement('div');
+  rotate.id = 'rotate';
+  rotate.innerHTML =
+    '<svg viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="20" width="48" height="26" rx="5" fill="none" stroke="#f4f8fc" stroke-width="3"/>' +
+    '<path d="M20 12 A20 20 0 0 1 48 14" fill="none" stroke="#ff7a1a" stroke-width="3"/><path d="M48 6 L48 14 L40 14" fill="none" stroke="#ff7a1a" stroke-width="3"/></svg>' +
+    '<b>Turn your phone sideways</b><p>Park Laps is made for a wide screen. You ride with a controller and tap or steer through the menus.</p>' +
+    '<button type="button">Play upright anyway</button>';
+  rotate.querySelector('button')?.addEventListener('click', () => rotate.classList.add('is-dismissed'));
+  document.body.appendChild(rotate);
 }
 
 if (new URLSearchParams(window.location.search).has('map')) start();

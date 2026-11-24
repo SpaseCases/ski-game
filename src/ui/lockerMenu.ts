@@ -37,6 +37,7 @@ import type { Rect, StageWindow } from '../render/lockerStage.ts';
 import { addBackButton, board, setHints, type Screen } from './menus.ts';
 import { paintSkis } from './skiThumb.ts';
 import { drawWear } from './wearGrid.ts';
+import { isTouchScreen } from './phone.ts';
 
 // The Locker: the skier turning slowly in a window on the left (drawn by the
 // game's renderer through a hole in the menu, see LockerStage), the choices
@@ -907,7 +908,8 @@ export function previewCanvas(view: HTMLElement): CanvasRenderingContext2D | nul
   canvas.className = 'locker-canvas';
   const hint = document.createElement('span');
   hint.className = 'preview-hint';
-  hint.textContent = 'Drag to turn · Wheel to zoom';
+  // A phone has no wheel: a finger's drag turns it (2026-11-24).
+  hint.textContent = isTouchScreen() ? 'Drag to turn' : 'Drag to turn · Wheel to zoom';
   view.append(canvas, hint);
   view.classList.add('is-handled');
   let x = 0;

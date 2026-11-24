@@ -1,0 +1,353 @@
+/*
+ * Phones (2026-11-24, the user's ask; his iPhone 15 first: 852×393 CSS px
+ * held sideways, with the camera's cutout taking 59 px at one side and the
+ * home bar 21 px at the bottom). Sizing and layout only: on a phone the game
+ * is ridden with a controller (milestone 26) and the menus are tapped or
+ * steered with it.
+ *
+ * Loaded after style.css (main.ts). Two kinds of rule, so a Chromebook's
+ * 1366×768 (and an embed with a mouse) looks exactly as before:
+ * - Safe areas: index.html's viewport-fit=cover lets the 3D view fill the
+ *   whole phone screen, under the cutout and the home bar; everything pinned
+ *   to an edge moves in by env(safe-area-inset-*), which is 0 everywhere but
+ *   on such a phone. Full-screen layers (the menus' backdrop, the fade, the
+ *   scope) still cover it all; only what sits on them moves in.
+ * - Short touch screens, (pointer: coarse) and (max-height: 520px): a phone
+ *   held sideways. The signs get tighter, the title and pause planks go two
+ *   to a row, and the Locker and the editors keep the 3D window beside the
+ *   choices instead of above them. A mouse never matches, whatever its size.
+ *
+ * Upright, a phone shows a "turn it sideways" sign first (index.html #rotate,
+ * boot.ts), with a button to play upright anyway; then the narrow-screen rules
+ * style.css already has for small embeds lay the menus out in one column.
+ *
+ * The online and multiplayer CSS loads later in its own chunks, so the rules
+ * for those carry `:root` in front to win over them.
+ */
+
+:root {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+}
+
+/* No text blown up when a phone turns sideways, no grey flash on a tap, no pinch zoom or page bounce. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
+body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The 3D view: a finger's drag orbits the camera (core/pointerOrbit.ts) rather than scrolling or selecting. */
+#app canvas {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ---------------------------------------------------------- safe areas */
+
+.menu {
+  padding: calc(58px + var(--safe-t)) calc(16px + var(--safe-r)) calc(16px + var(--safe-b)) calc(16px + var(--safe-l));
+}
+
+.title-screen {
+  margin-bottom: calc(-16px - var(--safe-b));
+}
+
+.fatal {
+  padding: calc(24px + var(--safe-t)) calc(24px + var(--safe-r)) calc(24px + var(--safe-b)) calc(24px + var(--safe-l));
+}
+
+.window-buttons {
+  top: calc(12px + var(--safe-t));
+  right: calc(12px + var(--safe-r));
+}
+
+.fps {
+  left: calc(8px + var(--safe-l));
+  bottom: calc(6px + var(--safe-b));
+}
+
+.race-hud,
+.cheats-tag {
+  top: calc(12px + var(--safe-t));
+}
+
+.cheats-tag {
+  left: calc(12px + var(--safe-l));
+}
+
+.corner-map {
+  right: calc(12px + var(--safe-r));
+  bottom: calc(12px + var(--safe-b));
+}
+
+.score-hud {
+  bottom: calc(clamp(10px, 3vh, 26px) + var(--safe-b));
+}
+
+.score-best {
+  left: calc(8px + var(--safe-l));
+  bottom: calc(24px + var(--safe-b));
+}
+
+:root .mp-chip {
+  top: calc(10px + var(--safe-t));
+}
+
+:root .mp-chat {
+  left: calc(12px + var(--safe-l));
+  bottom: calc(64px + var(--safe-b));
+}
+
+:root .mp-chat-box {
+  left: calc(12px + var(--safe-l));
+  bottom: calc(22px + var(--safe-b));
+}
+
+/* Phone browsers count the bars that come and go in 100vh; dvh is the screen as shown (the same on a Chromebook). */
+.trail-map-canvas {
+  max-width: min(100%, calc((100dvh - 215px - var(--safe-t) - var(--safe-b)) * var(--map-aspect, 1)));
+}
+
+:root .lobby-screen {
+  max-height: calc(100dvh - 48px - var(--safe-t) - var(--safe-b));
+}
+
+/* The narrow-screen rules (style.css) again, with the safe areas. */
+@media (max-width: 640px), (max-height: 480px) {
+  .finish-row {
+    top: calc(50px + var(--safe-t));
+  }
+}
+
+@media (max-width: 760px) {
+  .corner-map {
+    right: calc(8px + var(--safe-r));
+    bottom: calc(8px + var(--safe-b));
+  }
+}
+
+@media (max-width: 520px) {
+  .menu {
+    padding: calc(52px + var(--safe-t)) calc(10px + var(--safe-r)) calc(10px + var(--safe-b)) calc(10px + var(--safe-l));
+  }
+
+  .title-screen {
+    margin-bottom: calc(-10px - var(--safe-b));
+  }
+}
+
+@media (max-width: 700px) {
+  :root .mp-chat,
+  :root .mp-chat-box {
+    width: calc(100vw - 24px - var(--safe-l) - var(--safe-r));
+  }
+}
+
+/* ------------------------------------------- a phone held sideways */
+
+@media (pointer: coarse) and (max-height: 520px) {
+  /* The sign starts near the top: the window buttons' row is empty on a phone in the menus (no embed, and
+     iPhones have no Fullscreen button). Where one shows (Fullscreen on Android), the sign stays under it. */
+  .menu {
+    padding-top: calc(12px + var(--safe-t));
+    padding-bottom: calc(10px + var(--safe-b));
+  }
+
+  #hud:has(.window-buttons > :not(.ride-only)) .menu {
+    padding-top: calc(50px + var(--safe-t));
+  }
+
+  .title-screen {
+    margin-bottom: calc(-10px - var(--safe-b));
+  }
+
+  .board {
+    padding: 14px 16px 12px;
+    outline-offset: -7px;
+  }
+
+  .board-head {
+    margin-bottom: 10px;
+  }
+
+  .sign-text {
+    height: 22px;
+  }
+
+  .board-sub {
+    margin-top: 6px;
+    font-size: 13px;
+  }
+
+  .board-status {
+    margin-top: 8px;
+    font-size: 13px;
+  }
+
+  /* The keys' hints: the controller's buttons are its own (the narrow-screen rule drops them too). */
+  .board-foot {
+    display: none;
+  }
+
+  .plank-list {
+    gap: 6px;
+  }
+
+  .plank {
+    min-height: 38px;
+    padding: 6px 34px 6px 14px;
+    font-size: 16px;
+  }
+
+  .plank-small {
+    min-height: 34px;
+    font-size: 14px;
+  }
+
+  /* Title and pause: the planks two to a row, so the whole sign shows at once. */
+  .title-screen,
+  .pause-screen {
+    width: min(620px, 100%);
+  }
+
+  .title-screen .plank-list,
+  .pause-screen .plank-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px 8px;
+  }
+
+  .title-screen .sign-text {
+    height: 36px;
+  }
+
+  .title-screen::after {
+    flex-basis: 16px;
+  }
+
+  .name-box {
+    margin-top: 10px;
+    padding-top: 8px;
+  }
+
+  .text-box {
+    min-height: 34px;
+  }
+
+  .name-note {
+    margin-top: 5px;
+    font-size: 12px;
+  }
+
+  /* Map select: smaller cards, three across. */
+  .map-grid {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 10px;
+  }
+
+  .map-art {
+    aspect-ratio: 2 / 1;
+  }
+
+  .map-text {
+    padding: 7px 10px 8px;
+  }
+
+  .map-name {
+    font-size: 16px;
+  }
+
+  .map-blurb {
+    font-size: 12px;
+    line-height: 1.3;
+  }
+
+  .map-options {
+    padding: 0 10px 10px;
+  }
+
+  /* The Locker and the editors: the 3D window beside the choices (style.css stacks them under 900 px wide), and
+     the sign as tall as the screen, its choices scrolling inside. */
+  .locker-screen,
+  .editor-screen {
+    min-height: 0;
+  }
+
+  .locker-layout {
+    grid-template-columns: minmax(170px, 0.7fr) minmax(0, 1.3fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .locker-frame {
+    height: auto;
+  }
+
+  .locker-tab {
+    padding: 5px 14px 4px;
+    font-size: 14px;
+  }
+
+  .locker-panel {
+    padding-top: 8px;
+  }
+
+  .editor-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(150px, 210px);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .locker-frame.editor-frame {
+    order: 0;
+    height: auto;
+  }
+
+  /* Settings and cheats: tighter. */
+  .settings-column {
+    gap: 14px;
+  }
+
+  .cheat {
+    min-height: 56px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  /* The trail map: a smaller head and legend, so the map gets the height. */
+  .trail-map .menu-panel {
+    padding: 10px 14px 8px;
+  }
+
+  .trail-map .menu-head {
+    margin-bottom: 8px;
+  }
+
+  .trail-map .menu-title {
+    font-size: 20px;
+  }
+
+  .trail-map .menu-foot {
+    margin-top: 6px;
+    font-size: 12px;
+  }
+
+  .trail-map-canvas {
+    max-width: min(100%, calc((100dvh - 120px - var(--safe-t) - var(--safe-b)) * var(--map-aspect, 1)));
+  }
+
+  /* Multiplayer's lobby list: the menu scrolls it as one sign. */
+  :root .lobby-screen {
+    max-height: none;
+  }
+}
