@@ -1379,17 +1379,32 @@ export const CONFIG = {
       hoverBrake: 30,
       /** Turning with ← → (rad/s). */
       turnRate: 1.6,
-      /** Climbing on ↑ and diving on ↓ (m/s), reached at `climbAccel` (m/s²). */
+      /**
+       * Climbing on ↑ and diving on ↓ (m/s), reached at `climbAccel` (m/s²);
+       * the dive (the polish after milestone 28, the user's request: down
+       * faster) reaches its speed at `diveAccel`, and with the pole key held
+       * (fast) dives at `fastDive`.
+       */
       climb: 9,
-      dive: 14,
+      dive: 30,
+      fastDive: 70,
       climbAccel: 24,
+      diveAccel: 60,
       /** The lift off the snow at take-off (m/s up). */
       liftOff: 6,
       /** Feet kept at least this far over the snow while flying (m); and no higher than `ceiling` m over it. */
       clearance: 0.5,
       ceiling: 300,
-      /** Landing: the glide down to the snow (m/s down), and how much of the speed across the ground it keeps on touching down. */
+      /**
+       * Landing: the glide down to the snow (m/s down) near it, and how much of
+       * the speed across the ground it keeps on touching down. Higher up it
+       * comes down faster (the polish after milestone 28): `glideFar` m/s more
+       * per meter over the snow, up to `glideMax` m/s, so a landing from the
+       * ceiling takes seconds and still eases onto the snow.
+       */
       glide: 7,
+      glideFar: 0.6,
+      glideMax: 45,
       landKeep: 1,
       /** How quickly the body turns to the flight's heading and pitch (1/s), and how far it pitches with a climb or dive (rad at full rate). */
       turnBody: 8,
@@ -1404,6 +1419,15 @@ export const CONFIG = {
       aimRate: 0.5,
       /** Fine aiming with the pole key held (rad/s). */
       fineRate: 0.08,
+      /**
+       * Aiming with the mouse (the polish after milestone 28): rad per CSS
+       * pixel moved or dragged (about the zoomed view's own, so the
+       * crosshairs stay near the spot the cursor passed), scaled by
+       * fineRate / aimRate with the pole key held; and with the cursor
+       * pinned at the window's edge, the aim keeps turning that way (rad/s).
+       */
+      mouseRate: 0.0006,
+      edgeRate: 0.7,
       /** Where the aim starts up and down (rad, 0 level): the camera's heading, a touch below the horizon. */
       startPitch: -0.03,
       pitchMin: -1.2,

@@ -31,6 +31,8 @@ export interface Dev {
   readonly testerPads: ReadonlyMap<string, string>;
   /** A pad code going down or up while riding (milestone 26). */
   padKey(code: string, down: boolean): void;
+  /** The powers' own keys (Y, U, I; not Space, the pop key): while the powers work they drive nothing else, so Y never opens the chat too. */
+  readonly ownKeys: readonly string[];
 }
 
 export function createDevPowers(h: DevHooks): Dev {
@@ -67,7 +69,8 @@ export function createDevPowers(h: DevHooks): Dev {
     [DEV_PADS.fire, 'Dev: fire'],
     [DEV_PADS.space, 'Dev: hover'],
   ]);
-  return { powers, controls: () => controlsTable(), testerKeys, testerPads, padKey: (code, down) => keys.pad(code, down) };
+  const ownKeys = [DEV_CODES.fly, DEV_CODES.aim, DEV_CODES.fire];
+  return { powers, controls: () => controlsTable(), testerKeys, testerPads, padKey: (code, down) => keys.pad(code, down), ownKeys };
 }
 
 function controlsTable(): HTMLElement {
@@ -79,11 +82,11 @@ function controlsTable(): HTMLElement {
   const rows: [string[], string[], string][] = [
     [[DEV_CODES.fly], [DEV_PADS.fly], 'Take off into flight. Flying: glide down and land (you ride away, no crash). Gliding: fly on.'],
     [['ArrowLeft', 'ArrowRight'], ['PadLSLeft', 'PadLSRight'], 'Flying: turn'],
-    [['ArrowUp', 'ArrowDown'], ['PadLSUp', 'PadLSDown'], 'Flying: climb or dive'],
+    [['ArrowUp', 'ArrowDown'], ['PadLSUp', 'PadLSDown'], 'Flying: climb or dive (Shift or RT held: dive fast)'],
     [['ShiftLeft'], ['PadRT'], 'Flying: fast (held)'],
     [[DEV_CODES.space], [DEV_PADS.space], 'Flying: hover (held)'],
-    [[DEV_CODES.aim], [DEV_PADS.aim], 'Hold to look through the scope; the arrows or the left stick aim (Shift or RT held: fine) and the rider coasts straight'],
-    [[DEV_CODES.fire], [DEV_PADS.fire], 'Fire (Space or A too while aiming)'],
+    [[DEV_CODES.aim], [DEV_PADS.aim], 'Hold to look through the scope; the mouse (move or drag), the arrows or the left stick aim (Shift or RT held: fine) and the rider coasts straight'],
+    [[DEV_CODES.fire], [DEV_PADS.fire], 'Fire (Space, A or a click too while aiming)'],
   ];
   for (const [codes, pads, what] of rows) {
     const tr = document.createElement('tr');

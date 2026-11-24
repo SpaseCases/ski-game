@@ -22,6 +22,27 @@ export interface DevButton {
   pressed: boolean;
 }
 
+/**
+ * The mouse over the game view (the polish after milestone 28, the user's
+ * request): the scope aims with it. Moved pixels since the last take (a
+ * plain move, no button held: a drag goes through core/pointerOrbit.ts and
+ * main hands it over), whether the cursor sits at the window's edge (-1, 0
+ * or 1 each way: the aim keeps turning there, since without pointer lock
+ * the cursor stops at the edge), and a click (pressed and let go without
+ * moving).
+ */
+export interface DevMouse {
+  x: number;
+  y: number;
+  edgeX: number;
+  edgeY: number;
+  click: boolean;
+}
+
+/** How near the window's edge (CSS px) the cursor counts as at it, and how far a press may move and still be a click. */
+const EDGE = 3;
+const CLICK_SLOP = 5;
+
 export class DevKeys {
   readonly fly: DevButton = { held: false, pressed: false };
   readonly aim: DevButton = { held: false, pressed: false };
@@ -30,6 +51,15 @@ export class DevKeys {
   private readonly down = { fly: false, aim: false, fire: false, space: false };
   private readonly latch = { fly: false, aim: false, fire: false, space: false };
   private readonly listening: () => boolean;
+  private mouseX = 0;
+  private mouseY = 0;
+  private edgeX = 0;
+  private edgeY = 0;
+  private clicked = false;
+  /** A left press down on the game view, and where. */
+  private down0 = false;
+  private downX = 0;
+  private downY = 0;
 
   /** `listening` says whether the game takes keys now (no menu open). */
   constructor(listening: () => boolean) {
@@ -47,6 +77,47 @@ export class DevKeys {
       if (key) this.down[key] = false;
     });
     window.addEventListener('blur', () => this.clear());
+    window.addEventListener(
+      'mousemove',
+      (e) => {
+        if (!this.listening()) return;
+        // A held button is a drag: main hands the orbit's pixels over instead (no counting them twice).
+        if (e.buttons === 0) {
+          this.mouseX += e.movementX;
+          this.mouseY += e.movementY;
+        }
+        this.edgeX = e.clientX <= EDGE ? -1 : e.clientX >= window.innerWidth - 1 - EDGE ? 1 : 0;
+        this.edgeY = e.clientY <= EDGE ? -1 : e.clientY >= window.innerHeight - 1 - EDGE ? 1 : 0;
+      },
+      { passive: true },
+    );
+    // Out of the window (or the embedding page's frame): no more moves come, so nothing keeps turning.
+    document.documentElement.addEventListener('mouseleave', () => {
+      this.edgeX = 0;
+      this.edgeY = 0;
+    });
+    window.addEventListener('mousedown', (e) => {
+      this.down0 = e.button === 0 && e.target instanceof HTMLCanvasElement && this.listening();
+      this.downX = e.clientX;
+      this.downY = e.clientY;
+    });
+    window.addEventListener('mouseup', (e) => {
+      const was = this.down0;
+      this.down0 = false;
+      if (e.button === 0 && was && Math.abs(e.clientX - this.downX) + Math.abs(e.clientY - this.downY) <= CLICK_SLOP && this.listening()) this.clicked = true;
+    });
+  }
+
+  /** Writes the mouse since the last take into `out` and clears the moves and the click. */
+  takeMouse(out: DevMouse): void {
+    out.x = this.mouseX;
+    out.y = this.mouseY;
+    out.edgeX = this.edgeX;
+    out.edgeY = this.edgeY;
+    out.click = this.clicked;
+    this.mouseX = 0;
+    this.mouseY = 0;
+    this.clicked = false;
   }
 
   /** A pad code going down or up (main hands every one over while riding): its power, if it has one. */
@@ -76,6 +147,10 @@ export class DevKeys {
       this.down[key] = false;
       this.latch[key] = false;
     }
+    this.mouseX = 0;
+    this.mouseY = 0;
+    this.clicked = false;
+    this.down0 = false;
   }
 
   private copy(key: DevKey, b: DevButton): void {

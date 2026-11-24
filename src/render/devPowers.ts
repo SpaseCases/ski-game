@@ -1,6 +1,6 @@
 import { BufferAttribute, BufferGeometry, Color, Euler, Matrix4, Mesh, MeshLambertMaterial, Quaternion, SRGBColorSpace, Vector3, type PerspectiveCamera, type Scene } from 'three';
 import { CONFIG } from '../config.ts';
-import type { DevKeys } from '../core/devKeys.ts';
+import type { DevKeys, DevMouse } from '../core/devKeys.ts';
 import type { ButtonState, InputState } from '../core/input.ts';
 import { flightKeys, flightStep, startFlight, toggleLanding } from '../sim/flight.ts';
 import type { Course } from '../sim/obstacles.ts';
@@ -93,6 +93,12 @@ export class DevPowers {
   private readonly pinCenter = new Vector3();
   private aimX = 0;
   private aimY = 0;
+  /** The mouse this frame (DevKeys.takeMouse), and a drag's pixels main handed over (takeDrag), both aim while scoped. */
+  private readonly mouse: DevMouse = { x: 0, y: 0, edgeX: 0, edgeY: 0, click: false };
+  private dragX = 0;
+  private dragY = 0;
+  /** The mouse moved during this aim: only then does a cursor at the window's edge keep turning it (one resting there at the start doesn't). */
+  private mouseMoved = false;
   /** The pole key held while aiming: fine aim. */
   private fine = false;
   /** 0 at rest, 1 looking through the scope. */
@@ -182,6 +188,19 @@ export class DevPowers {
   }
 
   /**
+   * Before the game camera, each frame: while aiming, a click-and-drag on
+   * the game view aims the scope instead of orbiting the camera (the user's
+   * request), so its pixels are taken and the camera sees none.
+   */
+  takeDrag(drag: { x: number; y: number }): void {
+    if (!this.aiming) return;
+    this.dragX += drag.x;
+    this.dragY += drag.y;
+    drag.x = 0;
+    drag.y = 0;
+  }
+
+  /**
    * After each fixed step (milestone 28): a rider pinned for the aim is put
    * back where it stood, at rest. Anything that crashes it (an avalanche, a
    * shot in a lobby) lets go.
@@ -210,6 +229,7 @@ export class DevPowers {
       this.out.showTag(tag);
     }
     if (!on) {
+      this.keys.takeMouse(this.mouse);
       this.raise = 0;
       this.fireQueued = false;
       this.out.showScope(false);
@@ -218,21 +238,46 @@ export class DevPowers {
       return;
     }
     const S = CONFIG.dev.scope;
+    const m = this.mouse;
+    this.keys.takeMouse(m);
     if (this.aiming && this.raise === 0) {
       // The way the camera looks now, at `startPitch` (the chase camera looks down at the rider: from the eye that's the snow a few meters ahead).
       camera.getWorldDirection(forward);
       this.aimYaw = Math.atan2(-forward.x, -forward.z);
       this.aimPitch = S.startPitch;
       this.steady = 0;
+      // Moves from before the aim began don't turn it.
+      this.mouseMoved = false;
+      m.x = 0;
+      m.y = 0;
+      this.dragX = 0;
+      this.dragY = 0;
       this.out.prepareShot();
     }
     this.raise = approach(this.raise, this.aiming ? 1 : 0, frameTime / S.raise);
-    if (this.raise > 0) {
+    if (this.raise > 0 && this.aiming) {
       const rate = this.fine ? S.fineRate : S.aimRate;
-      this.aimYaw -= this.aimX * rate * frameTime;
-      this.aimPitch = clamp(this.aimPitch + this.aimY * rate * frameTime, S.pitchMin, S.pitchMax);
-      this.steady = this.aimX !== 0 || this.aimY !== 0 ? 0 : Math.min(1, this.steady + frameTime / S.steady);
+      // The mouse (a plain move or a drag): right looks right, down looks down; fine aim with the pole key slows it as it does the arrows.
+      const px = m.x + this.dragX;
+      const py = m.y + this.dragY;
+      const mouseRate = S.mouseRate * (this.fine ? S.fineRate / S.aimRate : 1);
+      if (px !== 0 || py !== 0) this.mouseMoved = true;
+      // At the window's edge the cursor stops, so the aim keeps turning that way.
+      const ex = this.mouseMoved ? m.edgeX : 0;
+      const ey = this.mouseMoved ? m.edgeY : 0;
+      const edgeRate = this.fine ? S.fineRate : S.edgeRate;
+      this.aimYaw -= this.aimX * rate * frameTime + px * mouseRate + ex * edgeRate * frameTime;
+      this.aimPitch = clamp(this.aimPitch + this.aimY * rate * frameTime - py * mouseRate - ey * edgeRate * frameTime, S.pitchMin, S.pitchMax);
+      const moving = this.aimX !== 0 || this.aimY !== 0 || px !== 0 || py !== 0 || ex !== 0 || ey !== 0;
+      this.steady = moving ? 0 : Math.min(1, this.steady + frameTime / S.steady);
+      // A click on the game view fires, as I does.
+      if (m.click && this.reload <= 0) {
+        this.fireQueued = true;
+        this.reload = CONFIG.dev.shot.reload;
+      }
     }
+    this.dragX = 0;
+    this.dragY = 0;
     // Sway: two slow waves each way, smaller once steady, bigger at speed; the kick on top.
     this.swayTime += frameTime;
     this.kick *= Math.exp(-S.settle * frameTime);

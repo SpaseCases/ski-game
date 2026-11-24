@@ -1463,6 +1463,8 @@ startLoop(
   (dt) => {
     if (!level) return;
     const { built, run, race } = level;
+    // The developer's own keys drive nothing else while the powers work (Y flies and never opens the chat too).
+    keyboard.setSkipped(devLive() && dev ? dev.ownKeys : null);
     keyboard.sample(keys);
     if (keys.trailMap.pressed) toggleCornerMap();
     // R: back to the checkpoint at once. Holding it keeps the skier there,
@@ -1564,6 +1566,8 @@ startLoop(
       skierView.update(pose, frameTime, stageScreen ? 0 : gameCamera.firstWeight);
       orbit.take(drag);
       drag.active = orbit.dragging;
+      // Aiming the developer's scope, a drag aims it instead of orbiting the camera.
+      if (devLive()) dev?.powers.takeDrag(drag);
       gameCamera.update(chase, pose, skierView.rig, level.built.hf, frameTime, drag);
       // The developer's powers (milestone 25): through the scope (it overrides the camera), the carried model, a shot. Put away while the Locker shows.
       dev?.powers.frame(devLive() && !stageScreen, pose, skier, skierView.rig, camera, frameTime, level.built.course, level.world.snow, gameCamera.firstWeight);
