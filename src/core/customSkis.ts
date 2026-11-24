@@ -57,6 +57,73 @@ export const EDIT_PALETTE: readonly { readonly name: string; readonly hex: strin
 ];
 const HEXES = EDIT_PALETTE.map((c) => c.hex);
 
+/**
+ * Colors of the player's own (typed as hex codes in an editor, 2026-11-24)
+ * each slot may add after EDIT_PALETTE: indices 32 on, one letter each
+ * (LETTERS has 52). A slot's palette is EDIT_PALETTE then its own colors.
+ */
+export const OWN_COLORS = 8;
+
+/** A hex code as typed ("f0a", "#FF00aa") made "#rrggbb", or null when it isn't one. */
+export function hexCode(text: string): string | null {
+  const t = text.trim().replace(/^#/, '').toLowerCase();
+  if (/^[0-9a-f]{6}$/.test(t)) return `#${t}`;
+  if (/^[0-9a-f]{3}$/.test(t)) return `#${t[0]}${t[0]}${t[1]}${t[1]}${t[2]}${t[2]}`;
+  return null;
+}
+
+/** A new slot's palette: EDIT_PALETTE's colors, its own appended as they're added. */
+export function newPalette(): string[] {
+  return HEXES.slice();
+}
+
+/**
+ * The index of `hex` in a slot's `palette` (EDIT_PALETTE's own if it's one
+ * of them, else one of the slot's own colors), adding it (in place) if it's
+ * new: in a free place, or over an own color nothing uses (`used`). -1 when
+ * all OWN_COLORS are in use.
+ */
+export function paletteAdd(palette: string[], hex: string, used: (index: number) => boolean): number {
+  const at = palette.indexOf(hex);
+  if (at >= 0) return at;
+  if (palette.length < HEXES.length + OWN_COLORS) return palette.push(hex) - 1;
+  for (let i = HEXES.length; i < palette.length; i++) {
+    if (!used(i)) {
+      palette[i] = hex;
+      return i;
+    }
+  }
+  return -1;
+}
+
+/** A palette's own colors as saved: six hex digits each, after the last separator (nothing when it has none). */
+export function ownColorsText(palette: readonly string[]): string {
+  let out = '';
+  for (let i = HEXES.length; i < palette.length; i++) out += palette[i]!.slice(1);
+  return out;
+}
+
+/** A slot's palette from its saved own colors (ownColorsText's form; undefined: none), or null if it can't be read. */
+export function paletteFrom(text: string | undefined): string[] | null {
+  const out = newPalette();
+  if (text === undefined || text === '') return out;
+  if (text.length % 6 !== 0 || text.length / 6 > OWN_COLORS || !/^[0-9a-f]+$/.test(text)) return null;
+  for (let k = 0; k < text.length; k += 6) out.push(`#${text.slice(k, k + 6)}`);
+  return out;
+}
+
+/** A color's name in an editor: EDIT_PALETTE's, or the hex code of an own color. */
+export function colorName(palette: readonly string[], index: number): string {
+  return EDIT_PALETTE[index]?.name ?? (palette[index] ?? '#000000').toUpperCase();
+}
+
+/** Each own color of `palette` as the nearest EDIT_PALETTE color (an index map; EDIT_PALETTE's own map to themselves). */
+export function snapMap(palette: readonly string[]): Uint8Array {
+  const map = new Uint8Array(palette.length);
+  for (let i = 0; i < palette.length; i++) map[i] = i < HEXES.length ? i : nearestIndex(palette[i]!);
+  return map;
+}
+
 /** A new slot: the top sheets in Ink, the bases and sidewalls in Cobalt (indices into EDIT_PALETTE). */
 const BLANK_TOP = 0;
 const BLANK_BASE = 22;
@@ -95,6 +162,8 @@ export const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 /** A slot's own data: its two grids (shared with its graphic's layers), the sidewalls' color index, and whether the skis are painted alike (never on a board). */
 interface Slot {
   graphic: SkiGraphic;
+  /** The slot's palette (EDIT_PALETTE, then its own colors), shared with both grids' art. */
+  colors: string[];
   top: PixelArt;
   base: PixelArt;
   sidewall: number;
@@ -125,8 +194,23 @@ export function customSidewall(gear: Gear, slot: number): number {
 export function setCustomSidewall(gear: Gear, slot: number, index: number): void {
   const s = slotOf(gear, slot);
   s.sidewall = index;
-  s.graphic.sidewall = HEXES[index]!;
-  s.graphic.base = HEXES[index]!;
+  s.graphic.sidewall = s.colors[index] ?? HEXES[0]!;
+  s.graphic.base = s.graphic.sidewall;
+}
+
+/** The slot's palette: EDIT_PALETTE's colors, then its own (edited in place by customColor). */
+export function customPalette(gear: Gear, slot: number): readonly string[] {
+  return slotOf(gear, slot).colors;
+}
+
+/**
+ * The index of a color typed as a hex code in the slot's palette, added as
+ * one of its own if new (over one nothing uses: not the slot, nor `held`,
+ * the editor's undo steps); -1 when its own colors are all in use.
+ */
+export function customColor(gear: Gear, slot: number, hex: string, held: (index: number) => boolean = () => false): number {
+  const s = slotOf(gear, slot);
+  return paletteAdd(s.colors, hex, (i) => s.sidewall === i || s.top.cells.includes(i) || s.base.cells.includes(i) || held(i));
 }
 
 /** Whether the editor paints both skis alike (never on a board). */
@@ -198,12 +282,13 @@ function slotOf(gear: Gear, slot: number): Slot {
     // A ski slot paints the pair (each row across both skis); a board slot one board.
     const pair = gearBoard(gear) === null;
     const width = pair ? cols * 2 : cols;
-    const grid = (fill: number): PixelArt => ({ rows, cols: width, pair, cells: new Uint8Array(rows * width).fill(fill), colors: HEXES });
+    const colors = newPalette();
+    const grid = (fill: number): PixelArt => ({ rows, cols: width, pair, cells: new Uint8Array(rows * width).fill(fill), colors });
     const top = grid(BLANK_TOP);
     const base = grid(BLANK_BASE);
     const wall = HEXES[BLANK_BASE]!;
     const graphic: SkiGraphic = { id, name: `Custom ${slot + 1}`, base: wall, sidewall: wall, pair, layers: [{ pixels: top }], baseLayers: [{ pixels: base }] };
-    s = { graphic, top, base, sidewall: BLANK_BASE, linked: pair };
+    s = { graphic, colors, top, base, sidewall: BLANK_BASE, linked: pair };
     slots.set(id, s);
     gearList(gear)[slot] = graphic;
   }
@@ -325,39 +410,48 @@ function objectOf(v: unknown): Record<string, unknown> | null {
 /**
  * The sidewalls' letter, `=` (linked) or `~`, then the top sheets' cells and,
  * after a `/`, the bases', run by run: "12A" is twelve cells of color 0, "B"
- * one of color 1. (The first ski saves, before the bases were painted, were
- * the base's letter then one ski's top: still read.) A board slot's is the
- * same, always `~`, its rows one board wide.
+ * one of color 1. A slot with colors of its own (hex codes, 2026-11-24) adds
+ * a `/` and six hex digits for each (letters from `g` on: index 32 up).
+ * (The first ski saves, before the bases were painted, were the base's
+ * letter then one ski's top: still read.) A board slot's is the same,
+ * always `~`, its rows one board wide. `plain` writes the own colors as the
+ * nearest EDIT_PALETTE ones, with no `/` part (the marketplace's form: its
+ * Worker takes only EDIT_PALETTE's letters).
  */
-function encode(s: Slot): string {
-  return `${LETTERS[s.sidewall]!}${s.linked ? '=' : '~'}${runs(s.top.cells)}/${runs(s.base.cells)}`;
+function encode(s: Slot, plain = false): string {
+  const own = ownColorsText(s.colors);
+  const map = plain && own ? snapMap(s.colors) : null;
+  const tail = own && !plain ? `/${own}` : '';
+  return `${LETTERS[map ? map[s.sidewall]! : s.sidewall]!}${s.linked ? '=' : '~'}${runs(s.top.cells, map)}/${runs(s.base.cells, map)}${tail}`;
 }
 
 /** Run-length text of palette letters (customSkis.v1's cells; core/customWear.ts saves garments the same way). */
-export function runs(cells: Uint8Array): string {
+export function runs(cells: Uint8Array, map: Uint8Array | null = null): string {
   let out = '';
+  const at = (i: number): number => (map ? map[cells[i]!]! : cells[i]!);
   for (let i = 0; i < cells.length; ) {
     let j = i + 1;
-    while (j < cells.length && cells[j] === cells[i]) j++;
-    out += (j - i > 1 ? String(j - i) : '') + LETTERS[cells[i]!]!;
+    while (j < cells.length && at(j) === at(i)) j++;
+    out += (j - i > 1 ? String(j - i) : '') + LETTERS[at(i)]!;
     i = j;
   }
   return out;
 }
 
-export function letterIndex(ch: string | undefined): number {
+/** A saved letter's palette index, or -1 if it isn't one of a palette of `size` colors (EDIT_PALETTE's by default). */
+export function letterIndex(ch: string | undefined, size = HEXES.length): number {
   const i = ch === undefined ? -1 : LETTERS.indexOf(ch);
-  return i >= 0 && i < HEXES.length ? i : -1;
+  return i >= 0 && i < size ? i : -1;
 }
 
-/** Fills `count` cells from run-length text, or returns null if it doesn't fit exactly. */
-export function unruns(text: string, count: number): Uint8Array | null {
+/** Fills `count` cells from run-length text (letters of a palette of `size` colors), or returns null if it doesn't fit exactly. */
+export function unruns(text: string, count: number, size = HEXES.length): Uint8Array | null {
   const cells = new Uint8Array(count);
   let n = 0;
   for (let k = 0; k < text.length; ) {
     let run = 0;
     while (k < text.length && text[k]! >= '0' && text[k]! <= '9') run = run * 10 + Number(text[k++]);
-    const color = letterIndex(text[k++]);
+    const color = letterIndex(text[k++], size);
     const len = Math.max(1, run);
     if (color < 0 || n + len > count) return null;
     cells.fill(color, n, n + len);
@@ -366,29 +460,31 @@ export function unruns(text: string, count: number): Uint8Array | null {
   return n === count ? cells : null;
 }
 
-/** A slot's saved text read: its two grids, the sidewalls' color and whether it's linked; null if it can't be read. */
-function parseSlot(text: string, gear: Gear): { top: Uint8Array; base: Uint8Array; wall: number; linked: boolean } | null {
+/** A slot's saved text read: its two grids, the sidewalls' color, whether it's linked and its palette; null if it can't be read. */
+function parseSlot(text: string, gear: Gear): { top: Uint8Array; base: Uint8Array; wall: number; linked: boolean; colors: string[] } | null {
   const { rows, cols } = gearType(gear).model;
   const board = gearBoard(gear) !== null;
   const width = board ? cols : cols * 2;
-  const wall = letterIndex(text[0]);
-  if (wall < 0) return null;
   if (text[1] === '=' || text[1] === '~') {
-    const [topText, baseText] = text.slice(2).split('/');
-    const top = unruns(topText ?? '', rows * width);
-    const base = unruns(baseText ?? '', rows * width);
-    if (!top || !base) return null;
-    return { top, base, wall, linked: !board && text[1] === '=' };
+    const [topText, baseText, own, extra] = text.slice(2).split('/');
+    const colors = paletteFrom(own);
+    if (!colors || extra !== undefined) return null;
+    const wall = letterIndex(text[0], colors.length);
+    const top = unruns(topText ?? '', rows * width, colors.length);
+    const base = unruns(baseText ?? '', rows * width, colors.length);
+    if (wall < 0 || !top || !base) return null;
+    return { top, base, wall, linked: !board && text[1] === '=', colors };
   }
   // The first ski format: one ski's top sheet, the same on both, and one color underneath.
-  if (board) return null;
+  const wall = letterIndex(text[0]);
+  if (board || wall < 0) return null;
   const one = unruns(text.slice(1), rows * cols);
   if (!one) return null;
   const top = new Uint8Array(rows * width);
   for (let r = 0; r < rows; r++) {
     for (let side = 0; side < 2; side++) top.set(one.subarray(r * cols, (r + 1) * cols), r * cols * 2 + side * cols);
   }
-  return { top, base: new Uint8Array(rows * width).fill(wall), wall, linked: false };
+  return { top, base: new Uint8Array(rows * width).fill(wall), wall, linked: false, colors: newPalette() };
 }
 
 /** Fills the slot from saved text; false (the slot untouched) if it can't be read. */
@@ -396,6 +492,9 @@ function decode(text: string, gear: Gear, slot: number): boolean {
   const read = parseSlot(text, gear);
   if (!read) return false;
   const s = slotOf(gear, slot);
+  // The palette in place: both grids' art shares it.
+  s.colors.length = 0;
+  s.colors.push(...read.colors);
   s.top.cells.set(read.top);
   s.base.cells.set(read.base);
   if (text[1] === '=' || text[1] === '~') s.linked = read.linked;
@@ -403,9 +502,20 @@ function decode(text: string, gear: Gear, slot: number): boolean {
   return true;
 }
 
-/** One slot's saved text (the marketplace shares it, milestone 24), or null while it has never been opened. */
-export function slotText(gear: Gear, slot: number): string | null {
-  return gearList(gear)[slot] ? encode(slotOf(gear, slot)) : null;
+/**
+ * One slot's saved text (the marketplace shares it, milestone 24, `plain`:
+ * its own colors as the nearest EDIT_PALETTE ones), or null while it has
+ * never been opened.
+ */
+export function slotText(gear: Gear, slot: number, plain = false): string | null {
+  return gearList(gear)[slot] ? encode(slotOf(gear, slot), plain) : null;
+}
+
+/** Whether the slot paints with a color of its own (one only its own palette has: the marketplace shares it as the nearest). */
+export function slotHasOwnColor(gear: Gear, slot: number): boolean {
+  if (!gearList(gear)[slot]) return false;
+  const s = slotOf(gear, slot);
+  return s.sidewall >= HEXES.length || s.top.cells.some((c) => c >= HEXES.length) || s.base.cells.some((c) => c >= HEXES.length);
 }
 
 /** Paints one slot from saved text and saves; false (nothing changed) if it can't be read. The caller repaints. */
@@ -422,7 +532,7 @@ export function graphicFromText(gear: Gear, text: string): SkiGraphic | null {
   const { rows, cols } = gearType(gear).model;
   const pair = gearBoard(gear) === null;
   const width = pair ? cols * 2 : cols;
-  const art = (cells: Uint8Array): PixelArt => ({ rows, cols: width, pair, cells, colors: HEXES });
-  const wall = HEXES[read.wall]!;
+  const art = (cells: Uint8Array): PixelArt => ({ rows, cols: width, pair, cells, colors: read.colors });
+  const wall = read.colors[read.wall]!;
   return { id: 'market', name: 'Market', base: wall, sidewall: wall, pair, layers: [{ pixels: art(read.top) }], baseLayers: [{ pixels: art(read.base) }] };
 }

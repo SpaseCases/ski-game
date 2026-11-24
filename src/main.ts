@@ -551,7 +551,7 @@ function loadMultiplayer(): Promise<Multiplayer> {
       inLobby: (on) => pauseScreen.setLobby(on),
       toast: (text) => toast.show(text),
       chatKey: () => mainKey(settings.bindings, 'chat'),
-      paint: { customId, boardGear, graphicFromText, wearFromText, hexes: EDIT_PALETTE.map((c) => c.hex) },
+      paint: { customId, boardGear, graphicFromText, wearFromText },
     });
     for (const screen of mp.screens) menus.add(screen);
     return mp;

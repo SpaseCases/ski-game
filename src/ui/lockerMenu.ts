@@ -16,8 +16,8 @@ import {
   type Pattern,
 } from '../core/outfit.ts';
 import { BOARD_TYPES, boardGraphic, boardStats, boardType, type BoardId } from '../core/boards.ts';
-import { boardGear, customGraphic, customId, EDIT_PALETTE, gearBoard, gearType, type Gear } from '../core/customSkis.ts';
-import { wearCells, wearPattern } from '../core/customWear.ts';
+import { boardGear, customGraphic, customId, gearBoard, gearType, type Gear } from '../core/customSkis.ts';
+import { wearCells, wearPalette, wearPattern } from '../core/customWear.ts';
 import { wearOffsets, wearPanels } from '../render/wearPanels.ts';
 import {
   CUSTOM_SLOTS,
@@ -89,7 +89,6 @@ const LONGEST_SKI = Math.max(...SKI_TYPES.map((t) => t.model.length));
 const LONGEST_BOARD = Math.max(...BOARD_TYPES.map((t) => t.model.length));
 /** A garment slot's thumbnail: CSS pixels a square. */
 const WEAR_THUMB_PX = 3;
-const EDIT_HEXES = EDIT_PALETTE.map((c) => c.hex);
 /** A custom slot never painted: the ski's outline in the plank's hover blue. */
 const EMPTY_SLOT: SkiGraphic = { id: 'empty', name: 'Empty', base: '#2b5582', layers: [{ fill: '#2b5582' }] };
 
@@ -623,7 +622,7 @@ export class LockerScreen implements Screen, StageWindow {
   private paintCustoms(): void {
     for (const w of this.wearSlots) {
       const cells = wearCells(w.garment, w.slot);
-      drawWear(w.thumb, wearPanels(w.garment), wearOffsets(w.garment), cells, EDIT_HEXES, WEAR_THUMB_PX, '#2b5582');
+      drawWear(w.thumb, wearPanels(w.garment), wearOffsets(w.garment), cells, wearPalette(w.garment, w.slot), WEAR_THUMB_PX, '#2b5582');
       w.note.textContent = cells ? '' : 'Empty: paint one';
       w.share.hidden = !cells;
       w.button.setAttribute('aria-label', `${w.garment === 'jacket' ? 'Jacket' : 'Pants'}: Custom ${w.slot + 1}${cells ? '' : ', empty'}`);

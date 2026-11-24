@@ -1,6 +1,6 @@
 import { BOARD_TYPES, boardType } from '../core/boards.ts';
-import { boardGear, customGraphic, customId, EDIT_PALETTE, gearBoard, gearType, graphicFromText, setSlotText, slotText, type Gear } from '../core/customSkis.ts';
-import { setWearSlotText, wearCells, wearFromText, wearPattern, wearSlot, wearSlotText, wornOutfit } from '../core/customWear.ts';
+import { boardGear, customGraphic, customId, gearBoard, gearType, graphicFromText, setSlotText, slotHasOwnColor, slotText, type Gear } from '../core/customSkis.ts';
+import { setWearSlotText, wearCells, wearFromText, wearHasOwnColor, wearPalette, wearPattern, wearSlot, wearSlotText, wornOutfit } from '../core/customWear.ts';
 import { GARMENTS, isCustomPattern, outfitFrom, type Garment, type Outfit } from '../core/outfit.ts';
 import { CUSTOM_SLOTS, SKI_TYPES, skiType, type SkiId } from '../core/skis.ts';
 import type { MarketItem } from '../online/market.ts';
@@ -30,7 +30,6 @@ export interface GlueHooks {
   slotsChanged: () => void;
 }
 
-const EDIT_HEXES = EDIT_PALETTE.map((c) => c.hex);
 /** Thumbnails' scale, canvas pixels a meter (the longest ski is about 160 px). */
 const PX_PER_M = 84;
 const BOARD_MAX_HALF = Math.max(...BOARD_TYPES.flatMap((t) => t.model.width.map(([, hw]) => hw)));
@@ -50,10 +49,10 @@ function gearName(gear: Gear): string {
   return gearBoard(gear) ? `${gearType(gear).name} board` : `${gearType(gear).name} skis`;
 }
 
-function paintGear(canvas: HTMLCanvasElement, gear: Gear, g: Parameters<typeof paintSkis>[2]): void {
+function paintGear(canvas: HTMLCanvasElement, gear: Gear, g: Parameters<typeof paintSkis>[2], base = false): void {
   const board = gearBoard(gear);
-  if (board) paintSkis(canvas, boardType(board), g, false, PX_PER_M, [1], BOARD_MAX_HALF);
-  else paintSkis(canvas, skiType(gear as SkiId), g, false, PX_PER_M);
+  if (board) paintSkis(canvas, boardType(board), g, base, PX_PER_M, [1], BOARD_MAX_HALF);
+  else paintSkis(canvas, skiType(gear as SkiId), g, base, PX_PER_M);
 }
 
 const EMPTY_GRAPHIC = { id: 'empty', name: 'Empty', base: EMPTY, layers: [{ fill: EMPTY }] };
@@ -65,13 +64,21 @@ export function marketThumb(it: MarketItem): HTMLElement {
     const gear = gearOf(it.kind, it.type);
     const g = gear ? graphicFromText(gear, it.data) : null;
     if (gear && g) {
+      // The top sheets and the bases, both drawn: the Market's Top / Base switch shows one (market.css).
       paintGear(canvas, gear, g);
-      return canvas;
+      canvas.className = 'mk-face-top';
+      const base = document.createElement('canvas');
+      base.className = 'mk-face-base';
+      paintGear(base, gear, g, true);
+      const faces = document.createElement('span');
+      faces.className = 'mk-faces';
+      faces.append(canvas, base);
+      return faces;
     }
   } else if (it.kind === 'jacket' || it.kind === 'pants') {
     const read = wearFromText(it.kind, it.data);
     if (read) {
-      drawWear(canvas, wearPanels(it.kind), wearOffsets(it.kind), read.cells, EDIT_HEXES, WEAR_PX, EMPTY);
+      drawWear(canvas, wearPanels(it.kind), wearOffsets(it.kind), read.cells, read.colors, WEAR_PX, EMPTY);
       return canvas;
     }
   }
@@ -89,24 +96,37 @@ export function marketDescribe(it: MarketItem): string {
   return it.kind === 'jacket' ? 'Jacket' : it.kind === 'pants' ? 'Pants' : 'Outfit';
 }
 
-/** One painted slot to share (from an editor or the Locker), or null while it's never been painted. */
+/**
+ * What the share sign says under an item painted with colors of its own
+ * (hex codes, 2026-11-24): the marketplace's Worker takes only the editor
+ * palette's colors, so a share carries the nearest of them instead.
+ */
+const OWN_COLOR_NOTE = ' Your own hex colors share as the nearest palette colors.';
+
+/**
+ * One painted slot to share (from an editor or the Locker), or null while
+ * it's never been painted. Its own hex colors go as the nearest palette
+ * colors (`plain`), and the thumbnail is drawn from what's sent.
+ */
 export function slotShare(kind: SlotKind, gearOrGarment: Gear | Garment, slot: number): ShareRequest | null {
   if (kind === 'jacket' || kind === 'pants') {
-    const data = wearSlotText(kind, slot);
-    const cells = wearCells(kind, slot);
-    if (!data || !cells) return null;
+    const data = wearSlotText(kind, slot, true);
+    const read = data ? wearFromText(kind, data) : null;
+    if (!data || !read) return null;
     const canvas = document.createElement('canvas');
-    drawWear(canvas, wearPanels(kind), wearOffsets(kind), cells, EDIT_HEXES, WEAR_PX, EMPTY);
-    return { kind, type: '', data, look: '', what: `${kind === 'jacket' ? 'Jacket' : 'Pants'}: Custom ${slot + 1}`, thumb: canvas };
+    drawWear(canvas, wearPanels(kind), wearOffsets(kind), read.cells, read.colors, WEAR_PX, EMPTY);
+    const note = wearHasOwnColor(kind, slot) ? `.${OWN_COLOR_NOTE}` : '';
+    return { kind, type: '', data, look: '', what: `${kind === 'jacket' ? 'Jacket' : 'Pants'}: Custom ${slot + 1}${note}`, thumb: canvas };
   }
   const gear = gearOrGarment as Gear;
-  const data = slotText(gear, slot);
-  const g = customGraphic(gear, slot);
+  const data = slotText(gear, slot, true);
+  const g = data ? graphicFromText(gear, data) : null;
   if (!data || !g) return null;
   const canvas = document.createElement('canvas');
   paintGear(canvas, gear, g);
   const board = gearBoard(gear);
-  return { kind: board ? 'board' : 'skis', type: board ?? gear, data, look: '', what: `${gearName(gear)}: Custom ${slot + 1}`, thumb: canvas };
+  const note = slotHasOwnColor(gear, slot) ? `.${OWN_COLOR_NOTE}` : '';
+  return { kind: board ? 'board' : 'skis', type: board ?? gear, data, look: '', what: `${gearName(gear)}: Custom ${slot + 1}${note}`, thumb: canvas };
 }
 
 /** The slot a worn custom ski or board graphic names (customId's "custom-<gear>-<n>"), or -1. */
@@ -117,9 +137,12 @@ function graphicSlot(gear: Gear, graphic: string): number {
 
 /** The outfit worn now and the custom slots it wears, to share (the caller adds the look code and the thumbnail). */
 export function outfitShare(o: Outfit): Omit<ShareRequest, 'thumb' | 'look'> {
+  let own = false;
   const garment = (g: Garment): string | null => {
     const p = o[GARMENTS.find((x) => x.id === g)!.pattern];
-    return isCustomPattern(p) ? wearSlotText(g, wearSlot(p)) : null;
+    if (!isCustomPattern(p)) return null;
+    own ||= wearHasOwnColor(g, wearSlot(p));
+    return wearSlotText(g, wearSlot(p), true);
   };
   const skiSlot = graphicSlot(o.ski, o.skiGraphic);
   const boardSlot = graphicSlot(boardGear(o.board), o.boardGraphic);
@@ -127,11 +150,14 @@ export function outfitShare(o: Outfit): Omit<ShareRequest, 'thumb' | 'look'> {
     outfit: o,
     jacket: garment('jacket'),
     pants: garment('pants'),
-    skis: skiSlot >= 0 ? slotText(o.ski, skiSlot) : null,
-    board: boardSlot >= 0 ? slotText(boardGear(o.board), boardSlot) : null,
+    skis: skiSlot >= 0 ? slotText(o.ski, skiSlot, true) : null,
+    board: boardSlot >= 0 ? slotText(boardGear(o.board), boardSlot, true) : null,
   };
+  if (skiSlot >= 0) own ||= slotHasOwnColor(o.ski, skiSlot);
+  if (boardSlot >= 0) own ||= slotHasOwnColor(boardGear(o.board), boardSlot);
   const painted = [data.jacket, data.pants, data.skis, data.board].filter((x) => x).length;
-  return { kind: 'outfit', type: '', data: JSON.stringify(data), what: painted ? `Your outfit, with ${painted} painted part${painted === 1 ? '' : 's'}` : 'Your outfit' };
+  const what = painted ? `Your outfit, with ${painted} painted part${painted === 1 ? '' : 's'}` : 'Your outfit';
+  return { kind: 'outfit', type: '', data: JSON.stringify(data), what: own ? `${what}.${OWN_COLOR_NOTE}` : what };
 }
 
 /** A free slot of that gear or garment, or (all painted) one the player picks to paint over; null when they cancel. */
@@ -141,7 +167,7 @@ async function slotFor(kind: SlotKind, gear: Gear | null, pick: SlotPick): Promi
     const painted = kind === 'jacket' || kind === 'pants' ? wearCells(kind, slot) !== null : customGraphic(gear!, slot) !== null;
     if (!painted) return slot;
     const canvas = document.createElement('canvas');
-    if (kind === 'jacket' || kind === 'pants') drawWear(canvas, wearPanels(kind), wearOffsets(kind), wearCells(kind, slot), EDIT_HEXES, WEAR_PX, EMPTY);
+    if (kind === 'jacket' || kind === 'pants') drawWear(canvas, wearPanels(kind), wearOffsets(kind), wearCells(kind, slot), wearPalette(kind, slot), WEAR_PX, EMPTY);
     else paintGear(canvas, gear!, customGraphic(gear!, slot) ?? EMPTY_GRAPHIC);
     thumbs.push(canvas);
   }
