@@ -9,6 +9,7 @@ import { board, EDITOR_PAD_HINTS, EDITOR_PAD_KEYS, setHints, type Screen } from 
 import { signText } from './signText.ts';
 import { contentWidth, label, text, toolButton } from './skiEditor.ts';
 import { WearGrid } from './wearGrid.ts';
+import { menuPadY } from './phone.ts';
 
 // The garment editor (milestone 23 part 2), opened from a jacket's or the
 // pants' custom slot in the Locker: every square of the garment's low-poly
@@ -42,8 +43,6 @@ const UNDO_MAX = 60;
 /** Grid cell size in CSS pixels: as big as fits, within these. */
 const CELL_MAX = 20;
 const CELL_MIN = 6;
-/** The menu's padding above and below the sign (style.css .menu), px. */
-const MENU_PAD = 74;
 const BRUSHES = [1, 2, 3, 4] as const;
 const JUMP = 4;
 const MOVES: Partial<Record<string, readonly [number, number]>> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
@@ -621,7 +620,7 @@ export class WearEditorScreen implements Screen, StageWindow {
     // As wide as the bench, and no taller than the scrolling part can show at once (the rest of the bench under it too).
     const width = contentWidth(this.bench);
     const sign = this.el.firstElementChild?.getBoundingClientRect().height ?? 0;
-    const room = window.innerHeight - MENU_PAD - (sign - this.main.clientHeight) - (this.bench.getBoundingClientRect().height - this.grid.getBoundingClientRect().height);
+    const room = window.innerHeight - menuPadY(this.el) - (sign - this.main.clientHeight) - (this.bench.getBoundingClientRect().height - this.grid.getBoundingClientRect().height);
     this.cell = Math.max(CELL_MIN, Math.min(CELL_MAX, Math.floor(width / this.g.width), Math.floor(room / this.g.height)));
     this.grid.style.width = `${this.cell * this.g.width}px`;
     this.grid.style.height = `${this.cell * this.g.height}px`;
