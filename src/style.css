@@ -327,7 +327,8 @@ body {
 
 .menu[hidden],
 .menu-screen[hidden],
-.board-sub[hidden] {
+.board-sub[hidden],
+.plank[hidden] {
   display: none;
 }
 
